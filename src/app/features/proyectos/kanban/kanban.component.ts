@@ -1,12 +1,22 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth.service';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { AdjuntosPanelComponent } from '../../../shared/components/adjuntos-panel/adjuntos-panel.component';
+import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
+import { ConfiguracionAparienciaService } from '../../../shared/services/configuracion-apariencia.service';
+import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { ToastService } from '../../../shared/services/toast.service';
-import { ProyectoOpcion, TableroColumna } from '../tableros/tablero-columna.model';
+import { exportarCsv } from '../../../shared/utils/csv.util';
+import {
+  ProyectoOpcion,
+  TableroColumna,
+  TICKET_CAMPOS_CONFIGURABLES,
+  parsearConfiguracionCampos,
+  reglaCampo,
+} from '../tableros/tablero-columna.model';
 import { TicketTipo } from '../ticket-tipos/ticket-tipo.model';
 import { TicketPrioridad } from '../ticket-prioridades/ticket-prioridad.model';
 import {
@@ -48,7 +58,7 @@ type ClaseSla = 'sla-ok' | 'sla-warning' | 'sla-expired';
 @Component({
   selector: 'app-kanban',
   standalone: true,
-  imports: [ReactiveFormsModule, ConfirmDialogComponent, AdjuntosPanelComponent, DatePipe],
+  imports: [ReactiveFormsModule, ConfirmDialogComponent, AdjuntosPanelComponent, DatePipe, NgTemplateOutlet, DataTableComponent],
   templateUrl: './kanban.component.html',
   styleUrl: './kanban.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -58,6 +68,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
   private readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
+  private readonly configuracionApariencia = inject(ConfiguracionAparienciaService);
+  protected readonly preferenciasGrid = inject(PreferenciasGridService);
 
   protected readonly iniciales = iniciales;
   protected readonly colorAvatar = colorAvatar;
@@ -76,11 +88,14 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly tiposSolucion = signal<TicketTipoSolucionOpcion[]>([]);
   protected readonly usuarios = signal<UsuarioOpcion[]>([]);
 
+  /** 'tablero' (Kanban) o 'lista' (tabla) — recuerda la preferencia del usuario (Panel de Control › Apariencia). */
+  protected readonly modoVista = signal<'tablero' | 'lista'>(this.configuracionApariencia.vistaProyectosPreferida());
   protected readonly filtroTipoId = signal<number>(0);
   protected readonly filtroPrioridadId = signal<number>(0);
   protected readonly filtroAsignadoId = signal<number>(0);
+  protected readonly filtroTexto = signal('');
   protected readonly hayFiltros = computed(
-    () => !!(this.filtroTipoId() || this.filtroPrioridadId() || this.filtroAsignadoId()),
+    () => !!(this.filtroTipoId() || this.filtroPrioridadId() || this.filtroAsignadoId() || this.filtroTexto().trim()),
   );
 
   protected readonly modalAbierto = signal(false);
@@ -124,11 +139,13 @@ export class KanbanComponent implements OnInit, OnDestroy {
     const tipoId = this.filtroTipoId();
     const prioridadId = this.filtroPrioridadId();
     const asignadoId = this.filtroAsignadoId();
+    const texto = this.filtroTexto().trim().toLowerCase();
     return this.tickets().filter(
       (t) =>
         (!tipoId || Number(t.ticketTipoId) === tipoId) &&
         (!prioridadId || Number(t.ticketPrioridadId) === prioridadId) &&
-        (!asignadoId || Number(t.asignadoUsuarioId) === asignadoId),
+        (!asignadoId || Number(t.asignadoUsuarioId) === asignadoId) &&
+        (!texto || t.numeroTicket.toLowerCase().includes(texto) || t.titulo.toLowerCase().includes(texto)),
     );
   });
 
@@ -142,6 +159,31 @@ export class KanbanComponent implements OnInit, OnDestroy {
     }
     return mapa;
   });
+
+  /** Columnas de la vista de Lista (tabla) — alternativa al tablero Kanban, mismo estándar del resto del sistema. */
+  protected readonly columnasLista: ColumnaTabla<Ticket>[] = [
+    { campo: 'numeroTicket', etiqueta: 'Folio' },
+    { campo: 'titulo', etiqueta: 'Título' },
+    {
+      campo: 'ticketTipoId',
+      etiqueta: 'Tipo',
+      formatear: (fila) => `${this.iconoTipo(fila.ticketTipoId)} ${this.nombreTipo(fila.ticketTipoId)}`.trim(),
+    },
+    { campo: 'ticketPrioridadId', etiqueta: 'Prioridad', formatear: (fila) => this.nombrePrioridad(fila.ticketPrioridadId) },
+    {
+      campo: 'tableroColumnaId',
+      etiqueta: 'Estado',
+      formatear: (fila) => this.nombreColumna(fila.tableroColumnaId),
+      claseValor: () => 'grid-badge-neutral',
+    },
+    { campo: 'asignadoUsuarioId', etiqueta: 'Asignado a', formatear: (fila) => this.nombreUsuario(fila.asignadoUsuarioId) },
+    {
+      campo: 'fechaCreacion',
+      etiqueta: 'Vigencia',
+      formatear: (fila) => this.textoSla(fila) || '—',
+      claseValor: (fila) => this.claseBadgeSla(fila),
+    },
+  ];
 
   protected readonly form = this.fb.nonNullable.group({
     id: [0],
@@ -238,6 +280,37 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.filtroTipoId.set(0);
     this.filtroPrioridadId.set(0);
     this.filtroAsignadoId.set(0);
+    this.filtroTexto.set('');
+  }
+
+  cambiarModoVista(vista: 'tablero' | 'lista'): void {
+    this.modoVista.set(vista);
+    this.configuracionApariencia.cambiarVistaProyectos(vista);
+  }
+
+  exportarTicketsCsv(): void {
+    const filas = this.ticketsFiltrados().map((t) => ({
+      ...t,
+      tipoTexto: this.nombreTipo(t.ticketTipoId),
+      prioridadTexto: this.nombrePrioridad(t.ticketPrioridadId),
+      estadoTexto: this.nombreColumna(t.tableroColumnaId),
+      asignadoTexto: this.nombreUsuario(t.asignadoUsuarioId),
+      slaTexto: this.textoSla(t) || 'Sin vigencia',
+    }));
+
+    exportarCsv(
+      'tickets.csv',
+      [
+        { clave: 'numeroTicket', etiqueta: 'Folio' },
+        { clave: 'titulo', etiqueta: 'Título' },
+        { clave: 'tipoTexto', etiqueta: 'Tipo' },
+        { clave: 'prioridadTexto', etiqueta: 'Prioridad' },
+        { clave: 'estadoTexto', etiqueta: 'Estado' },
+        { clave: 'asignadoTexto', etiqueta: 'Asignado a' },
+        { clave: 'slaTexto', etiqueta: 'Vigencia' },
+      ],
+      filas,
+    );
   }
 
   columnaPorDefecto(): number {
@@ -290,6 +363,26 @@ export class KanbanComponent implements OnInit, OnDestroy {
     return `${proyecto?.clave ?? 'TCK'}-${String(siguiente).padStart(4, '0')}`;
   }
 
+  /** Aplica, sobre `this.form`, las reglas editable/obligatorio configuradas para
+   *  la columna actual (Gestión de Proyectos → Gestor de Estados → "⚙ Campos").
+   *  Se llama cada vez que se abre/actualiza el formulario (alta, detalle, tras
+   *  mover el ticket de columna). */
+  private aplicarConfiguracionCampos(): void {
+    const enEdicion = this.ticketEnEdicion();
+    const columnaId = enEdicion ? Number(enEdicion.tableroColumnaId) : this.columnaCreacionId();
+    const columna = this.columnasTablero().find((c) => Number(c.id) === Number(columnaId));
+    const config = parsearConfiguracionCampos(columna?.configuracionCamposJson);
+
+    for (const campo of TICKET_CAMPOS_CONFIGURABLES) {
+      const regla = reglaCampo(config, campo.clave);
+      const control = this.form.controls[campo.clave];
+      if (regla.editable) control.enable({ emitEvent: false });
+      else control.disable({ emitEvent: false });
+      control.setValidators(regla.obligatorio ? [Validators.required] : []);
+      control.updateValueAndValidity({ emitEvent: false });
+    }
+  }
+
   nuevoTicket(columnaId: number): void {
     this.ticketEnEdicion.set(null);
     this.columnaCreacionId.set(columnaId || this.columnaPorDefecto());
@@ -311,6 +404,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       fechaFinCliente: '',
       solucion: '',
     });
+    this.aplicarConfiguracionCampos();
     this.modalAbierto.set(true);
   }
 
@@ -455,6 +549,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
           fechaFinCliente: (completo.fechaFinCliente ?? '').slice(0, 10),
           solucion: completo.solucion ?? '',
         });
+        this.aplicarConfiguracionCampos();
         this.formComentario.reset({ texto: '' });
         this.formActividad.reset({ texto: '', tiempoMin: 15 });
         this.formEtiqueta.reset({ texto: '' });
@@ -476,6 +571,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       next: (completo) => {
         this.ticketActivo.set(completo);
         this.ticketEnEdicion.set(completo);
+        this.aplicarConfiguracionCampos();
         this.cargarDetalle(completo.id);
         this.ajustarTabSiNoPermitida();
       },
@@ -683,6 +779,15 @@ export class KanbanComponent implements OnInit, OnDestroy {
     const info = this.slaInfo(ticket);
     if (!info) return null;
     return info.isExpired ? 'sla-expired' : info.isWarning ? 'sla-warning' : 'sla-ok';
+  }
+
+  /** Mismo semáforo de `claseSla`, traducido a las clases `.grid-badge-*` que usa la vista de Lista. */
+  claseBadgeSla(ticket: Ticket): string {
+    const clase = this.claseSla(ticket);
+    if (clase === 'sla-expired') return 'grid-badge-danger';
+    if (clase === 'sla-warning') return 'grid-badge-warning';
+    if (clase === 'sla-ok') return 'grid-badge-success';
+    return 'grid-badge-muted';
   }
 
   textoSla(ticket: Ticket): string {

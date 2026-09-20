@@ -54,3 +54,21 @@
     </select>
   </div>
 </div>
+
+<div class="settings-card">
+  <h2 class="settings-card-title">🗂️ Gestión de Proyectos</h2>
+  <div class="toggle-row">
+    <div>
+      <p class="toggle-row-title">Vista por defecto</p>
+      <p class="hint" style="margin:2px 0 0;">Con qué vista se abre el módulo: tablero Kanban o lista de tickets.</p>
+    </div>
+    <select
+      class="pagesize-select"
+      [value]="vistaProyectosPreferida()"
+      (change)="cambiarVistaProyectos($any($event.target).value)"
+    >
+      <option value="tablero">Tablero Kanban</option>
+      <option value="lista">Lista de tickets</option>
+    </select>
+  </div>
+</div>

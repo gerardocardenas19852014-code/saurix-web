@@ -1,6 +1,23 @@
 <div class="page-header">
-  <h1>Tablero Kanban</h1>
+  <h1>{{ modoVista() === 'lista' ? 'Lista de tickets' : 'Tablero Kanban' }}</h1>
   <div class="page-actions">
+    <div class="tab-bar" style="margin: 0;">
+      <button type="button" class="tab-btn" [class.is-active]="modoVista() === 'tablero'" (click)="cambiarModoVista('tablero')">
+        ▦ Tablero
+      </button>
+      <button type="button" class="tab-btn" [class.is-active]="modoVista() === 'lista'" (click)="cambiarModoVista('lista')">
+        ☰ Lista
+      </button>
+    </div>
+    <button
+      type="button"
+      class="btn-secondary small toolbar-icon-button"
+      title="Exportar CSV"
+      aria-label="Exportar tickets a CSV"
+      (click)="exportarTicketsCsv()"
+    >
+      ⇩
+    </button>
     <button type="button" class="toolbar-btn" (click)="nuevoTicket(columnaPorDefecto())" [disabled]="!columnasTablero().length">
       + Nuevo ticket
     </button>
@@ -15,6 +32,16 @@
         <option [value]="proyecto.id">{{ proyecto.clave }} — {{ proyecto.nombre }}</option>
       }
     </select>
+  </label>
+
+  <label class="board-filter-field">
+    Buscar
+    <input
+      type="search"
+      placeholder="Folio o título…"
+      [value]="filtroTexto()"
+      (input)="filtroTexto.set($any($event.target).value)"
+    />
   </label>
 
   <label class="board-filter-field">
@@ -59,6 +86,14 @@
     <p>Este proyecto todavía no tiene columnas configuradas.</p>
     <p>Créalas en Gestión de Proyectos → Gestor de Estados.</p>
   </div>
+} @else if (modoVista() === 'lista') {
+  <app-data-table
+    [columnas]="columnasLista"
+    [filas]="ticketsFiltrados()"
+    [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+    (editar)="abrirDetalle($event)"
+    (eliminar)="pedirEliminarTicket($event)"
+  />
 } @else {
   <div class="kanban-board">
     @for (columna of columnasTablero(); track columna.id; let iColumna = $index) {
@@ -155,77 +190,110 @@
   </div>
 }
 
+<ng-template #camposTicket>
+  <label>
+    Folio
+    <input type="text" formControlName="numeroTicket" />
+  </label>
+  <label>
+    Folio interno
+    <input type="text" formControlName="folioInterno" />
+  </label>
+
+  <label class="full-span">
+    Título
+    <input type="text" formControlName="titulo" />
+  </label>
+
+  <label class="full-span">
+    Descripción
+    <textarea rows="3" formControlName="descripcion"></textarea>
+  </label>
+
+  <label>
+    Tipo
+    <select formControlName="ticketTipoId">
+      <option [ngValue]="0" disabled>Selecciona un tipo</option>
+      @for (tipo of tipos(); track tipo.id) {
+        <option [ngValue]="tipo.id">{{ tipo.icono }} {{ tipo.nombre }}</option>
+      }
+    </select>
+  </label>
+  <label>
+    Prioridad
+    <select formControlName="ticketPrioridadId">
+      <option [ngValue]="0" disabled>Selecciona una prioridad</option>
+      @for (prioridad of prioridades(); track prioridad.id) {
+        <option [ngValue]="prioridad.id">{{ prioridad.nombre }}</option>
+      }
+    </select>
+  </label>
+
+  <label>
+    Motivo de solución
+    <select formControlName="ticketTipoSolucionId">
+      <option [ngValue]="0">Sin definir</option>
+      @for (motivo of tiposSolucion(); track motivo.id) {
+        <option [ngValue]="motivo.id">{{ motivo.nombre }}</option>
+      }
+    </select>
+  </label>
+  <label>
+    Asignado a
+    <select formControlName="asignadoUsuarioId">
+      <option [ngValue]="0">Sin asignar</option>
+      @for (usuario of usuarios(); track usuario.id) {
+        <option [ngValue]="usuario.id">{{ usuario.nombreCompleto }}</option>
+      }
+    </select>
+  </label>
+
+  <label>
+    Reportado por
+    <select formControlName="reportadoPorUsuarioId">
+      <option [ngValue]="0" disabled>Selecciona quién reportó</option>
+      @for (usuario of usuarios(); track usuario.id) {
+        <option [ngValue]="usuario.id">{{ usuario.nombreCompleto }}</option>
+      }
+    </select>
+  </label>
+  <label>
+    Tiempo estimado (min)
+    <input type="number" formControlName="tiempoEstimadoMin" />
+  </label>
+
+  <label class="checkbox-inline">
+    <input type="checkbox" formControlName="planeado" />
+    Planeado
+  </label>
+  <span></span>
+
+  <label>
+    Fin análisis
+    <input type="date" formControlName="fechaFinAnalisis" />
+  </label>
+  <label>
+    Fin desarrollo
+    <input type="date" formControlName="fechaFinDesarrollo" />
+  </label>
+
+  <label class="full-span">
+    Fin cliente
+    <input type="date" formControlName="fechaFinCliente" />
+  </label>
+  <label class="full-span">
+    Solución
+    <textarea rows="3" formControlName="solucion"></textarea>
+  </label>
+</ng-template>
+
 @if (modalAbierto()) {
   <div class="modal-overlay show" (click)="modalAbierto.set(false)">
     <form class="modal-box" style="max-width: 640px;" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardarTicket()">
       <h3>Nuevo ticket</h3>
 
       <div class="edit-form form-grid-2col" style="margin-bottom: 18px;">
-        <label>
-          Folio
-          <input type="text" formControlName="numeroTicket" />
-        </label>
-        <label>
-          Folio interno
-          <input type="text" formControlName="folioInterno" />
-        </label>
-
-        <label class="full-span">
-          Título
-          <input type="text" formControlName="titulo" />
-        </label>
-
-        <label class="full-span">
-          Descripción
-          <textarea rows="3" formControlName="descripcion"></textarea>
-        </label>
-
-        <label>
-          Tipo
-          <select formControlName="ticketTipoId">
-            <option [ngValue]="0" disabled>Selecciona un tipo</option>
-            @for (tipo of tipos(); track tipo.id) {
-              <option [ngValue]="tipo.id">{{ tipo.icono }} {{ tipo.nombre }}</option>
-            }
-          </select>
-        </label>
-        <label>
-          Prioridad
-          <select formControlName="ticketPrioridadId">
-            <option [ngValue]="0" disabled>Selecciona una prioridad</option>
-            @for (prioridad of prioridades(); track prioridad.id) {
-              <option [ngValue]="prioridad.id">{{ prioridad.nombre }}</option>
-            }
-          </select>
-        </label>
-
-        <label>
-          Asignado a
-          <select formControlName="asignadoUsuarioId">
-            <option [ngValue]="0">Sin asignar</option>
-            @for (usuario of usuarios(); track usuario.id) {
-              <option [ngValue]="usuario.id">{{ usuario.nombreCompleto }}</option>
-            }
-          </select>
-        </label>
-        <label>
-          Reportado por
-          <select formControlName="reportadoPorUsuarioId">
-            <option [ngValue]="0" disabled>Selecciona quién reportó</option>
-            @for (usuario of usuarios(); track usuario.id) {
-              <option [ngValue]="usuario.id">{{ usuario.nombreCompleto }}</option>
-            }
-          </select>
-        </label>
-
-        <label>
-          Tiempo estimado (min)
-          <input type="number" formControlName="tiempoEstimadoMin" />
-        </label>
-        <label class="checkbox-inline">
-          <input type="checkbox" formControlName="planeado" />
-          Planeado
-        </label>
+        <ng-container *ngTemplateOutlet="camposTicket" />
       </div>
 
       <div class="modal-actions">
@@ -297,97 +365,7 @@
 
       @if (tabActiva() === 'detalles') {
         <form class="tab-panel edit-form form-grid-2col" [formGroup]="form" (ngSubmit)="guardarTicket()">
-          <label>
-            Folio
-            <input type="text" formControlName="numeroTicket" />
-          </label>
-          <label>
-            Folio interno
-            <input type="text" formControlName="folioInterno" />
-          </label>
-
-          <label class="full-span">
-            Título
-            <input type="text" formControlName="titulo" />
-          </label>
-
-          <label class="full-span">
-            Descripción
-            <textarea rows="3" formControlName="descripcion"></textarea>
-          </label>
-
-          <label>
-            Tipo
-            <select formControlName="ticketTipoId">
-              @for (tipo of tipos(); track tipo.id) {
-                <option [ngValue]="tipo.id">{{ tipo.icono }} {{ tipo.nombre }}</option>
-              }
-            </select>
-          </label>
-          <label>
-            Prioridad
-            <select formControlName="ticketPrioridadId">
-              @for (prioridad of prioridades(); track prioridad.id) {
-                <option [ngValue]="prioridad.id">{{ prioridad.nombre }}</option>
-              }
-            </select>
-          </label>
-
-          <label>
-            Motivo de solución
-            <select formControlName="ticketTipoSolucionId">
-              <option [ngValue]="0">Sin definir</option>
-              @for (motivo of tiposSolucion(); track motivo.id) {
-                <option [ngValue]="motivo.id">{{ motivo.nombre }}</option>
-              }
-            </select>
-          </label>
-          <label>
-            Asignado a
-            <select formControlName="asignadoUsuarioId">
-              <option [ngValue]="0">Sin asignar</option>
-              @for (usuario of usuarios(); track usuario.id) {
-                <option [ngValue]="usuario.id">{{ usuario.nombreCompleto }}</option>
-              }
-            </select>
-          </label>
-
-          <label>
-            Reportado por
-            <select formControlName="reportadoPorUsuarioId">
-              @for (usuario of usuarios(); track usuario.id) {
-                <option [ngValue]="usuario.id">{{ usuario.nombreCompleto }}</option>
-              }
-            </select>
-          </label>
-          <label>
-            Tiempo estimado (min)
-            <input type="number" formControlName="tiempoEstimadoMin" />
-          </label>
-
-          <label class="checkbox-inline">
-            <input type="checkbox" formControlName="planeado" />
-            Planeado
-          </label>
-          <span></span>
-
-          <label>
-            Fin análisis
-            <input type="date" formControlName="fechaFinAnalisis" />
-          </label>
-          <label>
-            Fin desarrollo
-            <input type="date" formControlName="fechaFinDesarrollo" />
-          </label>
-
-          <label class="full-span">
-            Fin cliente
-            <input type="date" formControlName="fechaFinCliente" />
-          </label>
-          <label class="full-span">
-            Solución
-            <textarea rows="3" formControlName="solucion"></textarea>
-          </label>
+          <ng-container *ngTemplateOutlet="camposTicket" />
 
           <div class="form-actions full-span">
             <button type="submit" class="btn-primary">Guardar cambios</button>

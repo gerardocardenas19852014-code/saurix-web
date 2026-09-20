@@ -37,6 +37,9 @@
         <div class="status-manager-actions">
           <button type="button" class="kanban-move-btn" (click)="moverOrden(columna, -1)" [disabled]="i === 0" title="Mover antes">▲</button>
           <button type="button" class="kanban-move-btn" (click)="moverOrden(columna, 1)" [disabled]="i === columnasTablero().length - 1" title="Mover después">▼</button>
+          <button type="button" class="btn-secondary small" (click)="abrirCampos(columna)" title="Configurar campos del ticket en esta columna">
+            ⚙ Campos
+          </button>
           <button type="button" class="btn-secondary small" (click)="editar(columna)">Editar</button>
           <button
             type="button"
@@ -93,6 +96,48 @@
         <button type="submit" class="btn-primary">Guardar</button>
       </div>
     </form>
+  </div>
+}
+
+@if (columnaCamposEnEdicion(); as columna) {
+  <div class="modal-overlay show" (click)="cerrarCampos()">
+    <div class="modal-box" style="max-width: 640px;" (click)="$event.stopPropagation()">
+      <h3>Campos del ticket — {{ columna.nombre }}</h3>
+      <p class="hint" style="margin: 0 0 16px;">
+        Decide qué campos del ticket se pueden editar y cuáles son obligatorios cuando el ticket está en esta columna.
+      </p>
+
+      <div class="edit-form form-grid-3col" style="margin-bottom: 4px; font-weight: 600;">
+        <span>Campo</span>
+        <span>Editable</span>
+        <span>Obligatorio</span>
+      </div>
+      @for (campo of camposConfigurables; track campo.clave) {
+        <div class="edit-form form-grid-3col" style="align-items: center; margin-bottom: 2px;">
+          <span>{{ campo.etiqueta }}</span>
+          <label class="checkbox-inline">
+            <input
+              type="checkbox"
+              [checked]="reglaDe(campo.clave).editable"
+              (change)="toggleEditable(campo.clave, $any($event.target).checked)"
+            />
+          </label>
+          <label class="checkbox-inline">
+            <input
+              type="checkbox"
+              [checked]="reglaDe(campo.clave).obligatorio"
+              [disabled]="!reglaDe(campo.clave).editable"
+              (change)="toggleObligatorio(campo.clave, $any($event.target).checked)"
+            />
+          </label>
+        </div>
+      }
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="cerrarCampos()">Cancelar</button>
+        <button type="button" class="btn-primary" (click)="guardarCampos()">Guardar</button>
+      </div>
+    </div>
   </div>
 }
 

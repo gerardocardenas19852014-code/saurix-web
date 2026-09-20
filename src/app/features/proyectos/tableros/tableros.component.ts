@@ -3,7 +3,16 @@ import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../../shared/services/toast.service';
-import { ProyectoOpcion, TableroColumna } from './tablero-columna.model';
+import {
+  CampoTicketConfigurable,
+  ConfiguracionCamposTicket,
+  ProyectoOpcion,
+  ReglaCampoTicket,
+  TICKET_CAMPOS_CONFIGURABLES,
+  TableroColumna,
+  parsearConfiguracionCampos,
+  reglaCampo,
+} from './tablero-columna.model';
 
 interface TicketOpcion {
   id: number;
@@ -49,6 +58,11 @@ export class TablerosComponent implements OnInit {
   protected readonly modalAbierto = signal(false);
   protected readonly columnaEnEdicion = signal<TableroColumna | null>(null);
   protected readonly columnaAEliminar = signal<TableroColumna | null>(null);
+
+  /** "⚙ Campos" — configura, por columna, qué campos del ticket son editables/obligatorios en esa etapa. */
+  protected readonly camposConfigurables = TICKET_CAMPOS_CONFIGURABLES;
+  protected readonly columnaCamposEnEdicion = signal<TableroColumna | null>(null);
+  protected readonly configuracionCamposEdit = signal<ConfiguracionCamposTicket>({});
 
   protected readonly form = this.fb.nonNullable.group({
     id: [0],
@@ -178,6 +192,47 @@ export class TablerosComponent implements OnInit {
       next: () => {
         this.toast.exito('Columna eliminada.');
         this.columnaAEliminar.set(null);
+        this.cargar();
+      },
+    });
+  }
+
+  // ---------------- "⚙ Campos" (ConfiguracionCamposJson por columna) ----------------
+
+  abrirCampos(columna: TableroColumna): void {
+    this.columnaCamposEnEdicion.set(columna);
+    this.configuracionCamposEdit.set(parsearConfiguracionCampos(columna.configuracionCamposJson));
+  }
+
+  cerrarCampos(): void {
+    this.columnaCamposEnEdicion.set(null);
+  }
+
+  reglaDe(campo: CampoTicketConfigurable): ReglaCampoTicket {
+    return reglaCampo(this.configuracionCamposEdit(), campo);
+  }
+
+  toggleEditable(campo: CampoTicketConfigurable, marcado: boolean): void {
+    this.configuracionCamposEdit.update((cfg) => {
+      const actual = reglaCampo(cfg, campo);
+      // Si se desmarca "editable", no tiene sentido dejarlo "obligatorio" a la vez.
+      return { ...cfg, [campo]: { editable: marcado, obligatorio: marcado ? actual.obligatorio : false } };
+    });
+  }
+
+  toggleObligatorio(campo: CampoTicketConfigurable, marcado: boolean): void {
+    this.configuracionCamposEdit.update((cfg) => ({ ...cfg, [campo]: { editable: true, obligatorio: marcado } }));
+  }
+
+  guardarCampos(): void {
+    const columna = this.columnaCamposEnEdicion();
+    if (!columna) return;
+
+    const configuracionCamposJson = JSON.stringify(this.configuracionCamposEdit());
+    this.data.modificacion<TableroColumna>('TableroColumna', { ...columna, configuracionCamposJson }).subscribe({
+      next: () => {
+        this.toast.exito('Configuración de campos guardada.');
+        this.cerrarCampos();
         this.cargar();
       },
     });

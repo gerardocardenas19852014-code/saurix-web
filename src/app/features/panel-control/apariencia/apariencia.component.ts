@@ -25,6 +25,7 @@ export class AparienciaComponent {
   protected readonly temas = TEMAS;
 
   protected readonly asistenteIaActivo = this.configuracionApariencia.asistenteIaActivo;
+  protected readonly vistaProyectosPreferida = this.configuracionApariencia.vistaProyectosPreferida;
 
   cambiarTema(tema: Tema): void {
     this.configuracionApariencia.cambiarTema(tema);
@@ -36,5 +37,9 @@ export class AparienciaComponent {
 
   cambiarTamanoPagina(valorTexto: string): void {
     this.configuracionApariencia.cambiarTamanoPagina(Number(valorTexto) || 10);
+  }
+
+  cambiarVistaProyectos(valorTexto: string): void {
+    this.configuracionApariencia.cambiarVistaProyectos(valorTexto === 'lista' ? 'lista' : 'tablero');
   }
 }

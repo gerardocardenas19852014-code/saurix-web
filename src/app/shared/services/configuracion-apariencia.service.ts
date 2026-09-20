@@ -7,6 +7,10 @@ import { Tema, ThemeService } from './theme.service';
 
 const ENTIDAD = 'ConfiguracionApariencia';
 const CLAVE_ASISTENTE_IA_LOCAL = 'saurix.asistenteIaActivo';
+const CLAVE_VISTA_PROYECTOS_LOCAL = 'saurix.vistaProyectosPreferida';
+
+/** Vista por defecto del módulo Gestión de Proyectos: tablero Kanban o tabla/lista de tickets. */
+export type VistaProyectos = 'tablero' | 'lista';
 
 /** Mismo contrato que usará PlataformaSaurix.ConfiguracionApariencia (1-1
  *  con Usuario: Tema, AsistenteIaActivo, TamanoPaginaGrid) cuando se
@@ -17,6 +21,9 @@ export interface ConfiguracionApariencia {
   tema: Tema;
   asistenteIaActivo: boolean;
   tamanoPaginaGrid: number;
+  /** Vista por defecto de Gestión de Proyectos (tablero/lista). Puede faltar en
+   *  registros guardados antes de que existiera este campo — tratar como 'tablero'. */
+  vistaProyectosPreferida?: VistaProyectos;
   fechaCreacion?: string;
   fechaModificacion?: string;
 }
@@ -40,6 +47,7 @@ export class ConfiguracionAparienciaService {
   private readonly preferenciasGrid = inject(PreferenciasGridService);
 
   readonly asistenteIaActivo = signal(this.leerAsistenteLocal());
+  readonly vistaProyectosPreferida = signal<VistaProyectos>(this.leerVistaLocal());
 
   private registroActual: ConfiguracionApariencia | null = null;
   private usuarioIdCargado: number | null = null;
@@ -61,12 +69,14 @@ export class ConfiguracionAparienciaService {
         this.theme.cambiar('claro');
         this.preferenciasGrid.cambiarTamanoPagina(10);
         this.asistenteIaActivo.set(true);
+        this.vistaProyectosPreferida.set('tablero');
         return;
       }
 
       this.theme.cambiar(registro.tema);
       this.preferenciasGrid.cambiarTamanoPagina(registro.tamanoPaginaGrid);
       this.asistenteIaActivo.set(registro.asistenteIaActivo);
+      this.vistaProyectosPreferida.set(registro.vistaProyectosPreferida ?? 'tablero');
     } catch {
       /* Sin datos disponibles todavía; se queda con lo que había localmente. */
     }
@@ -92,7 +102,19 @@ export class ConfiguracionAparienciaService {
     this.guardar({ tamanoPaginaGrid: valor });
   }
 
-  private guardar(cambios: Partial<Pick<ConfiguracionApariencia, 'tema' | 'asistenteIaActivo' | 'tamanoPaginaGrid'>>): void {
+  cambiarVistaProyectos(vista: VistaProyectos): void {
+    this.vistaProyectosPreferida.set(vista);
+    try {
+      localStorage.setItem(CLAVE_VISTA_PROYECTOS_LOCAL, vista);
+    } catch {
+      /* localStorage no disponible; se ignora */
+    }
+    this.guardar({ vistaProyectosPreferida: vista });
+  }
+
+  private guardar(
+    cambios: Partial<Pick<ConfiguracionApariencia, 'tema' | 'asistenteIaActivo' | 'tamanoPaginaGrid' | 'vistaProyectosPreferida'>>,
+  ): void {
     const usuarioId = this.auth.usuarioActual()?.id;
     if (!usuarioId) return;
 
@@ -101,6 +123,7 @@ export class ConfiguracionAparienciaService {
       tema: this.registroActual?.tema ?? this.theme.tema(),
       asistenteIaActivo: this.registroActual?.asistenteIaActivo ?? this.asistenteIaActivo(),
       tamanoPaginaGrid: this.registroActual?.tamanoPaginaGrid ?? this.preferenciasGrid.tamanoPagina(),
+      vistaProyectosPreferida: this.registroActual?.vistaProyectosPreferida ?? this.vistaProyectosPreferida(),
       ...cambios,
     };
 
@@ -117,6 +140,14 @@ export class ConfiguracionAparienciaService {
       return valor === null ? true : valor === 'true';
     } catch {
       return true;
+    }
+  }
+
+  private leerVistaLocal(): VistaProyectos {
+    try {
+      return localStorage.getItem(CLAVE_VISTA_PROYECTOS_LOCAL) === 'lista' ? 'lista' : 'tablero';
+    } catch {
+      return 'tablero';
     }
   }
 }
