@@ -163,7 +163,11 @@ export class TablerosComponent implements OnInit {
     });
   }
 
-  /** Intercambia el `orden` de una columna con el de su vecina (▲ -1 / ▼ +1) y recarga. */
+  /** Intercambia el `orden` de una columna con el de su vecina (▲ -1 / ▼ +1) y recarga.
+   *  Son dos escrituras independientes (el motor de datos no tiene transacciones) — si la
+   *  segunda falla después de que la primera ya se aplicó, las dos columnas quedarían con
+   *  el mismo `orden`; por eso ambas tienen manejo de error, que avisa y recarga para que la
+   *  lista siempre refleje el estado real de la base en vez de quedarse con datos viejos. */
   moverOrden(columna: TableroColumna, direccion: -1 | 1): void {
     const columnas = this.columnasTablero();
     const indiceActual = columnas.findIndex((c) => c.id === columna.id);
@@ -171,16 +175,32 @@ export class TablerosComponent implements OnInit {
     if (indiceActual === -1 || indiceDestino < 0 || indiceDestino >= columnas.length) return;
 
     const vecina = columnas[indiceDestino];
+    const avisarErrorYRecargar = () => {
+      this.toast.error('No se pudo reordenar la columna. Intenta de nuevo.');
+      this.cargar();
+    };
     this.data.modificacion<TableroColumna>('TableroColumna', { ...columna, orden: vecina.orden }).subscribe({
       next: () => {
         this.data.modificacion<TableroColumna>('TableroColumna', { ...vecina, orden: columna.orden }).subscribe({
           next: () => this.cargar(),
+          error: avisarErrorYRecargar,
         });
       },
+      error: avisarErrorYRecargar,
     });
   }
 
   pedirEliminar(columna: TableroColumna): void {
+    // IndexedDB no valida integridad referencial: si se borra una columna con
+    // tickets adentro, esos tickets quedan con un tableroColumnaId que ya no
+    // existe y desaparecen del tablero (y de cualquier otra vista) sin aviso.
+    const enUso = this.conteoPorColumna().get(columna.id) ?? 0;
+    if (enUso > 0) {
+      this.toast.advertencia(
+        `No se puede eliminar: hay ${enUso} ticket${enUso === 1 ? '' : 's'} en esta columna. Muévelos primero a otro estado.`,
+      );
+      return;
+    }
     this.columnaAEliminar.set(columna);
   }
 

@@ -47,12 +47,11 @@ type TabDetalle =
 type ClaseSla = 'sla-ok' | 'sla-warning' | 'sla-expired';
 
 /**
- * Tablero Kanban por proyecto. Arrastrar y soltar (drag & drop nativo HTML5)
- * es la forma principal de mover un ticket entre columnas; los botones
- * "◀ ▶" de cada tarjeta son el respaldo confiable (útil en móvil o si el
- * navegador no soporta drag & drop). Ambos caminos —y también el selector
- * de estado dentro del detalle— terminan llamando a `moverTicketAColumna`,
- * el único punto que persiste el cambio de columna.
+ * Tablero Kanban por proyecto. El único lugar desde donde se cambia de estado
+ * es la barra de estado del detalle del ticket ("Aceptar"/"◀ Regresar"), que
+ * exige haber registrado antes una actividad en la columna actual — ver
+ * `mover()`. Ambos botones terminan llamando a `moverTicketAColumna`, el único
+ * punto que persiste el cambio de columna.
  */
 @Component({
   selector: 'app-kanban',
@@ -93,6 +92,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly filtroPrioridadId = signal<number>(0);
   protected readonly filtroAsignadoId = signal<number>(0);
   protected readonly filtroTexto = signal('');
+  /** false por defecto: los tickets archivados (activo === false) se ocultan del
+   *  tablero/lista salvo que se marque esta casilla — alternativa al borrado duro. */
+  protected readonly mostrarInactivos = signal(false);
   protected readonly hayFiltros = computed(
     () => !!(this.filtroTipoId() || this.filtroPrioridadId() || this.filtroAsignadoId() || this.filtroTexto().trim()),
   );
@@ -153,8 +155,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
     const prioridadId = this.filtroPrioridadId();
     const asignadoId = this.filtroAsignadoId();
     const texto = this.filtroTexto().trim().toLowerCase();
+    const conInactivos = this.mostrarInactivos();
     return this.tickets().filter(
       (t) =>
+        (conInactivos || t.activo !== false) &&
         (!tipoId || Number(t.ticketTipoId) === tipoId) &&
         (!prioridadId || Number(t.ticketPrioridadId) === prioridadId) &&
         (!asignadoId || Number(t.asignadoUsuarioId) === asignadoId) &&
@@ -248,12 +252,15 @@ export class KanbanComponent implements OnInit, OnDestroy {
     fechaFinDesarrollo: [''],
     fechaFinCliente: [''],
     solucion: [''],
+    activo: [true],
   });
 
   protected readonly formComentario = this.fb.nonNullable.group({ texto: ['', Validators.required] });
   protected readonly formActividad = this.fb.nonNullable.group({
     texto: ['', Validators.required],
-    tiempoMin: [15, Validators.required],
+    // Mínimo 1: un 0 (o negativo) se cuela como "actividad válida" para la regla de
+    // actividad-obligatoria de mover(), pero infla en cero los totales de Reportes de horas.
+    tiempoMin: [15, [Validators.required, Validators.min(1)]],
   });
   protected readonly formEtiqueta = this.fb.nonNullable.group({ texto: ['', Validators.required] });
   protected readonly formAsociado = this.fb.nonNullable.group({ ticketRelacionadoId: [0] });
@@ -478,6 +485,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       fechaFinDesarrollo: '',
       fechaFinCliente: '',
       solucion: '',
+      activo: true,
     });
     this.aplicarConfiguracionCampos();
     this.modalAbierto.set(true);
@@ -501,6 +509,19 @@ export class KanbanComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // El folio es libre y siempre editable — sin este chequeo, dos tickets del
+    // mismo proyecto podrían terminar con el mismo folio (o alguien podría
+    // "robarle" el folio a otro ticket ya existente al editar el suyo).
+    const folioDuplicado = this.tickets().some(
+      (t) =>
+        t.numeroTicket.trim().toLowerCase() === valor.numeroTicket.trim().toLowerCase() &&
+        Number(t.id) !== Number(valor.id),
+    );
+    if (folioDuplicado) {
+      this.toast.advertencia(`Ya existe un ticket con el folio "${valor.numeroTicket}" en este proyecto.`);
+      return;
+    }
+
     const payload = {
       id: valor.id,
       proyectoId: this.proyectoSeleccionadoId(),
@@ -519,6 +540,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       fechaFinDesarrollo: valor.fechaFinDesarrollo || null,
       fechaFinCliente: valor.fechaFinCliente || null,
       solucion: valor.solucion || null,
+      activo: valor.activo,
     };
 
     const esEdicion = enEdicion !== null;
@@ -651,6 +673,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
           fechaFinDesarrollo: (completo.fechaFinDesarrollo ?? '').slice(0, 10),
           fechaFinCliente: (completo.fechaFinCliente ?? '').slice(0, 10),
           solucion: completo.solucion ?? '',
+          activo: completo.activo ?? true,
         });
         this.aplicarConfiguracionCampos();
         this.formComentario.reset({ texto: '' });

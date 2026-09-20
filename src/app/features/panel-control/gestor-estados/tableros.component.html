@@ -38,9 +38,9 @@
         <span class="status-manager-name">{{ columna.nombre }}</span>
         <span class="status-manager-count">{{ conteoPorColumna().get(columna.id) ?? 0 }} ticket{{ (conteoPorColumna().get(columna.id) ?? 0) === 1 ? '' : 's' }}</span>
         <div class="status-manager-actions">
-          <button type="button" class="kanban-move-btn" (click)="moverOrden(columna, -1)" [disabled]="i === 0" title="Mover antes">▲</button>
-          <button type="button" class="kanban-move-btn" (click)="moverOrden(columna, 1)" [disabled]="i === columnasTablero().length - 1" title="Mover después">▼</button>
-          <button type="button" class="btn-secondary small" (click)="abrirCampos(columna)" title="Configurar campos del ticket en esta columna">
+          <button type="button" class="kanban-move-btn" (click)="moverOrden(columna, -1)" [disabled]="i === 0" title="Mover antes" aria-label="Mover columna antes">▲</button>
+          <button type="button" class="kanban-move-btn" (click)="moverOrden(columna, 1)" [disabled]="i === columnasTablero().length - 1" title="Mover después" aria-label="Mover columna después">▼</button>
+          <button type="button" class="btn-secondary small" (click)="abrirCampos(columna)" title="Configurar campos del ticket en esta columna" aria-label="Configurar campos del ticket en esta columna">
             ⚙ Campos
           </button>
           <button type="button" class="btn-secondary small" (click)="editar(columna)">Editar</button>
@@ -48,8 +48,14 @@
             type="button"
             class="btn-danger small"
             (click)="pedirEliminar(columna)"
-            [disabled]="columnasTablero().length <= 1"
-            [title]="columnasTablero().length <= 1 ? 'Debe quedar al menos un estado' : ''"
+            [disabled]="columnasTablero().length <= 1 || (conteoPorColumna().get(columna.id) ?? 0) > 0"
+            [title]="
+              columnasTablero().length <= 1
+                ? 'Debe quedar al menos un estado'
+                : (conteoPorColumna().get(columna.id) ?? 0) > 0
+                  ? 'Mueve los tickets de esta columna antes de eliminarla'
+                  : ''
+            "
           >
             Eliminar
           </button>

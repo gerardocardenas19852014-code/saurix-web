@@ -286,6 +286,13 @@ html[data-wide='grid'] .content { max-width: 1600px; }
   padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 14px;
   color: var(--text-strong); background: var(--paper-raised); width: 100%; min-width: 0; box-sizing: border-box;
 }
+// Variante del filtro para una casilla (p.ej. "Mostrar inactivos"): en vez de
+// apilar el texto arriba del control (como .board-filter-field normal), se
+// muestran en fila para alinearse con la altura de los <select>/<input> vecinos.
+.board-filter-field.board-filter-checkbox {
+  flex-direction: row; align-items: center; gap: 8px; flex: 0 0 auto; white-space: nowrap;
+}
+.board-filter-field.board-filter-checkbox input[type='checkbox'] { width: auto; }
 .kanban-board { display: flex; gap: 18px; overflow-x: auto; padding-bottom: 8px; align-items: flex-start; }
 .kanban-column {
   flex: 1 1 300px; min-width: 300px; max-width: 400px; background: var(--paper-raised);

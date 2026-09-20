@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DataClientService } from '../../../core/services/data-client.service';
+import { exportarCsv } from '../../../shared/utils/csv.util';
 import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
 import { colorAvatar } from '../kanban/avatar.util';
 import { Ticket, TicketActividad } from '../kanban/ticket.model';
@@ -181,4 +182,39 @@ export class ReportesHorasComponent implements OnInit {
   protected readonly maxUsuario = computed(() => Math.max(1, ...this.horasPorUsuario().map((f) => f.minutos)));
   protected readonly maxProyecto = computed(() => Math.max(1, ...this.horasPorProyecto().map((f) => f.minutos)));
   protected readonly maxTicket = computed(() => Math.max(1, ...this.horasPorTicket().map((f) => f.minutos)));
+
+  private nombreUsuarioDe(id: number | null): string {
+    if (!id) return 'Sin usuario';
+    const usuario = this.usuarios().find((u) => Number(u.id) === Number(id));
+    return usuario ? nombreCompletoUsuario(usuario) : 'Sin usuario';
+  }
+
+  /** Exporta el detalle (no solo los agrupados) de las actividades del periodo/proyecto
+   *  filtrado — mismo patrón que el CSV de Kanban/Dashboard, vía shared/utils/csv.util. */
+  exportarActividadesCsv(): void {
+    const filas = this.actividadesFiltradas().map((a) => {
+      const ticket = this.ticketDe(a.ticketId);
+      return {
+        fecha: a.fechaCreacion ? new Date(a.fechaCreacion).toLocaleString('es-MX') : '',
+        folio: ticket ? `#${ticket.numeroTicket}` : '—',
+        ticket: ticket ? ticket.titulo : 'Ticket eliminado',
+        usuario: this.nombreUsuarioDe(a.creadoPor),
+        minutos: a.tiempoMin,
+        descripcion: a.texto,
+      };
+    });
+
+    exportarCsv(
+      `horas-${this.periodo()}.csv`,
+      [
+        { clave: 'fecha', etiqueta: 'Fecha' },
+        { clave: 'folio', etiqueta: 'Folio' },
+        { clave: 'ticket', etiqueta: 'Ticket' },
+        { clave: 'usuario', etiqueta: 'Usuario' },
+        { clave: 'minutos', etiqueta: 'Minutos' },
+        { clave: 'descripcion', etiqueta: 'Descripción' },
+      ],
+      filas,
+    );
+  }
 }

@@ -99,7 +99,18 @@ export class TicketTiposComponent implements OnInit {
   }
 
   pedirEliminar(tipo: TicketTipo): void {
-    this.tipoAEliminar.set(tipo);
+    // Si se borra un Tipo que algún ticket todavía usa, ese ticket se queda con un
+    // ticketTipoId que ya no existe en ningún catálogo — nombreTipo() no lo encuentra
+    // y el ticket pierde su tipo silenciosamente en todas las vistas (tablero, dashboard, CSV).
+    this.data.list<{ id: number }>('Ticket', { ticketTipoId: tipo.id }).subscribe((tickets) => {
+      if (tickets.length > 0) {
+        this.toast.advertencia(
+          `No se puede eliminar: ${tickets.length} ticket${tickets.length === 1 ? '' : 's'} usa${tickets.length === 1 ? '' : 'n'} este tipo.`,
+        );
+        return;
+      }
+      this.tipoAEliminar.set(tipo);
+    });
   }
 
   confirmarEliminar(): void {

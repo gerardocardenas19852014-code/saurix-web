@@ -74,6 +74,15 @@
     </select>
   </label>
 
+  <label class="board-filter-field board-filter-checkbox">
+    <input
+      type="checkbox"
+      [checked]="mostrarInactivos()"
+      (change)="mostrarInactivos.set($any($event.target).checked)"
+    />
+    Mostrar inactivos
+  </label>
+
   @if (hayFiltros()) {
     <button type="button" class="btn-secondary small" (click)="limpiarFiltros()">✕ Limpiar filtros</button>
   }
@@ -115,7 +124,15 @@
                 ></span>
               </div>
 
-              <p class="kanban-card-title" (click)="abrirDetalle(ticket)">
+              <p
+                class="kanban-card-title"
+                role="button"
+                tabindex="0"
+                [attr.aria-label]="'Abrir ticket ' + ticket.titulo"
+                (click)="abrirDetalle(ticket)"
+                (keydown.enter)="abrirDetalle(ticket)"
+                (keydown.space)="$event.preventDefault(); abrirDetalle(ticket)"
+              >
                 {{ iconoTipo(ticket.ticketTipoId) }} {{ ticket.titulo }}
               </p>
 
@@ -247,6 +264,10 @@
           <label class="checkbox-inline">
             <input type="checkbox" formControlName="planeado" />
             Planeado
+          </label>
+          <label class="checkbox-inline">
+            <input type="checkbox" formControlName="activo" />
+            Activo
           </label>
       </div>
 
@@ -416,6 +437,10 @@
             <input type="checkbox" formControlName="planeado" />
             Planeado
           </label>
+          <label class="checkbox-inline">
+            <input type="checkbox" formControlName="activo" />
+            Activo
+          </label>
 
           <div class="form-actions full-span">
             <button type="submit" class="btn-primary">Guardar cambios</button>
@@ -440,7 +465,7 @@
               </label>
               <label>
                 Minutos
-                <input type="number" formControlName="tiempoMin" />
+                <input type="number" min="1" formControlName="tiempoMin" />
               </label>
               <div class="form-actions">
                 <button type="submit" class="btn-secondary">+ Registrar</button>
@@ -529,7 +554,7 @@
                       #{{ ticketPorId(dependencia.ticketRelacionadoId)?.numeroTicket ?? '—' }} —
                       {{ ticketPorId(dependencia.ticketRelacionadoId)?.titulo ?? 'Ticket eliminado' }}
                     </span>
-                    <button type="button" class="btn-danger small" (click)="eliminarAsociado(dependencia)">✕</button>
+                    <button type="button" class="btn-danger small" aria-label="Quitar ticket asociado" title="Quitar ticket asociado" (click)="eliminarAsociado(dependencia)">✕</button>
                   </div>
                 </li>
               }

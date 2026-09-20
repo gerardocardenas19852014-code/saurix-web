@@ -77,7 +77,15 @@
         </thead>
         <tbody>
           @for (r of pendientesOrdenados(); track r.ticket.id) {
-            <tr class="dashboard-row" (click)="abrirTicket(r.ticket)">
+            <tr
+              class="dashboard-row"
+              role="button"
+              tabindex="0"
+              [attr.aria-label]="'Abrir ticket ' + r.ticket.titulo"
+              (click)="abrirTicket(r.ticket)"
+              (keydown.enter)="abrirTicket(r.ticket)"
+              (keydown.space)="$event.preventDefault(); abrirTicket(r.ticket)"
+            >
               <td data-label="Folio">#{{ r.ticket.numeroTicket }}</td>
               <td data-label="Título">{{ r.ticket.titulo }}</td>
               <td data-label="Proyecto">{{ r.proyectoClave }} — {{ r.proyectoNombre }}</td>
@@ -116,7 +124,15 @@
         </thead>
         <tbody>
           @for (r of resueltosMostrados(); track r.ticket.id) {
-            <tr class="dashboard-row" (click)="abrirTicket(r.ticket)">
+            <tr
+              class="dashboard-row"
+              role="button"
+              tabindex="0"
+              [attr.aria-label]="'Abrir ticket ' + r.ticket.titulo"
+              (click)="abrirTicket(r.ticket)"
+              (keydown.enter)="abrirTicket(r.ticket)"
+              (keydown.space)="$event.preventDefault(); abrirTicket(r.ticket)"
+            >
               <td data-label="Folio">#{{ r.ticket.numeroTicket }}</td>
               <td data-label="Título">{{ r.ticket.titulo }}</td>
               <td data-label="Proyecto">{{ r.proyectoClave }} — {{ r.proyectoNombre }}</td>
@@ -139,7 +155,15 @@
   } @else {
     <ul class="actividades-list">
       @for (r of ticketsQueSigo(); track r.ticket.id) {
-        <li class="actividad-item dashboard-row" (click)="abrirTicket(r.ticket)">
+        <li
+          class="actividad-item dashboard-row"
+          role="button"
+          tabindex="0"
+          [attr.aria-label]="'Abrir ticket ' + r.ticket.titulo"
+          (click)="abrirTicket(r.ticket)"
+          (keydown.enter)="abrirTicket(r.ticket)"
+          (keydown.space)="$event.preventDefault(); abrirTicket(r.ticket)"
+        >
           <div class="actividad-item-head">
             <span class="tag">#{{ r.ticket.numeroTicket }}</span>
             @if (r.clase) {

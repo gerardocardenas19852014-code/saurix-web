@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { forkJoin, of, switchMap } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../../shared/services/toast.service';
@@ -38,8 +39,10 @@ export class TicketPrioridadesComponent implements OnInit {
     nombre: ['', Validators.required],
     clave: ['', Validators.required],
     codigoHex: ['#ff4f4f', Validators.required],
-    vigenciaHoras: [24, Validators.required],
-    avisoHoras: [4, Validators.required],
+    // Mínimo 1: con 0 o negativos, el "deadline" del ticket queda en el pasado
+    // desde el instante en que se crea (siempre se ve "🔥 Vencido").
+    vigenciaHoras: [24, [Validators.required, Validators.min(1)]],
+    avisoHoras: [4, [Validators.required, Validators.min(1)]],
   });
 
   ngOnInit(): void {
@@ -153,19 +156,41 @@ export class TicketPrioridadesComponent implements OnInit {
   }
 
   pedirEliminar(prioridad: TicketPrioridad): void {
-    this.prioridadAEliminar.set(prioridad);
+    // Si se borra una Prioridad que algún ticket todavía usa, ese ticket pierde
+    // silenciosamente su badge de vigencia (slaInfo() ya no encuentra la prioridad
+    // y deja de calcular el "Vencido/Por vencer"), sin ningún aviso.
+    this.data.list<{ id: number }>('Ticket', { ticketPrioridadId: prioridad.id }).subscribe((tickets) => {
+      if (tickets.length > 0) {
+        this.toast.advertencia(
+          `No se puede eliminar: ${tickets.length} ticket${tickets.length === 1 ? '' : 's'} usa${tickets.length === 1 ? '' : 'n'} esta prioridad.`,
+        );
+        return;
+      }
+      this.prioridadAEliminar.set(prioridad);
+    });
   }
 
   confirmarEliminar(): void {
     const prioridad = this.prioridadAEliminar();
     if (!prioridad) return;
 
-    this.data.baja('TicketPrioridad', prioridad.id).subscribe({
-      next: () => {
-        this.toast.exito('Prioridad eliminada.');
-        this.prioridadAEliminar.set(null);
-        this.cargar();
-      },
-    });
+    // Limpia también sus propias TicketPrioridadNotificar (a quién avisar) —
+    // si no, quedan huérfanas en la base sin ninguna prioridad a la que pertenecer.
+    this.data
+      .list<TicketPrioridadNotificar>('TicketPrioridadNotificar', { ticketPrioridadId: prioridad.id })
+      .pipe(
+        switchMap((notificaciones) => {
+          const bajas = notificaciones.map((n) => this.data.baja('TicketPrioridadNotificar', n.id));
+          return bajas.length ? forkJoin(bajas) : of(null);
+        }),
+        switchMap(() => this.data.baja('TicketPrioridad', prioridad.id)),
+      )
+      .subscribe({
+        next: () => {
+          this.toast.exito('Prioridad eliminada.');
+          this.prioridadAEliminar.set(null);
+          this.cargar();
+        },
+      });
   }
 }
