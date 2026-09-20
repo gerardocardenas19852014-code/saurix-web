@@ -264,7 +264,6 @@
       <div class="page-header" style="margin-bottom: 12px;">
         <h3>#{{ activo.numeroTicket }} — {{ activo.titulo }}</h3>
         <div class="page-actions">
-          <button type="button" class="btn-danger small" (click)="pedirEliminarTicket(activo)">Eliminar</button>
           <button type="button" class="btn-secondary small" (click)="cerrarDetalle()">Cerrar</button>
         </div>
       </div>
@@ -420,6 +419,7 @@
 
           <div class="form-actions full-span">
             <button type="submit" class="btn-primary">Guardar cambios</button>
+            <button type="button" class="btn-danger" (click)="pedirEliminarTicket(activo)">Eliminar ticket</button>
           </div>
         </form>
       }
