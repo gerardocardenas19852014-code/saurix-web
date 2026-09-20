@@ -156,7 +156,13 @@ export class KanbanComponent implements OnInit, OnDestroy {
     const tipoId = this.filtroTipoId();
     const prioridadId = this.filtroPrioridadId();
     const asignadoId = this.filtroAsignadoId();
-    const texto = this.filtroTexto().trim().toLowerCase();
+    // Admite varios folios separados por coma (p.ej. "55350,55182"): cada término
+    // se busca por separado (OR entre términos, igual que antes OR entre campos).
+    const terminos = this.filtroTexto()
+      .toLowerCase()
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
     const conInactivos = this.mostrarInactivos();
     return this.tickets().filter(
       (t) =>
@@ -164,10 +170,13 @@ export class KanbanComponent implements OnInit, OnDestroy {
         (!tipoId || Number(t.ticketTipoId) === tipoId) &&
         (!prioridadId || Number(t.ticketPrioridadId) === prioridadId) &&
         (!asignadoId || Number(t.asignadoUsuarioId) === asignadoId) &&
-        (!texto ||
-          t.numeroTicket.toLowerCase().includes(texto) ||
-          (t.folioInterno ?? '').toLowerCase().includes(texto) ||
-          t.titulo.toLowerCase().includes(texto)),
+        (!terminos.length ||
+          terminos.some(
+            (termino) =>
+              t.numeroTicket.toLowerCase().includes(termino) ||
+              (t.folioInterno ?? '').toLowerCase().includes(termino) ||
+              t.titulo.toLowerCase().includes(termino),
+          )),
     );
   });
 
