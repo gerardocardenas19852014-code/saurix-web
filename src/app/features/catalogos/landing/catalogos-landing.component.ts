@@ -15,11 +15,11 @@ interface EnlaceCatalogo {
 const GRUPO_ICONOS: Record<string, string> = {
   General: '🧩',
   'Presupuesto Personal': '💰',
+  'Gestión de Proyectos': '📋',
 };
 
 // Los catálogos de WikiDocs (Tipo de sistema, Categoría, Secciones) viven
-// dentro del propio módulo WikiDocs (misma idea que los catálogos de
-// Proyectos, que tampoco aparecen en esta lista genérica).
+// dentro del propio módulo WikiDocs.
 const CATALOGOS: EnlaceCatalogo[] = [
   {
     ruta: 'listas-valores',
@@ -44,6 +44,30 @@ const CATALOGOS: EnlaceCatalogo[] = [
     titulo: 'Cuentas de presupuesto',
     descripcion: 'Efectivo, banco, tarjeta y ahorro; para tarjetas incluye límite y fechas de corte/pago.',
     grupo: 'Presupuesto Personal',
+  },
+  {
+    ruta: 'tipos-ticket',
+    icono: '🏳️',
+    color: 'generic',
+    titulo: 'Tipos de ticket',
+    descripcion: 'Clasificación de tickets (incidencia, requerimiento, mejora, etc.) del módulo de Gestión de Proyectos.',
+    grupo: 'Gestión de Proyectos',
+  },
+  {
+    ruta: 'prioridades',
+    icono: '🚦',
+    color: 'generic',
+    titulo: 'Prioridades',
+    descripcion: 'Niveles de prioridad de ticket con su SLA (vigencia y aviso en horas) y usuarios a notificar.',
+    grupo: 'Gestión de Proyectos',
+  },
+  {
+    ruta: 'motivos-solucion',
+    icono: '✅',
+    color: 'generic',
+    titulo: 'Motivos de solución',
+    descripcion: 'Catálogo de motivos con los que se cierra un ticket.',
+    grupo: 'Gestión de Proyectos',
   },
 ];
 

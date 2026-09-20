@@ -9,9 +9,8 @@ export const CATALOGOS_ROUTES: Routes = [
 
   // Los catálogos de WikiDocs (Tipo de sistema, Categoría, Secciones) se
   // movieron por completo a features/wikidocs (jerarquía real
-  // TipoSistema→Categoria→Sección, con FK padre obligatorio) — mismo
-  // criterio que los catálogos de Proyectos, que viven solo en su propio
-  // módulo y no aquí.
+  // TipoSistema→Categoria→Sección, con FK padre obligatorio) y viven solo
+  // en su propio módulo, no aquí.
 
   // Catálogos de Presupuesto Personal (compartidos entre todos los usuarios).
   {
@@ -31,5 +30,34 @@ export const CATALOGOS_ROUTES: Routes = [
     path: 'cuentas-presupuesto',
     loadComponent: () =>
       import('./cuenta-presupuesto/cuenta-presupuesto-list.component').then((m) => m.CuentaPresupuestoListComponent),
+  },
+
+  // Catálogos de Gestión de Proyectos (los administra el mismo Catálogos
+  // general; el modelo de datos de cada uno sigue viviendo en su módulo de
+  // origen, dentro de features/proyectos, ya que las pantallas del propio
+  // módulo de Gestión de Proyectos también lo usan).
+  {
+    path: 'tipos-ticket',
+    loadComponent: () =>
+      import('./ticket-tipos/ticket-tipos.component').then((m) => m.TicketTiposComponent),
+  },
+  {
+    path: 'prioridades',
+    loadComponent: () =>
+      import('./ticket-prioridades/ticket-prioridades.component').then((m) => m.TicketPrioridadesComponent),
+  },
+  {
+    path: 'motivos-solucion',
+    loadComponent: () =>
+      import('../../shared/components/catalogo-simple/catalogo-simple.component').then(
+        (m) => m.CatalogoSimpleComponent,
+      ),
+    data: {
+      config: {
+        entidad: 'TicketTipoSolucion',
+        tituloPlural: 'Motivos de Solución',
+        tituloSingular: 'Motivo de Solución',
+      },
+    },
   },
 ];

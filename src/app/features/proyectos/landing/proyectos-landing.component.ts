@@ -17,6 +17,10 @@ interface GrupoModulo {
   enlaces: EnlaceModulo[];
 }
 
+// Los catálogos propios de este módulo (Tipos de Ticket, Prioridades,
+// Motivos de Solución) y el Gestor de Estados de columnas se administran
+// ahora desde Catálogos y Panel de Control respectivamente — mismo dato,
+// una sola pantalla de administración, para no duplicar mantenimiento.
 const GRUPOS: GrupoModulo[] = [
   {
     titulo: 'Proyectos',
@@ -35,14 +39,6 @@ const GRUPOS: GrupoModulo[] = [
         color: 'siif',
         titulo: 'Proyectos',
         descripcion: 'Alta y edición de los proyectos que tienen su propio tablero Kanban.',
-        grupo: 'Proyectos',
-      },
-      {
-        ruta: 'tableros',
-        icono: '🧭',
-        color: 'siif',
-        titulo: 'Gestor de Estados',
-        descripcion: 'Columnas del tablero de cada proyecto, con permisos de pestañas por columna.',
         grupo: 'Proyectos',
       },
     ],
@@ -65,35 +61,6 @@ const GRUPOS: GrupoModulo[] = [
         titulo: 'Reportes de horas',
         descripcion: 'Horas registradas por usuario, por proyecto y por ticket.',
         grupo: 'Reportes',
-      },
-    ],
-  },
-  {
-    titulo: 'Catálogos',
-    enlaces: [
-      {
-        ruta: 'tipos-ticket',
-        icono: '🏷️',
-        color: 'generic',
-        titulo: 'Tipos de Ticket',
-        descripcion: 'Catálogo compartido de tipos de ticket (bug, tarea, mejora, etc.).',
-        grupo: 'Catálogos',
-      },
-      {
-        ruta: 'prioridades',
-        icono: '🚦',
-        color: 'generic',
-        titulo: 'Prioridades',
-        descripcion: 'Prioridades de ticket, con su color, vigencia (SLA) y usuarios a avisar.',
-        grupo: 'Catálogos',
-      },
-      {
-        ruta: 'motivos-solucion',
-        icono: '✅',
-        color: 'generic',
-        titulo: 'Motivos de Solución',
-        descripcion: 'Catálogo compartido de motivos usados al resolver un ticket.',
-        grupo: 'Catálogos',
       },
     ],
   },

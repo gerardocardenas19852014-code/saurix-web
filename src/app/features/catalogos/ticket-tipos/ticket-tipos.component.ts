@@ -4,7 +4,7 @@ import { DataClientService } from '../../../core/services/data-client.service';
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../../shared/services/toast.service';
-import { TicketTipo } from './ticket-tipo.model';
+import { TicketTipo } from '../../proyectos/ticket-tipos/ticket-tipo.model';
 
 @Component({
   selector: 'app-ticket-tipos',

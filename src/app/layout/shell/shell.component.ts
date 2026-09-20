@@ -59,7 +59,7 @@ export class ShellComponent {
   );
 
   protected readonly moduloActivo = computed<
-    'seguridad' | 'catalogos' | 'wikidocs' | 'presupuesto' | 'proyectos' | null
+    'seguridad' | 'catalogos' | 'wikidocs' | 'presupuesto' | 'proyectos' | 'panel-control' | null
   >(() => {
     const url = this.urlActual();
     if (url.startsWith('/seguridad')) return 'seguridad';
@@ -67,6 +67,7 @@ export class ShellComponent {
     if (url.startsWith('/wikidocs')) return 'wikidocs';
     if (url.startsWith('/presupuesto')) return 'presupuesto';
     if (url.startsWith('/proyectos')) return 'proyectos';
+    if (url.startsWith('/panel-control')) return 'panel-control';
     return null;
   });
 

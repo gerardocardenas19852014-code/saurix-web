@@ -19,6 +19,9 @@
         <a routerLink="/catalogos" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
         <a routerLink="/catalogos/categorias-presupuesto" routerLinkActive="active">🏷️ Categorías de presupuesto</a>
         <a routerLink="/catalogos/cuentas-presupuesto" routerLinkActive="active">🏦 Cuentas de presupuesto</a>
+        <a routerLink="/catalogos/tipos-ticket" routerLinkActive="active">🏳️ Tipos de Ticket</a>
+        <a routerLink="/catalogos/prioridades" routerLinkActive="active">🚦 Prioridades</a>
+        <a routerLink="/catalogos/motivos-solucion" routerLinkActive="active">✅ Motivos de Solución</a>
       </nav>
     }
 
@@ -53,12 +56,18 @@
         <a routerLink="/proyectos" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
         <a routerLink="/proyectos/tablero" routerLinkActive="active">🗂️ Tablero Kanban</a>
         <a routerLink="/proyectos/proyectos" routerLinkActive="active">📁 Proyectos</a>
-        <a routerLink="/proyectos/tableros" routerLinkActive="active">🧭 Gestor de Estados</a>
         <a routerLink="/proyectos/dashboard" routerLinkActive="active">📊 Mi Dashboard</a>
         <a routerLink="/proyectos/reportes-horas" routerLinkActive="active">⏱️ Reportes de horas</a>
-        <a routerLink="/proyectos/tipos-ticket" routerLinkActive="active">🏷️ Tipos de Ticket</a>
-        <a routerLink="/proyectos/prioridades" routerLinkActive="active">🚦 Prioridades</a>
-        <a routerLink="/proyectos/motivos-solucion" routerLinkActive="active">✅ Motivos de Solución</a>
+      </nav>
+    }
+
+    @if (moduloActivo() === 'panel-control') {
+      <span class="sidebar-label">Panel de Control</span>
+      <nav class="sidebar-nav" aria-label="Menú de panel de control">
+        <a routerLink="/panel-control" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
+        <a routerLink="/panel-control/apariencia" routerLinkActive="active">🎨 Apariencia</a>
+        <a routerLink="/panel-control/conexiones" routerLinkActive="active">🔌 Conexiones</a>
+        <a routerLink="/panel-control/gestion-proyectos/gestor-estados" routerLinkActive="active">🧭 Gestor de Estados (Proyectos)</a>
       </nav>
     }
   </aside>
