@@ -32,6 +32,10 @@ export class DataTableComponent<T extends { id: number }> {
   readonly filas = input.required<T[]>();
   readonly tamanoPagina = input<number>(10);
   readonly cargando = input<boolean>(false);
+  /** true = solo lectura: oculta por completo la columna "Acciones" (Editar/Eliminar).
+   *  Pensado para bitácoras/históricos donde no tiene sentido editar o borrar un registro
+   *  ya generado (p.ej. el historial de cambios de estado de un ticket). */
+  readonly soloLectura = input<boolean>(false);
 
   readonly editar = output<T>();
   readonly eliminar = output<T>();

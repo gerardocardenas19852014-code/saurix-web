@@ -14,7 +14,9 @@
             </button>
           </th>
         }
-        <th class="grid-actions-col">Acciones</th>
+        @if (!soloLectura()) {
+          <th class="grid-actions-col">Acciones</th>
+        }
       </tr>
     </thead>
     <tbody>
@@ -29,41 +31,43 @@
               }
             </td>
           }
-          <td class="grid-actions-col" data-label="Acciones">
-            @if (accionExtraEtiqueta()) {
+          @if (!soloLectura()) {
+            <td class="grid-actions-col" data-label="Acciones">
+              @if (accionExtraEtiqueta()) {
+                <button
+                  type="button"
+                  class="btn-secondary small"
+                  [title]="accionExtraTitulo() ?? accionExtraEtiqueta()"
+                  [attr.aria-label]="accionExtraTitulo() ?? accionExtraEtiqueta()"
+                  (click)="accionExtra.emit(fila)"
+                >
+                  {{ accionExtraEtiqueta() }}
+                </button>
+              }
               <button
                 type="button"
-                class="btn-secondary small"
-                [title]="accionExtraTitulo() ?? accionExtraEtiqueta()"
-                [attr.aria-label]="accionExtraTitulo() ?? accionExtraEtiqueta()"
-                (click)="accionExtra.emit(fila)"
+                class="btn-secondary small grid-action-icon"
+                title="Editar"
+                aria-label="Editar registro"
+                (click)="editar.emit(fila)"
               >
-                {{ accionExtraEtiqueta() }}
+                ✎
               </button>
-            }
-            <button
-              type="button"
-              class="btn-secondary small grid-action-icon"
-              title="Editar"
-              aria-label="Editar registro"
-              (click)="editar.emit(fila)"
-            >
-              ✎
-            </button>
-            <button
-              type="button"
-              class="btn-danger small grid-action-icon"
-              title="Eliminar"
-              aria-label="Eliminar registro"
-              (click)="eliminar.emit(fila)"
-            >
-              🗑
-            </button>
-          </td>
+              <button
+                type="button"
+                class="btn-danger small grid-action-icon"
+                title="Eliminar"
+                aria-label="Eliminar registro"
+                (click)="eliminar.emit(fila)"
+              >
+                🗑
+              </button>
+            </td>
+          }
         </tr>
       } @empty {
         <tr>
-          <td [attr.colspan]="columnas().length + 1">
+          <td [attr.colspan]="soloLectura() ? columnas().length : columnas().length + 1">
             <div class="empty-state-block">
               <p>Sin registros para mostrar.</p>
             </div>

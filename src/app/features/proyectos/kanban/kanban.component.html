@@ -191,7 +191,7 @@
 }
 
 @if (modalAbierto()) {
-  <div class="modal-overlay show" (click)="modalAbierto.set(false)">
+  <div class="modal-overlay show">
     <form class="modal-box" style="max-width: 1120px;" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardarTicket()">
       <h3>Nuevo ticket</h3>
 
@@ -280,11 +280,6 @@
             <input type="checkbox" formControlName="planeado" />
             Planeado
           </label>
-
-          <label class="full-span">
-            Solución
-            <textarea rows="3" formControlName="solucion"></textarea>
-          </label>
       </div>
 
       <div class="modal-actions">
@@ -296,7 +291,7 @@
 }
 
 @if (ticketActivo(); as activo) {
-  <div class="modal-overlay show" (click)="cerrarDetalle()">
+  <div class="modal-overlay show">
     <div class="modal-box" style="max-width: 1160px; width: 96%; text-align: left;" (click)="$event.stopPropagation()">
       <div class="page-header" style="margin-bottom: 12px;">
         <h3>#{{ activo.numeroTicket }} — {{ activo.titulo }}</h3>
@@ -352,6 +347,9 @@
         </button>
         <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'historial'" (click)="tabActiva.set('historial')">
           Historial
+        </button>
+        <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'solucion'" (click)="tabActiva.set('solucion')">
+          Solución
         </button>
       </div>
 
@@ -442,11 +440,6 @@
             Planeado
           </label>
 
-          <label class="full-span">
-            Solución
-            <textarea rows="3" formControlName="solucion"></textarea>
-          </label>
-
           <div class="form-actions full-span">
             <button type="submit" class="btn-primary">Guardar cambios</button>
           </div>
@@ -456,21 +449,7 @@
       @if (tabActiva() === 'actividades') {
         <div class="tab-panel">
           <p class="hint" style="margin: 0 0 12px;">Tiempo total registrado: {{ totalMinutosActividad() }} min.</p>
-          @if (actividades().length === 0) {
-            <p class="empty">Aún no hay actividades registradas.</p>
-          } @else {
-            <ul class="actividades-list">
-              @for (actividad of actividades(); track actividad.id) {
-                <li class="actividad-item">
-                  <div class="actividad-item-head">
-                    <span class="tag">{{ actividad.tiempoMin }} min</span>
-                  </div>
-                  <p class="actividad-item-texto">{{ actividad.texto }}</p>
-                </li>
-              }
-            </ul>
-          }
-          <form [formGroup]="formActividad" (ngSubmit)="agregarActividad()" style="margin-top: 14px;">
+          <form [formGroup]="formActividad" (ngSubmit)="agregarActividad()">
             <div class="edit-form form-grid-2col">
               <label class="full-span">
                 Descripción del trabajo
@@ -485,6 +464,12 @@
               </div>
             </div>
           </form>
+          <app-data-table
+            [columnas]="columnasActividades"
+            [filas]="actividades()"
+            [soloLectura]="true"
+            style="margin-top: 14px; display: block;"
+          />
         </div>
       }
 
@@ -614,29 +599,26 @@
 
       @if (tabActiva() === 'historial') {
         <div class="tab-panel">
-          @if (historial().length === 0) {
-            <p class="empty">Aún no hay cambios de estado registrados.</p>
-          } @else {
-            <ul class="actividades-list">
-              @for (evento of historial(); track evento.id) {
-                <li class="actividad-item">
-                  <div class="actividad-item-head">
-                    <span class="tag">
-                      {{ evento.tableroColumnaAnteriorId ? nombreColumna(evento.tableroColumnaAnteriorId) : 'Creación' }}
-                      → {{ nombreColumna(evento.tableroColumnaNuevaId) }}
-                    </span>
-                  </div>
-                  <p class="actividad-item-texto">
-                    {{ nombreUsuario(evento.usuarioId) }}
-                    @if (evento.fechaCreacion) {
-                      · {{ evento.fechaCreacion | date: 'short' }}
-                    }
-                  </p>
-                </li>
-              }
-            </ul>
-          }
+          <app-data-table [columnas]="columnasHistorial" [filas]="historial()" [soloLectura]="true" />
         </div>
+      }
+
+      @if (tabActiva() === 'solucion') {
+        <form class="tab-panel edit-form" [formGroup]="form" (ngSubmit)="guardarTicket()">
+          @if (enFaseFinal()) {
+            <label class="full-span">
+              Solución <span class="hint">(obligatorio: el ticket está en su último estado)</span>
+              <textarea rows="6" formControlName="solucion"></textarea>
+            </label>
+            <div class="form-actions">
+              <button type="submit" class="btn-primary">Guardar solución</button>
+            </div>
+          } @else {
+            <p class="hint" style="margin:0;">
+              Este campo se habilita cuando el ticket llega a su último estado configurado en el tablero.
+            </p>
+          }
+        </form>
       }
     </div>
   </div>

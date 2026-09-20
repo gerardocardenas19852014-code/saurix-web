@@ -1,4 +1,5 @@
 import { DatePipe } from '@angular/common';
+import { forkJoin, of, switchMap } from 'rxjs';
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
@@ -41,7 +42,8 @@ type TabDetalle =
   | 'adjuntos'
   | 'historial'
   | 'asociados'
-  | 'seguidores';
+  | 'seguidores'
+  | 'solucion';
 type ClaseSla = 'sla-ok' | 'sla-warning' | 'sla-expired';
 
 /**
@@ -55,7 +57,7 @@ type ClaseSla = 'sla-ok' | 'sla-warning' | 'sla-expired';
 @Component({
   selector: 'app-kanban',
   standalone: true,
-  imports: [ReactiveFormsModule, ConfirmDialogComponent, AdjuntosPanelComponent, DatePipe, DataTableComponent],
+  imports: [ReactiveFormsModule, ConfirmDialogComponent, AdjuntosPanelComponent, DataTableComponent],
   templateUrl: './kanban.component.html',
   styleUrl: './kanban.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -120,6 +122,13 @@ export class KanbanComponent implements OnInit, OnDestroy {
     };
   });
 
+  /** La Solución solo se habilita (y se exige) cuando el ticket ya está en el último
+   *  estado configurado en el tablero — antes de eso no hay nada que "cerrar". */
+  protected readonly enFaseFinal = computed(() => {
+    const activo = this.ticketActivo();
+    return !!activo && this.siguienteColumna(activo) === null;
+  });
+
   protected readonly ticketsDisponiblesParaAsociar = computed(() => {
     const activo = this.ticketActivo();
     if (!activo) return [];
@@ -180,6 +189,33 @@ export class KanbanComponent implements OnInit, OnDestroy {
       formatear: (fila) => this.textoSla(fila) || '—',
       claseValor: (fila) => this.claseBadgeSla(fila),
     },
+  ];
+
+  private readonly datePipe = new DatePipe('es-MX');
+
+  private formatearFecha(fecha?: string | null): string {
+    if (!fecha) return '—';
+    return this.datePipe.transform(fecha, 'short') ?? '—';
+  }
+
+  /** Columnas de la pestaña "Actividades" del detalle, como grid en vez de tarjetas sueltas. */
+  protected readonly columnasActividades: ColumnaTabla<TicketActividad>[] = [
+    { campo: 'fechaCreacion', etiqueta: 'Fecha', formatear: (fila) => this.formatearFecha(fila.fechaCreacion) },
+    { campo: 'tiempoMin', etiqueta: 'Minutos' },
+    { campo: 'texto', etiqueta: 'Descripción' },
+    { campo: 'creadoPor', etiqueta: 'Registrado por', formatear: (fila) => this.nombreUsuario(fila.creadoPor) },
+  ];
+
+  /** Columnas de la pestaña "Historial" del detalle, como grid en vez de tarjetas sueltas. */
+  protected readonly columnasHistorial: ColumnaTabla<TicketHistorialEstado>[] = [
+    {
+      campo: 'tableroColumnaNuevaId',
+      etiqueta: 'Cambio',
+      formatear: (fila) =>
+        `${fila.tableroColumnaAnteriorId ? this.nombreColumna(fila.tableroColumnaAnteriorId) : 'Creación'} → ${this.nombreColumna(fila.tableroColumnaNuevaId)}`,
+    },
+    { campo: 'usuarioId', etiqueta: 'Usuario', formatear: (fila) => this.nombreUsuario(fila.usuarioId) },
+    { campo: 'fechaCreacion', etiqueta: 'Fecha', formatear: (fila) => this.formatearFecha(fila.fechaCreacion) },
   ];
 
   protected readonly form = this.fb.nonNullable.group({
@@ -441,6 +477,16 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
     const valor = this.form.getRawValue();
     const enEdicion = this.ticketEnEdicion();
+
+    // La Solución es obligatoria únicamente cuando el ticket ya llegó a su último
+    // estado configurado (ver enFaseFinal); antes de eso el campo ni siquiera se
+    // muestra, así que no tiene sentido exigirlo.
+    if (enEdicion && this.enFaseFinal() && !valor.solucion?.trim()) {
+      this.tabActiva.set('solucion');
+      this.toast.advertencia('Antes de guardar es obligatorio capturar la solución: el ticket está en su último estado.');
+      return;
+    }
+
     const payload = {
       id: valor.id,
       proyectoId: this.proyectoSeleccionadoId(),
@@ -509,7 +555,32 @@ export class KanbanComponent implements OnInit, OnDestroy {
     const indiceActual = columnas.findIndex((c) => Number(c.id) === Number(ticket.tableroColumnaId));
     const indiceDestino = indiceActual + direccion;
     if (indiceActual === -1 || indiceDestino < 0 || indiceDestino >= columnas.length) return;
+
+    // Avanzar (no retroceder) exige haber bitacoreado qué se hizo en la columna actual —
+    // solo se puede verificar de forma confiable cuando el detalle de ESTE ticket está
+    // abierto (actividades()/historial() traen datos de ese ticket en ese caso), y solo si
+    // la columna actual permite la pestaña Actividades (si no la permite, no hay dónde
+    // registrarla, así que no se puede exigir).
+    if (
+      direccion === 1 &&
+      this.ticketActivo()?.id === ticket.id &&
+      this.tabsPermitidas().actividades &&
+      !this.tieneActividadDesdeUltimoCambio(ticket)
+    ) {
+      this.tabActiva.set('actividades');
+      this.toast.advertencia('Antes de avanzar de estado es obligatorio registrar una actividad describiendo qué se hizo.');
+      return;
+    }
+
     this.moverTicketAColumna(ticket, columnas[indiceDestino].id);
+  }
+
+  /** true si ya se registró al menos una Actividad después del último cambio de columna
+   *  (o, si nunca ha cambiado de columna, después de creado) — la condición para poder
+   *  avanzar de estado desde la barra "Siguiente estado" del detalle. */
+  private tieneActividadDesdeUltimoCambio(ticket: Ticket): boolean {
+    const ultimoCambio = this.historial()[0]?.fechaCreacion ?? ticket.fechaCreacion ?? '';
+    return this.actividades().some((a) => (a.fechaCreacion ?? '') > ultimoCambio);
   }
 
   /** Columna que sigue en el orden configurado, o null si el ticket ya está en la
@@ -628,14 +699,32 @@ export class KanbanComponent implements OnInit, OnDestroy {
     const ticket = this.ticketAEliminar();
     if (!ticket) return;
 
-    this.data.baja('Ticket', ticket.id).subscribe({
-      next: () => {
-        this.toast.exito('Ticket eliminado.');
-        this.ticketAEliminar.set(null);
-        this.cerrarDetalle();
-        this.cargarTickets();
-      },
-    });
+    // IndexedDB no tiene integridad referencial: si solo se borra el Ticket,
+    // su bitácora de actividades y su historial de cambios de estado quedan
+    // huérfanos en la base. Antes de dar de baja el ticket, se borran esos
+    // registros relacionados.
+    forkJoin([
+      this.data.list<TicketActividad>('TicketActividad', { ticketId: ticket.id }),
+      this.data.list<TicketHistorialEstado>('TicketHistorialEstado', { ticketId: ticket.id }),
+    ])
+      .pipe(
+        switchMap(([actividades, historial]) => {
+          const bajas = [
+            ...actividades.map((a) => this.data.baja('TicketActividad', a.id)),
+            ...historial.map((h) => this.data.baja('TicketHistorialEstado', h.id)),
+          ];
+          return bajas.length ? forkJoin(bajas) : of(null);
+        }),
+        switchMap(() => this.data.baja('Ticket', ticket.id)),
+      )
+      .subscribe({
+        next: () => {
+          this.toast.exito('Ticket eliminado.');
+          this.ticketAEliminar.set(null);
+          this.cerrarDetalle();
+          this.cargarTickets();
+        },
+      });
   }
 
   private cargarDetalle(ticketId: number): void {
