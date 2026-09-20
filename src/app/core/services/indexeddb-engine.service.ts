@@ -55,6 +55,12 @@ export class IndexedDbEngineService {
         ? indexedDB.open(IndexedDbEngineService.DB_NAME, this.version)
         : indexedDB.open(IndexedDbEngineService.DB_NAME);
 
+      // Si el bloqueo no se libera solo (otra pestaña vieja, de antes de
+      // este arreglo, que todavía no cierra su conexión sola — ver
+      // onversionchange más abajo — o de verdad congelada), se informa con
+      // un error claro en vez de dejar la operación colgada para siempre.
+      let bloqueoTimeout: ReturnType<typeof setTimeout> | undefined;
+
       request.onupgradeneeded = () => {
         const db = request.result;
         for (const store of this.storesConocidos) {
@@ -64,15 +70,42 @@ export class IndexedDbEngineService {
         }
       };
       request.onsuccess = () => {
+        if (bloqueoTimeout) clearTimeout(bloqueoTimeout);
         this.db = request.result;
         this.version = request.result.version;
         this.db.onclose = () => {
           this.db = null;
         };
+        // Si OTRA pestaña necesita subir de versión (p. ej. creó una
+        // entidad nueva primero), esta conexión se cierra sola para no
+        // bloquearla — sin esto, dos pestañas de Saurix abiertas a la vez
+        // podían quedarse bloqueando indefinidamente la migración una a la
+        // otra (ver onblocked, abajo).
+        this.db.onversionchange = () => {
+          this.db?.close();
+          this.db = null;
+        };
         resolve(request.result);
       };
-      request.onerror = () => reject(request.error);
-      request.onblocked = () => reject(new Error('IndexedDB: la actualización de la base de datos está bloqueada por otra pestaña abierta.'));
+      request.onerror = () => {
+        if (bloqueoTimeout) clearTimeout(bloqueoTimeout);
+        reject(request.error);
+      };
+      request.onblocked = () => {
+        // No es un fallo definitivo: en cuanto la otra pestaña cierre su
+        // conexión (lo hace sola gracias a onversionchange, arriba), este
+        // mismo request sigue su curso y dispara onupgradeneeded/onsuccess
+        // con normalidad. Solo se rechaza si el bloqueo persiste pasado un
+        // rato (p. ej. una pestaña vieja que todavía no tiene ese arreglo).
+        console.warn('IndexedDB: esperando a que se cierren otras pestañas de Saurix para actualizar la base de datos…');
+        bloqueoTimeout = setTimeout(() => {
+          reject(
+            new Error(
+              'No se pudo actualizar la base de datos: hay otra pestaña de Saurix abierta bloqueando la operación. Cierra las demás pestañas de Saurix y recarga esta página.',
+            ),
+          );
+        }, 4000);
+      };
     }).finally(() => {
       this.openPromise = null;
     });
