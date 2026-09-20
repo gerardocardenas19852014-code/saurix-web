@@ -216,7 +216,9 @@ export class ReportesHorasComponent implements OnInit {
         folio: ticket ? `#${ticket.numeroTicket}` : '—',
         ticket: ticket ? ticket.titulo : 'Ticket eliminado',
         usuario: this.nombreUsuarioDe(a.creadoPor),
-        minutos: a.tiempoMin,
+        // Igual que en Kanban (formActividad/columnasActividades): se presenta en horas;
+        // el dato real (TicketActividad.tiempoMin) sigue en minutos.
+        horas: Math.round((a.tiempoMin / 60) * 100) / 100,
         descripcion: a.texto,
       };
     });
@@ -228,7 +230,7 @@ export class ReportesHorasComponent implements OnInit {
         { clave: 'folio', etiqueta: 'Folio' },
         { clave: 'ticket', etiqueta: 'Ticket' },
         { clave: 'usuario', etiqueta: 'Usuario' },
-        { clave: 'minutos', etiqueta: 'Minutos' },
+        { clave: 'horas', etiqueta: 'Horas' },
         { clave: 'descripcion', etiqueta: 'Descripción' },
       ],
       filas,

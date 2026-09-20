@@ -456,7 +456,7 @@
               ⚠️ Es obligatorio registrar una actividad describiendo el trabajo realizado en este estado antes de poder cambiar de estado (avanzar o regresar).
             </p>
           }
-          <p class="hint" style="margin: 0 0 12px;">Tiempo total registrado: {{ totalMinutosActividad() }} min.</p>
+          <p class="hint" style="margin: 0 0 12px;">Tiempo total registrado: {{ formatearHoras(totalMinutosActividad()) }} h.</p>
           <form [formGroup]="formActividad" (ngSubmit)="agregarActividad()">
             <div class="edit-form form-grid-2col">
               <label class="full-span">
@@ -464,8 +464,8 @@
                 <input type="text" formControlName="texto" />
               </label>
               <label>
-                Minutos
-                <input type="number" min="1" formControlName="tiempoMin" />
+                Horas
+                <input type="number" min="0.01" step="0.25" formControlName="tiempoHoras" />
               </label>
               <div class="form-actions">
                 <button type="submit" class="btn-secondary">+ Registrar</button>

@@ -222,7 +222,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   /** Columnas de la pestaña "Actividades" del detalle, como grid en vez de tarjetas sueltas. */
   protected readonly columnasActividades: ColumnaTabla<TicketActividad>[] = [
     { campo: 'fechaCreacion', etiqueta: 'Fecha', formatear: (fila) => this.formatearFecha(fila.fechaCreacion) },
-    { campo: 'tiempoMin', etiqueta: 'Minutos' },
+    { campo: 'tiempoMin', etiqueta: 'Horas', formatear: (fila) => this.formatearHoras(fila.tiempoMin) },
     { campo: 'texto', etiqueta: 'Descripción' },
     { campo: 'creadoPor', etiqueta: 'Registrado por', formatear: (fila) => this.nombreUsuario(fila.creadoPor) },
   ];
@@ -265,9 +265,12 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly formComentario = this.fb.nonNullable.group({ texto: ['', Validators.required] });
   protected readonly formActividad = this.fb.nonNullable.group({
     texto: ['', Validators.required],
-    // Mínimo 1: un 0 (o negativo) se cuela como "actividad válida" para la regla de
+    // Se captura en HORAS (más natural que minutos para registrar trabajo) — se
+    // convierte a minutos al guardar, mismo campo real (TicketActividad.tiempoMin,
+    // documentado en esquema-tablas-saurix.md) que consume Reportes de horas.
+    // Mínimo > 0: un 0 (o negativo) se cuela como "actividad válida" para la regla de
     // actividad-obligatoria de mover(), pero infla en cero los totales de Reportes de horas.
-    tiempoMin: [15, [Validators.required, Validators.min(1)]],
+    tiempoHoras: [0.25, [Validators.required, Validators.min(0.01)]],
   });
   protected readonly formEtiqueta = this.fb.nonNullable.group({ texto: ['', Validators.required] });
   protected readonly formAsociado = this.fb.nonNullable.group({ ticketRelacionadoId: [0] });
@@ -702,7 +705,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
         });
         this.aplicarConfiguracionCampos();
         this.formComentario.reset({ texto: '' });
-        this.formActividad.reset({ texto: '', tiempoMin: 15 });
+        this.formActividad.reset({ texto: '', tiempoHoras: 0.25 });
         this.formEtiqueta.reset({ texto: '' });
         this.formAsociado.reset({ ticketRelacionadoId: 0 });
         this.cargarDetalle(completo.id);
@@ -873,15 +876,18 @@ export class KanbanComponent implements OnInit, OnDestroy {
     const activo = this.ticketActivo();
     if (!activo || this.formActividad.invalid) return;
 
+    const { tiempoHoras, ...resto } = this.formActividad.getRawValue();
+
     this.data
       .alta<TicketActividad>('TicketActividad', {
         ticketId: activo.id,
-        ...this.formActividad.getRawValue(),
+        ...resto,
+        tiempoMin: Math.round(tiempoHoras * 60),
         creadoPor: this.auth.usuarioActual()?.id ?? null,
       })
       .subscribe({
         next: () => {
-          this.formActividad.reset({ texto: '', tiempoMin: 15 });
+          this.formActividad.reset({ texto: '', tiempoHoras: 0.25 });
           this.cargarDetalle(activo.id);
         },
       });
@@ -919,6 +925,13 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   totalMinutosActividad(): number {
     return this.actividades().reduce((acc, a) => acc + a.tiempoMin, 0);
+  }
+
+  /** Formatea minutos como horas para la UI (el dato real sigue en minutos — ver
+   *  formActividad — para no romper las sumas de Reportes de horas/Dashboard, que
+   *  asumen TicketActividad.tiempoMin en minutos). */
+  protected formatearHoras(minutos: number): string {
+    return (Math.round((minutos / 60) * 100) / 100).toString();
   }
 
   // ---------------- Vigencia (SLA) según la prioridad del ticket ----------------
