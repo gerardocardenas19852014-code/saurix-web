@@ -29,8 +29,8 @@ const GRUPOS: GrupoModulo[] = [
         ruta: 'tablero',
         icono: '🗂️',
         color: 'siif',
-        titulo: 'Tablero Kanban',
-        descripcion: 'Vista de tickets por estado, con arrastrar y soltar entre columnas.',
+        titulo: 'Ticket',
+        descripcion: 'Vista de tickets por estado, organizados en columnas.',
         grupo: 'Proyectos',
       },
       {
