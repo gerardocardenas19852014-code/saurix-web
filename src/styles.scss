@@ -194,6 +194,7 @@ h1, h2 { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(
 }
 
 .content { max-width: 980px; margin: 0 auto; padding: 40px 32px 80px; }
+.content.content-wide { max-width: none; }
 .hero { margin-bottom: 40px; max-width: 640px; }
 .hero h1 { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--heading-navy); font-size: 36px; line-height: 1.2; margin: 0 0 10px; }
 .hero p { color: var(--ink-soft); font-size: 16px; }

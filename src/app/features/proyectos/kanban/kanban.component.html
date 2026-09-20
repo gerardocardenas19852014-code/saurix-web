@@ -255,17 +255,9 @@
               }
             </select>
           </label>
-          <label>
-            Tiempo estimado (min)
-            <input type="number" formControlName="tiempoEstimadoMin" />
-          </label>
-
-          <label class="checkbox-inline">
-            <input type="checkbox" formControlName="planeado" />
-            Planeado
-          </label>
-          <span></span>
-
+          <!-- Las 3 fechas van juntas, seguidas, en una sola fila (con Reportado
+               por justo antes completando la fila previa de 4, quedan alineadas
+               exactas en columnas 1-3 de esta). -->
           <label>
             Fin análisis
             <input type="date" formControlName="fechaFinAnalisis" />
@@ -274,11 +266,21 @@
             Fin desarrollo
             <input type="date" formControlName="fechaFinDesarrollo" />
           </label>
-
-          <label class="full-span">
+          <label>
             Fin cliente
             <input type="date" formControlName="fechaFinCliente" />
           </label>
+          <span></span>
+
+          <label>
+            Tiempo estimado (min)
+            <input type="number" formControlName="tiempoEstimadoMin" />
+          </label>
+          <label class="checkbox-inline">
+            <input type="checkbox" formControlName="planeado" />
+            Planeado
+          </label>
+
           <label class="full-span">
             Solución
             <textarea rows="3" formControlName="solucion"></textarea>
@@ -313,11 +315,12 @@
           }
         </div>
         <div class="ticket-status-bar-action">
-          <select [value]="activo.tableroColumnaId" (change)="cambiarEstadoDetalle(activo, +$any($event.target).value)">
-            @for (columna of columnasTablero(); track columna.id) {
-              <option [value]="columna.id">{{ columna.nombre }}</option>
-            }
-          </select>
+          @if (siguienteColumna(activo); as siguiente) {
+            <span class="ticket-status-bar-next">Siguiente estado: <strong>{{ siguiente.nombre }}</strong></span>
+            <button type="button" class="btn-primary small" (click)="mover(activo, 1)">Aceptar</button>
+          } @else {
+            <span class="hint" style="margin:0;">Es el último estado. Para regresar, usa las flechas ◀ del tablero.</span>
+          }
         </div>
       </div>
 
@@ -413,17 +416,9 @@
               }
             </select>
           </label>
-          <label>
-            Tiempo estimado (min)
-            <input type="number" formControlName="tiempoEstimadoMin" />
-          </label>
-
-          <label class="checkbox-inline">
-            <input type="checkbox" formControlName="planeado" />
-            Planeado
-          </label>
-          <span></span>
-
+          <!-- Las 3 fechas van juntas, seguidas, en una sola fila (con Reportado
+               por justo antes completando la fila previa de 4, quedan alineadas
+               exactas en columnas 1-3 de esta). -->
           <label>
             Fin análisis
             <input type="date" formControlName="fechaFinAnalisis" />
@@ -432,11 +427,21 @@
             Fin desarrollo
             <input type="date" formControlName="fechaFinDesarrollo" />
           </label>
-
-          <label class="full-span">
+          <label>
             Fin cliente
             <input type="date" formControlName="fechaFinCliente" />
           </label>
+          <span></span>
+
+          <label>
+            Tiempo estimado (min)
+            <input type="number" formControlName="tiempoEstimadoMin" />
+          </label>
+          <label class="checkbox-inline">
+            <input type="checkbox" formControlName="planeado" />
+            Planeado
+          </label>
+
           <label class="full-span">
             Solución
             <textarea rows="3" formControlName="solucion"></textarea>

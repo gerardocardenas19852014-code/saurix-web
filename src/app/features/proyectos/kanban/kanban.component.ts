@@ -512,8 +512,14 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.moverTicketAColumna(ticket, columnas[indiceDestino].id);
   }
 
-  cambiarEstadoDetalle(ticket: Ticket, columnaId: number): void {
-    this.moverTicketAColumna(ticket, columnaId);
+  /** Columna que sigue en el orden configurado, o null si el ticket ya está en la
+   *  última — usada por la barra "Siguiente estado" del detalle (un solo paso hacia
+   *  adelante; regresar solo se hace con las flechas ◀ del tablero, igual que ahí). */
+  siguienteColumna(ticket: Ticket): TableroColumna | null {
+    const columnas = this.columnasTablero();
+    const indiceActual = columnas.findIndex((c) => Number(c.id) === Number(ticket.tableroColumnaId));
+    if (indiceActual === -1 || indiceActual >= columnas.length - 1) return null;
+    return columnas[indiceActual + 1];
   }
 
   // ---------------- Arrastrar y soltar (drag & drop nativo del navegador) ----------------

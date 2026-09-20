@@ -58,6 +58,12 @@ export class ShellComponent {
     { initialValue: this.router.url },
   );
 
+  /** El Tablero Kanban (y su vista Lista) se ahoga en el ancho de lectura de
+   *  980px que usan el resto de pantallas — con varias columnas o una tabla
+   *  ancha, ese límite obliga a hacer scroll horizontal sin necesidad, así
+   *  que ahí se le da todo el ancho disponible (ver .content-wide). */
+  protected readonly contenidoAncho = computed(() => this.urlActual().startsWith('/proyectos/tablero'));
+
   protected readonly moduloActivo = computed<
     'seguridad' | 'catalogos' | 'wikidocs' | 'presupuesto' | 'proyectos' | 'panel-control' | null
   >(() => {
