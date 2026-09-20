@@ -13,6 +13,7 @@ interface EnlaceCatalogo {
 }
 
 const GRUPO_ICONOS: Record<string, string> = {
+  General: '🧩',
   'Presupuesto Personal': '💰',
 };
 
@@ -20,6 +21,14 @@ const GRUPO_ICONOS: Record<string, string> = {
 // dentro del propio módulo WikiDocs (misma idea que los catálogos de
 // Proyectos, que tampoco aparecen en esta lista genérica).
 const CATALOGOS: EnlaceCatalogo[] = [
+  {
+    ruta: 'listas-valores',
+    icono: '🧩',
+    color: 'generic',
+    titulo: 'Listas de valores',
+    descripcion: 'Combos de tipo/estado usados por otras pantallas (tipo de cuenta, tipo de movimiento, frecuencia, proveedor de conexión, etc.), 100% configurables.',
+    grupo: 'General',
+  },
   {
     ruta: 'categorias-presupuesto',
     icono: '🏷️',

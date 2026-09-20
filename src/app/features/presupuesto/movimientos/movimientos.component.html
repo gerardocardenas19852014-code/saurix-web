@@ -60,8 +60,9 @@
     Tipo
     <select [value]="filtroTipo()" (change)="filtroTipo.set($any($event.target).value)">
       <option value="">Todos</option>
-      <option value="Ingreso">Ingreso</option>
-      <option value="Gasto">Gasto</option>
+      @for (t of tiposMovimiento(); track t.id) {
+        <option [value]="t.clave">{{ t.etiqueta }}</option>
+      }
     </select>
   </label>
   @if (hayFiltros()) {
@@ -126,8 +127,9 @@
         <label>
           Tipo
           <select formControlName="tipo">
-            <option value="Gasto">Gasto</option>
-            <option value="Ingreso">Ingreso</option>
+            @for (t of tiposMovimiento(); track t.id) {
+              <option [value]="t.clave">{{ t.etiqueta }}</option>
+            }
             @if (!movimientoEnEdicion()) {
               <option value="Transferencia">Transferencia entre cuentas</option>
             }

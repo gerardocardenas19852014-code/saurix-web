@@ -1,4 +1,7 @@
-export type TipoCuentaPresupuesto = 'Efectivo' | 'Banco' | 'Tarjeta' | 'Ahorro';
+/** Ahora viene del catálogo "Listas de valores" (Catálogos, grupo
+ *  CuentaPresupuestoTipo) en vez de un enum fijo — cualquier clave que
+ *  exista ahí es válida. */
+export type TipoCuentaPresupuesto = string;
 
 /**
  * Catálogo compartido (Presupuesto Personal). No tiene "saldoInicial": el

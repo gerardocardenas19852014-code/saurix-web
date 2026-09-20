@@ -15,6 +15,12 @@ export const CATALOGOS_ROUTES: Routes = [
 
   // Catálogos de Presupuesto Personal (compartidos entre todos los usuarios).
   {
+    path: 'listas-valores',
+    loadComponent: () =>
+      import('./valor-lista/valor-lista-list.component').then((m) => m.ValorListaListComponent),
+  },
+
+  {
     path: 'categorias-presupuesto',
     loadComponent: () =>
       import('./categoria-presupuesto/categoria-presupuesto-list.component').then(

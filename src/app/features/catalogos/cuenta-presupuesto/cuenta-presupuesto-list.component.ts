@@ -10,11 +10,14 @@ import { PreferenciasGridService } from '../../../shared/services/preferencias-g
 import { ToastService } from '../../../shared/services/toast.service';
 import { exportarCsv } from '../../../shared/utils/csv.util';
 import { CuentaPresupuesto, TipoCuentaPresupuesto } from './cuenta-presupuesto.model';
+import { ValorLista } from '../valor-lista/valor-lista.model';
 
 const MODULO_BITACORA = 'Catálogos / Cuentas de presupuesto';
 const ENTIDAD = 'CuentaPresupuesto';
-const TIPOS: TipoCuentaPresupuesto[] = ['Efectivo', 'Banco', 'Tarjeta', 'Ahorro'];
-const ICONOS_TIPO: Record<TipoCuentaPresupuesto, string> = { Efectivo: '💵', Banco: '🏦', Tarjeta: '💳', Ahorro: '🐷' };
+const GRUPO_VALOR_LISTA = 'CuentaPresupuestoTipo';
+// Iconos best-effort para los tipos ya conocidos; cualquier tipo nuevo que
+// se agregue desde "Listas de valores" cae en el emoji genérico de abajo.
+const ICONOS_TIPO_CONOCIDOS: Record<string, string> = { Efectivo: '💵', Banco: '🏦', Tarjeta: '💳', Ahorro: '🐷' };
 
 /**
  * Catálogo "Cuentas de presupuesto" (Presupuesto Personal) — mismo estándar
@@ -38,8 +41,8 @@ export class CuentaPresupuestoListComponent implements OnInit {
   private readonly auth = inject(AuthService);
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
 
-  protected readonly tipos = TIPOS;
-  protected readonly iconoTipo = (tipo: TipoCuentaPresupuesto) => ICONOS_TIPO[tipo] ?? '💰';
+  protected readonly tipos = signal<ValorLista[]>([]);
+  protected readonly iconoTipo = (tipo: string) => ICONOS_TIPO_CONOCIDOS[tipo] ?? '💰';
 
   protected readonly registrosTodos = signal<CuentaPresupuesto[]>([]);
   protected readonly cargando = signal(false);
@@ -85,6 +88,10 @@ export class CuentaPresupuestoListComponent implements OnInit {
 
   ngOnInit(): void {
     this.cargar();
+    this.data.list<ValorLista>('ValorLista', { grupo: GRUPO_VALOR_LISTA }).subscribe({
+      next: (valores) => this.tipos.set([...valores].sort((a, b) => a.orden - b.orden)),
+      error: () => this.toast.error('No se pudieron cargar los tipos de cuenta.'),
+    });
   }
 
   cargar(): void {

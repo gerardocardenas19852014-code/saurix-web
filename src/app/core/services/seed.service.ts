@@ -6,6 +6,26 @@ import { hashPassword, pareceHashSha256 } from '../../shared/utils/password.util
 import { debeDesactivarsePorVigenciaVencida } from '../../shared/utils/vigencia.util';
 import { BitacoraService } from '../../shared/services/bitacora.service';
 
+/** Valores iniciales del catálogo genérico "Listas de valores" (Catálogos):
+ *  sin esto las pantallas que ya dependen de él (Cuentas de presupuesto,
+ *  Movimientos, Fijos y Proyección, Conexiones) arrancarían con combos
+ *  vacíos hasta que alguien los cargue a mano. Solo se siembra si el store
+ *  está completamente vacío (ver ejecutar()), así que agregar o quitar
+ *  valores aquí después no pisa lo que el usuario ya haya editado. */
+const VALORES_LISTA_INICIALES: { grupo: string; clave: string; etiqueta: string; orden: number }[] = [
+  { grupo: 'CuentaPresupuestoTipo', clave: 'Efectivo', etiqueta: 'Efectivo', orden: 1 },
+  { grupo: 'CuentaPresupuestoTipo', clave: 'Banco', etiqueta: 'Banco', orden: 2 },
+  { grupo: 'CuentaPresupuestoTipo', clave: 'Tarjeta', etiqueta: 'Tarjeta', orden: 3 },
+  { grupo: 'CuentaPresupuestoTipo', clave: 'Ahorro', etiqueta: 'Ahorro', orden: 4 },
+  { grupo: 'MovimientoPresupuestoTipo', clave: 'Ingreso', etiqueta: 'Ingreso', orden: 1 },
+  { grupo: 'MovimientoPresupuestoTipo', clave: 'Gasto', etiqueta: 'Gasto', orden: 2 },
+  { grupo: 'MovimientoRecurrenteFrecuencia', clave: 'Mensual', etiqueta: 'Mensual', orden: 1 },
+  { grupo: 'MovimientoRecurrenteFrecuencia', clave: 'Anual', etiqueta: 'Anual', orden: 2 },
+  { grupo: 'ConfiguracionConexionProveedor', clave: 'SqlServer', etiqueta: 'SQL Server', orden: 1 },
+  { grupo: 'ConfiguracionConexionProveedor', clave: 'PostgreSql', etiqueta: 'PostgreSQL', orden: 2 },
+  { grupo: 'ConfiguracionConexionProveedor', clave: 'MySql', etiqueta: 'MySQL', orden: 3 },
+];
+
 const DATOS_ROOT = {
   nombreUsuario: 'root',
   nombre: 'Administrador',
@@ -68,6 +88,15 @@ export class SeedService {
     // hash desde el alta, no necesita pasar por aquí).
     await this.migrarPasswordsPlanos(usuarios);
     await this.desactivarVencidos(usuarios);
+    await this.sembrarValoresLista();
+  }
+
+  private async sembrarValoresLista(): Promise<void> {
+    const existentes = await firstValueFrom(this.data.list<{ id: number }>('ValorLista'));
+    if (existentes.length > 0) return;
+    for (const valor of VALORES_LISTA_INICIALES) {
+      await firstValueFrom(this.data.alta('ValorLista', valor));
+    }
   }
 
   private async desactivarVencidos(usuarios: Usuario[]): Promise<void> {

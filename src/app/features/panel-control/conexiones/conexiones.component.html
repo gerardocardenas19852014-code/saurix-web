@@ -27,9 +27,9 @@
         <label>
           Proveedor
           <select formControlName="proveedor">
-            <option value="SqlServer">SQL Server</option>
-            <option value="PostgreSql">PostgreSQL</option>
-            <option value="MySql">MySQL</option>
+            @for (p of proveedores(); track p.id) {
+              <option [value]="p.clave">{{ p.etiqueta }}</option>
+            }
           </select>
         </label>
 

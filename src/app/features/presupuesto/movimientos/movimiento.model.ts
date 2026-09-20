@@ -1,4 +1,6 @@
-export type TipoMovimiento = 'Ingreso' | 'Gasto';
+/** Ahora viene del catálogo "Listas de valores" (Catálogos, grupo
+ *  MovimientoPresupuestoTipo) en vez de un enum fijo. */
+export type TipoMovimiento = string;
 
 /** Personal (por usuario, vía creadoPorUsuarioId) — nunca visible entre usuarios. */
 export interface MovimientoPresupuesto {

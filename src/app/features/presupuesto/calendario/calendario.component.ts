@@ -15,7 +15,7 @@ interface EventoCalendario {
   titulo: string;
   detalle: string;
   monto: number | null;
-  tipo: 'Ingreso' | 'Gasto';
+  tipo: string; // catálogo "Listas de valores", grupo MovimientoPresupuestoTipo
 }
 
 interface DiaCalendario {

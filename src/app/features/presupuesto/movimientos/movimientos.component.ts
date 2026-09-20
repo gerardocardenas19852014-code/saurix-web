@@ -9,6 +9,7 @@ import { ToastService } from '../../../shared/services/toast.service';
 import { CategoriaPresupuesto } from '../../catalogos/categoria-presupuesto/categoria-presupuesto.model';
 import { CuentaPresupuesto } from '../../catalogos/cuenta-presupuesto/cuenta-presupuesto.model';
 import { colorCategoria, formatMoneda, iconoTipoCuenta } from '../shared/wallet.util';
+import { ValorLista } from '../../catalogos/valor-lista/valor-lista.model';
 import { MovimientoPresupuesto } from './movimiento.model';
 
 interface ColumnaMensual {
@@ -51,6 +52,7 @@ export class MovimientosComponent implements OnInit {
   protected readonly movimientos = signal<MovimientoPresupuesto[]>([]);
   protected readonly cuentas = signal<CuentaPresupuesto[]>([]);
   protected readonly categorias = signal<CategoriaPresupuesto[]>([]);
+  protected readonly tiposMovimiento = signal<ValorLista[]>([]);
   protected readonly cargando = signal(false);
 
   protected readonly modalAbierto = signal(false);
@@ -60,7 +62,7 @@ export class MovimientosComponent implements OnInit {
   protected readonly filtroTexto = signal('');
   protected readonly filtroCuentaId = signal(0);
   protected readonly filtroCategoriaId = signal(0);
-  protected readonly filtroTipo = signal<'' | 'Ingreso' | 'Gasto'>('');
+  protected readonly filtroTipo = signal<string>('');
 
   protected readonly hayFiltros = computed(
     () =>
@@ -109,7 +111,7 @@ export class MovimientosComponent implements OnInit {
   protected readonly form = this.fb.nonNullable.group({
     id: [0],
     fecha: [new Date().toISOString().slice(0, 10), Validators.required],
-    tipo: ['Gasto' as 'Ingreso' | 'Gasto' | 'Transferencia', Validators.required],
+    tipo: ['Gasto' as string, Validators.required],
     cuentaPresupuestoId: [0, Validators.required],
     cuentaDestinoId: [0],
     categoriaPresupuestoId: [0],
@@ -128,6 +130,9 @@ export class MovimientosComponent implements OnInit {
   ngOnInit(): void {
     this.data.list<CuentaPresupuesto>('CuentaPresupuesto').subscribe((cuentas) => this.cuentas.set(cuentas));
     this.data.list<CategoriaPresupuesto>('CategoriaPresupuesto').subscribe((categorias) => this.categorias.set(categorias));
+    this.data.list<ValorLista>('ValorLista', { grupo: 'MovimientoPresupuestoTipo' }).subscribe((valores) =>
+      this.tiposMovimiento.set([...valores].sort((a, b) => a.orden - b.orden)),
+    );
     this.cargar();
   }
 

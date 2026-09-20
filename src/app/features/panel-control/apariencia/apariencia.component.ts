@@ -1,16 +1,15 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ConfiguracionAparienciaService } from '../../../shared/services/configuracion-apariencia.service';
 import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { TEMAS, Tema, ThemeService } from '../../../shared/services/theme.service';
 
-const CLAVE_ASISTENTE_IA = 'saurix.asistenteIaActivo';
-
 /**
- * Apariencia. El esquema real tiene PanelControl.ConfiguracionApariencia
- * 1-1 con Seguridad.Usuario, pero como todavía no hay autenticación real
- * (CreadoPor/usuario actual siempre es NULL en el backend, ver notas de
- * servicios-net-plataformasaurix.md), estas preferencias se guardan
- * localmente por ahora; cuando exista un usuario autenticado real, este
- * componente es el lugar natural para sincronizarlas contra ese endpoint.
+ * Apariencia. Antes se guardaba solo en localStorage del navegador; ahora
+ * ConfiguracionAparienciaService la sincroniza también contra la "base de
+ * datos" de la app (IndexedDB hoy — mismo contrato que usará
+ * PlataformaSaurix.ConfiguracionApariencia cuando se conecte el backend
+ * real) por usuario, para que la preferencia viaje con la cuenta y no solo
+ * con este navegador.
  */
 @Component({
   selector: 'app-apariencia',
@@ -22,33 +21,20 @@ const CLAVE_ASISTENTE_IA = 'saurix.asistenteIaActivo';
 export class AparienciaComponent {
   protected readonly themeService = inject(ThemeService);
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
+  private readonly configuracionApariencia = inject(ConfiguracionAparienciaService);
   protected readonly temas = TEMAS;
 
-  protected readonly asistenteIaActivo = signal(this.leerBooleano(CLAVE_ASISTENTE_IA, true));
+  protected readonly asistenteIaActivo = this.configuracionApariencia.asistenteIaActivo;
 
   cambiarTema(tema: Tema): void {
-    this.themeService.cambiar(tema);
+    this.configuracionApariencia.cambiarTema(tema);
   }
 
   alternarAsistenteIa(activo: boolean): void {
-    this.asistenteIaActivo.set(activo);
-    try {
-      localStorage.setItem(CLAVE_ASISTENTE_IA, String(activo));
-    } catch {
-      /* localStorage no disponible; se ignora */
-    }
+    this.configuracionApariencia.alternarAsistenteIa(activo);
   }
 
   cambiarTamanoPagina(valorTexto: string): void {
-    this.preferenciasGrid.cambiarTamanoPagina(Number(valorTexto) || 10);
-  }
-
-  private leerBooleano(clave: string, porDefecto: boolean): boolean {
-    try {
-      const valor = localStorage.getItem(clave);
-      return valor === null ? porDefecto : valor === 'true';
-    } catch {
-      return porDefecto;
-    }
+    this.configuracionApariencia.cambiarTamanoPagina(Number(valorTexto) || 10);
   }
 }

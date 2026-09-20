@@ -6,6 +6,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { DataClientService } from '../../core/services/data-client.service';
 import { MiPerfilComponent } from '../../shared/components/mi-perfil/mi-perfil.component';
 import { ToastComponent } from '../../shared/components/toast/toast.component';
+import { ConfiguracionAparienciaService } from '../../shared/services/configuracion-apariencia.service';
 
 interface NotifItem {
   id: number;
@@ -37,6 +38,15 @@ export class ShellComponent {
   private readonly data = inject(DataClientService);
   protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly configuracionApariencia = inject(ConfiguracionAparienciaService);
+
+  constructor() {
+    // Trae y aplica Tema/Asistente IA/Tamaño de página guardados en la
+    // "base de datos" del usuario actual cada vez que se entra al shell
+    // (login fresco o sesión restaurada) — no solo lo que había en
+    // localStorage de este navegador.
+    void this.configuracionApariencia.cargarParaUsuarioActual();
+  }
 
   // ── Menú lateral: cada módulo muestra solo su propia sección, nunca la
   // de otro módulo (p.ej. estando en Catálogos no debe verse "Seguridad"). ──

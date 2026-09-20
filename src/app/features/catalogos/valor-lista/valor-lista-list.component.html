@@ -1,0 +1,92 @@
+<div class="page-header">
+  <div>
+    <span class="eyebrow">§ Catálogos</span>
+    <h1>Listas de valores</h1>
+  </div>
+</div>
+
+<p class="hint" style="margin:-8px 0 18px;">
+  Aquí se administran los combos de tipo/estado que usan otras pantallas (tipo de cuenta,
+  tipo de movimiento, frecuencia, proveedor de conexión, y cualquier otro que se agregue más
+  adelante) para que nada quede fijo en el código.
+</p>
+
+<div class="grid-toolbar">
+  <label class="floating-field" style="min-width:280px;">
+    <span>Grupo</span>
+    <select
+      class="form-control pill-control"
+      [value]="grupoSeleccionado()"
+      (change)="cambiarGrupo($any($event.target).value)"
+    >
+      @for (grupo of gruposDisponibles(); track grupo) {
+        <option [value]="grupo">{{ etiquetaGrupo(grupo) }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="floating-field" style="min-width:220px;">
+    <span>Crear grupo nuevo…</span>
+    <input
+      type="text"
+      class="form-control pill-control"
+      placeholder="ej. TicketPrioridadColor"
+      [value]="grupoNuevoTexto()"
+      (input)="grupoNuevoTexto.set($any($event.target).value)"
+    />
+  </label>
+  <button type="button" class="btn-secondary small" (click)="crearGrupoNuevo()">+ Crear grupo</button>
+</div>
+
+<div class="grid-toolbar">
+  <button type="button" class="toolbar-btn" (click)="nuevo()" [disabled]="!grupoSeleccionado()">+ Nuevo valor</button>
+  <app-bitacora modulo="Catálogos / Listas de valores" />
+</div>
+
+<app-data-table
+  [columnas]="columnas"
+  [filas]="registros()"
+  [cargando]="cargando()"
+  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+  (editar)="editar($event)"
+  (eliminar)="pedirEliminar($event)"
+/>
+
+@if (modalAbierto()) {
+  <div class="modal-overlay modal show d-block" (click)="modalAbierto.set(false)">
+    <form class="modal-box modal-dialog modal-content" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3 class="modal-title mb-3">{{ registroEnEdicion() ? 'Editar valor' : 'Nuevo valor' }}</h3>
+      <p class="hint" style="margin:-8px 0 14px;">Grupo: <strong>{{ etiquetaGrupo(grupoSeleccionado()) }}</strong></p>
+
+      <div class="edit-form">
+        <label class="floating-field">
+          <span>Etiqueta (lo que ve el usuario) <b>*</b></span>
+          <input type="text" class="form-control pill-control" formControlName="etiqueta" placeholder=" " aria-label="Etiqueta" />
+        </label>
+
+        <label class="floating-field">
+          <span>Clave (lo que se guarda) <b>*</b></span>
+          <input type="text" class="form-control pill-control" formControlName="clave" placeholder=" " aria-label="Clave" />
+        </label>
+
+        <label class="floating-field">
+          <span>Orden <b>*</b></span>
+          <input type="number" min="1" class="form-control pill-control" formControlName="orden" placeholder=" " aria-label="Orden" />
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary btn btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="registroAEliminar() !== null"
+  titulo="Eliminar valor"
+  [mensaje]="'¿Eliminar el valor ' + (registroAEliminar()?.etiqueta ?? '') + '? Los registros que ya lo tengan guardado conservan el texto anterior.'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="registroAEliminar.set(null)"
+/>

@@ -54,8 +54,8 @@
         <label class="floating-field">
           <span>Tipo <b>*</b></span>
           <select class="form-control pill-control" formControlName="tipo" aria-label="Tipo">
-            @for (t of tipos; track t) {
-              <option [ngValue]="t">{{ iconoTipo(t) }} {{ t }}</option>
+            @for (t of tipos(); track t.id) {
+              <option [ngValue]="t.clave">{{ iconoTipo(t.clave) }} {{ t.etiqueta }}</option>
             }
           </select>
         </label>

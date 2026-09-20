@@ -4,7 +4,10 @@ import { DataClientService } from '../../../core/services/data-client.service';
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../../shared/services/toast.service';
+import { ValorLista } from '../../catalogos/valor-lista/valor-lista.model';
 import { ConfiguracionConexion } from './conexion.model';
+
+const GRUPO_PROVEEDOR = 'ConfiguracionConexionProveedor';
 
 /**
  * Configuración de conexiones de base de datos. Nombres de campo
@@ -12,6 +15,9 @@ import { ConfiguracionConexion } from './conexion.model';
  * + credenciales) — no se tuvo el DTO exacto de PlataformaSaurix.Web a
  * la vista, así que si el Controller real usa otros nombres, ajustar
  * conexion.model.ts y este componente.
+ *
+ * La lista de proveedores ya no está fija en el código: viene del catálogo
+ * "Listas de valores" (Catálogos → grupo ConfiguracionConexionProveedor).
  */
 @Component({
   selector: 'app-conexiones',
@@ -28,6 +34,7 @@ export class ConexionesComponent implements OnInit {
 
   protected readonly conexiones = signal<ConfiguracionConexion[]>([]);
   protected readonly cargando = signal(false);
+  protected readonly proveedores = signal<ValorLista[]>([]);
 
   protected readonly modalAbierto = signal(false);
   protected readonly conexionEnEdicion = signal<ConfiguracionConexion | null>(null);
@@ -53,6 +60,9 @@ export class ConexionesComponent implements OnInit {
 
   ngOnInit(): void {
     this.cargar();
+    this.data.list<ValorLista>('ValorLista', { grupo: GRUPO_PROVEEDOR }).subscribe((valores) =>
+      this.proveedores.set([...valores].sort((a, b) => a.orden - b.orden)),
+    );
   }
 
   cargar(): void {

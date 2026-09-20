@@ -9,6 +9,7 @@ import { ToastService } from '../../../shared/services/toast.service';
 import { CategoriaPresupuesto } from '../../catalogos/categoria-presupuesto/categoria-presupuesto.model';
 import { CuentaPresupuesto } from '../../catalogos/cuenta-presupuesto/cuenta-presupuesto.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
+import { ValorLista } from '../../catalogos/valor-lista/valor-lista.model';
 import { MovimientoRecurrentePresupuesto } from './recurrente.model';
 
 /**
@@ -37,6 +38,8 @@ export class RecurrentesComponent implements OnInit {
   protected readonly movimientosOrigen = signal<MovimientoPresupuesto[]>([]);
   protected readonly cuentas = signal<CuentaPresupuesto[]>([]);
   protected readonly categorias = signal<CategoriaPresupuesto[]>([]);
+  protected readonly tiposMovimiento = signal<ValorLista[]>([]);
+  protected readonly frecuencias = signal<ValorLista[]>([]);
   protected readonly cargando = signal(false);
 
   protected readonly modalAbierto = signal(false);
@@ -63,11 +66,11 @@ export class RecurrentesComponent implements OnInit {
   protected readonly form = this.fb.nonNullable.group({
     id: [0],
     descripcion: ['', Validators.required],
-    tipo: ['Gasto' as 'Ingreso' | 'Gasto', Validators.required],
+    tipo: ['Gasto' as string, Validators.required],
     cuentaPresupuestoId: [0, Validators.required],
     categoriaPresupuestoId: [0],
     monto: [0, [Validators.required, Validators.min(0.01)]],
-    frecuencia: ['Mensual' as 'Mensual' | 'Anual', Validators.required],
+    frecuencia: ['Mensual' as string, Validators.required],
     diaDelMes: [1, [Validators.required, Validators.min(1), Validators.max(31)]],
   });
 
@@ -78,6 +81,12 @@ export class RecurrentesComponent implements OnInit {
   ngOnInit(): void {
     this.data.list<CuentaPresupuesto>('CuentaPresupuesto').subscribe((c) => this.cuentas.set(c));
     this.data.list<CategoriaPresupuesto>('CategoriaPresupuesto').subscribe((c) => this.categorias.set(c));
+    this.data.list<ValorLista>('ValorLista', { grupo: 'MovimientoPresupuestoTipo' }).subscribe((v) =>
+      this.tiposMovimiento.set([...v].sort((a, b) => a.orden - b.orden)),
+    );
+    this.data.list<ValorLista>('ValorLista', { grupo: 'MovimientoRecurrenteFrecuencia' }).subscribe((v) =>
+      this.frecuencias.set([...v].sort((a, b) => a.orden - b.orden)),
+    );
     this.cargar();
   }
 
@@ -118,7 +127,7 @@ export class RecurrentesComponent implements OnInit {
     return fila.frecuencia === 'Mensual' ? `${hoy.getFullYear()}-${hoy.getMonth() + 1}` : `${hoy.getFullYear()}`;
   }
 
-  private cicloDeFecha(fecha: string, frecuencia: 'Mensual' | 'Anual'): string {
+  private cicloDeFecha(fecha: string, frecuencia: string): string {
     const f = new Date(fecha);
     return frecuencia === 'Mensual' ? `${f.getFullYear()}-${f.getMonth() + 1}` : `${f.getFullYear()}`;
   }

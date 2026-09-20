@@ -1,4 +1,6 @@
-export type FrecuenciaRecurrente = 'Mensual' | 'Anual';
+/** Ahora viene del catálogo "Listas de valores" (Catálogos, grupo
+ *  MovimientoRecurrenteFrecuencia) en vez de un enum fijo. */
+export type FrecuenciaRecurrente = string;
 
 /**
  * "Fijos y Proyección" — personal (por usuario, vía creadoPorUsuarioId).
@@ -9,7 +11,7 @@ export type FrecuenciaRecurrente = 'Mensual' | 'Anual';
 export interface MovimientoRecurrentePresupuesto {
   id: number;
   descripcion: string;
-  tipo: 'Ingreso' | 'Gasto';
+  tipo: string; // catálogo "Listas de valores", grupo MovimientoPresupuestoTipo (compartido con Movimientos)
   cuentaPresupuestoId: number;
   categoriaPresupuestoId: number | null;
   monto: number;
