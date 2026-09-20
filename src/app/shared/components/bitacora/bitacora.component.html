@@ -1,0 +1,156 @@
+<button
+  type="button"
+  class="btn-secondary btn btn-outline-secondary small toolbar-icon-button"
+  title="Abrir bitácora"
+  aria-label="Abrir bitácora"
+  (click)="abrir()"
+>
+  ☷
+</button>
+
+@if (abierta()) {
+  <div class="modal-overlay modal show d-block bitacora-overlay" (click)="cerrar()">
+    <section class="modal-box modal-dialog modal-content bitacora-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header p-0 pb-3 mb-3">
+        <div>
+          <h3 class="modal-title mb-1">Bitácora</h3>
+          <p class="text-muted mb-0">{{ modulo() }} · cambios registrados</p>
+        </div>
+      </div>
+
+      @if (cargando()) {
+        <div class="text-center text-muted py-4">Cargando bitácora...</div>
+      } @else {
+        @if (ultimoRegistro(); as ultimo) {
+          <div class="bitacora-latest alert alert-light mb-3">
+            <div>
+              <span class="bitacora-latest-label">Último evento</span>
+              <strong>{{ ultimo.accion }}</strong>
+              <span>{{ ultimo.entidad }} · {{ ultimo.usuario }} · {{ fecha(ultimo.fecha) }}</span>
+            </div>
+            <span class="bitacora-count">{{ registros().length }} movimientos</span>
+          </div>
+        }
+        @if (registros().length > 0) {
+          <div class="bitacora-filtros mb-3">
+            <label class="bitacora-filtro-campo">
+              <span>Desde</span>
+              <input type="date" class="form-control pill-control" [ngModel]="filtroDesde()" (ngModelChange)="filtroDesde.set($event)" />
+            </label>
+            <label class="bitacora-filtro-campo">
+              <span>Hasta</span>
+              <input type="date" class="form-control pill-control" [ngModel]="filtroHasta()" (ngModelChange)="filtroHasta.set($event)" />
+            </label>
+            <label class="bitacora-filtro-campo">
+              <span>Acción</span>
+              <select class="toolbar-select" [ngModel]="filtroAccion()" (ngModelChange)="filtroAccion.set($event)">
+                <option value="">Todas</option>
+                @for (accion of accionesDisponibles(); track accion) {
+                  <option [value]="accion">{{ accion }}</option>
+                }
+              </select>
+            </label>
+            <label class="bitacora-filtro-campo">
+              <span>Usuario</span>
+              <input
+                type="text"
+                class="form-control pill-control"
+                placeholder="Buscar por usuario…"
+                [ngModel]="filtroUsuario()"
+                (ngModelChange)="filtroUsuario.set($event)"
+              />
+            </label>
+            <button type="button" class="btn-secondary btn btn-outline-secondary small bitacora-filtro-export" (click)="exportarCsv()">
+              ⬇️ Exportar CSV
+            </button>
+          </div>
+
+          @if (registrosFiltrados().length > 0) {
+            <div class="table-responsive bitacora-grid-wrap">
+              <table class="table table-hover align-middle mb-0 bitacora-grid">
+                <thead>
+                  <tr>
+                    <th class="bitacora-number-column">#</th>
+                    <th>Acción</th>
+                    <th>Fecha</th>
+                    <th>Usuario</th>
+                    <th>Registro</th>
+                    <th class="text-end">Detalle</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (registro of registrosFiltrados(); track registro.id) {
+                    <tr
+                      class="bitacora-grid-row"
+                      [class.table-active]="registroSeleccionado()?.id === registro.id"
+                      tabindex="0"
+                      (click)="seleccionar(registro)"
+                      (keydown.enter)="seleccionar(registro)"
+                    >
+                      <td class="bitacora-number-column"><span class="bitacora-movement-number">{{ registro.id }}</span></td>
+                      <td><strong>{{ registro.accion }}</strong></td>
+                      <td>{{ fecha(registro.fecha) }}</td>
+                      <td>{{ registro.usuario }}</td>
+                      <td>{{ registro.entidad }}{{ registro.registroId ? ' #' + registro.registroId : '' }}</td>
+                      <td class="text-end"><span class="bitacora-detail-link">Ver detalle →</span></td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <div class="text-center text-muted py-4">Ningún movimiento coincide con el filtro.</div>
+          }
+        } @else {
+          <div class="text-center text-muted py-4">Todavía no hay movimientos en este módulo.</div>
+        }
+
+        @if (registroSeleccionado(); as registro) {
+          <div class="modal-overlay modal show d-block bitacora-detail-overlay" (click)="registroSeleccionado.set(null)">
+            <section class="modal-box modal-dialog modal-content bitacora-detail-window" (click)="$event.stopPropagation()">
+              <div class="bitacora-detail-head">
+                <div>
+                  <h4 class="mb-1">Detalle de {{ registro.accion }}</h4>
+                  <span class="text-muted small">{{ registro.entidad }} · {{ fecha(registro.fecha) }}</span>
+                </div>
+              </div>
+              @if (registro.cambios.length > 0) {
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Campo modificado</th>
+                        <th>Antes</th>
+                        <th>Ahora</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (cambio of registro.cambios; track cambio.campo) {
+                        <tr>
+                          <td>{{ cambio.campo }}</td>
+                          <td class="bitacora-before">{{ valor(cambio.anterior) }}</td>
+                          <td class="bitacora-after">{{ valor(cambio.actual) }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <p class="text-muted small mb-0">Sin campos modificados.</p>
+              }
+              <div class="modal-actions mt-3">
+                <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="registroSeleccionado.set(null)">
+                  Cerrar detalle
+                </button>
+              </div>
+            </section>
+          </div>
+        }
+      }
+
+      <div class="modal-actions mt-3">
+        <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="cerrar()">Cerrar</button>
+      </div>
+    </section>
+  </div>
+}

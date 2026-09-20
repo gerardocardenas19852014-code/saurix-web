@@ -1,0 +1,27 @@
+/* Estilos en src/styles.scss (.page-header, .grid-toolbar, .modal-overlay, .edit-form). */
+
+.user-modal {
+	max-width: 760px;
+}
+
+.user-modal-fields {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 16px 20px;
+}
+
+/* El patrón .floating-field (label + span flotante) ahora es global, en
+   src/styles.scss — lo usa también Mi Perfil. Aquí solo queda lo específico
+   de esta pantalla (el grid de 2 columnas y el checkbox de Activo). */
+.active-field { min-height: 28px; justify-content: flex-start; }
+
+@media (max-width: 640px) {
+	.user-modal-fields { grid-template-columns: 1fr; }
+}
+
+/* .password-fortaleza (+ variantes) y .toolbar-select ahora viven en
+   src/styles.scss — son genéricas y las usa también Mi Perfil; aquí había
+   una versión vieja/duplicada de antes del rediseño con Bootstrap que
+   competía con la nueva (mismo nombre de clase, encapsulada a este
+   componente, ganaba por orden de inyección) y dejaba el selector "Todos"
+   más chico y sin la píldora/flecha nuevas. */

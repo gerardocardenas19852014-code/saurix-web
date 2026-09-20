@@ -1,0 +1,112 @@
+<div class="page-header">
+  <h1>Prioridades de Ticket</h1>
+  <div class="page-actions">
+    <button type="button" class="toolbar-btn" (click)="nueva()">+ Nueva</button>
+  </div>
+</div>
+
+<div class="grid-table-scroll">
+  <table class="grid-table">
+    <thead>
+      <tr>
+        <th>Clave</th>
+        <th>Nombre</th>
+        <th>Color</th>
+        <th>SLA (hrs)</th>
+        <th>Aviso (hrs antes)</th>
+        <th class="grid-actions-col">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (prioridad of prioridades(); track prioridad.id) {
+        <tr>
+          <td data-label="Clave">{{ prioridad.clave }}</td>
+          <td data-label="Nombre">{{ prioridad.nombre }}</td>
+          <td data-label="Color"><span class="color-swatch" [style.background]="prioridad.codigoHex"></span></td>
+          <td data-label="SLA (hrs)">{{ prioridad.vigenciaHoras }}</td>
+          <td data-label="Aviso (hrs antes)">{{ prioridad.avisoHoras }}</td>
+          <td class="grid-actions-col" data-label="Acciones">
+            <button type="button" class="btn-secondary small" (click)="editar(prioridad)">Editar</button>
+            <button type="button" class="btn-danger small" (click)="pedirEliminar(prioridad)">Eliminar</button>
+          </td>
+        </tr>
+      } @empty {
+        <tr>
+          <td colspan="6">
+            <div class="empty-state-block">
+              <p>Sin registros para mostrar.</p>
+            </div>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+@if (modalAbierto()) {
+  <div class="modal-overlay show" (click)="modalAbierto.set(false)">
+    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3>{{ prioridadEnEdicion() ? 'Editar prioridad' : 'Nueva prioridad' }}</h3>
+
+      <div class="edit-form" style="margin-bottom: 18px;">
+        <label>
+          Nombre
+          <input type="text" formControlName="nombre" />
+        </label>
+
+        <label>
+          Clave
+          <input type="text" formControlName="clave" />
+        </label>
+
+        <label>
+          Color
+          <input type="color" formControlName="codigoHex" />
+        </label>
+
+        <label>
+          Vigencia SLA (horas)
+          <input type="number" formControlName="vigenciaHoras" />
+        </label>
+
+        <label>
+          Aviso antes de vencer (horas)
+          <input type="number" formControlName="avisoHoras" />
+        </label>
+      </div>
+
+      <div class="edit-form" style="margin-bottom: 18px;">
+        <label>Avisar también a (además del asignado)</label>
+        @if (usuarios().length === 0) {
+          <p class="hint">No hay usuarios registrados.</p>
+        } @else {
+          <div class="role-checkbox-list">
+            @for (usuario of usuarios(); track usuario.id) {
+              <label class="checkbox-inline">
+                <input
+                  type="checkbox"
+                  [checked]="usuarioIdsNotificar().includes(usuario.id)"
+                  (change)="toggleNotificar(usuario.id, $any($event.target).checked)"
+                />
+                {{ usuario.nombreCompleto }}
+              </label>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="prioridadAEliminar() !== null"
+  titulo="Eliminar prioridad"
+  [mensaje]="'¿Eliminar ' + (prioridadAEliminar()?.nombre ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="prioridadAEliminar.set(null)"
+/>

@@ -1,0 +1,20 @@
+<div class="modules-header-row">
+  <div>
+    <span class="eyebrow">§ Panel de módulos</span>
+    <h1>¿Qué módulo quieres abrir?</h1>
+  </div>
+  <div class="session-inline">
+    <span>👤 <strong>{{ auth.usuarioActual()?.nombreUsuario }}</strong> <span class="role-tag">{{ auth.usuarioActual()?.role }}</span></span>
+    <button type="button" class="btn-secondary small" (click)="salir()">Salir</button>
+  </div>
+</div>
+<p class="hint">Elige un módulo para continuar. Aquí se irán agregando más conforme se vayan sumando al sistema.</p>
+
+<div class="tiles-grid">
+  @for (modulo of modulos; track modulo.ruta) {
+    <a class="module-tile" [class]="modulo.clase" [routerLink]="modulo.ruta">
+      <div class="module-tile-icon">{{ modulo.icono }}</div>
+      <div class="module-tile-label">{{ modulo.etiqueta }}</div>
+    </a>
+  }
+</div>

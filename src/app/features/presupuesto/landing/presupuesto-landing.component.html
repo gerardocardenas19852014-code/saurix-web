@@ -1,0 +1,25 @@
+<div class="page-header">
+  <h1>Presupuesto</h1>
+</div>
+<p class="hint" style="margin-top:-12px;">
+  Las categorías y cuentas se administran desde Catálogos; aquí van tus movimientos personales.
+</p>
+
+<div class="dashboard-stats">
+  <div class="dashboard-stat-card"><div class="num">{{ formatMoneda(saldoTotal()) }}</div><div class="label">Saldo total</div></div>
+  <div class="dashboard-stat-card dashboard-stat-danger"><div class="num">{{ formatMoneda(gastosDelMes()) }}</div><div class="label">Gastos del mes</div></div>
+  <div class="dashboard-stat-card"><div class="num">{{ cuentas().length }}</div><div class="label">Cuentas</div></div>
+</div>
+
+<div class="catalog-list">
+  @for (enlace of enlaces; track enlace.ruta) {
+    <a class="catalog-list-item" [routerLink]="enlace.ruta">
+      <span class="catalog-list-icon catalog-list-icon-{{ enlace.color }}">{{ enlace.icono }}</span>
+      <div class="catalog-list-body">
+        <h3>{{ enlace.titulo }}</h3>
+        <p>{{ enlace.descripcion }}</p>
+      </div>
+      <span class="workspace-card-enter catalog-list-enter">Entrar →</span>
+    </a>
+  }
+</div>

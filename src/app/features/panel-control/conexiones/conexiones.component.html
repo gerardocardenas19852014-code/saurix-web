@@ -1,0 +1,80 @@
+<div class="page-header">
+  <h1>Configuración de conexiones</h1>
+  <div class="page-actions">
+    <button type="button" class="toolbar-btn" (click)="nueva()">+ Nueva</button>
+  </div>
+</div>
+
+<app-data-table
+  [columnas]="columnas"
+  [filas]="conexiones()"
+  [cargando]="cargando()"
+  (editar)="editar($event)"
+  (eliminar)="pedirEliminar($event)"
+/>
+
+@if (modalAbierto()) {
+  <div class="modal-overlay show" (click)="modalAbierto.set(false)">
+    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3>{{ conexionEnEdicion() ? 'Editar conexión' : 'Nueva conexión' }}</h3>
+
+      <div class="edit-form" style="margin-bottom: 18px;">
+        <label>
+          Nombre
+          <input type="text" formControlName="nombre" />
+        </label>
+
+        <label>
+          Proveedor
+          <select formControlName="proveedor">
+            <option value="SqlServer">SQL Server</option>
+            <option value="PostgreSql">PostgreSQL</option>
+            <option value="MySql">MySQL</option>
+          </select>
+        </label>
+
+        <label>
+          Servidor
+          <input type="text" formControlName="servidor" />
+        </label>
+
+        <label>
+          Puerto
+          <input type="number" formControlName="puerto" />
+        </label>
+
+        <label>
+          Base de datos
+          <input type="text" formControlName="baseDatos" />
+        </label>
+
+        <label>
+          Usuario
+          <input type="text" formControlName="usuarioConexion" />
+        </label>
+
+        <label>
+          Contraseña
+          <input
+            type="password"
+            formControlName="passwordConexion"
+            [placeholder]="conexionEnEdicion() ? 'Dejar en blanco para no cambiarla' : ''"
+          />
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="conexionAEliminar() !== null"
+  titulo="Eliminar conexión"
+  [mensaje]="'¿Eliminar la conexión ' + (conexionAEliminar()?.nombre ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="conexionAEliminar.set(null)"
+/>

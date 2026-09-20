@@ -1,0 +1,14 @@
+<div class="page-header">
+  <h1>Comercio</h1>
+</div>
+<div class="workspace-grid">
+  @for (enlace of enlaces; track enlace.ruta) {
+    <a class="workspace-card" [routerLink]="enlace.ruta">
+      <div class="workspace-card-icon">{{ enlace.icono }}</div>
+      <span class="eyebrow">{{ enlace.eyebrow }}</span>
+      <h2>{{ enlace.titulo }}</h2>
+      <p class="workspace-card-blurb">{{ enlace.descripcion }}</p>
+      <div class="workspace-card-foot"><span class="workspace-card-enter">Entrar →</span></div>
+    </a>
+  }
+</div>

@@ -1,0 +1,198 @@
+<div class="page-header">
+  <h1>Movimientos</h1>
+  <div class="page-actions">
+    <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo movimiento</button>
+  </div>
+</div>
+
+<h2 class="settings-card-title" style="margin:0 0 12px;">Cuentas</h2>
+<div class="wallet-accounts-grid" style="margin-bottom:28px;">
+  @for (cuenta of cuentas(); track cuenta.id) {
+    <div class="wallet-account-card">
+      <span class="wallet-account-icon">{{ iconoTipoCuenta(cuenta.tipo) }}</span>
+      <div class="wallet-account-name">{{ cuenta.nombre }}</div>
+      <div class="wallet-account-balance">{{ formatMoneda(saldoCuenta(cuenta.id)) }}</div>
+    </div>
+  } @empty {
+    <p class="empty">Aún no hay cuentas — créalas desde Catálogos.</p>
+  }
+</div>
+
+@if (resumenMensual().length > 0) {
+  <h2 class="settings-card-title" style="margin:0 0 12px;">Ingresos vs. gastos (últimos 6 meses)</h2>
+  <div class="wallet-monthly-chart" style="margin-bottom:28px;">
+    @for (columna of resumenMensual(); track columna.etiqueta) {
+      <div class="wallet-monthly-col">
+        <div class="wallet-monthly-bars">
+          <div class="wallet-monthly-bar wallet-monthly-bar-in" [style.height.px]="(columna.ingreso / maxMensual()) * 140"></div>
+          <div class="wallet-monthly-bar wallet-monthly-bar-out" [style.height.px]="(columna.gasto / maxMensual()) * 140"></div>
+        </div>
+        <span class="wallet-monthly-label">{{ columna.etiqueta }}</span>
+      </div>
+    }
+  </div>
+}
+
+<div class="board-filters">
+  <label class="board-filter-field">
+    Buscar
+    <input type="text" [value]="filtroTexto()" placeholder="Buscar por descripción…" (input)="filtroTexto.set($any($event.target).value)" />
+  </label>
+  <label class="board-filter-field">
+    Cuenta
+    <select [value]="filtroCuentaId()" (change)="filtroCuentaId.set(+$any($event.target).value)">
+      <option [value]="0">Todas</option>
+      @for (cuenta of cuentas(); track cuenta.id) {
+        <option [value]="cuenta.id">{{ cuenta.nombre }}</option>
+      }
+    </select>
+  </label>
+  <label class="board-filter-field">
+    Categoría
+    <select [value]="filtroCategoriaId()" (change)="filtroCategoriaId.set(+$any($event.target).value)">
+      <option [value]="0">Todas</option>
+      @for (categoria of categorias(); track categoria.id) {
+        <option [value]="categoria.id">{{ categoria.nombre }}</option>
+      }
+    </select>
+  </label>
+  <label class="board-filter-field">
+    Tipo
+    <select [value]="filtroTipo()" (change)="filtroTipo.set($any($event.target).value)">
+      <option value="">Todos</option>
+      <option value="Ingreso">Ingreso</option>
+      <option value="Gasto">Gasto</option>
+    </select>
+  </label>
+  @if (hayFiltros()) {
+    <button type="button" class="btn-secondary small" (click)="limpiarFiltros()">✕ Limpiar filtros</button>
+  }
+</div>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else if (movimientosFiltrados().length === 0) {
+  <div class="empty-state-block">
+    <p>No hay movimientos{{ hayFiltros() ? ' con estos filtros' : '' }}.</p>
+    @if (!hayFiltros()) {
+      <button type="button" class="btn-primary" (click)="nuevo()">+ Registrar el primero</button>
+    }
+  </div>
+} @else {
+  <ul class="wallet-tx-list">
+    @for (movimiento of movimientosFiltrados(); track movimiento.id) {
+      <li class="wallet-tx-item" (click)="editar(movimiento)">
+        <span class="wallet-tx-cat-dot" [style.background]="colorCategoria(movimiento.categoriaPresupuestoId)"></span>
+        <div class="wallet-tx-body">
+          <strong>{{ movimiento.descripcion || nombreCategoria(movimiento.categoriaPresupuestoId) }}</strong>
+          @if (movimiento.transferenciaId) {
+            <span class="tag" title="Transferencia entre cuentas">🔄 transferencia</span>
+          }
+          <span class="hint" style="margin:0;">
+            {{ nombreCuenta(movimiento.cuentaPresupuestoId) }}
+            @if (!movimiento.transferenciaId) {
+              · {{ nombreCategoria(movimiento.categoriaPresupuestoId) }}
+            }
+            · {{ movimiento.fecha | date: 'dd/MM/yyyy' }}
+          </span>
+        </div>
+        <span class="wallet-tx-amount" [class.wallet-tx-amount-in]="movimiento.tipo === 'Ingreso'" [class.wallet-tx-amount-out]="movimiento.tipo === 'Gasto'">
+          {{ movimiento.tipo === 'Ingreso' ? '+' : '-' }}{{ formatMoneda(movimiento.monto) }}
+        </span>
+        <button
+          type="button"
+          class="btn-danger small"
+          title="Eliminar"
+          (click)="$event.stopPropagation(); pedirEliminar(movimiento)"
+        >
+          Eliminar
+        </button>
+      </li>
+    }
+  </ul>
+}
+
+@if (modalAbierto()) {
+  <div class="modal-overlay show" (click)="modalAbierto.set(false)">
+    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()" style="max-width:560px;">
+      <h3>{{ movimientoEnEdicion() ? 'Editar movimiento' : 'Nuevo movimiento' }}</h3>
+
+      <div class="edit-form form-grid-2col" style="margin-bottom:18px;">
+        <label>
+          Fecha
+          <input type="date" formControlName="fecha" />
+        </label>
+
+        <label>
+          Tipo
+          <select formControlName="tipo">
+            <option value="Gasto">Gasto</option>
+            <option value="Ingreso">Ingreso</option>
+            @if (!movimientoEnEdicion()) {
+              <option value="Transferencia">Transferencia entre cuentas</option>
+            }
+          </select>
+        </label>
+
+        <label>
+          {{ esTransferencia ? 'Cuenta origen' : 'Cuenta' }}
+          <select formControlName="cuentaPresupuestoId">
+            <option [ngValue]="0">Selecciona...</option>
+            @for (cuenta of cuentas(); track cuenta.id) {
+              <option [ngValue]="cuenta.id">{{ cuenta.nombre }}</option>
+            }
+          </select>
+        </label>
+
+        @if (esTransferencia) {
+          <label>
+            Cuenta destino
+            <select formControlName="cuentaDestinoId">
+              <option [ngValue]="0">Selecciona...</option>
+              @for (cuenta of cuentas(); track cuenta.id) {
+                <option [ngValue]="cuenta.id">{{ cuenta.nombre }}</option>
+              }
+            </select>
+          </label>
+        } @else {
+          <label>
+            Categoría
+            <select formControlName="categoriaPresupuestoId">
+              <option [ngValue]="0">Sin categoría</option>
+              @for (categoria of categorias(); track categoria.id) {
+                <option [ngValue]="categoria.id">{{ categoria.nombre }}</option>
+              }
+            </select>
+          </label>
+        }
+
+        <label>
+          Monto
+          <input type="number" step="0.01" formControlName="monto" />
+        </label>
+
+        <label class="full-span">
+          Descripción
+          <input type="text" formControlName="descripcion" />
+        </label>
+      </div>
+
+      @if (movimientoEnEdicion(); as movimiento) {
+        <app-adjuntos-panel entidad="MovimientoPresupuestoAdjunto" campoPadre="movimientoPresupuestoId" [padreId]="movimiento.id" />
+      }
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="movimientoAEliminar() !== null"
+  titulo="Eliminar movimiento"
+  [mensaje]="'¿Eliminar este movimiento?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="movimientoAEliminar.set(null)"
+/>

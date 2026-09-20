@@ -1,0 +1,593 @@
+<div class="page-header">
+  <h1>Tablero Kanban</h1>
+  <div class="page-actions">
+    <button type="button" class="toolbar-btn" (click)="nuevoTicket(columnaPorDefecto())" [disabled]="!columnasTablero().length">
+      + Nuevo ticket
+    </button>
+  </div>
+</div>
+
+<div class="board-filters">
+  <label class="board-filter-field">
+    Proyecto
+    <select [value]="proyectoSeleccionadoId()" (change)="cambiarProyecto($any($event.target).value)">
+      @for (proyecto of proyectos(); track proyecto.id) {
+        <option [value]="proyecto.id">{{ proyecto.clave }} — {{ proyecto.nombre }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="board-filter-field">
+    Tipo
+    <select [value]="filtroTipoId()" (change)="filtroTipoId.set(+$any($event.target).value)">
+      <option [value]="0">Todos</option>
+      @for (tipo of tipos(); track tipo.id) {
+        <option [value]="tipo.id">{{ tipo.icono }} {{ tipo.nombre }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="board-filter-field">
+    Prioridad
+    <select [value]="filtroPrioridadId()" (change)="filtroPrioridadId.set(+$any($event.target).value)">
+      <option [value]="0">Todas</option>
+      @for (prioridad of prioridades(); track prioridad.id) {
+        <option [value]="prioridad.id">{{ prioridad.nombre }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="board-filter-field">
+    Asignado a
+    <select [value]="filtroAsignadoId()" (change)="filtroAsignadoId.set(+$any($event.target).value)">
+      <option [value]="0">Todos</option>
+      @for (usuario of usuarios(); track usuario.id) {
+        <option [value]="usuario.id">{{ usuario.nombreCompleto }}</option>
+      }
+    </select>
+  </label>
+
+  @if (hayFiltros()) {
+    <button type="button" class="btn-secondary small" (click)="limpiarFiltros()">✕ Limpiar filtros</button>
+  }
+</div>
+
+@if (cargando()) {
+  <p class="hint">Cargando tablero…</p>
+} @else if (!columnasTablero().length) {
+  <div class="empty-state-block">
+    <p>Este proyecto todavía no tiene columnas configuradas.</p>
+    <p>Créalas en Gestión de Proyectos → Gestor de Estados.</p>
+  </div>
+} @else {
+  <div class="kanban-board">
+    @for (columna of columnasTablero(); track columna.id; let iColumna = $index) {
+      <div class="kanban-column" [class.is-drop-target]="columnaDropTargetId() === columna.id">
+        <div class="kanban-column-header">
+          <span>{{ columna.nombre }}</span>
+          <span class="kanban-column-count">{{ (ticketsPorColumna().get(columna.id) ?? []).length }}</span>
+        </div>
+
+        <div
+          class="kanban-column-body"
+          (dragover)="$event.preventDefault(); onDragEnterColumn(columna.id)"
+          (dragleave)="onDragLeaveColumn(columna.id)"
+          (drop)="onDrop($event, columna)"
+        >
+          @for (ticket of ticketsPorColumna().get(columna.id) ?? []; track ticket.id) {
+            <div
+              class="kanban-card"
+              [class.is-dragging]="ticketArrastrandoId() === ticket.id"
+              [draggable]="true"
+              (dragstart)="onDragStart($event, ticket)"
+              (dragend)="onDragEnd()"
+            >
+              <div class="kanban-card-top">
+                <span class="kanban-card-id">#{{ ticket.numeroTicket }}</span>
+                <span
+                  class="kanban-card-priority"
+                  [style.background]="colorPrioridad(ticket.ticketPrioridadId)"
+                  [title]="'Prioridad: ' + nombrePrioridad(ticket.ticketPrioridadId)"
+                ></span>
+              </div>
+
+              <p class="kanban-card-title" (click)="abrirDetalle(ticket)">
+                {{ iconoTipo(ticket.ticketTipoId) }} {{ ticket.titulo }}
+              </p>
+
+              @if (etiquetasDe(ticket.id).length > 0) {
+                <div class="kanban-card-tags">
+                  @for (etiqueta of etiquetasDe(ticket.id); track etiqueta.id) {
+                    <span class="kanban-tag">{{ etiqueta.texto }}</span>
+                  }
+                </div>
+              }
+
+              @if (claseSla(ticket); as clase) {
+                <span [class]="'sla-badge ' + clase">{{ textoSla(ticket) }}</span>
+              }
+
+              <div class="kanban-card-foot">
+                <div class="kanban-card-moves">
+                  <button
+                    type="button"
+                    class="kanban-move-btn"
+                    (click)="mover(ticket, -1)"
+                    [disabled]="iColumna === 0"
+                    title="Mover a columna anterior"
+                  >
+                    ◀
+                  </button>
+                  <button
+                    type="button"
+                    class="kanban-move-btn"
+                    (click)="mover(ticket, 1)"
+                    [disabled]="iColumna === columnasTablero().length - 1"
+                    title="Mover a columna siguiente"
+                  >
+                    ▶
+                  </button>
+                </div>
+
+                @if (ticket.asignadoUsuarioId) {
+                  <span
+                    class="kanban-card-assignee"
+                    [style.background]="colorAvatar(nombreUsuario(ticket.asignadoUsuarioId))"
+                    [title]="'Asignado a ' + nombreUsuario(ticket.asignadoUsuarioId)"
+                  >
+                    {{ iniciales(nombreUsuario(ticket.asignadoUsuarioId)) }}
+                  </span>
+                } @else {
+                  <span class="kanban-card-assignee kanban-card-assignee-empty" title="Sin asignar">?</span>
+                }
+              </div>
+            </div>
+          }
+
+          @if ((ticketsPorColumna().get(columna.id) ?? []).length === 0) {
+            <p class="kanban-empty">Sin tickets{{ hayFiltros() ? ' con estos filtros' : '' }}</p>
+          }
+
+          <button type="button" class="btn-secondary small" style="margin-top: 4px;" (click)="nuevoTicket(columna.id)">+ Ticket</button>
+        </div>
+      </div>
+    }
+  </div>
+}
+
+@if (modalAbierto()) {
+  <div class="modal-overlay show" (click)="modalAbierto.set(false)">
+    <form class="modal-box" style="max-width: 640px;" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardarTicket()">
+      <h3>Nuevo ticket</h3>
+
+      <div class="edit-form form-grid-2col" style="margin-bottom: 18px;">
+        <label>
+          Folio
+          <input type="text" formControlName="numeroTicket" />
+        </label>
+        <label>
+          Folio interno
+          <input type="text" formControlName="folioInterno" />
+        </label>
+
+        <label class="full-span">
+          Título
+          <input type="text" formControlName="titulo" />
+        </label>
+
+        <label class="full-span">
+          Descripción
+          <textarea rows="3" formControlName="descripcion"></textarea>
+        </label>
+
+        <label>
+          Tipo
+          <select formControlName="ticketTipoId">
+            <option [ngValue]="0" disabled>Selecciona un tipo</option>
+            @for (tipo of tipos(); track tipo.id) {
+              <option [ngValue]="tipo.id">{{ tipo.icono }} {{ tipo.nombre }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          Prioridad
+          <select formControlName="ticketPrioridadId">
+            <option [ngValue]="0" disabled>Selecciona una prioridad</option>
+            @for (prioridad of prioridades(); track prioridad.id) {
+              <option [ngValue]="prioridad.id">{{ prioridad.nombre }}</option>
+            }
+          </select>
+        </label>
+
+        <label>
+          Asignado a
+          <select formControlName="asignadoUsuarioId">
+            <option [ngValue]="0">Sin asignar</option>
+            @for (usuario of usuarios(); track usuario.id) {
+              <option [ngValue]="usuario.id">{{ usuario.nombreCompleto }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          Reportado por
+          <select formControlName="reportadoPorUsuarioId">
+            <option [ngValue]="0" disabled>Selecciona quién reportó</option>
+            @for (usuario of usuarios(); track usuario.id) {
+              <option [ngValue]="usuario.id">{{ usuario.nombreCompleto }}</option>
+            }
+          </select>
+        </label>
+
+        <label>
+          Tiempo estimado (min)
+          <input type="number" formControlName="tiempoEstimadoMin" />
+        </label>
+        <label class="checkbox-inline">
+          <input type="checkbox" formControlName="planeado" />
+          Planeado
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+@if (ticketActivo(); as activo) {
+  <div class="modal-overlay show" (click)="cerrarDetalle()">
+    <div class="modal-box" style="max-width: 860px; width: 96%; text-align: left;" (click)="$event.stopPropagation()">
+      <div class="page-header" style="margin-bottom: 12px;">
+        <h3>#{{ activo.numeroTicket }} — {{ activo.titulo }}</h3>
+        <div class="page-actions">
+          <button type="button" class="btn-danger small" (click)="pedirEliminarTicket(activo)">Eliminar</button>
+          <button type="button" class="btn-secondary small" (click)="cerrarDetalle()">Cerrar</button>
+        </div>
+      </div>
+
+      <div class="ticket-status-bar">
+        <div class="ticket-status-bar-info">
+          <strong>{{ nombreColumna(activo.tableroColumnaId) }}</strong>
+          <span>{{ nombreTipo(activo.ticketTipoId) }} · {{ nombrePrioridad(activo.ticketPrioridadId) }}</span>
+          @if (claseSla(activo); as clase) {
+            <span [class]="'sla-badge ' + clase" style="margin-top: 4px; width: fit-content;">{{ textoSla(activo) }}</span>
+          }
+        </div>
+        <div class="ticket-status-bar-action">
+          <select [value]="activo.tableroColumnaId" (change)="cambiarEstadoDetalle(activo, +$any($event.target).value)">
+            @for (columna of columnasTablero(); track columna.id) {
+              <option [value]="columna.id">{{ columna.nombre }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="tab-bar">
+        <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'detalles'" (click)="tabActiva.set('detalles')">Detalles</button>
+        @if (tabsPermitidas().actividades) {
+          <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'actividades'" (click)="tabActiva.set('actividades')">
+            Actividades ({{ actividades().length }})
+          </button>
+        }
+        <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'comentarios'" (click)="tabActiva.set('comentarios')">
+          Comentarios ({{ comentarios().length }})
+        </button>
+        <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'etiquetas'" (click)="tabActiva.set('etiquetas')">
+          Etiquetas ({{ etiquetas().length }})
+        </button>
+        @if (tabsPermitidas().adjuntos) {
+          <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'adjuntos'" (click)="tabActiva.set('adjuntos')">
+            Adjuntos
+          </button>
+        }
+        @if (tabsPermitidas().asociados) {
+          <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'asociados'" (click)="tabActiva.set('asociados')">
+            Asociados ({{ dependencias().length }})
+          </button>
+        }
+        <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'seguidores'" (click)="tabActiva.set('seguidores')">
+          Seguidores ({{ seguidores().length }})
+        </button>
+        <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'historial'" (click)="tabActiva.set('historial')">
+          Historial
+        </button>
+      </div>
+
+      @if (tabActiva() === 'detalles') {
+        <form class="tab-panel edit-form form-grid-2col" [formGroup]="form" (ngSubmit)="guardarTicket()">
+          <label>
+            Folio
+            <input type="text" formControlName="numeroTicket" />
+          </label>
+          <label>
+            Folio interno
+            <input type="text" formControlName="folioInterno" />
+          </label>
+
+          <label class="full-span">
+            Título
+            <input type="text" formControlName="titulo" />
+          </label>
+
+          <label class="full-span">
+            Descripción
+            <textarea rows="3" formControlName="descripcion"></textarea>
+          </label>
+
+          <label>
+            Tipo
+            <select formControlName="ticketTipoId">
+              @for (tipo of tipos(); track tipo.id) {
+                <option [ngValue]="tipo.id">{{ tipo.icono }} {{ tipo.nombre }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            Prioridad
+            <select formControlName="ticketPrioridadId">
+              @for (prioridad of prioridades(); track prioridad.id) {
+                <option [ngValue]="prioridad.id">{{ prioridad.nombre }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            Motivo de solución
+            <select formControlName="ticketTipoSolucionId">
+              <option [ngValue]="0">Sin definir</option>
+              @for (motivo of tiposSolucion(); track motivo.id) {
+                <option [ngValue]="motivo.id">{{ motivo.nombre }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            Asignado a
+            <select formControlName="asignadoUsuarioId">
+              <option [ngValue]="0">Sin asignar</option>
+              @for (usuario of usuarios(); track usuario.id) {
+                <option [ngValue]="usuario.id">{{ usuario.nombreCompleto }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            Reportado por
+            <select formControlName="reportadoPorUsuarioId">
+              @for (usuario of usuarios(); track usuario.id) {
+                <option [ngValue]="usuario.id">{{ usuario.nombreCompleto }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            Tiempo estimado (min)
+            <input type="number" formControlName="tiempoEstimadoMin" />
+          </label>
+
+          <label class="checkbox-inline">
+            <input type="checkbox" formControlName="planeado" />
+            Planeado
+          </label>
+          <span></span>
+
+          <label>
+            Fin análisis
+            <input type="date" formControlName="fechaFinAnalisis" />
+          </label>
+          <label>
+            Fin desarrollo
+            <input type="date" formControlName="fechaFinDesarrollo" />
+          </label>
+
+          <label class="full-span">
+            Fin cliente
+            <input type="date" formControlName="fechaFinCliente" />
+          </label>
+          <label class="full-span">
+            Solución
+            <textarea rows="3" formControlName="solucion"></textarea>
+          </label>
+
+          <div class="form-actions full-span">
+            <button type="submit" class="btn-primary">Guardar cambios</button>
+          </div>
+        </form>
+      }
+
+      @if (tabActiva() === 'actividades') {
+        <div class="tab-panel">
+          <p class="hint" style="margin: 0 0 12px;">Tiempo total registrado: {{ totalMinutosActividad() }} min.</p>
+          @if (actividades().length === 0) {
+            <p class="empty">Aún no hay actividades registradas.</p>
+          } @else {
+            <ul class="actividades-list">
+              @for (actividad of actividades(); track actividad.id) {
+                <li class="actividad-item">
+                  <div class="actividad-item-head">
+                    <span class="tag">{{ actividad.tiempoMin }} min</span>
+                  </div>
+                  <p class="actividad-item-texto">{{ actividad.texto }}</p>
+                </li>
+              }
+            </ul>
+          }
+          <form [formGroup]="formActividad" (ngSubmit)="agregarActividad()" style="margin-top: 14px;">
+            <div class="edit-form form-grid-2col">
+              <label class="full-span">
+                Descripción del trabajo
+                <input type="text" formControlName="texto" />
+              </label>
+              <label>
+                Minutos
+                <input type="number" formControlName="tiempoMin" />
+              </label>
+              <div class="form-actions">
+                <button type="submit" class="btn-secondary">+ Registrar</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      }
+
+      @if (tabActiva() === 'comentarios') {
+        <div class="tab-panel">
+          @if (comentarios().length === 0) {
+            <p class="empty">Aún no hay comentarios.</p>
+          } @else {
+            <ul class="actividades-list">
+              @for (comentario of comentarios(); track comentario.id) {
+                <li class="actividad-item">
+                  <p class="actividad-item-texto">{{ comentario.texto }}</p>
+                </li>
+              }
+            </ul>
+          }
+          <form [formGroup]="formComentario" (ngSubmit)="agregarComentario()" style="margin-top: 14px;">
+            <div class="edit-form">
+              <label>
+                Escribe un comentario
+                <input type="text" formControlName="texto" />
+              </label>
+              <div class="form-actions">
+                <button type="submit" class="btn-secondary">+ Comentar</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      }
+
+      @if (tabActiva() === 'etiquetas') {
+        <div class="tab-panel">
+          @if (etiquetas().length === 0) {
+            <p class="empty">Este ticket todavía no tiene etiquetas.</p>
+          } @else {
+            <div class="kanban-card-tags" style="margin-bottom: 14px;">
+              @for (etiqueta of etiquetas(); track etiqueta.id) {
+                <span class="kanban-tag" style="cursor: pointer;" (click)="eliminarEtiqueta(etiqueta)" title="Clic para eliminar">
+                  {{ etiqueta.texto }} ✕
+                </span>
+              }
+            </div>
+          }
+          <form [formGroup]="formEtiqueta" (ngSubmit)="agregarEtiqueta()">
+            <div class="edit-form">
+              <label>
+                Nueva etiqueta
+                <input type="text" formControlName="texto" />
+              </label>
+              <div class="form-actions">
+                <button type="submit" class="btn-secondary">+ Agregar</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      }
+
+      @if (tabActiva() === 'adjuntos' && tabsPermitidas().adjuntos) {
+        <div class="tab-panel">
+          <app-adjuntos-panel
+            entidad="TicketAdjunto"
+            campoPadre="ticketId"
+            [padreId]="activo.id"
+            [soportaComentario]="true"
+          />
+        </div>
+      }
+
+      @if (tabActiva() === 'asociados' && tabsPermitidas().asociados) {
+        <div class="tab-panel">
+          @if (dependencias().length === 0) {
+            <p class="empty">Este ticket todavía no tiene tickets asociados.</p>
+          } @else {
+            <ul class="actividades-list">
+              @for (dependencia of dependencias(); track dependencia.id) {
+                <li class="actividad-item">
+                  <div class="actividad-item-head">
+                    <span class="actividad-item-texto">
+                      #{{ ticketPorId(dependencia.ticketRelacionadoId)?.numeroTicket ?? '—' }} —
+                      {{ ticketPorId(dependencia.ticketRelacionadoId)?.titulo ?? 'Ticket eliminado' }}
+                    </span>
+                    <button type="button" class="btn-danger small" (click)="eliminarAsociado(dependencia)">✕</button>
+                  </div>
+                </li>
+              }
+            </ul>
+          }
+          <form [formGroup]="formAsociado" (ngSubmit)="agregarAsociado()" style="margin-top: 14px;">
+            <div class="edit-form form-grid-2col">
+              <label class="full-span">
+                Asociar ticket
+                <select formControlName="ticketRelacionadoId">
+                  <option [ngValue]="0" disabled>Selecciona un ticket</option>
+                  @for (ticket of ticketsDisponiblesParaAsociar(); track ticket.id) {
+                    <option [ngValue]="ticket.id">#{{ ticket.numeroTicket }} — {{ ticket.titulo }}</option>
+                  }
+                </select>
+              </label>
+              <div class="form-actions">
+                <button type="submit" class="btn-secondary">+ Asociar</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      }
+
+      @if (tabActiva() === 'seguidores') {
+        <div class="tab-panel">
+          @if (usuarios().length === 0) {
+            <p class="empty">No hay usuarios registrados.</p>
+          } @else {
+            <div class="role-checkbox-list">
+              @for (usuario of usuarios(); track usuario.id) {
+                <label class="checkbox-inline">
+                  <input
+                    type="checkbox"
+                    [checked]="esSeguidor(usuario.id)"
+                    (change)="toggleSeguidor(usuario.id, $any($event.target).checked)"
+                  />
+                  {{ usuario.nombreCompleto }}
+                </label>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      @if (tabActiva() === 'historial') {
+        <div class="tab-panel">
+          @if (historial().length === 0) {
+            <p class="empty">Aún no hay cambios de estado registrados.</p>
+          } @else {
+            <ul class="actividades-list">
+              @for (evento of historial(); track evento.id) {
+                <li class="actividad-item">
+                  <div class="actividad-item-head">
+                    <span class="tag">
+                      {{ evento.tableroColumnaAnteriorId ? nombreColumna(evento.tableroColumnaAnteriorId) : 'Creación' }}
+                      → {{ nombreColumna(evento.tableroColumnaNuevaId) }}
+                    </span>
+                  </div>
+                  <p class="actividad-item-texto">
+                    {{ nombreUsuario(evento.usuarioId) }}
+                    @if (evento.fechaCreacion) {
+                      · {{ evento.fechaCreacion | date: 'short' }}
+                    }
+                  </p>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+      }
+    </div>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="ticketAEliminar() !== null"
+  titulo="Eliminar ticket"
+  [mensaje]="'¿Eliminar el ticket ' + (ticketAEliminar()?.numeroTicket ?? '') + '?'"
+  (confirmar)="confirmarEliminarTicket()"
+  (cancelar)="ticketAEliminar.set(null)"
+/>

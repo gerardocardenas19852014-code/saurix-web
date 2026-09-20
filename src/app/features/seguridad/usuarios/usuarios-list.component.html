@@ -1,0 +1,165 @@
+<div class="page-header">
+  <div>
+    <span class="eyebrow">§ Seguridad</span>
+    <h1>Usuarios</h1>
+  </div>
+</div>
+
+<div class="grid-toolbar">
+  <button type="button" class="toolbar-btn" (click)="nuevoUsuario()">+ Nuevo</button>
+
+  <div class="toolbar-group">
+    <button
+      type="button"
+      class="btn-secondary small toolbar-icon-button"
+      title="Exportar CSV"
+      aria-label="Exportar usuarios a CSV"
+      (click)="exportarUsuariosCsv()"
+    >
+      ⇩
+    </button>
+    <app-bitacora modulo="Seguridad / Usuarios" />
+  </div>
+
+  <div class="grid-filter">
+    <select
+      class="toolbar-select"
+      aria-label="Filtrar por estado"
+      [value]="filtroEstado()"
+      (change)="filtroEstado.set($any($event.target).value)"
+    >
+      <option value="todos">Todos</option>
+      <option value="activos">Solo activos</option>
+      <option value="inactivos">Solo inactivos</option>
+    </select>
+    <input
+      type="search"
+      placeholder="Buscar por usuario, nombre o correo…"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value)"
+    />
+  </div>
+</div>
+
+<app-data-table
+  [columnas]="columnas"
+  [filas]="usuarios()"
+  [cargando]="cargando()"
+  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+  accionExtraEtiqueta="Resetear"
+  accionExtraTitulo="Resetear contraseña"
+  (accionExtra)="pedirResetearPassword($event)"
+  (editar)="editarUsuario($event)"
+  (eliminar)="pedirEliminar($event)"
+/>
+
+@if (modalAbierto()) {
+  <div class="modal-overlay modal show d-block" (click)="modalAbierto.set(false)">
+    <form class="modal-box modal-dialog modal-content user-modal" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3 class="modal-title mb-3">{{ usuarioEnEdicion() ? 'Editar usuario' : 'Nuevo usuario' }}</h3>
+
+      <div class="edit-form user-modal-fields">
+        <label class="floating-field">
+          <span>Usuario <b>*</b></span>
+          <input type="text" class="form-control" formControlName="nombreUsuario" placeholder=" " aria-label="Usuario" />
+        </label>
+
+        <label class="floating-field">
+          <span>Rol <b>*</b></span>
+          <input type="text" class="form-control" formControlName="role" placeholder=" " aria-label="Rol" />
+        </label>
+
+        <label class="floating-field">
+          <span>Nombre <b>*</b></span>
+          <input type="text" class="form-control" formControlName="nombre" placeholder=" " aria-label="Nombre" />
+        </label>
+
+        <label class="floating-field">
+          <span>Apellido paterno</span>
+          <input type="text" class="form-control" formControlName="apellidoPaterno" placeholder=" " aria-label="Apellido paterno" />
+        </label>
+
+        <label class="floating-field">
+          <span>Apellido materno</span>
+          <input type="text" class="form-control" formControlName="apellidoMaterno" placeholder=" " aria-label="Apellido materno" />
+        </label>
+
+        <label class="checkbox-inline active-field">
+          <input type="checkbox" class="form-check-input" formControlName="activo" />
+          Activo
+        </label>
+
+        <label class="floating-field full-span">
+          <span>Email <b>*</b></span>
+          <input type="email" class="form-control" formControlName="email" placeholder=" " aria-label="Email" />
+        </label>
+
+        <label class="floating-field">
+          <span>{{ usuarioEnEdicion() ? 'Nueva contraseña (opcional)' : 'Contraseña' }} @if (!usuarioEnEdicion()) {<b>*</b>}</span>
+          <input
+            [type]="mostrarPassword() ? 'text' : 'password'"
+            class="form-control"
+            formControlName="password"
+            [placeholder]="usuarioEnEdicion() ? 'Dejar en blanco para no cambiarla' : ' '"
+            aria-label="Contraseña"
+          />
+          @if (fortalezaPassword().nivel !== 'vacia') {
+            <div class="password-fortaleza password-fortaleza-{{ fortalezaPassword().nivel }}">
+              Fortaleza: {{ fortalezaPassword().etiqueta }}
+            </div>
+          }
+        </label>
+
+        <label class="floating-field">
+          <span>{{ usuarioEnEdicion() ? 'Confirmar nueva contraseña (opcional)' : 'Confirmar contraseña' }} @if (!usuarioEnEdicion()) {<b>*</b>}</span>
+          <input
+            [type]="mostrarPassword() ? 'text' : 'password'"
+            class="form-control"
+            formControlName="confirmacionPassword"
+            [placeholder]="usuarioEnEdicion() ? 'Dejar en blanco para no cambiarla' : ' '"
+            aria-label="Confirmar contraseña"
+          />
+        </label>
+
+        <div class="toggle-row full-span">
+          <span class="hint" style="margin:0;">Ver contraseñas</span>
+          <label class="toggle-switch">
+            <input type="checkbox" [checked]="mostrarPassword()" (change)="alternarMostrarPassword()" />
+            <span class="toggle-switch-track"></span>
+          </label>
+        </div>
+
+        <label class="floating-field">
+          <span>Fecha inicial de vigencia <b>*</b></span>
+          <input type="date" class="form-control" formControlName="fechaInicioVigencia" placeholder=" " aria-label="Fecha inicial de vigencia" />
+        </label>
+
+        <label class="floating-field">
+          <span>Fecha final de vigencia <b>*</b></span>
+          <input type="date" class="form-control" formControlName="fechaFinVigencia" placeholder=" " aria-label="Fecha final de vigencia" />
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary btn btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="usuarioAEliminar() !== null"
+  titulo="Eliminar usuario"
+  [mensaje]="'¿Eliminar al usuario ' + (usuarioAEliminar()?.nombreUsuario ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="usuarioAEliminar.set(null)"
+/>
+
+<app-confirm-dialog
+  [visible]="usuarioAResetearPassword() !== null"
+  titulo="Resetear contraseña"
+  [mensaje]="'¿Generar una contraseña temporal para ' + (usuarioAResetearPassword()?.nombreUsuario ?? '') + '? Deberá cambiarla en su próximo inicio de sesión.'"
+  (confirmar)="confirmarResetearPassword()"
+  (cancelar)="usuarioAResetearPassword.set(null)"
+/>

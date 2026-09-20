@@ -1,0 +1,85 @@
+<div class="page-header">
+  <h1>Deudas y Préstamos</h1>
+  <div class="page-actions">
+    <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nueva</button>
+  </div>
+</div>
+<p class="hint" style="margin:-10px 0 24px;">Lleva el control de préstamos personales, de auto, etc.</p>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else if (deudas().length === 0) {
+  <div class="empty-state-block">
+    <p>No tienes deudas ni préstamos registrados.</p>
+    <button type="button" class="btn-primary" (click)="nuevo()">+ Registrar la primera</button>
+  </div>
+} @else {
+  @for (deuda of deudas(); track deuda.id) {
+    <div class="wallet-limit-card">
+      <div class="wallet-limit-head">
+        <span>
+          <strong>{{ deuda.descripcion }}</strong>
+          @if (liquidada(deuda)) {
+            <span class="tag" style="background:var(--client-soft); color:var(--client);">✅ ¡Liquidada!</span>
+          }
+        </span>
+        <span class="wallet-limit-amounts">{{ formatMoneda(saldoDeuda(deuda)) }} <span class="hint" style="margin:0;">de {{ formatMoneda(deuda.montoOriginal) }}</span></span>
+      </div>
+      <div class="wallet-limit-track">
+        <div class="wallet-limit-fill wallet-limit-fill-ok" [style.width.%]="pctPagado(deuda)"></div>
+      </div>
+      <div class="wallet-limit-foot">
+        <span class="hint" style="margin:0;">{{ pctPagado(deuda) | number: '1.0-0' }}% pagado · desde {{ deuda.fechaInicio | date: 'dd/MM/yyyy' }}</span>
+        <span>
+          <button type="button" class="btn-secondary small" (click)="toggleHistorial(deuda)">{{ historialAbierto() === deuda.id ? 'Ocultar' : 'Historial' }}</button>
+          <button type="button" class="btn-secondary small" (click)="editar(deuda)">Editar</button>
+          <button type="button" class="btn-danger small" (click)="pedirEliminar(deuda)">Eliminar</button>
+        </span>
+      </div>
+      @if (!liquidada(deuda)) {
+        <div class="anexos-upload-row" style="margin-top:12px;">
+          <input type="text" inputmode="decimal" #abonoInput placeholder="Monto a abonar" />
+          <button type="button" class="btn-primary small" (click)="abonar(deuda, abonoInput.value); abonoInput.value = ''">+ Abonar</button>
+        </div>
+      }
+      @if (historialAbierto() === deuda.id) {
+        <ul class="anexos-list" style="margin-top:12px;">
+          @for (abono of abonosDe(deuda.id); track abono.id) {
+            <li class="actividad-item">
+              <div class="actividad-item-head">
+                <span>{{ abono.fecha | date: 'dd/MM/yyyy' }} · {{ formatMoneda(abono.monto) }}</span>
+                <button type="button" class="btn-danger small" title="Eliminar abono" (click)="eliminarAbono(abono, deuda)">✕</button>
+              </div>
+            </li>
+          } @empty {
+            <p class="hint" style="margin:0;">Sin abonos registrados todavía.</p>
+          }
+        </ul>
+      }
+    </div>
+  }
+}
+
+@if (modalAbierto()) {
+  <div class="modal-overlay show" (click)="modalAbierto.set(false)">
+    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3>{{ enEdicion() ? 'Editar deuda' : 'Nueva deuda' }}</h3>
+
+      <div class="edit-form" style="margin-bottom:18px;">
+        <label>Descripción<input type="text" formControlName="descripcion" /></label>
+        <label>Monto original<input type="number" step="0.01" formControlName="montoOriginal" /></label>
+        <label>Fecha de inicio<input type="date" formControlName="fechaInicio" /></label>
+      </div>
+      @if (enEdicion()) {
+        <p class="hint" style="margin:-8px 0 14px;">El saldo se calcula solo, a partir de los abonos registrados.</p>
+      }
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog [visible]="aEliminar() !== null" titulo="Eliminar deuda" mensaje="¿Eliminar esta deuda?" (confirmar)="confirmarEliminar()" (cancelar)="aEliminar.set(null)" />

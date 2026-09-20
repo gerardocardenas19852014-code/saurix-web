@@ -1,0 +1,76 @@
+<div class="page-header">
+  <h1>Metas de ahorro</h1>
+  <div class="page-actions">
+    <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nueva</button>
+  </div>
+</div>
+<p class="hint" style="margin:-10px 0 24px;">Ponte objetivos de ahorro y ve registrando tus aportes conforme vayas guardando.</p>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else if (metas().length === 0) {
+  <div class="empty-state-block">
+    <p>Aún no tienes metas de ahorro.</p>
+    <button type="button" class="btn-primary" (click)="nuevo()">+ Crear la primera</button>
+  </div>
+} @else {
+  @for (meta of metas(); track meta.id) {
+    <div class="wallet-limit-card">
+      <div class="wallet-limit-head">
+        <span>
+          <strong>{{ meta.nombre }}</strong>
+          @if (cumplida(meta)) {
+            <span class="tag" style="background:var(--client-soft); color:var(--client);">🎉 ¡Cumplida!</span>
+          }
+        </span>
+        <span class="wallet-limit-amounts">{{ formatMoneda(meta.montoActual) }} <span class="hint" style="margin:0;">de {{ formatMoneda(meta.montoObjetivo) }}</span></span>
+      </div>
+      <div class="wallet-limit-track">
+        <div class="wallet-limit-fill" [class.wallet-limit-fill-ok]="cumplida(meta)" [class.wallet-limit-fill-goal]="!cumplida(meta)" [style.width.%]="pctAhorrado(meta)"></div>
+      </div>
+      <div class="wallet-limit-foot">
+        <span class="hint" style="margin:0;">
+          {{ pctAhorrado(meta) | number: '1.0-0' }}% ahorrado
+          @if (meta.fechaLimite) {
+            · meta: {{ meta.fechaLimite | date: 'dd/MM/yyyy' }}
+            @if (diasRestantes(meta) !== null) {
+              ({{ diasRestantes(meta)! >= 0 ? 'faltan ' + diasRestantes(meta) + 'd' : 'ya venció' }})
+            }
+          }
+        </span>
+        <span>
+          <button type="button" class="btn-secondary small" (click)="editar(meta)">Editar</button>
+          <button type="button" class="btn-danger small" (click)="pedirEliminar(meta)">Eliminar</button>
+        </span>
+      </div>
+      @if (!cumplida(meta)) {
+        <div class="anexos-upload-row" style="margin-top:12px;">
+          <input type="text" inputmode="decimal" #aporteInput placeholder="Monto a aportar" />
+          <button type="button" class="btn-primary small" (click)="aportar(meta, aporteInput.value); aporteInput.value = ''">+ Aportar</button>
+        </div>
+      }
+    </div>
+  }
+}
+
+@if (modalAbierto()) {
+  <div class="modal-overlay show" (click)="modalAbierto.set(false)">
+    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3>{{ enEdicion() ? 'Editar meta' : 'Nueva meta' }}</h3>
+
+      <div class="edit-form" style="margin-bottom:18px;">
+        <label>Nombre<input type="text" formControlName="nombre" /></label>
+        <label>Monto objetivo<input type="number" step="0.01" formControlName="montoObjetivo" /></label>
+        <label>Ahorrado hasta ahora<input type="number" step="0.01" formControlName="montoActual" /></label>
+        <label>Fecha límite<input type="date" formControlName="fechaLimite" /></label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog [visible]="aEliminar() !== null" titulo="Eliminar meta" mensaje="¿Eliminar esta meta?" (confirmar)="confirmarEliminar()" (cancelar)="aEliminar.set(null)" />

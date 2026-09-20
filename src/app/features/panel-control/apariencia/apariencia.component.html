@@ -1,0 +1,56 @@
+<div class="page-header">
+  <h1>Apariencia</h1>
+</div>
+
+<div class="settings-card">
+  <h2 class="settings-card-title">🎨 Tema</h2>
+  <p class="hint" style="margin:0 0 16px;">Elige cómo se ve Saurix para ti en este dispositivo.</p>
+  <div class="theme-picker">
+    @for (tema of temas; track tema.valor) {
+      <button
+        type="button"
+        class="theme-option"
+        [class.is-active]="themeService.tema() === tema.valor"
+        (click)="cambiarTema(tema.valor)"
+      >
+        <span class="theme-swatch" [class]="tema.swatch"></span>
+        <span>{{ tema.etiqueta }}</span>
+      </button>
+    }
+  </div>
+</div>
+
+<div class="settings-card">
+  <h2 class="settings-card-title">🤖 Asistente Saurix</h2>
+  <div class="toggle-row">
+    <div>
+      <p class="toggle-row-title">Chat flotante de ayuda</p>
+      <p class="hint" style="margin:2px 0 0;">Muestra u oculta el botón de chat con IA en todos los módulos.</p>
+    </div>
+    <label class="toggle-switch">
+      <input type="checkbox" [checked]="asistenteIaActivo()" (change)="alternarAsistenteIa($any($event.target).checked)" />
+      <span class="toggle-switch-track"></span>
+    </label>
+  </div>
+</div>
+
+<div class="settings-card">
+  <h2 class="settings-card-title">📋 Tablas y listados</h2>
+  <div class="toggle-row">
+    <div>
+      <p class="toggle-row-title">Registros por página</p>
+      <p class="hint" style="margin:2px 0 0;">Cuántas filas se muestran por defecto en las tablas.</p>
+    </div>
+    <select
+      class="pagesize-select"
+      [value]="preferenciasGrid.tamanoPagina()"
+      (change)="cambiarTamanoPagina($any($event.target).value)"
+    >
+      <option value="5">5</option>
+      <option value="10">10</option>
+      <option value="25">25</option>
+      <option value="50">50</option>
+      <option value="100">100</option>
+    </select>
+  </div>
+</div>

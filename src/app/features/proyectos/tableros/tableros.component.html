@@ -1,0 +1,105 @@
+<div class="page-header">
+  <h1>Gestor de Estados</h1>
+  <div class="page-actions">
+    <button type="button" class="toolbar-btn" (click)="nueva()" [disabled]="!proyectoSeleccionadoId()">+ Nueva columna</button>
+  </div>
+</div>
+
+<div class="board-filters">
+  <label class="board-filter-field">
+    Proyecto
+    <select [value]="proyectoSeleccionadoId()" (change)="cambiarProyecto($any($event.target).value)">
+      @for (proyecto of proyectos(); track proyecto.id) {
+        <option [value]="proyecto.id">{{ proyecto.clave }} — {{ proyecto.nombre }}</option>
+      }
+    </select>
+  </label>
+</div>
+
+<p class="hint" style="margin:-10px 0 20px;">
+  Estos estados forman las columnas del tablero Kanban del proyecto seleccionado. El orden de la
+  lista es el orden en que aparecen las columnas, de izquierda a derecha — usa ▲ ▼ para reordenarlos.
+</p>
+
+@if (cargando()) {
+  <p class="hint">Cargando…</p>
+} @else if (!columnasTablero().length) {
+  <div class="empty-state-block">
+    <p>Este proyecto todavía no tiene columnas configuradas.</p>
+  </div>
+} @else {
+  <ul class="status-manager-list">
+    @for (columna of columnasTablero(); track columna.id; let i = $index) {
+      <li class="status-manager-item">
+        <span class="status-manager-order">{{ i + 1 }}</span>
+        <span class="status-manager-name">{{ columna.nombre }}</span>
+        <span class="status-manager-count">{{ conteoPorColumna().get(columna.id) ?? 0 }} ticket{{ (conteoPorColumna().get(columna.id) ?? 0) === 1 ? '' : 's' }}</span>
+        <div class="status-manager-actions">
+          <button type="button" class="kanban-move-btn" (click)="moverOrden(columna, -1)" [disabled]="i === 0" title="Mover antes">▲</button>
+          <button type="button" class="kanban-move-btn" (click)="moverOrden(columna, 1)" [disabled]="i === columnasTablero().length - 1" title="Mover después">▼</button>
+          <button type="button" class="btn-secondary small" (click)="editar(columna)">Editar</button>
+          <button
+            type="button"
+            class="btn-danger small"
+            (click)="pedirEliminar(columna)"
+            [disabled]="columnasTablero().length <= 1"
+            [title]="columnasTablero().length <= 1 ? 'Debe quedar al menos un estado' : ''"
+          >
+            Eliminar
+          </button>
+        </div>
+      </li>
+    }
+  </ul>
+}
+
+@if (modalAbierto()) {
+  <div class="modal-overlay show" (click)="modalAbierto.set(false)">
+    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3>{{ columnaEnEdicion() ? 'Editar columna' : 'Nueva columna' }}</h3>
+
+      <div class="edit-form" style="margin-bottom: 18px;">
+        <label>
+          Nombre
+          <input type="text" formControlName="nombre" />
+        </label>
+
+        <label>
+          Clave
+          <input type="text" formControlName="clave" />
+        </label>
+
+        <label>
+          Orden
+          <input type="number" formControlName="orden" />
+        </label>
+
+        <label class="checkbox-inline">
+          <input type="checkbox" formControlName="permiteActividades" />
+          Permite bitácora de actividades
+        </label>
+        <label class="checkbox-inline">
+          <input type="checkbox" formControlName="permiteAnexos" />
+          Permite anexos
+        </label>
+        <label class="checkbox-inline">
+          <input type="checkbox" formControlName="permiteAsociados" />
+          Permite tickets asociados
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="columnaAEliminar() !== null"
+  titulo="Eliminar columna"
+  [mensaje]="'¿Eliminar ' + (columnaAEliminar()?.nombre ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="columnaAEliminar.set(null)"
+/>

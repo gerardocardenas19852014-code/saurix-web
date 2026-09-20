@@ -1,0 +1,79 @@
+<div class="page-header">
+  <div>
+    @if (nivel.campoPadre) {
+      <button type="button" class="btn-secondary small" (click)="volver()" style="margin-bottom: 8px;">← Volver</button>
+    }
+    <h1>
+      {{ nivel.tituloPlural }}
+      @if (padreNombre()) {
+        <span class="tag" style="margin-left: 8px;">de {{ padreNombre() }}</span>
+      }
+    </h1>
+  </div>
+  <div class="page-actions">
+    <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo</button>
+  </div>
+</div>
+
+<div class="grid-table-scroll">
+  <table class="grid-table">
+    <thead>
+      <tr>
+        <th>Nombre</th>
+        <th>Activo</th>
+        <th class="grid-actions-col">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (item of items(); track item.id) {
+        <tr>
+          <td data-label="Nombre">{{ item.nombre }}</td>
+          <td data-label="Activo">{{ item.activo ? 'Sí' : 'No' }}</td>
+          <td class="grid-actions-col" data-label="Acciones">
+            @if (nivel.siguienteRutaBase) {
+              <a class="btn-secondary small" [routerLink]="rutaSiguiente(item)">{{ nivel.siguienteEtiquetaBoton }}</a>
+            }
+            <button type="button" class="btn-secondary small" (click)="editar(item)">Editar</button>
+            <button type="button" class="btn-danger small" (click)="pedirEliminar(item)">Eliminar</button>
+          </td>
+        </tr>
+      } @empty {
+        <tr>
+          <td colspan="3">
+            <div class="empty-state-block">
+              <p>{{ cargando() ? 'Cargando…' : 'Sin registros para mostrar.' }}</p>
+            </div>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+@if (modalAbierto()) {
+  <div class="modal-overlay show" (click)="modalAbierto.set(false)">
+    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3>{{ itemEnEdicion() ? 'Editar' : 'Nuevo' }} {{ nivel.tituloSingular }}</h3>
+
+      <div class="edit-form" style="margin-bottom: 18px;">
+        <label>
+          Nombre
+          <input type="text" formControlName="nombre" />
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="itemAEliminar() !== null"
+  [titulo]="'Eliminar ' + nivel.tituloSingular"
+  [mensaje]="'¿Eliminar ' + (itemAEliminar()?.nombre ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="itemAEliminar.set(null)"
+/>

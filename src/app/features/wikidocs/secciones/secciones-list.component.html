@@ -1,0 +1,107 @@
+<div class="page-header">
+  <div>
+    <span class="eyebrow">§ WikiDocs</span>
+    <h1>Secciones</h1>
+  </div>
+</div>
+
+<div class="grid-toolbar">
+  <label class="floating-field" style="margin:0; min-width:200px;">
+    <span>Tipo de sistema</span>
+    <select
+      class="form-control pill-control"
+      aria-label="Tipo de sistema"
+      [value]="tipoSistemaSeleccionadoId()"
+      (change)="cambiarTipoSistema($any($event.target).value)"
+    >
+      @for (tipo of tiposSistema(); track tipo.id) {
+        <option [value]="tipo.id">{{ tipo.nombre }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="floating-field" style="margin:0; min-width:200px;">
+    <span>Categoría</span>
+    <select
+      class="form-control pill-control"
+      aria-label="Categoría"
+      [value]="categoriaSeleccionadaId()"
+      (change)="cambiarCategoria($any($event.target).value)"
+    >
+      <option [value]="0">Selecciona…</option>
+      @for (categoria of categoriasDelTipo(); track categoria.id) {
+        <option [value]="categoria.id">{{ categoria.nombre }}</option>
+      }
+    </select>
+  </label>
+
+  <button type="button" class="toolbar-btn" [disabled]="!categoriaSeleccionadaId()" (click)="nuevo()">+ Nueva</button>
+
+  <div class="toolbar-group">
+    <button
+      type="button"
+      class="btn-secondary small toolbar-icon-button"
+      title="Exportar CSV"
+      aria-label="Exportar secciones a CSV"
+      (click)="exportarCsvArchivo()"
+    >
+      ⇩
+    </button>
+    <app-bitacora modulo="WikiDocs / Secciones" />
+  </div>
+
+  <div class="grid-filter">
+    <input
+      type="search"
+      placeholder="Buscar por nombre…"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value)"
+    />
+  </div>
+</div>
+
+@if (!categoriasDelTipo().length) {
+  <p class="empty">Este tipo de sistema todavía no tiene categorías; da de alta una en "Categoría" primero.</p>
+} @else if (!categoriaSeleccionadaId()) {
+  <p class="empty">Selecciona una categoría para ver sus secciones.</p>
+} @else {
+  <app-data-table
+    [columnas]="columnas"
+    [filas]="registros()"
+    [cargando]="cargando()"
+    [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+    accionExtraEtiqueta="Documentos"
+    accionExtraTitulo="Ver documentos de esta sección"
+    (accionExtra)="verDocumentos($event)"
+    (editar)="editar($event)"
+    (eliminar)="pedirEliminar($event)"
+  />
+}
+
+@if (modalAbierto()) {
+  <div class="modal-overlay modal show d-block" (click)="modalAbierto.set(false)">
+    <form class="modal-box modal-dialog modal-content" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3 class="modal-title mb-3">{{ registroEnEdicion() ? 'Editar sección' : 'Nueva sección' }}</h3>
+
+      <div class="edit-form">
+        <label class="floating-field full-span">
+          <span>Nombre <b>*</b></span>
+          <input type="text" class="form-control pill-control" formControlName="nombre" placeholder=" " aria-label="Nombre" />
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary btn btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="registroAEliminar() !== null"
+  titulo="Eliminar sección"
+  [mensaje]="'¿Eliminar la sección ' + (registroAEliminar()?.nombre ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="registroAEliminar.set(null)"
+/>

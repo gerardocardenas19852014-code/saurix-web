@@ -1,0 +1,87 @@
+<div class="page-header">
+  <div>
+    <span class="eyebrow">§ WikiDocs</span>
+    <h1>Categoría</h1>
+  </div>
+</div>
+
+<div class="grid-toolbar">
+  <label class="floating-field" style="margin:0; min-width:220px;">
+    <span>Tipo de sistema</span>
+    <select
+      class="form-control pill-control"
+      aria-label="Tipo de sistema"
+      [value]="tipoSistemaSeleccionadoId()"
+      (change)="cambiarTipoSistema($any($event.target).value)"
+    >
+      @for (tipo of tiposSistema(); track tipo.id) {
+        <option [value]="tipo.id">{{ tipo.nombre }}</option>
+      }
+    </select>
+  </label>
+
+  <button type="button" class="toolbar-btn" [disabled]="!tipoSistemaSeleccionadoId()" (click)="nuevo()">+ Nueva</button>
+
+  <div class="toolbar-group">
+    <button
+      type="button"
+      class="btn-secondary small toolbar-icon-button"
+      title="Exportar CSV"
+      aria-label="Exportar categorías a CSV"
+      (click)="exportarCsvArchivo()"
+    >
+      ⇩
+    </button>
+    <app-bitacora modulo="WikiDocs / Categoría" />
+  </div>
+
+  <div class="grid-filter">
+    <input
+      type="search"
+      placeholder="Buscar por nombre…"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value)"
+    />
+  </div>
+</div>
+
+@if (!tiposSistema().length) {
+  <p class="empty">Antes de crear categorías, da de alta al menos un Tipo de sistema.</p>
+} @else {
+  <app-data-table
+    [columnas]="columnas"
+    [filas]="registros()"
+    [cargando]="cargando()"
+    [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+    (editar)="editar($event)"
+    (eliminar)="pedirEliminar($event)"
+  />
+}
+
+@if (modalAbierto()) {
+  <div class="modal-overlay modal show d-block" (click)="modalAbierto.set(false)">
+    <form class="modal-box modal-dialog modal-content" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3 class="modal-title mb-3">{{ registroEnEdicion() ? 'Editar categoría' : 'Nueva categoría' }}</h3>
+
+      <div class="edit-form">
+        <label class="floating-field full-span">
+          <span>Nombre <b>*</b></span>
+          <input type="text" class="form-control pill-control" formControlName="nombre" placeholder=" " aria-label="Nombre" />
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary btn btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="registroAEliminar() !== null"
+  titulo="Eliminar categoría"
+  [mensaje]="'¿Eliminar la categoría ' + (registroAEliminar()?.nombre ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="registroAEliminar.set(null)"
+/>

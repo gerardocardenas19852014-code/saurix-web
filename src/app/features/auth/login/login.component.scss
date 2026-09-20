@@ -1,0 +1,21 @@
+/* Estilos en src/styles.scss (.auth-box). */
+
+.auth-box label.checkbox-inline {
+	flex-direction: row;
+	align-items: center;
+	justify-content: flex-start;
+	width: fit-content;
+	cursor: pointer;
+}
+
+.auth-box label.checkbox-inline input {
+	width: auto;
+	margin: 0;
+}
+
+.login-error {
+	margin: -2px 0 0;
+	color: var(--danger);
+	font-size: 13px;
+	line-height: 1.4;
+}

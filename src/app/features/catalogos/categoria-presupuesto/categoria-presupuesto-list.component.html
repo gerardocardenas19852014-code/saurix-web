@@ -1,0 +1,81 @@
+<div class="page-header">
+  <div>
+    <span class="eyebrow">§ Catálogos</span>
+    <h1>Categorías de presupuesto</h1>
+  </div>
+</div>
+
+<div class="grid-toolbar">
+  <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo</button>
+
+  <div class="toolbar-group">
+    <button
+      type="button"
+      class="btn-secondary small toolbar-icon-button"
+      title="Exportar CSV"
+      aria-label="Exportar categorías de presupuesto a CSV"
+      (click)="exportarCsvArchivo()"
+    >
+      ⇩
+    </button>
+    <app-bitacora modulo="Catálogos / Categorías de presupuesto" />
+  </div>
+
+  <div class="grid-filter">
+    <input
+      type="search"
+      placeholder="Buscar por nombre…"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value)"
+    />
+  </div>
+</div>
+
+<app-data-table
+  [columnas]="columnas"
+  [filas]="registros()"
+  [cargando]="cargando()"
+  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+  (editar)="editar($event)"
+  (eliminar)="pedirEliminar($event)"
+/>
+
+@if (modalAbierto()) {
+  <div class="modal-overlay modal show d-block" (click)="modalAbierto.set(false)">
+    <form class="modal-box modal-dialog modal-content" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3 class="modal-title mb-3">{{ registroEnEdicion() ? 'Editar categoría' : 'Nueva categoría' }}</h3>
+
+      <div class="edit-form">
+        <label class="floating-field full-span">
+          <span>Nombre <b>*</b></span>
+          <input type="text" class="form-control pill-control" formControlName="nombre" placeholder=" " aria-label="Nombre" />
+        </label>
+
+        <label class="floating-field full-span">
+          <span>Categoría padre (vacío = raíz)</span>
+          <select class="form-control pill-control" formControlName="categoriaPresupuestoPadreId" aria-label="Categoría padre">
+            <option [ngValue]="0">Ninguna (es una categoría raíz)</option>
+            @for (raiz of raices(); track raiz.id) {
+              @if (raiz.id !== registroEnEdicion()?.id) {
+                <option [ngValue]="raiz.id">{{ raiz.nombre }}</option>
+              }
+            }
+          </select>
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary btn btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="registroAEliminar() !== null"
+  titulo="Eliminar categoría"
+  [mensaje]="'¿Eliminar la categoría ' + (registroAEliminar()?.nombre ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="registroAEliminar.set(null)"
+/>

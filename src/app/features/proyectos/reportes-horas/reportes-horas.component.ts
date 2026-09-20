@@ -1,0 +1,184 @@
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { DataClientService } from '../../../core/services/data-client.service';
+import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
+import { colorAvatar } from '../kanban/avatar.util';
+import { Ticket, TicketActividad } from '../kanban/ticket.model';
+import { ProyectoOpcion } from '../tableros/tablero-columna.model';
+
+type PeriodoId = 'todo' | 'mes-actual' | 'mes-anterior' | 'anio-actual' | 'anio-anterior';
+
+interface RangoFecha {
+  inicio: Date;
+  fin: Date;
+}
+
+interface HorasAgrupadas {
+  id: number;
+  nombre: string;
+  subtitulo?: string;
+  minutos: number;
+  horas: number;
+  pct: number;
+  color: string;
+}
+
+/**
+ * "Reportes de horas" (Gestión de Proyectos) — agrega TicketActividad (la
+ * bitácora de tiempo trabajado) por usuario, por proyecto y por ticket.
+ * Igual que el resto de pantallas de "Reportes" del sistema, toda la
+ * suma/agrupación se hace en el cliente sobre los GetList ya disponibles
+ * (GetListTicketActividad admite traer todas las actividades sin filtrar
+ * por ticket) — no requiere ningún SP de agregación.
+ */
+@Component({
+  selector: 'app-reportes-horas',
+  standalone: true,
+  imports: [],
+  templateUrl: './reportes-horas.component.html',
+  styleUrl: './reportes-horas.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class ReportesHorasComponent implements OnInit {
+  private readonly data = inject(DataClientService);
+
+  protected readonly colorAvatar = colorAvatar;
+
+  protected readonly cargando = signal(false);
+  protected readonly proyectos = signal<ProyectoOpcion[]>([]);
+  protected readonly tickets = signal<Ticket[]>([]);
+  protected readonly actividades = signal<TicketActividad[]>([]);
+  protected readonly usuarios = signal<Usuario[]>([]);
+
+  protected readonly filtroProyectoId = signal<number>(0);
+  protected readonly periodo = signal<PeriodoId>('mes-actual');
+
+  ngOnInit(): void {
+    this.cargando.set(true);
+    this.data.list<ProyectoOpcion>('Proyecto').subscribe((p) => this.proyectos.set(p));
+    this.data.list<Usuario>('Usuario').subscribe((u) => this.usuarios.set(u));
+    this.data.list<Ticket>('Ticket').subscribe((t) => this.tickets.set(t));
+    this.data.list<TicketActividad>('TicketActividad').subscribe({
+      next: (actividades) => {
+        this.actividades.set(actividades);
+        this.cargando.set(false);
+      },
+      error: () => this.cargando.set(false),
+    });
+  }
+
+  private rangoDe(id: PeriodoId): RangoFecha | null {
+    if (id === 'todo') return null;
+    const hoy = new Date();
+    if (id === 'mes-actual' || id === 'mes-anterior') {
+      const offset = id === 'mes-actual' ? 0 : -1;
+      const base = new Date(hoy.getFullYear(), hoy.getMonth() + offset, 1);
+      return {
+        inicio: new Date(base.getFullYear(), base.getMonth(), 1),
+        fin: new Date(base.getFullYear(), base.getMonth() + 1, 0, 23, 59, 59),
+      };
+    }
+    const anio = hoy.getFullYear() + (id === 'anio-actual' ? 0 : -1);
+    return { inicio: new Date(anio, 0, 1), fin: new Date(anio, 11, 31, 23, 59, 59) };
+  }
+
+  protected readonly etiquetaPeriodo = computed(() => {
+    switch (this.periodo()) {
+      case 'todo':
+        return 'todo el historial';
+      case 'mes-actual':
+        return 'este mes';
+      case 'mes-anterior':
+        return 'el mes anterior';
+      case 'anio-actual':
+        return 'este año';
+      case 'anio-anterior':
+        return 'el año anterior';
+    }
+  });
+
+  private ticketDe(id: number): Ticket | undefined {
+    return this.tickets().find((t) => Number(t.id) === Number(id));
+  }
+
+  /** Actividades que caen dentro del periodo elegido y, si aplica, del proyecto filtrado. */
+  protected readonly actividadesFiltradas = computed(() => {
+    const rango = this.rangoDe(this.periodo());
+    const proyectoId = this.filtroProyectoId();
+    return this.actividades().filter((a) => {
+      if (rango) {
+        if (!a.fechaCreacion) return false;
+        const f = new Date(a.fechaCreacion);
+        if (f < rango.inicio || f > rango.fin) return false;
+      }
+      if (proyectoId) {
+        const ticket = this.ticketDe(a.ticketId);
+        if (!ticket || Number(ticket.proyectoId) !== proyectoId) return false;
+      }
+      return true;
+    });
+  });
+
+  protected readonly totalMinutos = computed(() => this.actividadesFiltradas().reduce((s, a) => s + a.tiempoMin, 0));
+  protected readonly totalHoras = computed(() => Math.round((this.totalMinutos() / 60) * 10) / 10);
+
+  private agrupar(claves: (a: TicketActividad) => number | null, resolver: (id: number) => { nombre: string; subtitulo?: string }): HorasAgrupadas[] {
+    const porClave = new Map<number, number>();
+    for (const a of this.actividadesFiltradas()) {
+      const clave = claves(a);
+      if (clave === null) continue;
+      porClave.set(clave, (porClave.get(clave) ?? 0) + a.tiempoMin);
+    }
+    const totalMin = this.totalMinutos();
+    const filas = [...porClave.entries()].map(([id, minutos]) => {
+      const info = resolver(id);
+      return {
+        id,
+        nombre: info.nombre,
+        subtitulo: info.subtitulo,
+        minutos,
+        horas: Math.round((minutos / 60) * 10) / 10,
+        pct: totalMin > 0 ? (minutos / totalMin) * 100 : 0,
+        color: colorAvatar(info.nombre),
+      };
+    });
+    return filas.sort((a, b) => b.minutos - a.minutos);
+  }
+
+  protected readonly horasPorUsuario = computed(() =>
+    this.agrupar(
+      (a) => (a.creadoPor ? Number(a.creadoPor) : null),
+      (id) => {
+        const usuario = this.usuarios().find((u) => Number(u.id) === id);
+        return { nombre: usuario ? nombreCompletoUsuario(usuario) : 'Sin usuario' };
+      },
+    ),
+  );
+
+  protected readonly horasPorProyecto = computed(() =>
+    this.agrupar(
+      (a) => {
+        const ticket = this.ticketDe(a.ticketId);
+        return ticket ? Number(ticket.proyectoId) : null;
+      },
+      (id) => {
+        const proyecto = this.proyectos().find((p) => Number(p.id) === id);
+        return { nombre: proyecto ? `${proyecto.clave} — ${proyecto.nombre}` : '—' };
+      },
+    ),
+  );
+
+  /** Top 10 tickets con más horas registradas en el periodo/proyecto filtrado. */
+  protected readonly horasPorTicket = computed(() =>
+    this.agrupar(
+      (a) => Number(a.ticketId),
+      (id) => {
+        const ticket = this.ticketDe(id);
+        return { nombre: ticket ? `#${ticket.numeroTicket} — ${ticket.titulo}` : 'Ticket eliminado' };
+      },
+    ).slice(0, 10),
+  );
+
+  protected readonly maxUsuario = computed(() => Math.max(1, ...this.horasPorUsuario().map((f) => f.minutos)));
+  protected readonly maxProyecto = computed(() => Math.max(1, ...this.horasPorProyecto().map((f) => f.minutos)));
+  protected readonly maxTicket = computed(() => Math.max(1, ...this.horasPorTicket().map((f) => f.minutos)));
+}

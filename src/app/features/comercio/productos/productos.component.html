@@ -1,0 +1,85 @@
+<div class="page-header">
+  <h1>Productos</h1>
+  <div class="page-actions">
+    <button type="button" class="toolbar-btn" (click)="nueva()">+ Nuevo</button>
+  </div>
+</div>
+
+<div class="grid-toolbar">
+  <div class="grid-filter">
+    <input
+      type="search"
+      placeholder="Buscar por nombre…"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value); cargar()"
+    />
+  </div>
+</div>
+
+<app-data-table
+  [columnas]="columnas"
+  [filas]="productos()"
+  [cargando]="cargando()"
+  (editar)="editar($event)"
+  (eliminar)="pedirEliminar($event)"
+/>
+
+@if (modalAbierto()) {
+  <div class="modal-overlay show" (click)="modalAbierto.set(false)">
+    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3>{{ productoEnEdicion() ? 'Editar producto' : 'Nuevo producto' }}</h3>
+
+      <div class="edit-form" style="margin-bottom: 18px;">
+        <label>
+          Nombre
+          <input type="text" formControlName="nombre" />
+        </label>
+
+        <label>
+          Categoría
+          <select formControlName="categoriaProductoId">
+            <option [ngValue]="0" disabled>Selecciona una categoría</option>
+            @for (categoria of categorias(); track categoria.id) {
+              <option [ngValue]="categoria.id">{{ categoria.nombre }}</option>
+            }
+          </select>
+        </label>
+
+        <label>
+          Descripción
+          <textarea rows="2" formControlName="descripcion"></textarea>
+        </label>
+
+        <label>
+          Precio unitario
+          <input type="number" step="0.01" formControlName="precioUnitario" />
+        </label>
+
+        <label class="checkbox-inline">
+          <input type="checkbox" formControlName="esServicio" />
+          Es un servicio (sin inventario)
+        </label>
+
+        @if (!esServicio) {
+          <label>
+            Existencia
+            <input type="number" formControlName="existencia" />
+          </label>
+        }
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="productoAEliminar() !== null"
+  titulo="Eliminar producto"
+  [mensaje]="'¿Eliminar ' + (productoAEliminar()?.nombre ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="productoAEliminar.set(null)"
+/>

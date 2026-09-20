@@ -1,0 +1,49 @@
+<div class="adjuntos-panel">
+  <div class="adjuntos-panel-head">
+    <span class="hint" style="margin:0;">📎 {{ etiqueta() }}</span>
+    <label class="upload-btn">
+      {{ subiendo() ? 'Subiendo…' : '+ Adjuntar' }}
+      <input type="file" (change)="onArchivoSeleccionado($event)" [disabled]="subiendo()" style="display:none;" />
+    </label>
+  </div>
+
+  @if (soportaComentario()) {
+    <input
+      type="text"
+      placeholder="Comentario del adjunto (opcional)"
+      [value]="comentarioNuevo()"
+      (input)="comentarioNuevo.set($any($event.target).value)"
+      style="margin-top:8px; width:100%; font-family:'IBM Plex Sans',sans-serif; font-size:14px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--paper-raised); color:var(--text-strong);"
+    />
+  }
+
+  @if (cargando()) {
+    <p class="empty" style="margin:8px 0 0;">Cargando…</p>
+  } @else if (adjuntos().length === 0) {
+    <p class="hint" style="margin:8px 0 0;">Sin {{ etiqueta().toLowerCase() }} todavía.</p>
+  } @else {
+    <ul class="anexos-list" style="margin-top:10px;">
+      @for (adjunto of adjuntos(); track adjunto.id) {
+        <li class="actividad-item">
+          <div class="actividad-item-head">
+            <a [href]="adjunto.contenido" [download]="adjunto.nombreArchivo" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              📄 {{ adjunto.nombreArchivo }}
+            </a>
+            <button type="button" class="btn-danger small" title="Eliminar adjunto" (click)="pedirEliminar(adjunto)">✕</button>
+          </div>
+          @if (adjunto.comentario) {
+            <p class="actividad-item-texto">{{ adjunto.comentario }}</p>
+          }
+        </li>
+      }
+    </ul>
+  }
+</div>
+
+<app-confirm-dialog
+  [visible]="aEliminar() !== null"
+  titulo="Eliminar adjunto"
+  [mensaje]="'¿Eliminar el adjunto ' + (aEliminar()?.nombreArchivo ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="aEliminar.set(null)"
+/>

@@ -1,0 +1,53 @@
+<div class="page-header">
+  <h1>{{ config.tituloPlural }}</h1>
+  <div class="page-actions">
+    <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo</button>
+  </div>
+</div>
+
+<div class="grid-toolbar">
+  <div class="grid-filter">
+    <input
+      type="search"
+      placeholder="Buscar por nombre…"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value); cargar()"
+    />
+  </div>
+</div>
+
+<app-data-table
+  [columnas]="columnas"
+  [filas]="items()"
+  [cargando]="cargando()"
+  (editar)="editar($event)"
+  (eliminar)="pedirEliminar($event)"
+/>
+
+@if (modalAbierto()) {
+  <div class="modal-overlay show" (click)="modalAbierto.set(false)">
+    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3>{{ itemEnEdicion() ? 'Editar' : 'Nuevo' }} {{ config.tituloSingular }}</h3>
+
+      <div class="edit-form" style="margin-bottom: 18px;">
+        <label>
+          Nombre
+          <input type="text" formControlName="nombre" />
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="itemAEliminar() !== null"
+  [titulo]="'Eliminar ' + config.tituloSingular"
+  [mensaje]="'¿Eliminar ' + (itemAEliminar()?.nombre ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="itemAEliminar.set(null)"
+/>

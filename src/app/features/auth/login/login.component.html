@@ -1,0 +1,23 @@
+<div class="auth-box">
+  <span class="eyebrow">§ Saurix</span>
+  <h1>Iniciar sesión</h1>
+
+  <form [formGroup]="form" (ngSubmit)="entrar()">
+    <label>
+      Usuario
+      <input type="text" formControlName="usuario" placeholder="p.ej. ana" autofocus autocomplete="username" />
+    </label>
+    <label>
+      Contraseña
+      <input type="password" formControlName="password" autocomplete="current-password" />
+    </label>
+    <label class="checkbox-inline">
+      <input type="checkbox" formControlName="recordarUsuario" />
+      Recordar usuario
+    </label>
+    @if (mensajeError()) {
+      <p class="login-error" role="alert">{{ mensajeError() }}</p>
+    }
+    <button type="submit" class="btn-primary" [disabled]="enviando()">Entrar</button>
+  </form>
+</div>

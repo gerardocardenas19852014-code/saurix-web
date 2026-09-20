@@ -1,0 +1,105 @@
+<div class="page-header">
+  <div>
+    <span class="eyebrow">§ Catálogos</span>
+    <h1>Cuentas de presupuesto</h1>
+  </div>
+</div>
+
+<div class="grid-toolbar">
+  <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo</button>
+
+  <div class="toolbar-group">
+    <button
+      type="button"
+      class="btn-secondary small toolbar-icon-button"
+      title="Exportar CSV"
+      aria-label="Exportar cuentas de presupuesto a CSV"
+      (click)="exportarCsvArchivo()"
+    >
+      ⇩
+    </button>
+    <app-bitacora modulo="Catálogos / Cuentas de presupuesto" />
+  </div>
+
+  <div class="grid-filter">
+    <input
+      type="search"
+      placeholder="Buscar por nombre…"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value)"
+    />
+  </div>
+</div>
+
+<app-data-table
+  [columnas]="columnas"
+  [filas]="registros()"
+  [cargando]="cargando()"
+  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+  (editar)="editar($event)"
+  (eliminar)="pedirEliminar($event)"
+/>
+
+@if (modalAbierto()) {
+  <div class="modal-overlay modal show d-block" (click)="modalAbierto.set(false)">
+    <form class="modal-box modal-dialog modal-content" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3 class="modal-title mb-3">{{ registroEnEdicion() ? 'Editar cuenta' : 'Nueva cuenta' }}</h3>
+
+      <div class="edit-form">
+        <label class="floating-field">
+          <span>Nombre <b>*</b></span>
+          <input type="text" class="form-control pill-control" formControlName="nombre" placeholder=" " aria-label="Nombre" />
+        </label>
+
+        <label class="floating-field">
+          <span>Tipo <b>*</b></span>
+          <select class="form-control pill-control" formControlName="tipo" aria-label="Tipo">
+            @for (t of tipos; track t) {
+              <option [ngValue]="t">{{ iconoTipo(t) }} {{ t }}</option>
+            }
+          </select>
+        </label>
+
+        @if (esTarjeta) {
+          <label class="floating-field">
+            <span>Límite de crédito</span>
+            <input type="number" step="0.01" class="form-control pill-control" formControlName="limiteCredito" placeholder=" " aria-label="Límite de crédito" />
+          </label>
+
+          <label class="floating-field">
+            <span>Pago mínimo</span>
+            <input type="number" step="0.01" class="form-control pill-control" formControlName="pagoMinimo" placeholder=" " aria-label="Pago mínimo" />
+          </label>
+
+          <label class="floating-field">
+            <span>Día de corte</span>
+            <input type="number" min="1" max="31" class="form-control pill-control" formControlName="diaCorte" placeholder=" " aria-label="Día de corte" />
+          </label>
+
+          <label class="floating-field">
+            <span>Día de pago</span>
+            <input type="number" min="1" max="31" class="form-control pill-control" formControlName="diaPago" placeholder=" " aria-label="Día de pago" />
+          </label>
+
+          <label class="floating-field full-span">
+            <span>Pago sin intereses</span>
+            <input type="number" step="0.01" class="form-control pill-control" formControlName="pagoSinIntereses" placeholder=" " aria-label="Pago sin intereses" />
+          </label>
+        }
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary btn btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="registroAEliminar() !== null"
+  titulo="Eliminar cuenta"
+  [mensaje]="'¿Eliminar la cuenta ' + (registroAEliminar()?.nombre ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="registroAEliminar.set(null)"
+/>

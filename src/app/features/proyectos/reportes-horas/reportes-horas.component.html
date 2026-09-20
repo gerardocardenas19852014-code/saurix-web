@@ -1,0 +1,96 @@
+<div class="page-header">
+  <h1>Reportes de horas</h1>
+</div>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else {
+  <div class="board-filters" style="margin-bottom:22px;">
+    <label class="board-filter-field">
+      Proyecto
+      <select [value]="filtroProyectoId()" (change)="filtroProyectoId.set(+$any($event.target).value)">
+        <option [value]="0">Todos</option>
+        @for (proyecto of proyectos(); track proyecto.id) {
+          <option [value]="proyecto.id">{{ proyecto.clave }} — {{ proyecto.nombre }}</option>
+        }
+      </select>
+    </label>
+
+    <label class="board-filter-field">
+      Periodo
+      <select [value]="periodo()" (change)="periodo.set($any($event.target).value)">
+        <option value="mes-actual">Este mes</option>
+        <option value="mes-anterior">Mes anterior</option>
+        <option value="anio-actual">Este año</option>
+        <option value="anio-anterior">Año anterior</option>
+        <option value="todo">Todo el historial</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="dashboard-stats" style="margin-bottom:28px;">
+    <div class="dashboard-stat-card">
+      <div class="num">{{ totalHoras() }}h</div>
+      <div class="label">Total registrado — {{ etiquetaPeriodo() }}</div>
+    </div>
+    <div class="dashboard-stat-card">
+      <div class="num">{{ horasPorUsuario().length }}</div>
+      <div class="label">Personas con actividad</div>
+    </div>
+    <div class="dashboard-stat-card">
+      <div class="num">{{ horasPorProyecto().length }}</div>
+      <div class="label">Proyectos con actividad</div>
+    </div>
+  </div>
+
+  <h2 class="settings-card-title" style="margin:0 0 12px;">Horas por usuario</h2>
+  @if (horasPorUsuario().length === 0) {
+    <p class="empty" style="margin-bottom:28px;">Sin actividades registradas en este periodo.</p>
+  } @else {
+    <div style="margin-bottom:28px;">
+      @for (fila of horasPorUsuario(); track fila.id) {
+        <div class="wallet-cat-bar-row">
+          <span class="wallet-cat-bar-name" [title]="fila.nombre">{{ fila.nombre }}</span>
+          <div class="wallet-cat-bar-track">
+            <div class="wallet-cat-bar-fill" [style.width.%]="(fila.minutos / maxUsuario()) * 100" [style.background]="fila.color"></div>
+          </div>
+          <span class="wallet-cat-bar-amount">{{ fila.horas }}h</span>
+        </div>
+      }
+    </div>
+  }
+
+  <h2 class="settings-card-title" style="margin:0 0 12px;">Horas por proyecto</h2>
+  @if (horasPorProyecto().length === 0) {
+    <p class="empty" style="margin-bottom:28px;">Sin actividades registradas en este periodo.</p>
+  } @else {
+    <div style="margin-bottom:28px;">
+      @for (fila of horasPorProyecto(); track fila.id) {
+        <div class="wallet-cat-bar-row">
+          <span class="wallet-cat-bar-name" [title]="fila.nombre">{{ fila.nombre }}</span>
+          <div class="wallet-cat-bar-track">
+            <div class="wallet-cat-bar-fill" [style.width.%]="(fila.minutos / maxProyecto()) * 100" [style.background]="fila.color"></div>
+          </div>
+          <span class="wallet-cat-bar-amount">{{ fila.horas }}h</span>
+        </div>
+      }
+    </div>
+  }
+
+  <h2 class="settings-card-title" style="margin:0 0 12px;">Top 10 tickets con más horas</h2>
+  @if (horasPorTicket().length === 0) {
+    <p class="empty">Sin actividades registradas en este periodo.</p>
+  } @else {
+    <div>
+      @for (fila of horasPorTicket(); track fila.id) {
+        <div class="wallet-cat-bar-row">
+          <span class="wallet-cat-bar-name" [title]="fila.nombre">{{ fila.nombre }}</span>
+          <div class="wallet-cat-bar-track">
+            <div class="wallet-cat-bar-fill" [style.width.%]="(fila.minutos / maxTicket()) * 100" [style.background]="fila.color"></div>
+          </div>
+          <span class="wallet-cat-bar-amount">{{ fila.horas }}h</span>
+        </div>
+      }
+    </div>
+  }
+}

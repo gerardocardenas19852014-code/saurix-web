@@ -1,0 +1,85 @@
+<div class="grid-table-scroll">
+  <table class="grid-table" [attr.data-cargando]="cargando()">
+    <thead>
+      <tr>
+        @for (columna of columnas(); track columna.campo) {
+          <th>
+            <button
+              type="button"
+              class="grid-sort-button"
+              [attr.aria-label]="'Ordenar por ' + columna.etiqueta"
+              (click)="ordenarPor(columna)"
+            >
+              {{ columna.etiqueta }} <span aria-hidden="true">{{ indicadorOrden(columna) }}</span>
+            </button>
+          </th>
+        }
+        <th class="grid-actions-col">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (fila of filasPagina(); track fila.id) {
+        <tr>
+          @for (columna of columnas(); track columna.campo) {
+            <td [attr.data-label]="columna.etiqueta">
+              @if (columna.claseValor) {
+                <span class="grid-badge {{ columna.claseValor(fila) }}">{{ valorCelda(fila, columna) }}</span>
+              } @else {
+                {{ valorCelda(fila, columna) }}
+              }
+            </td>
+          }
+          <td class="grid-actions-col" data-label="Acciones">
+            @if (accionExtraEtiqueta()) {
+              <button
+                type="button"
+                class="btn-secondary small"
+                [title]="accionExtraTitulo() ?? accionExtraEtiqueta()"
+                [attr.aria-label]="accionExtraTitulo() ?? accionExtraEtiqueta()"
+                (click)="accionExtra.emit(fila)"
+              >
+                {{ accionExtraEtiqueta() }}
+              </button>
+            }
+            <button
+              type="button"
+              class="btn-secondary small grid-action-icon"
+              title="Editar"
+              aria-label="Editar registro"
+              (click)="editar.emit(fila)"
+            >
+              ✎
+            </button>
+            <button
+              type="button"
+              class="btn-danger small grid-action-icon"
+              title="Eliminar"
+              aria-label="Eliminar registro"
+              (click)="eliminar.emit(fila)"
+            >
+              🗑
+            </button>
+          </td>
+        </tr>
+      } @empty {
+        <tr>
+          <td [attr.colspan]="columnas().length + 1">
+            <div class="empty-state-block">
+              <p>Sin registros para mostrar.</p>
+            </div>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+@if (totalPaginas() > 1) {
+  <div class="grid-footer">
+    <div class="grid-pagination">
+      <button type="button" [disabled]="paginaActual() === 1" (click)="irAPagina(paginaActual() - 1)">‹ Anterior</button>
+      <span>Página {{ paginaActual() }} de {{ totalPaginas() }}</span>
+      <button type="button" [disabled]="paginaActual() === totalPaginas()" (click)="irAPagina(paginaActual() + 1)">Siguiente ›</button>
+    </div>
+  </div>
+}

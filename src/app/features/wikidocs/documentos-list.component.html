@@ -1,0 +1,136 @@
+@if (migajas().length > 0) {
+  <div class="breadcrumbs">
+    @for (migaja of migajas(); track migaja.etiqueta) {
+      @if (migaja.ruta) {
+        <a [routerLink]="migaja.ruta">{{ migaja.etiqueta }}</a> /
+      } @else {
+        <span>{{ migaja.etiqueta }}</span>
+      }
+    }
+    @if (vista() !== 'lista') {
+      / <span>{{ documentoActual()?.titulo ?? 'Nuevo documento' }}</span>
+    }
+  </div>
+}
+
+@if (vista() === 'lista') {
+  <div class="page-header">
+    <h1>Documentos</h1>
+    <div class="page-actions">
+      @if (seccionFijaId) {
+        <button type="button" class="btn-secondary" (click)="descargarSeccion()">⬇️ Descargar sección</button>
+      }
+      <button type="button" class="toolbar-btn" (click)="nuevoDocumento()">+ Nuevo documento</button>
+    </div>
+  </div>
+
+  <div class="grid-toolbar">
+    <div class="grid-filter">
+      <input
+        type="search"
+        placeholder="Buscar por título…"
+        [value]="busqueda()"
+        (input)="busqueda.set($any($event.target).value); cargar()"
+      />
+    </div>
+  </div>
+
+  <app-data-table
+    [columnas]="columnas"
+    [filas]="documentos()"
+    [cargando]="cargando()"
+    accionExtraEtiqueta="Ver"
+    (accionExtra)="verDocumento($event)"
+    (editar)="editarDocumento($event)"
+    (eliminar)="pedirEliminar($event)"
+  />
+} @else {
+  <div class="page-header">
+    <h1>{{ documentoActual()?.titulo ?? 'Nuevo documento' }}</h1>
+    <div class="page-actions">
+      @if (documentoActual()) {
+        <button type="button" class="btn-secondary" (click)="descargar(documentoActual()!)">⬇️ Descargar</button>
+      }
+      <button type="button" class="btn-secondary" (click)="volverALista()">← Volver</button>
+    </div>
+  </div>
+
+  @if (!esNuevo()) {
+    <div class="tab-bar">
+      <button type="button" class="tab-btn" [class.is-active]="vista() === 'ver'" (click)="cambiarTab('ver')">Ver</button>
+      <button type="button" class="tab-btn" [class.is-active]="vista() === 'editar'" (click)="cambiarTab('editar')">Editar</button>
+      <button type="button" class="tab-btn" [class.is-active]="vista() === 'adjuntos'" (click)="cambiarTab('adjuntos')">Adjuntos</button>
+    </div>
+  }
+
+  @if (vista() === 'ver') {
+    <article class="page-body" [innerHTML]="contenidoRenderizado()"></article>
+    <div class="page-meta">Última modificación: {{ formatearFecha(documentoActual()!) }}</div>
+  } @else if (vista() === 'adjuntos') {
+    <app-adjuntos-panel
+      entidad="DocumentoAdjunto"
+      campoPadre="documentoId"
+      [padreId]="documentoActual()!.id"
+      etiqueta="Adjuntos"
+    />
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="guardar()">
+      <div class="edit-form">
+        @if (!seccionFijaId) {
+          <label>
+            Tipo de sistema
+            <select (change)="onTipoSistemaCambia($any($event.target).value)">
+              <option value="0">Selecciona...</option>
+              @for (tipo of tiposSistema(); track tipo.id) {
+                <option [value]="tipo.id">{{ tipo.nombre }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            Categoría
+            <select (change)="onCategoriaCambia($any($event.target).value)">
+              <option value="0">Selecciona...</option>
+              @for (categoria of categorias(); track categoria.id) {
+                <option [value]="categoria.id">{{ categoria.nombre }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            Sección
+            <select (change)="onSeccionCambia($any($event.target).value)">
+              <option value="0">Selecciona...</option>
+              @for (seccion of secciones(); track seccion.id) {
+                <option [value]="seccion.id">{{ seccion.nombre }}</option>
+              }
+            </select>
+          </label>
+        }
+
+        <label>
+          Título
+          <input type="text" formControlName="titulo" />
+        </label>
+
+        <label>
+          Contenido (Markdown)
+          <textarea rows="16" formControlName="contenido"></textarea>
+        </label>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Guardar</button>
+          <button type="button" class="btn-secondary" (click)="volverALista()">Cancelar</button>
+        </div>
+      </div>
+    </form>
+  }
+}
+
+<app-confirm-dialog
+  [visible]="documentoAEliminar() !== null"
+  titulo="Eliminar documento"
+  [mensaje]="'¿Eliminar el documento ' + (documentoAEliminar()?.titulo ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="documentoAEliminar.set(null)"
+/>

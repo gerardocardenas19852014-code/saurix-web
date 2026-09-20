@@ -1,0 +1,33 @@
+<div class="page-header">
+  <h1>Calendario de pagos</h1>
+</div>
+<p class="hint" style="margin:-10px 0 24px;">Próximos fijos y próximo pago de cada tarjeta, a 60 días.</p>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else if (diasAgrupados().length === 0) {
+  <div class="empty-state-block">
+    <p>No hay pagos ni fijos próximos en los siguientes 60 días.</p>
+  </div>
+} @else {
+  @for (dia of diasAgrupados(); track dia.fecha.getTime()) {
+    <div class="wallet-calendar-day">
+      <div class="wallet-calendar-date">
+        <strong>{{ dia.fecha | date: 'dd MMM' }}</strong>
+        <span class="hint" style="margin:0;">{{ diasRestantes(dia.fecha) }}</span>
+      </div>
+      <div class="wallet-calendar-events">
+        @for (evento of dia.eventos; track evento.titulo + evento.tipo) {
+          <div class="wallet-calendar-event">
+            <span>{{ evento.icono }} {{ evento.titulo }} <span class="hint" style="margin:0;">· {{ evento.detalle }}</span></span>
+            @if (evento.monto !== null) {
+              <span [class.wallet-tx-amount-in]="evento.tipo === 'Ingreso'" [class.wallet-tx-amount-out]="evento.tipo === 'Gasto'" style="font-family:'JetBrains Mono', monospace; font-weight:700;">
+                {{ evento.tipo === 'Ingreso' ? '+' : '-' }}{{ formatMoneda(evento.monto) }}
+              </span>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+}

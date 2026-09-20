@@ -1,0 +1,69 @@
+<div class="page-header">
+  <h1>Fijos y Proyección</h1>
+  <div class="page-actions">
+    <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo</button>
+  </div>
+</div>
+
+<app-data-table
+  [columnas]="columnas"
+  [filas]="recurrentes()"
+  [cargando]="cargando()"
+  accionExtraEtiqueta="↻ Registrar ciclo"
+  accionExtraTitulo="Registrar este ciclo como movimiento"
+  (accionExtra)="registrarCiclo($event)"
+  (editar)="editar($event)"
+  (eliminar)="pedirEliminar($event)"
+/>
+
+@if (modalAbierto()) {
+  <div class="modal-overlay show" (click)="modalAbierto.set(false)">
+    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3>{{ enEdicion() ? 'Editar fijo' : 'Nuevo fijo' }}</h3>
+
+      <div class="edit-form" style="margin-bottom:18px;">
+        <label>Descripción<input type="text" formControlName="descripcion" /></label>
+        <label>Tipo
+          <select formControlName="tipo">
+            <option value="Gasto">Gasto</option>
+            <option value="Ingreso">Ingreso</option>
+          </select>
+        </label>
+        <label>Cuenta
+          <select formControlName="cuentaPresupuestoId">
+            <option [ngValue]="0">Selecciona...</option>
+            @for (c of cuentas(); track c.id) { <option [ngValue]="c.id">{{ c.nombre }}</option> }
+          </select>
+        </label>
+        <label>Categoría
+          <select formControlName="categoriaPresupuestoId">
+            <option [ngValue]="0">Sin categoría</option>
+            @for (c of categorias(); track c.id) { <option [ngValue]="c.id">{{ c.nombre }}</option> }
+          </select>
+        </label>
+        <label>Monto<input type="number" step="0.01" formControlName="monto" /></label>
+        <label>Frecuencia
+          <select formControlName="frecuencia">
+            <option value="Mensual">Mensual</option>
+            <option value="Anual">Anual</option>
+          </select>
+        </label>
+        <label>Día del mes<input type="number" min="1" max="31" formControlName="diaDelMes" /></label>
+      </div>
+
+      @if (enEdicion(); as fijo) {
+        <p class="hint" style="margin:-8px 0 14px;">
+          Ciclo actual: {{ estadoCiclo(fijo) === 'registrado' ? '✓ ya registrado' : estadoCiclo(fijo) === 'pendiente' ? '⚠ pendiente de registrar' : '· próximo' }}
+        </p>
+        <app-adjuntos-panel entidad="MovimientoRecurrentePresupuestoAdjunto" campoPadre="movimientoRecurrentePresupuestoId" [padreId]="fijo.id" />
+      }
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog [visible]="aEliminar() !== null" titulo="Eliminar" mensaje="¿Eliminar este registro?" (confirmar)="confirmarEliminar()" (cancelar)="aEliminar.set(null)" />

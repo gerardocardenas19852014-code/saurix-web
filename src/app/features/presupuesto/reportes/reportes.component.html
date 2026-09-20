@@ -1,0 +1,87 @@
+<div class="page-header">
+  <h1>Reportes</h1>
+</div>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else {
+  <div class="board-filters" style="margin-bottom:22px;">
+    <label class="board-filter-field">
+      Periodo
+      <select [value]="periodo()" (change)="periodo.set($any($event.target).value)">
+        <option value="mes-actual">Este mes</option>
+        <option value="mes-anterior">Mes anterior</option>
+        <option value="anio-actual">Este año</option>
+        <option value="anio-anterior">Año anterior</option>
+      </select>
+    </label>
+  </div>
+
+  <h2 class="settings-card-title" style="margin:0 0 12px; text-transform:capitalize;">Ingresos vs. gastos — {{ etiquetaPeriodo() }}</h2>
+  <div class="wallet-report-cards">
+    <div class="wallet-report-card">
+      <div class="wallet-report-card-label">Ingresos</div>
+      <div class="wallet-report-card-value" style="color:var(--client);">{{ formatMoneda(totalesActual().ingreso) }}</div>
+      <span class="wallet-compare" [class]="claseComparacion('ingreso', variacionIngreso())">{{ textoComparacion(variacionIngreso()) }}</span>
+    </div>
+    <div class="wallet-report-card">
+      <div class="wallet-report-card-label">Gastos</div>
+      <div class="wallet-report-card-value" style="color:var(--danger);">{{ formatMoneda(totalesActual().gasto) }}</div>
+      <span class="wallet-compare" [class]="claseComparacion('gasto', variacionGasto())">{{ textoComparacion(variacionGasto()) }}</span>
+    </div>
+    <div class="wallet-report-card">
+      <div class="wallet-report-card-label">Balance neto</div>
+      <div class="wallet-report-card-value" [style.color]="netoActual() >= 0 ? 'var(--client)' : 'var(--danger)'">{{ formatMoneda(netoActual()) }}</div>
+      <span class="hint" style="margin:4px 0 0;">ingresos − gastos del periodo</span>
+    </div>
+  </div>
+
+  <div class="page-header" style="margin-bottom:12px;">
+    <h2 class="settings-card-title" style="margin:0;">Gasto por categoría</h2>
+    <div class="page-actions">
+      <button type="button" class="btn-secondary small" [class.btn-primary]="vistaCategoria() === 'dona'" (click)="vistaCategoria.set('dona')">◔ Dona</button>
+      <button type="button" class="btn-secondary small" [class.btn-primary]="vistaCategoria() === 'barra'" (click)="vistaCategoria.set('barra')">▤ Barras</button>
+    </div>
+  </div>
+
+  @if (gastoPorCategoria().length === 0) {
+    <p class="empty" style="margin-bottom:28px;">Sin gastos registrados en este periodo.</p>
+  } @else if (vistaCategoria() === 'dona') {
+    <div class="wallet-donut-wrap" style="margin-bottom:28px;">
+      <div class="wallet-donut" [style.background]="gradienteDona()"></div>
+      <ul class="wallet-donut-legend">
+        @for (cat of gastoPorCategoria(); track cat.id) {
+          <li class="wallet-donut-legend-item">
+            <span class="wallet-donut-legend-dot" [style.background]="cat.color"></span>
+            <span class="wallet-donut-legend-name">{{ cat.nombre }}</span>
+            <span class="wallet-donut-legend-amount">{{ formatMoneda(cat.monto) }} · {{ cat.pct | number: '1.0-0' }}%</span>
+          </li>
+        }
+      </ul>
+    </div>
+  } @else {
+    <div style="margin-bottom:28px;">
+      @for (cat of gastoPorCategoria(); track cat.id) {
+        <div class="wallet-cat-bar-row">
+          <span class="wallet-cat-bar-name" [title]="cat.nombre">{{ cat.nombre }}</span>
+          <div class="wallet-cat-bar-track">
+            <div class="wallet-cat-bar-fill" [style.width.%]="(cat.monto / maxCategoria()) * 100" [style.background]="cat.color"></div>
+          </div>
+          <span class="wallet-cat-bar-amount">{{ formatMoneda(cat.monto) }}</span>
+        </div>
+      }
+    </div>
+  }
+
+  <h2 class="settings-card-title" style="margin:0 0 4px;">Patrimonio neto histórico</h2>
+  <p class="hint" style="margin:0 0 12px;">Suma de todos tus ingresos menos gastos, acumulada mes a mes (últimos 12 meses) · actual: <strong>{{ formatMoneda(patrimonioActual()) }}</strong></p>
+  <svg class="wallet-networth-chart" viewBox="0 0 640 200" preserveAspectRatio="none">
+    <polygon [attr.points]="areaPatrimonioSvg()" fill="var(--client-soft)" opacity="0.6" />
+    <polyline [attr.points]="puntosPatrimonioSvg()" fill="none" stroke="var(--client)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />
+  </svg>
+  <div class="wallet-networth-labels">
+    @for (punto of patrimonioHistorico(); track punto.etiqueta + punto.x) {
+      <span>{{ punto.etiqueta }}</span>
+    }
+  </div>
+}

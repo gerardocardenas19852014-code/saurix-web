@@ -1,0 +1,162 @@
+<div class="page-header">
+  <h1>Ventas</h1>
+  <div class="page-actions">
+    <button type="button" class="toolbar-btn" (click)="nueva()">+ Nueva</button>
+  </div>
+</div>
+
+<app-data-table
+  [columnas]="columnas"
+  [filas]="ventas()"
+  [cargando]="cargando()"
+  accionExtraEtiqueta="Partidas"
+  (editar)="editar($event)"
+  (eliminar)="pedirEliminar($event)"
+  (accionExtra)="abrirPartidas($event)"
+/>
+
+@if (modalAbierto()) {
+  <div class="modal-overlay show" (click)="modalAbierto.set(false)">
+    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()" style="max-width:560px;">
+      <h3>{{ ventaEnEdicion() ? 'Editar venta' : 'Nueva venta' }}</h3>
+
+      <div class="edit-form form-grid-2col" style="margin-bottom: 18px;">
+        <label>
+          Folio
+          <input type="text" formControlName="folio" />
+        </label>
+
+        <label>
+          Cliente
+          <select formControlName="clienteId">
+            <option [ngValue]="0" disabled>Selecciona un cliente</option>
+            @for (cliente of clientes(); track cliente.id) {
+              <option [ngValue]="cliente.id">{{ cliente.nombre }}</option>
+            }
+          </select>
+        </label>
+
+        <label>
+          Fecha
+          <input type="date" formControlName="fecha" />
+        </label>
+
+        <label>
+          Estado
+          <select formControlName="estado">
+            <option value="Pendiente">Pendiente</option>
+            <option value="Pagada">Pagada</option>
+            <option value="Cancelada">Cancelada</option>
+          </select>
+        </label>
+
+        <label>
+          IVA %
+          <input type="number" formControlName="ivaPct" />
+        </label>
+
+        <label class="full-span">
+          Notas
+          <textarea rows="2" formControlName="notas"></textarea>
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+@if (ventaActiva(); as activa) {
+  <div class="panel" style="margin-top:24px;">
+    <div class="panel-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <h2>Partidas de {{ activa.folio }}</h2>
+      <div class="page-actions">
+        <button type="button" class="btn-secondary small" (click)="exportarPdf()">Exportar PDF</button>
+        <button type="button" class="btn-secondary small" (click)="cerrarPartidas()">Cerrar</button>
+      </div>
+    </div>
+
+    <form class="edit-form form-grid-5col" [formGroup]="formItem" (ngSubmit)="agregarItem()" style="margin-bottom: 18px;">
+      <label>
+        Producto
+        <select formControlName="productoId" (change)="seleccionarProducto()">
+          <option [ngValue]="0" disabled>Selecciona...</option>
+          @for (producto of productos(); track producto.id) {
+            <option [ngValue]="producto.id">{{ producto.nombre }}</option>
+          }
+        </select>
+      </label>
+
+      <label>
+        Cantidad
+        <input type="number" min="1" formControlName="cantidad" />
+      </label>
+
+      <label>
+        Precio unitario
+        <input type="number" step="0.01" formControlName="precioUnitario" />
+      </label>
+
+      <label>
+        Descuento %
+        <input type="number" formControlName="descuentoPct" />
+      </label>
+
+      <div class="form-actions">
+        <button type="submit" class="btn-primary">+ Agregar</button>
+      </div>
+    </form>
+
+    <div class="grid-table-scroll">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th>Cantidad</th>
+            <th>Precio unitario</th>
+            <th>Descuento %</th>
+            <th>Subtotal</th>
+            <th class="grid-actions-col">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of items(); track item.id) {
+            <tr>
+              <td data-label="Producto">{{ nombreProducto(item.productoId) }}</td>
+              <td data-label="Cantidad">{{ item.cantidad }}</td>
+              <td data-label="Precio unitario">${{ item.precioUnitario.toFixed(2) }}</td>
+              <td data-label="Descuento %">{{ item.descuentoPct ? item.descuentoPct + '%' : '—' }}</td>
+              <td data-label="Subtotal">${{ (item.cantidad * item.precioUnitario * (1 - item.descuentoPct / 100)).toFixed(2) }}</td>
+              <td class="grid-actions-col" data-label="Acciones">
+                <button type="button" class="btn-danger small" (click)="eliminarItem(item)">Eliminar</button>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="6">
+                <div class="empty-state-block"><p>Sin partidas capturadas.</p></div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; gap:24px; margin-top:14px; font-size:14px;">
+      <span>Subtotal: ${{ subtotalItems().toFixed(2) }}</span>
+      <span>IVA ({{ activa.ivaPct }}%): ${{ ivaItems().toFixed(2) }}</span>
+      <strong>Total: ${{ totalItems().toFixed(2) }}</strong>
+    </div>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="ventaAEliminar() !== null"
+  titulo="Eliminar venta"
+  [mensaje]="'¿Eliminar ' + (ventaAEliminar()?.folio ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="ventaAEliminar.set(null)"
+/>

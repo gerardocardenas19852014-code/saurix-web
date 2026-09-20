@@ -1,0 +1,158 @@
+<div class="app-shell">
+  <aside class="sidebar">
+    <a class="brand" routerLink="/">
+      <span class="brand-mark">§</span>
+      <span class="brand-name">Sauri<em>x</em></span>
+    </a>
+
+    @if (moduloActivo() === 'seguridad') {
+      <span class="sidebar-label">Seguridad</span>
+      <nav class="sidebar-nav" aria-label="Menú de seguridad">
+        <a routerLink="/seguridad" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
+        <a routerLink="/seguridad/usuarios" routerLinkActive="active">👥 Usuarios</a>
+      </nav>
+    }
+
+    @if (moduloActivo() === 'catalogos') {
+      <span class="sidebar-label">Catálogos</span>
+      <nav class="sidebar-nav" aria-label="Menú de catálogos">
+        <a routerLink="/catalogos" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
+        <a routerLink="/catalogos/categorias-presupuesto" routerLinkActive="active">🏷️ Categorías de presupuesto</a>
+        <a routerLink="/catalogos/cuentas-presupuesto" routerLinkActive="active">🏦 Cuentas de presupuesto</a>
+      </nav>
+    }
+
+    @if (moduloActivo() === 'wikidocs') {
+      <span class="sidebar-label">WikiDocs</span>
+      <nav class="sidebar-nav" aria-label="Menú de WikiDocs">
+        <a routerLink="/wikidocs" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
+        <a routerLink="/wikidocs/documentos" routerLinkActive="active">📚 Documentos</a>
+        <a routerLink="/wikidocs/tipos-sistema" routerLinkActive="active">🗂️ Tipo de sistema</a>
+        <a routerLink="/wikidocs/categorias" routerLinkActive="active">📖 Categoría</a>
+        <a routerLink="/wikidocs/secciones" routerLinkActive="active">📑 Secciones</a>
+      </nav>
+    }
+
+    @if (moduloActivo() === 'presupuesto') {
+      <span class="sidebar-label">Presupuesto Personal</span>
+      <nav class="sidebar-nav" aria-label="Menú de presupuesto personal">
+        <a routerLink="/presupuesto" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
+        <a routerLink="/presupuesto/movimientos" routerLinkActive="active">💸 Movimientos</a>
+        <a routerLink="/presupuesto/recurrentes" routerLinkActive="active">🔁 Fijos y Proyección</a>
+        <a routerLink="/presupuesto/deudas" routerLinkActive="active">🏦 Deudas</a>
+        <a routerLink="/presupuesto/metas" routerLinkActive="active">🏆 Metas de ahorro</a>
+        <a routerLink="/presupuesto/limites" routerLinkActive="active">🎯 Límites de gasto</a>
+        <a routerLink="/presupuesto/reportes" routerLinkActive="active">📊 Reportes</a>
+        <a routerLink="/presupuesto/calendario" routerLinkActive="active">📅 Calendario de pagos</a>
+      </nav>
+    }
+
+    @if (moduloActivo() === 'proyectos') {
+      <span class="sidebar-label">Gestión de Proyectos</span>
+      <nav class="sidebar-nav" aria-label="Menú de gestión de proyectos">
+        <a routerLink="/proyectos" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
+        <a routerLink="/proyectos/tablero" routerLinkActive="active">🗂️ Tablero Kanban</a>
+        <a routerLink="/proyectos/proyectos" routerLinkActive="active">📁 Proyectos</a>
+        <a routerLink="/proyectos/tableros" routerLinkActive="active">🧭 Gestor de Estados</a>
+        <a routerLink="/proyectos/dashboard" routerLinkActive="active">📊 Mi Dashboard</a>
+        <a routerLink="/proyectos/reportes-horas" routerLinkActive="active">⏱️ Reportes de horas</a>
+        <a routerLink="/proyectos/tipos-ticket" routerLinkActive="active">🏷️ Tipos de Ticket</a>
+        <a routerLink="/proyectos/prioridades" routerLinkActive="active">🚦 Prioridades</a>
+        <a routerLink="/proyectos/motivos-solucion" routerLinkActive="active">✅ Motivos de Solución</a>
+      </nav>
+    }
+  </aside>
+
+  <div class="main-area">
+    <header class="main-topbar">
+      <span class="current-workspace-tag">SAURIX</span>
+      <form class="search-form" (submit)="$event.preventDefault()">
+        <input type="text" placeholder="Buscar en todo Saurix…" />
+      </form>
+      <div class="topbar-actions">
+        <div class="topbar-user">
+          <span class="topbar-user-icon" aria-hidden="true">👤</span>
+          <span class="topbar-user-info">
+            <strong>{{ auth.usuarioActual()?.nombreUsuario }}</strong>
+            <span class="role-tag">{{ auth.usuarioActual()?.role }}</span>
+          </span>
+        </div>
+        <app-mi-perfil />
+        <div class="notif-wrap">
+          <button type="button" class="notif-bell" (click)="toggleNotifPanel()" aria-label="Notificaciones">
+            🔔
+            @if (hayNoLeidas()) {
+              <span class="notif-dot">{{ totalNoLeidas() }}</span>
+            }
+          </button>
+          <div class="notif-panel" [class.open]="notifPanelAbierto()">
+            <div class="notif-panel-head">
+              <span>Notificaciones</span>
+              <a (click)="marcarTodasLeidas()">Marcar todas leídas</a>
+            </div>
+            <div class="notif-panel-list">
+              @for (n of notificaciones(); track n.id) {
+                <button type="button" class="notif-item" [class.unread]="!n.leida" (click)="marcarLeida(n.id)">
+                  <span class="notif-item-title">{{ n.titulo }}</span>
+                  <span class="notif-item-meta">{{ n.meta }}</span>
+                </button>
+              } @empty {
+                <div class="notif-empty">Sin notificaciones.</div>
+              }
+            </div>
+          </div>
+        </div>
+        <button type="button" class="link-btn topbar-exit" (click)="salir()">Salir</button>
+      </div>
+    </header>
+
+    <main class="content">
+      <router-outlet />
+    </main>
+
+    <footer class="footer">Saurix — datos guardados localmente en este navegador (IndexedDB).</footer>
+  </div>
+</div>
+
+<app-toast />
+
+<button
+  type="button"
+  class="ai-fab"
+  [class.is-open]="aiAbierto()"
+  (click)="toggleAiChat()"
+  title="Preguntarle al asistente"
+>
+  💬
+</button>
+
+<div class="ai-panel" [class.is-open]="aiAbierto()">
+  <div class="ai-panel-header">
+    <div>
+      <strong>Asistente Saurix</strong>
+      <span class="ai-panel-sub">Responde con base en la documentación cargada</span>
+    </div>
+    <button type="button" class="ai-panel-close" (click)="toggleAiChat()">✕</button>
+  </div>
+  <div class="ai-panel-messages">
+    @for (m of aiMensajes(); track $index) {
+      @if (m.rol === 'pending') {
+        <div class="ai-msg-pending">Pensando…</div>
+      } @else {
+        <div class="ai-msg" [class.ai-msg-user]="m.rol === 'user'" [class.ai-msg-bot]="m.rol === 'bot'">{{ m.texto }}</div>
+      }
+    } @empty {
+      <div class="ai-msg-pending">Pregúntame algo sobre la documentación cargada en WikiDocs.</div>
+    }
+  </div>
+  <form class="ai-panel-inputrow" (submit)="enviarPreguntaAi(); $event.preventDefault()">
+    <input
+      type="text"
+      [value]="aiPregunta()"
+      (input)="aiPregunta.set($any($event.target).value)"
+      placeholder="Escribe tu pregunta…"
+      autocomplete="off"
+    />
+    <button type="submit" class="btn-primary small">Enviar</button>
+  </form>
+</div>

@@ -1,0 +1,77 @@
+<button type="button" class="notif-bell" title="Mi perfil" aria-label="Mi perfil" (click)="abrir()">🔑</button>
+
+@if (abierta()) {
+  <div class="modal-overlay modal show d-block mi-perfil-overlay" (click)="cerrar()">
+    <section class="modal-box modal-dialog modal-content mi-perfil-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header p-0 pb-3 mb-3">
+        <div>
+          <h3 class="modal-title mb-1">Mi perfil</h3>
+          <p class="text-muted mb-0">{{ usuarioActual()?.nombreUsuario }} · {{ usuarioActual()?.role }}</p>
+        </div>
+      </div>
+
+      @if (forzado()) {
+        <div class="alert alert-light mi-perfil-aviso mb-3">
+          Un administrador reseteó tu contraseña. Debes cambiarla antes de seguir usando Saurix.
+        </div>
+      }
+
+      <form class="edit-form" [formGroup]="form" (ngSubmit)="guardar()">
+        <label class="floating-field">
+          <span>Contraseña actual <b>*</b></span>
+          <input
+            [type]="mostrarPassword() ? 'text' : 'password'"
+            class="form-control pill-control"
+            formControlName="passwordActual"
+            placeholder=" "
+            aria-label="Contraseña actual"
+          />
+        </label>
+
+        <label class="floating-field">
+          <span>Nueva contraseña <b>*</b></span>
+          <input
+            [type]="mostrarPassword() ? 'text' : 'password'"
+            class="form-control pill-control"
+            formControlName="passwordNueva"
+            placeholder=" "
+            aria-label="Nueva contraseña"
+          />
+          @if (fortalezaPassword().nivel !== 'vacia') {
+            <div class="password-fortaleza password-fortaleza-{{ fortalezaPassword().nivel }}">
+              Fortaleza: {{ fortalezaPassword().etiqueta }}
+            </div>
+          }
+        </label>
+
+        <label class="floating-field">
+          <span>Confirmar nueva contraseña <b>*</b></span>
+          <input
+            [type]="mostrarPassword() ? 'text' : 'password'"
+            class="form-control pill-control"
+            formControlName="confirmacionPassword"
+            placeholder=" "
+            aria-label="Confirmar nueva contraseña"
+          />
+        </label>
+
+        <div class="toggle-row">
+          <span class="hint" style="margin:0;">Ver contraseñas</span>
+          <label class="toggle-switch">
+            <input type="checkbox" [checked]="mostrarPassword()" (change)="alternarMostrarPassword()" />
+            <span class="toggle-switch-track"></span>
+          </label>
+        </div>
+
+        <div class="modal-actions mt-3">
+          @if (!forzado()) {
+            <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="cerrar()">Cancelar</button>
+          }
+          <button type="submit" class="btn-primary btn btn-primary" [disabled]="guardando()">
+            {{ guardando() ? 'Guardando…' : 'Cambiar contraseña' }}
+          </button>
+        </div>
+      </form>
+    </section>
+  </div>
+}
