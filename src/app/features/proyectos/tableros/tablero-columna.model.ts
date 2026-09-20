@@ -10,7 +10,7 @@ export interface TableroColumna {
   /**
    * JSON con reglas editable/obligatorio por campo del ticket ("Gestor de
    * Estados" del prototipo) — ver `ConfiguracionCamposTicket` más abajo.
-   * Se edita desde Gestión de Proyectos → Gestor de Estados → "⚙ Campos".
+   * Se edita desde Panel de Control → Gestión de Proyectos → Gestor de Estados → "⚙ Campos".
    */
   configuracionCamposJson: string | null;
   activo: boolean;
