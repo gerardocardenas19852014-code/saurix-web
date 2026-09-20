@@ -130,11 +130,14 @@ export class KanbanComponent implements OnInit, OnDestroy {
   });
 
   /** true si a este ticket todavía le falta la actividad obligatoria antes de poder
-   *  avanzar de estado (misma condición que revisa `mover()`) — controla el aviso
-   *  que se muestra en la pestaña Actividades para explicar por qué es obligatorio. */
+   *  cambiar de estado —ya sea avanzar o retroceder— (misma condición que revisa
+   *  `mover()`) — controla el aviso que se muestra en la pestaña Actividades para
+   *  explicar por qué es obligatorio. */
   protected readonly requiereActividadParaAvanzar = computed(() => {
     const activo = this.ticketActivo();
-    if (!activo || !this.tabsPermitidas().actividades || this.siguienteColumna(activo) === null) return false;
+    if (!activo || !this.tabsPermitidas().actividades) return false;
+    const hayCambioPosible = this.siguienteColumna(activo) !== null || this.columnaAnterior(activo) !== null;
+    if (!hayCambioPosible) return false;
     return !this.tieneActividadDesdeUltimoCambio(activo);
   });
 
@@ -144,11 +147,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
     const yaAsociadosIds = new Set(this.dependencias().map((d) => Number(d.ticketRelacionadoId)));
     return this.tickets().filter((t) => Number(t.id) !== Number(activo.id) && !yaAsociadosIds.has(Number(t.id)));
   });
-
-  /** Ticket que se está arrastrando (para la clase visual `is-dragging`). */
-  protected readonly ticketArrastrandoId = signal<number | null>(null);
-  /** Columna sobre la que se sostiene el arrastre (para `is-drop-target`). */
-  protected readonly columnaDropTargetId = signal<number | null>(null);
 
   protected readonly ticketsFiltrados = computed(() => {
     const tipoId = this.filtroTipoId();
@@ -551,8 +549,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Único punto que persiste un cambio de columna: lo usan las flechas, el drag & drop y el selector de estado del detalle.
-   *  También deja registro en TicketHistorialEstado (bitácora de cambios de estado). */
+  /** Único punto que persiste un cambio de columna: lo usan los botones "Aceptar"/"Regresar"
+   *  de la barra de estado del detalle (único lugar desde donde se cambia de estado — ver
+   *  `mover()`). También deja registro en TicketHistorialEstado (bitácora de cambios de estado). */
   private moverTicketAColumna(ticket: Ticket, columnaId: number): void {
     if (Number(ticket.tableroColumnaId) === Number(columnaId)) return;
     const columnaAnteriorId = Number(ticket.tableroColumnaId);
@@ -582,19 +581,18 @@ export class KanbanComponent implements OnInit, OnDestroy {
     const indiceDestino = indiceActual + direccion;
     if (indiceActual === -1 || indiceDestino < 0 || indiceDestino >= columnas.length) return;
 
-    // Avanzar (no retroceder) exige haber bitacoreado qué se hizo en la columna actual —
-    // solo se puede verificar de forma confiable cuando el detalle de ESTE ticket está
-    // abierto (actividades()/historial() traen datos de ese ticket en ese caso), y solo si
-    // la columna actual permite la pestaña Actividades (si no la permite, no hay dónde
-    // registrarla, así que no se puede exigir).
+    // Cambiar de estado (avanzar O retroceder) exige haber bitacoreado qué se hizo en la
+    // columna actual — solo se puede verificar de forma confiable cuando el detalle de ESTE
+    // ticket está abierto (actividades()/historial() traen datos de ese ticket en ese caso),
+    // y solo si la columna actual permite la pestaña Actividades (si no la permite, no hay
+    // dónde registrarla, así que no se puede exigir).
     if (
-      direccion === 1 &&
       this.ticketActivo()?.id === ticket.id &&
       this.tabsPermitidas().actividades &&
       !this.tieneActividadDesdeUltimoCambio(ticket)
     ) {
       this.tabActiva.set('actividades');
-      this.toast.advertencia('Antes de avanzar de estado es obligatorio registrar una actividad describiendo qué se hizo.');
+      this.toast.advertencia('Antes de cambiar de estado es obligatorio registrar una actividad describiendo qué se hizo.');
       return;
     }
 
@@ -611,7 +609,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   /** Columna que sigue en el orden configurado, o null si el ticket ya está en la
    *  última — usada por la barra "Siguiente estado" del detalle (un solo paso hacia
-   *  adelante; regresar solo se hace con las flechas ◀ del tablero, igual que ahí). */
+   *  adelante). */
   siguienteColumna(ticket: Ticket): TableroColumna | null {
     const columnas = this.columnasTablero();
     const indiceActual = columnas.findIndex((c) => Number(c.id) === Number(ticket.tableroColumnaId));
@@ -619,35 +617,14 @@ export class KanbanComponent implements OnInit, OnDestroy {
     return columnas[indiceActual + 1];
   }
 
-  // ---------------- Arrastrar y soltar (drag & drop nativo del navegador) ----------------
-
-  onDragStart(evt: DragEvent, ticket: Ticket): void {
-    evt.dataTransfer?.setData('text/plain', String(ticket.id));
-    if (evt.dataTransfer) evt.dataTransfer.effectAllowed = 'move';
-    this.ticketArrastrandoId.set(ticket.id);
-  }
-
-  onDragEnd(): void {
-    this.ticketArrastrandoId.set(null);
-    this.columnaDropTargetId.set(null);
-  }
-
-  onDragEnterColumn(columnaId: number): void {
-    this.columnaDropTargetId.set(columnaId);
-  }
-
-  onDragLeaveColumn(columnaId: number): void {
-    if (this.columnaDropTargetId() === columnaId) this.columnaDropTargetId.set(null);
-  }
-
-  onDrop(evt: DragEvent, columna: TableroColumna): void {
-    evt.preventDefault();
-    this.columnaDropTargetId.set(null);
-    const idTexto = evt.dataTransfer?.getData('text/plain');
-    const id = idTexto ? Number(idTexto) : NaN;
-    const ticket = this.tickets().find((t) => t.id === id);
-    if (!ticket) return;
-    this.moverTicketAColumna(ticket, columna.id);
+  /** Columna anterior en el orden configurado, o null si el ticket ya está en la primera —
+   *  usada por el botón "Regresar" de la barra de estado del detalle (único lugar desde
+   *  donde ahora se puede retroceder de estado; ver nota en `mover()`). */
+  columnaAnterior(ticket: Ticket): TableroColumna | null {
+    const columnas = this.columnasTablero();
+    const indiceActual = columnas.findIndex((c) => Number(c.id) === Number(ticket.tableroColumnaId));
+    if (indiceActual <= 0) return null;
+    return columnas[indiceActual - 1];
   }
 
   // ---------------- Detalle del ticket (tabs: Detalles / Actividades / Comentarios / Etiquetas) ----------------

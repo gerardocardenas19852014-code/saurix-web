@@ -96,27 +96,16 @@
   />
 } @else {
   <div class="kanban-board">
-    @for (columna of columnasTablero(); track columna.id; let iColumna = $index) {
-      <div class="kanban-column" [class.is-drop-target]="columnaDropTargetId() === columna.id">
+    @for (columna of columnasTablero(); track columna.id) {
+      <div class="kanban-column">
         <div class="kanban-column-header">
           <span>{{ columna.nombre }}</span>
           <span class="kanban-column-count">{{ (ticketsPorColumna().get(columna.id) ?? []).length }}</span>
         </div>
 
-        <div
-          class="kanban-column-body"
-          (dragover)="$event.preventDefault(); onDragEnterColumn(columna.id)"
-          (dragleave)="onDragLeaveColumn(columna.id)"
-          (drop)="onDrop($event, columna)"
-        >
+        <div class="kanban-column-body">
           @for (ticket of ticketsPorColumna().get(columna.id) ?? []; track ticket.id) {
-            <div
-              class="kanban-card"
-              [class.is-dragging]="ticketArrastrandoId() === ticket.id"
-              [draggable]="true"
-              (dragstart)="onDragStart($event, ticket)"
-              (dragend)="onDragEnd()"
-            >
+            <div class="kanban-card">
               <div class="kanban-card-top">
                 <span class="kanban-card-id">#{{ ticket.numeroTicket }}</span>
                 <span
@@ -143,27 +132,6 @@
               }
 
               <div class="kanban-card-foot">
-                <div class="kanban-card-moves">
-                  <button
-                    type="button"
-                    class="kanban-move-btn"
-                    (click)="mover(ticket, -1)"
-                    [disabled]="iColumna === 0"
-                    title="Mover a columna anterior"
-                  >
-                    ◀
-                  </button>
-                  <button
-                    type="button"
-                    class="kanban-move-btn"
-                    (click)="mover(ticket, 1)"
-                    [disabled]="iColumna === columnasTablero().length - 1"
-                    title="Mover a columna siguiente"
-                  >
-                    ▶
-                  </button>
-                </div>
-
                 @if (ticket.asignadoUsuarioId) {
                   <span
                     class="kanban-card-assignee"
@@ -310,11 +278,21 @@
           }
         </div>
         <div class="ticket-status-bar-action">
+          @if (columnaAnterior(activo); as anterior) {
+            <button
+              type="button"
+              class="btn-secondary small"
+              [title]="'Regresar a ' + anterior.nombre"
+              (click)="mover(activo, -1)"
+            >
+              ◀ Regresar
+            </button>
+          }
           @if (siguienteColumna(activo); as siguiente) {
             <span class="ticket-status-bar-next">Siguiente estado: <strong>{{ siguiente.nombre }}</strong></span>
             <button type="button" class="btn-primary small" (click)="mover(activo, 1)">Aceptar</button>
           } @else {
-            <span class="hint" style="margin:0;">Es el último estado. Para regresar, usa las flechas ◀ del tablero.</span>
+            <span class="hint" style="margin:0;">Es el último estado del proceso.</span>
           }
         </div>
       </div>
@@ -450,7 +428,7 @@
         <div class="tab-panel">
           @if (requiereActividadParaAvanzar()) {
             <p class="form-error" style="margin: 0 0 12px;">
-              ⚠️ Es obligatorio registrar una actividad describiendo el trabajo realizado en este estado antes de poder avanzar al siguiente.
+              ⚠️ Es obligatorio registrar una actividad describiendo el trabajo realizado en este estado antes de poder cambiar de estado (avanzar o regresar).
             </p>
           }
           <p class="hint" style="margin: 0 0 12px;">Tiempo total registrado: {{ totalMinutosActividad() }} min.</p>
