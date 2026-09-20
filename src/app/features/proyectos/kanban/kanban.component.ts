@@ -1,6 +1,7 @@
 import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { AdjuntosPanelComponent } from '../../../shared/components/adjuntos-panel/adjuntos-panel.component';
@@ -69,6 +70,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly configuracionApariencia = inject(ConfiguracionAparienciaService);
+  private readonly route = inject(ActivatedRoute);
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
 
   protected readonly iniciales = iniciales;
@@ -213,10 +215,27 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly formAsociado = this.fb.nonNullable.group({ ticketRelacionadoId: [0] });
 
   ngOnInit(): void {
+    // Deep link desde "Mi Dashboard" (u otra pantalla): ?ticket=123 abre
+    // directo el detalle de ese ticket, en el proyecto al que pertenece.
+    const ticketIdParam = Number(this.route.snapshot.queryParamMap.get('ticket')) || 0;
+
     this.data.list<ProyectoOpcion>('Proyecto').subscribe({
       next: (proyectos) => {
         this.proyectos.set(proyectos);
-        if (proyectos.length) {
+        if (!proyectos.length) return;
+
+        if (ticketIdParam) {
+          this.data.getById<Ticket>('Ticket', ticketIdParam).subscribe({
+            next: (ticket) => {
+              this.proyectoSeleccionadoId.set(Number(ticket.proyectoId));
+              this.cargarTablero(ticketIdParam);
+            },
+            error: () => {
+              this.proyectoSeleccionadoId.set(proyectos[0].id);
+              this.cargarTablero();
+            },
+          });
+        } else {
           this.proyectoSeleccionadoId.set(proyectos[0].id);
           this.cargarTablero();
         }
@@ -317,7 +336,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     return this.columnasTablero()[0]?.id ?? 0;
   }
 
-  private cargarTablero(): void {
+  private cargarTablero(abrirTicketId?: number): void {
     const proyectoId = this.proyectoSeleccionadoId();
     if (!proyectoId) return;
 
@@ -325,19 +344,23 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.data.list<TableroColumna>('TableroColumna', { proyectoId }).subscribe({
       next: (columnas) => {
         this.columnasTablero.set(columnas.sort((a, b) => a.orden - b.orden));
-        this.cargarTickets();
+        this.cargarTickets(abrirTicketId);
       },
       error: () => this.cargando.set(false),
     });
   }
 
-  private cargarTickets(): void {
+  private cargarTickets(abrirTicketId?: number): void {
     const proyectoId = this.proyectoSeleccionadoId();
     this.data.list<Ticket>('Ticket', { proyectoId }).subscribe({
       next: (tickets) => {
         this.tickets.set(tickets);
         this.cargando.set(false);
         this.cargarEtiquetasDeTablero(tickets.map((t) => t.id));
+        if (abrirTicketId) {
+          const ticket = tickets.find((t) => Number(t.id) === Number(abrirTicketId));
+          if (ticket) this.abrirDetalle(ticket);
+        }
       },
       error: () => this.cargando.set(false),
     });

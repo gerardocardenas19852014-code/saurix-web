@@ -1,33 +1,67 @@
 <div class="page-header">
-  <h1>Mi Dashboard</h1>
+  <div>
+    <span class="eyebrow">§ Gestión de Proyectos</span>
+    <h1>{{ viendoAMi() ? 'Mi Dashboard' : 'Dashboard de ' + nombreUsuario(usuarioViendoId()) }}</h1>
+  </div>
 </div>
-<p class="hint" style="margin-top:-12px;">Resumen personal de tus tickets, avisos de vigencia y horas registradas.</p>
+
+<div class="dashboard-user-filter">
+  <label class="dashboard-user-filter-label">
+    Viendo tareas de
+    <select [value]="usuarioViendoId()" (change)="cambiarUsuarioViendo($any($event.target).value)">
+      @for (usuario of usuarios(); track usuario.id) {
+        <option [value]="usuario.id">
+          {{ usuario.nombreCompleto }}{{ esUsuarioActual(usuario.id) ? ' (yo)' : '' }}
+        </option>
+      }
+    </select>
+  </label>
+</div>
+
+<p class="hint" style="margin:14px 0 24px;">
+  Resumen de los tickets asignados a
+  @if (viendoAMi()) {
+    <strong>ti</strong>
+  } @else {
+    <strong>{{ nombreUsuario(usuarioViendoId()) }}</strong>
+  }, en todos los proyectos.
+</p>
 
 @if (cargando()) {
   <p class="empty">Cargando…</p>
 } @else {
   <div class="dashboard-stats">
     <div class="dashboard-stat-card">
-      <div class="num">{{ misTicketsActivos().length }}</div>
-      <div class="label">Tickets activos asignados a mí</div>
-    </div>
-    <div class="dashboard-stat-card dashboard-stat-danger">
-      <div class="num">{{ ticketsVencidos().length }}</div>
-      <div class="label">Vencidos (SLA)</div>
+      <div class="num">{{ ticketsDeUsuarioViendo().length }}</div>
+      <div class="label">Asignados</div>
     </div>
     <div class="dashboard-stat-card">
-      <div class="num">{{ ticketsPorVencer().length }}</div>
+      <div class="num">{{ pendientes().length }}</div>
+      <div class="label">Pendientes</div>
+    </div>
+    <div class="dashboard-stat-card dashboard-stat-warning">
+      <div class="num">{{ porVencer().length }}</div>
       <div class="label">Por vencer</div>
     </div>
+    <div class="dashboard-stat-card dashboard-stat-danger">
+      <div class="num">{{ vencidos().length }}</div>
+      <div class="label">Vencidos</div>
+    </div>
     <div class="dashboard-stat-card">
-      <div class="num">{{ horasSemana() }}h</div>
-      <div class="label">Registradas por mí (últimos 7 días)</div>
+      <div class="num">{{ resueltos().length }}</div>
+      <div class="label">Resueltos</div>
     </div>
   </div>
 
-  <h2 class="settings-card-title" style="margin:24px 0 12px;">Mis tickets</h2>
-  @if (misTickets().length === 0) {
-    <p class="empty">No tienes tickets asignados.</p>
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+    <h2 class="settings-card-title" style="margin:0;">Tareas pendientes</h2>
+    @if (pendientesOrdenados().length > 0) {
+      <button type="button" class="btn-secondary small" (click)="exportarPendientesCsv()">⬇️ Exportar CSV</button>
+    }
+  </div>
+
+  @if (pendientesOrdenados().length === 0) {
+    <p class="empty">No hay tickets pendientes asignados a esta persona. 🎉</p>
   } @else {
     <div class="grid-table-scroll">
       <table class="grid-table">
@@ -42,8 +76,8 @@
           </tr>
         </thead>
         <tbody>
-          @for (r of misTickets(); track r.ticket.id) {
-            <tr>
+          @for (r of pendientesOrdenados(); track r.ticket.id) {
+            <tr class="dashboard-row" (click)="abrirTicket(r.ticket)">
               <td data-label="Folio">#{{ r.ticket.numeroTicket }}</td>
               <td data-label="Título">{{ r.ticket.titulo }}</td>
               <td data-label="Proyecto">{{ r.proyectoClave }} — {{ r.proyectoNombre }}</td>
@@ -66,13 +100,46 @@
     </div>
   }
 
+  @if (resueltosMostrados().length > 0) {
+    <h2 class="settings-card-title" style="margin:28px 0 12px;">Resueltos</h2>
+    <div class="grid-table-scroll">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th>Folio</th>
+            <th>Título</th>
+            <th>Proyecto</th>
+            <th>Estado</th>
+            <th>Prioridad</th>
+            <th>Vigencia</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of resueltosMostrados(); track r.ticket.id) {
+            <tr class="dashboard-row" (click)="abrirTicket(r.ticket)">
+              <td data-label="Folio">#{{ r.ticket.numeroTicket }}</td>
+              <td data-label="Título">{{ r.ticket.titulo }}</td>
+              <td data-label="Proyecto">{{ r.proyectoClave }} — {{ r.proyectoNombre }}</td>
+              <td data-label="Estado">{{ r.columnaNombre }}</td>
+              <td data-label="Prioridad">
+                <span class="kanban-card-priority" style="display:inline-block;" [style.background]="r.prioridadColor"></span>
+                {{ r.prioridadNombre }}
+              </td>
+              <td data-label="Vigencia"><span class="hint" style="margin:0;">—</span></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
   <h2 class="settings-card-title" style="margin:28px 0 12px;">Tickets que sigo</h2>
   @if (ticketsQueSigo().length === 0) {
     <p class="empty">No sigues ningún ticket todavía. Actívalo desde la pestaña "Seguidores" en el detalle de un ticket.</p>
   } @else {
     <ul class="actividades-list">
       @for (r of ticketsQueSigo(); track r.ticket.id) {
-        <li class="actividad-item">
+        <li class="actividad-item dashboard-row" (click)="abrirTicket(r.ticket)">
           <div class="actividad-item-head">
             <span class="tag">#{{ r.ticket.numeroTicket }}</span>
             @if (r.clase) {

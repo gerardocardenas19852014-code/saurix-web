@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { DataClientService } from '../../../core/services/data-client.service';
-import { colorAvatar, iniciales } from '../kanban/avatar.util';
-import { Ticket, TicketActividad, TicketSeguidor } from '../kanban/ticket.model';
+import { exportarCsv } from '../../../shared/utils/csv.util';
+import { Ticket, TicketSeguidor, UsuarioOpcion } from '../kanban/ticket.model';
 import { TicketPrioridad } from '../ticket-prioridades/ticket-prioridad.model';
 import { ProyectoOpcion, TableroColumna } from '../tableros/tablero-columna.model';
 
@@ -20,12 +21,15 @@ interface TicketResumen {
 }
 
 /**
- * "Mi Dashboard" (Gestión de Proyectos) — resumen personal del usuario en
- * sesión: tickets asignados a mí (con su vigencia/SLA), tickets que sigo y
- * horas registradas por mí en la última semana. Igual que el resto de
- * pantallas de "Reportes"/dashboards del sistema, todo se calcula del lado
- * del cliente a partir de los GetList ya disponibles (Ticket, TicketActividad,
- * TicketSeguidor) — no requiere ningún SP de agregación (ver esquema-tablas-saurix.md).
+ * "Mi Dashboard" (Gestión de Proyectos) — igual que en el prototipo original:
+ * resumen de los tickets asignados a un usuario (por defecto, quien tiene la
+ * sesión iniciada, pero se puede "ver" el de cualquier otro desde el selector
+ * "Viendo tareas de"), en todos los proyectos. Se agrega "Tickets que sigo"
+ * al final (TicketSeguidor no existía en el prototipo original en esta
+ * pantalla, pero sin una vista así el seguimiento de tickets quedaría sin
+ * forma de consultarse). Todo se calcula del lado del cliente a partir de
+ * los GetList ya disponibles (Ticket, TicketSeguidor) — no requiere ningún
+ * SP de agregación (ver esquema-tablas-saurix.md).
  */
 @Component({
   selector: 'app-proyectos-dashboard',
@@ -38,17 +42,18 @@ interface TicketResumen {
 export class ProyectosDashboardComponent implements OnInit {
   private readonly data = inject(DataClientService);
   private readonly auth = inject(AuthService);
-
-  protected readonly iniciales = iniciales;
-  protected readonly colorAvatar = colorAvatar;
+  private readonly router = inject(Router);
 
   protected readonly cargando = signal(false);
   protected readonly proyectos = signal<ProyectoOpcion[]>([]);
   protected readonly columnas = signal<TableroColumna[]>([]);
   protected readonly tickets = signal<Ticket[]>([]);
   protected readonly prioridades = signal<TicketPrioridad[]>([]);
-  protected readonly actividades = signal<TicketActividad[]>([]);
+  protected readonly usuarios = signal<UsuarioOpcion[]>([]);
   protected readonly seguidos = signal<TicketSeguidor[]>([]);
+
+  /** A quién se le está viendo el dashboard — por defecto, quien tiene la sesión iniciada. */
+  protected readonly usuarioViendoId = signal<number>(this.auth.usuarioActual()?.id ?? 0);
 
   private get usuarioActualId(): number {
     return this.auth.usuarioActual()?.id ?? 0;
@@ -59,6 +64,7 @@ export class ProyectosDashboardComponent implements OnInit {
     this.data.list<ProyectoOpcion>('Proyecto').subscribe((p) => this.proyectos.set(p));
     this.data.list<TableroColumna>('TableroColumna').subscribe((c) => this.columnas.set(c));
     this.data.list<TicketPrioridad>('TicketPrioridad').subscribe((p) => this.prioridades.set(p));
+    this.data.list<UsuarioOpcion>('Usuario').subscribe((u) => this.usuarios.set(u));
     this.data.list<Ticket>('Ticket').subscribe({
       next: (tickets) => {
         this.tickets.set(tickets);
@@ -67,12 +73,28 @@ export class ProyectosDashboardComponent implements OnInit {
       error: () => this.cargando.set(false),
     });
     this.data
-      .list<TicketActividad>('TicketActividad', { creadoPor: this.usuarioActualId })
-      .subscribe((actividades) => this.actividades.set(actividades));
-    this.data
       .list<TicketSeguidor>('TicketSeguidor', { usuarioId: this.usuarioActualId })
       .subscribe((seguidos) => this.seguidos.set(seguidos));
   }
+
+  cambiarUsuarioViendo(id: string | number): void {
+    this.usuarioViendoId.set(Number(id));
+  }
+
+  nombreUsuario(id: number): string {
+    return this.usuarios().find((u) => Number(u.id) === Number(id))?.nombreCompleto ?? '—';
+  }
+
+  esUsuarioActual(id: number): boolean {
+    return Number(id) === this.usuarioActualId;
+  }
+
+  /** Abre el ticket directo en el tablero Kanban de su proyecto (mismo comportamiento que el prototipo). */
+  abrirTicket(ticket: Ticket): void {
+    this.router.navigate(['/proyectos/tablero'], { queryParams: { ticket: ticket.id } });
+  }
+
+  protected readonly viendoAMi = computed(() => this.usuarioViendoId() === this.usuarioActualId);
 
   /** Última columna (por orden) del tablero de cada proyecto — se considera "resuelto" al llegar ahí. */
   private readonly ultimaColumnaPorProyecto = computed(() => {
@@ -129,6 +151,18 @@ export class ProyectosDashboardComponent implements OnInit {
     };
   }
 
+  /** Todos los tickets asignados a la persona que se está viendo (resueltos y pendientes). */
+  protected readonly ticketsDeUsuarioViendo = computed(() =>
+    this.tickets()
+      .filter((t) => Number(t.asignadoUsuarioId) === this.usuarioViendoId())
+      .map((t) => this.aResumen(t)),
+  );
+
+  protected readonly pendientes = computed(() => this.ticketsDeUsuarioViendo().filter((r) => !this.estaResuelto(r.ticket)));
+  protected readonly resueltos = computed(() => this.ticketsDeUsuarioViendo().filter((r) => this.estaResuelto(r.ticket)));
+  protected readonly porVencer = computed(() => this.ticketsDeUsuarioViendo().filter((r) => r.clase === 'sla-warning'));
+  protected readonly vencidos = computed(() => this.ticketsDeUsuarioViendo().filter((r) => r.clase === 'sla-expired'));
+
   private readonly pesoSla: Record<'sla-expired' | 'sla-warning' | 'sla-ok' | 'sin-sla', number> = {
     'sla-expired': 0,
     'sla-warning': 1,
@@ -136,24 +170,44 @@ export class ProyectosDashboardComponent implements OnInit {
     'sin-sla': 3,
   };
 
-  protected readonly misTickets = computed(() =>
-    this.tickets()
-      .filter((t) => Number(t.asignadoUsuarioId) === this.usuarioActualId)
-      .map((t) => this.aResumen(t))
-      .sort((a, b) => this.pesoSla[a.clase ?? 'sin-sla'] - this.pesoSla[b.clase ?? 'sin-sla']),
+  /** Pendientes ordenados: primero lo más urgente (SLA), luego lo más reciente — igual que el prototipo. */
+  protected readonly pendientesOrdenados = computed(() =>
+    [...this.pendientes()].sort(
+      (a, b) =>
+        this.pesoSla[a.clase ?? 'sin-sla'] - this.pesoSla[b.clase ?? 'sin-sla'] ||
+        (b.ticket.fechaCreacion ?? '').localeCompare(a.ticket.fechaCreacion ?? ''),
+    ),
   );
 
-  protected readonly misTicketsActivos = computed(() => this.misTickets().filter((r) => !this.estaResuelto(r.ticket)));
-  protected readonly ticketsVencidos = computed(() => this.misTickets().filter((r) => r.clase === 'sla-expired'));
-  protected readonly ticketsPorVencer = computed(() => this.misTickets().filter((r) => r.clase === 'sla-warning'));
+  /** Resueltos: solo los 8 más recientes, igual que el prototipo. */
+  protected readonly resueltosMostrados = computed(() =>
+    [...this.resueltos()]
+      .sort((a, b) => (b.ticket.fechaCreacion ?? '').localeCompare(a.ticket.fechaCreacion ?? ''))
+      .slice(0, 8),
+  );
 
-  protected readonly horasSemana = computed(() => {
-    const hace7dias = Date.now() - 7 * 24 * 3600000;
-    const minutos = this.actividades()
-      .filter((a) => !a.fechaCreacion || new Date(a.fechaCreacion).getTime() >= hace7dias)
-      .reduce((s, a) => s + a.tiempoMin, 0);
-    return Math.round((minutos / 60) * 10) / 10;
-  });
+  exportarPendientesCsv(): void {
+    const nombre = this.nombreUsuario(this.usuarioViendoId());
+    const filas = this.pendientesOrdenados().map((r) => ({
+      folio: r.ticket.numeroTicket,
+      titulo: r.ticket.titulo,
+      proyecto: `${r.proyectoClave} — ${r.proyectoNombre}`,
+      estado: r.columnaNombre,
+      prioridad: r.prioridadNombre,
+    }));
+
+    exportarCsv(
+      `tareas-${nombre}.csv`,
+      [
+        { clave: 'folio', etiqueta: 'Folio' },
+        { clave: 'titulo', etiqueta: 'Título' },
+        { clave: 'proyecto', etiqueta: 'Proyecto' },
+        { clave: 'estado', etiqueta: 'Estado' },
+        { clave: 'prioridad', etiqueta: 'Prioridad' },
+      ],
+      filas,
+    );
+  }
 
   protected readonly ticketsQueSigo = computed(() => {
     const idsSeguidos = new Set(this.seguidos().map((s) => Number(s.ticketId)));
