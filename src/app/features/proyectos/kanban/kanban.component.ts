@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { AdjuntosPanelComponent } from '../../../shared/components/adjuntos-panel/adjuntos-panel.component';
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
@@ -236,7 +237,12 @@ export class KanbanComponent implements OnInit, OnDestroy {
     });
     this.data.list<TicketTipo>('TicketTipo').subscribe((tipos) => this.tipos.set(tipos));
     this.data.list<TicketPrioridad>('TicketPrioridad').subscribe((prioridades) => this.prioridades.set(prioridades));
-    this.data.list<UsuarioOpcion>('Usuario').subscribe((usuarios) => this.usuarios.set(usuarios));
+    // 'Usuario' no trae un campo nombreCompleto propio (ver Usuario.model.ts) — hay que
+    // armarlo con nombreCompletoUsuario(), si no los combos de Asignado a / Reportado por
+    // quedan con opciones en blanco.
+    this.data.list<Usuario>('Usuario').subscribe((usuarios) =>
+      this.usuarios.set(usuarios.map((u) => ({ id: u.id, nombreCompleto: nombreCompletoUsuario(u) }))),
+    );
 
     // Refresca los badges de vigencia (SLA) cada minuto, igual que el prototipo.
     this.intervaloReloj = setInterval(() => this.ahora.set(Date.now()), 60000);

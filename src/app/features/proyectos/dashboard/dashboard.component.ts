@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { exportarCsv } from '../../../shared/utils/csv.util';
 import { Ticket, TicketSeguidor, UsuarioOpcion } from '../kanban/ticket.model';
@@ -64,7 +65,11 @@ export class ProyectosDashboardComponent implements OnInit {
     this.data.list<ProyectoOpcion>('Proyecto').subscribe((p) => this.proyectos.set(p));
     this.data.list<TableroColumna>('TableroColumna').subscribe((c) => this.columnas.set(c));
     this.data.list<TicketPrioridad>('TicketPrioridad').subscribe((p) => this.prioridades.set(p));
-    this.data.list<UsuarioOpcion>('Usuario').subscribe((u) => this.usuarios.set(u));
+    // 'Usuario' no trae un campo nombreCompleto propio — hay que armarlo con
+    // nombreCompletoUsuario(), si no el selector "Viendo tareas de" queda en blanco.
+    this.data
+      .list<Usuario>('Usuario')
+      .subscribe((u) => this.usuarios.set(u.map((x) => ({ id: x.id, nombreCompleto: nombreCompletoUsuario(x) }))));
     this.data.list<Ticket>('Ticket').subscribe({
       next: (tickets) => {
         this.tickets.set(tickets);
