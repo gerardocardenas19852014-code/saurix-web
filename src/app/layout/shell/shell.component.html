@@ -100,9 +100,11 @@
             </div>
             <div class="notif-panel-list">
               @for (n of notificaciones(); track n.id) {
-                <button type="button" class="notif-item" [class.unread]="!n.leida" (click)="marcarLeida(n.id)">
+                <button type="button" class="notif-item" [class.unread]="!n.leida" (click)="abrirNotificacion(n)">
                   <span class="notif-item-title">{{ n.titulo }}</span>
-                  <span class="notif-item-meta">{{ n.meta }}</span>
+                  @if (n.fechaCreacion) {
+                    <span class="notif-item-meta">{{ n.fechaCreacion | date: 'short' }}</span>
+                  }
                 </button>
               } @empty {
                 <div class="notif-empty">Sin notificaciones.</div>

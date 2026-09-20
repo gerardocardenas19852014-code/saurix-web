@@ -6,7 +6,7 @@ import { colorAvatar } from '../kanban/avatar.util';
 import { Ticket, TicketActividad } from '../kanban/ticket.model';
 import { ProyectoOpcion } from '../tableros/tablero-columna.model';
 
-type PeriodoId = 'todo' | 'mes-actual' | 'mes-anterior' | 'anio-actual' | 'anio-anterior';
+type PeriodoId = 'todo' | 'mes-actual' | 'mes-anterior' | 'anio-actual' | 'anio-anterior' | 'rango';
 
 interface RangoFecha {
   inicio: Date;
@@ -52,6 +52,9 @@ export class ReportesHorasComponent implements OnInit {
 
   protected readonly filtroProyectoId = signal<number>(0);
   protected readonly periodo = signal<PeriodoId>('mes-actual');
+  /** Solo se usan cuando periodo() === 'rango' — formato yyyy-mm-dd (input type=date). */
+  protected readonly rangoDesde = signal<string>('');
+  protected readonly rangoHasta = signal<string>('');
 
   ngOnInit(): void {
     this.cargando.set(true);
@@ -69,6 +72,14 @@ export class ReportesHorasComponent implements OnInit {
 
   private rangoDe(id: PeriodoId): RangoFecha | null {
     if (id === 'todo') return null;
+    if (id === 'rango') {
+      const desde = this.rangoDesde();
+      const hasta = this.rangoHasta();
+      if (!desde && !hasta) return null;
+      const inicio = desde ? new Date(`${desde}T00:00:00`) : new Date(0);
+      const fin = hasta ? new Date(`${hasta}T23:59:59`) : new Date(8640000000000000);
+      return { inicio, fin };
+    }
     const hoy = new Date();
     if (id === 'mes-actual' || id === 'mes-anterior') {
       const offset = id === 'mes-actual' ? 0 : -1;
@@ -94,6 +105,12 @@ export class ReportesHorasComponent implements OnInit {
         return 'este año';
       case 'anio-anterior':
         return 'el año anterior';
+      case 'rango': {
+        const desde = this.rangoDesde();
+        const hasta = this.rangoHasta();
+        if (!desde && !hasta) return 'el rango elegido';
+        return `del ${desde || '…'} al ${hasta || '…'}`;
+      }
     }
   });
 

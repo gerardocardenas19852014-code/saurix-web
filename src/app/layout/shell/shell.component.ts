@@ -1,3 +1,4 @@
+import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
@@ -7,13 +8,7 @@ import { DataClientService } from '../../core/services/data-client.service';
 import { MiPerfilComponent } from '../../shared/components/mi-perfil/mi-perfil.component';
 import { ToastComponent } from '../../shared/components/toast/toast.component';
 import { ConfiguracionAparienciaService } from '../../shared/services/configuracion-apariencia.service';
-
-interface NotifItem {
-  id: number;
-  titulo: string;
-  meta: string;
-  leida: boolean;
-}
+import { NotificacionesService } from '../../shared/services/notificaciones.service';
 
 interface AiMensaje {
   rol: 'user' | 'bot' | 'pending';
@@ -29,7 +24,7 @@ interface DocumentoBuscable {
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, ToastComponent, MiPerfilComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, ToastComponent, MiPerfilComponent, DatePipe],
   templateUrl: './shell.component.html',
   styleUrl: './shell.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -39,6 +34,7 @@ export class ShellComponent {
   protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly configuracionApariencia = inject(ConfiguracionAparienciaService);
+  protected readonly notificacionesService = inject(NotificacionesService);
 
   constructor() {
     // Trae y aplica Tema/Asistente IA/Tamaño de página guardados en la
@@ -46,6 +42,7 @@ export class ShellComponent {
     // (login fresco o sesión restaurada) — no solo lo que había en
     // localStorage de este navegador.
     void this.configuracionApariencia.cargarParaUsuarioActual();
+    void this.notificacionesService.cargarParaUsuarioActual();
   }
 
   // ── Menú lateral: cada módulo muestra solo su propia sección, nunca la
@@ -83,23 +80,27 @@ export class ShellComponent {
   }
 
   // ── Notificaciones ────────────────────────────────────────────────
+  // Ya no es una lista fija en memoria: NotificacionesService persiste en
+  // IndexedDB y la alimentan eventos reales (SLA, menciones, asignación de
+  // ticket — ver kanban.component.ts).
   protected readonly notifPanelAbierto = signal(false);
-  protected readonly notificaciones = signal<NotifItem[]>([
-    { id: 1, titulo: 'Bienvenido a Saurix', meta: 'Sistema · ahora', leida: false },
-  ]);
-  protected readonly hayNoLeidas = computed(() => this.notificaciones().some((n) => !n.leida));
-  protected readonly totalNoLeidas = computed(() => this.notificaciones().filter((n) => !n.leida).length);
+  protected readonly notificaciones = this.notificacionesService.notificaciones;
+  protected readonly hayNoLeidas = this.notificacionesService.hayNoLeidas;
+  protected readonly totalNoLeidas = this.notificacionesService.totalNoLeidas;
 
   toggleNotifPanel(): void {
     this.notifPanelAbierto.update((v) => !v);
   }
 
-  marcarLeida(id: number): void {
-    this.notificaciones.update((items) => items.map((n) => (n.id === id ? { ...n, leida: true } : n)));
+  /** Marca como leída y, si trae un link, navega ahí (p.ej. abre el ticket directo). */
+  abrirNotificacion(n: { id: number; leida: boolean; link?: string }): void {
+    this.notificacionesService.marcarLeida(n.id);
+    this.notifPanelAbierto.set(false);
+    if (n.link) this.router.navigateByUrl(n.link);
   }
 
   marcarTodasLeidas(): void {
-    this.notificaciones.update((items) => items.map((n) => ({ ...n, leida: true })));
+    this.notificacionesService.marcarTodasLeidas();
   }
 
   // ── Asistente de IA (chat flotante) ──────────────────────────────

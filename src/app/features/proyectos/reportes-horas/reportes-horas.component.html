@@ -36,8 +36,20 @@
         <option value="anio-actual">Este año</option>
         <option value="anio-anterior">Año anterior</option>
         <option value="todo">Todo el historial</option>
+        <option value="rango">Rango de fechas…</option>
       </select>
     </label>
+
+    @if (periodo() === 'rango') {
+      <label class="board-filter-field">
+        Desde
+        <input type="date" [value]="rangoDesde()" (change)="rangoDesde.set($any($event.target).value)" />
+      </label>
+      <label class="board-filter-field">
+        Hasta
+        <input type="date" [value]="rangoHasta()" (change)="rangoHasta.set($any($event.target).value)" />
+      </label>
+    }
   </div>
 
   <div class="dashboard-stats" style="margin-bottom:28px;">

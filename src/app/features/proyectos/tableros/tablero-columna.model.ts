@@ -32,7 +32,7 @@ export type CampoTicketConfigurable =
   | 'asignadoUsuarioId'
   | 'reportadoPorUsuarioId'
   | 'planeado'
-  | 'tiempoEstimadoMin'
+  | 'tiempoEstimadoDias'
   | 'fechaFinAnalisis'
   | 'fechaFinDesarrollo'
   | 'fechaFinCliente'
@@ -54,7 +54,9 @@ export const TICKET_CAMPOS_CONFIGURABLES: { clave: CampoTicketConfigurable; etiq
   { clave: 'asignadoUsuarioId', etiqueta: 'Asignado a' },
   { clave: 'reportadoPorUsuarioId', etiqueta: 'Reportado por' },
   { clave: 'planeado', etiqueta: 'Planeado' },
-  { clave: 'tiempoEstimadoMin', etiqueta: 'Tiempo estimado' },
+  // El formulario captura/edita esto en DÍAS (ver kanban.component.ts); el campo real
+  // del Ticket (tiempoEstimadoMin) sigue guardándose en minutos.
+  { clave: 'tiempoEstimadoDias', etiqueta: 'Tiempo estimado (días)' },
   { clave: 'fechaFinAnalisis', etiqueta: 'Fin de análisis' },
   { clave: 'fechaFinDesarrollo', etiqueta: 'Fin de desarrollo' },
   { clave: 'fechaFinCliente', etiqueta: 'Fin cliente' },

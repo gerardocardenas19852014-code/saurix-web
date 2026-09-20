@@ -10,6 +10,7 @@ import { AdjuntosPanelComponent } from '../../../shared/components/adjuntos-pane
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ConfiguracionAparienciaService } from '../../../shared/services/configuracion-apariencia.service';
+import { NotificacionesService } from '../../../shared/services/notificaciones.service';
 import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { ToastService } from '../../../shared/services/toast.service';
 import { exportarCsv } from '../../../shared/utils/csv.util';
@@ -67,6 +68,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly configuracionApariencia = inject(ConfiguracionAparienciaService);
+  private readonly notificaciones = inject(NotificacionesService);
   private readonly route = inject(ActivatedRoute);
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
 
@@ -180,6 +182,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   /** Columnas de la vista de Lista (tabla) — alternativa al tablero Kanban, mismo estándar del resto del sistema. */
   protected readonly columnasLista: ColumnaTabla<Ticket>[] = [
     { campo: 'numeroTicket', etiqueta: 'Folio' },
+    { campo: 'folioInterno', etiqueta: 'Folio interno', formatear: (fila) => fila.folioInterno || '—' },
     { campo: 'titulo', etiqueta: 'Título' },
     {
       campo: 'ticketTipoId',
@@ -247,7 +250,11 @@ export class KanbanComponent implements OnInit, OnDestroy {
     titulo: ['', Validators.required],
     descripcion: [''],
     planeado: [true],
-    tiempoEstimadoMin: [0],
+    // Se captura/edita en DÍAS en el formulario (más natural que minutos para una
+    // estimación); se convierte a minutos al guardar y de vuelta a días al cargar —
+    // el campo real (Ticket.tiempoEstimadoMin) sigue siendo minutos, igual que en
+    // TicketActividad.tiempoMin y como está documentado en esquema-tablas-saurix.md.
+    tiempoEstimadoDias: [0, Validators.min(0)],
     fechaFinAnalisis: [''],
     fechaFinDesarrollo: [''],
     fechaFinCliente: [''],
@@ -480,7 +487,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       titulo: '',
       descripcion: '',
       planeado: true,
-      tiempoEstimadoMin: 0,
+      tiempoEstimadoDias: 0,
       fechaFinAnalisis: '',
       fechaFinDesarrollo: '',
       fechaFinCliente: '',
@@ -535,7 +542,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       titulo: valor.titulo,
       descripcion: valor.descripcion || null,
       planeado: valor.planeado,
-      tiempoEstimadoMin: valor.tiempoEstimadoMin || null,
+      tiempoEstimadoMin: valor.tiempoEstimadoDias ? Math.round(valor.tiempoEstimadoDias * 1440) : null,
       fechaFinAnalisis: valor.fechaFinAnalisis || null,
       fechaFinDesarrollo: valor.fechaFinDesarrollo || null,
       fechaFinCliente: valor.fechaFinCliente || null,
@@ -548,9 +555,16 @@ export class KanbanComponent implements OnInit, OnDestroy {
       ? this.data.modificacion<Ticket>('Ticket', payload)
       : this.data.alta<Ticket>('Ticket', payload);
 
+    // Para poder avisarle al nuevo asignado SOLO cuando el asignado realmente
+    // cambió (y no en cada guardado, ni cuando se asigna a sí mismo).
+    const asignadoAnteriorId = enEdicion?.asignadoUsuarioId ? Number(enEdicion.asignadoUsuarioId) : null;
+
     peticion.subscribe({
       next: (ticketGuardado) => {
         this.toast.exito(esEdicion ? 'Ticket actualizado.' : 'Ticket creado.');
+        if (payload.asignadoUsuarioId && payload.asignadoUsuarioId !== asignadoAnteriorId) {
+          this.notificarAsignacion(ticketGuardado, payload.asignadoUsuarioId);
+        }
         if (esEdicion) {
           this.refrescarTicketActivo();
         } else {
@@ -569,6 +583,17 @@ export class KanbanComponent implements OnInit, OnDestroy {
         this.cargarTickets();
       },
     });
+  }
+
+  /** Notifica al usuario recién asignado — no antes de guardar (si falla el guardado, no
+   *  tiene sentido avisar de una asignación que no se llegó a persistir). */
+  private notificarAsignacion(ticket: Ticket, asignadoUsuarioId: number): void {
+    if (asignadoUsuarioId === this.auth.usuarioActual()?.id) return;
+    this.notificaciones.notificar(
+      asignadoUsuarioId,
+      `Te asignaron el ticket #${ticket.numeroTicket} — ${ticket.titulo}`,
+      `/proyectos/tablero?ticket=${ticket.id}`,
+    );
   }
 
   /** Único punto que persiste un cambio de columna: lo usan los botones "Aceptar"/"Regresar"
@@ -668,7 +693,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
           titulo: completo.titulo,
           descripcion: completo.descripcion ?? '',
           planeado: completo.planeado,
-          tiempoEstimadoMin: completo.tiempoEstimadoMin ?? 0,
+          tiempoEstimadoDias: completo.tiempoEstimadoMin ? completo.tiempoEstimadoMin / 1440 : 0,
           fechaFinAnalisis: (completo.fechaFinAnalisis ?? '').slice(0, 10),
           fechaFinDesarrollo: (completo.fechaFinDesarrollo ?? '').slice(0, 10),
           fechaFinCliente: (completo.fechaFinCliente ?? '').slice(0, 10),
