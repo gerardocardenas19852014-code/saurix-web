@@ -499,6 +499,12 @@ html[data-theme='dark'] .edit-form input[type=date], html[data-theme='ocean'] .e
 @media (max-width: 900px) { .form-grid-3col { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 640px) { .form-grid-3col { grid-template-columns: 1fr; } }
 
+.form-grid-4col { display: grid !important; grid-template-columns: repeat(4, 1fr); gap: 16px 24px; max-width: 1120px; }
+.form-grid-4col > h2, .form-grid-4col > p, .form-grid-4col > .form-actions, .form-grid-4col > .full-span { grid-column: 1 / -1; }
+@media (max-width: 1024px) { .form-grid-4col { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 760px) { .form-grid-4col { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 480px) { .form-grid-4col { grid-template-columns: 1fr; } }
+
 .form-grid-4col { display: grid !important; grid-template-columns: repeat(4, 1fr); gap: 16px 20px; max-width: 1100px; }
 .form-grid-4col > h2, .form-grid-4col > p, .form-grid-4col > .form-actions, .form-grid-4col > .full-span { grid-column: 1 / -1; }
 @media (max-width: 1000px) { .form-grid-4col { grid-template-columns: repeat(2, 1fr); } }

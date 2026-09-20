@@ -46,18 +46,4 @@ export const CATALOGOS_ROUTES: Routes = [
     loadComponent: () =>
       import('./ticket-prioridades/ticket-prioridades.component').then((m) => m.TicketPrioridadesComponent),
   },
-  {
-    path: 'motivos-solucion',
-    loadComponent: () =>
-      import('../../shared/components/catalogo-simple/catalogo-simple.component').then(
-        (m) => m.CatalogoSimpleComponent,
-      ),
-    data: {
-      config: {
-        entidad: 'TicketTipoSolucion',
-        tituloPlural: 'Motivos de Solución',
-        tituloSingular: 'Motivo de Solución',
-      },
-    },
-  },
 ];

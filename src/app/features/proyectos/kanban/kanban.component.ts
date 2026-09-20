@@ -32,11 +32,6 @@ import {
 } from './ticket.model';
 import { colorAvatar, iniciales } from './avatar.util';
 
-interface TicketTipoSolucionOpcion {
-  id: number;
-  nombre: string;
-}
-
 type TabDetalle =
   | 'detalles'
   | 'actividades'
@@ -87,7 +82,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   protected readonly tipos = signal<TicketTipo[]>([]);
   protected readonly prioridades = signal<TicketPrioridad[]>([]);
-  protected readonly tiposSolucion = signal<TicketTipoSolucionOpcion[]>([]);
   protected readonly usuarios = signal<UsuarioOpcion[]>([]);
 
   /** 'tablero' (Kanban) o 'lista' (tabla) — recuerda la preferencia del usuario (Panel de Control › Apariencia). */
@@ -191,7 +185,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
     id: [0],
     ticketTipoId: [0, Validators.required],
     ticketPrioridadId: [0, Validators.required],
-    ticketTipoSolucionId: [0],
     asignadoUsuarioId: [0],
     reportadoPorUsuarioId: [0, Validators.required],
     numeroTicket: ['', Validators.required],
@@ -243,9 +236,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
     });
     this.data.list<TicketTipo>('TicketTipo').subscribe((tipos) => this.tipos.set(tipos));
     this.data.list<TicketPrioridad>('TicketPrioridad').subscribe((prioridades) => this.prioridades.set(prioridades));
-    this.data
-      .list<TicketTipoSolucionOpcion>('TicketTipoSolucion')
-      .subscribe((tiposSolucion) => this.tiposSolucion.set(tiposSolucion));
     this.data.list<UsuarioOpcion>('Usuario').subscribe((usuarios) => this.usuarios.set(usuarios));
 
     // Refresca los badges de vigencia (SLA) cada minuto, igual que el prototipo.
@@ -420,9 +410,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
       id: 0,
       ticketTipoId: 0,
       ticketPrioridadId: 0,
-      ticketTipoSolucionId: 0,
       asignadoUsuarioId: 0,
-      reportadoPorUsuarioId: 0,
+      reportadoPorUsuarioId: this.auth.usuarioActual()?.id ?? 0,
       numeroTicket: this.folioSugerido(),
       folioInterno: '',
       titulo: '',
@@ -452,7 +441,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
       tableroColumnaId: enEdicion ? Number(enEdicion.tableroColumnaId) : this.columnaCreacionId(),
       ticketTipoId: Number(valor.ticketTipoId),
       ticketPrioridadId: Number(valor.ticketPrioridadId),
-      ticketTipoSolucionId: valor.ticketTipoSolucionId ? Number(valor.ticketTipoSolucionId) : null,
       asignadoUsuarioId: valor.asignadoUsuarioId ? Number(valor.asignadoUsuarioId) : null,
       reportadoPorUsuarioId: Number(valor.reportadoPorUsuarioId),
       numeroTicket: valor.numeroTicket,
@@ -565,7 +553,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
           id: completo.id,
           ticketTipoId: Number(completo.ticketTipoId),
           ticketPrioridadId: Number(completo.ticketPrioridadId),
-          ticketTipoSolucionId: completo.ticketTipoSolucionId ? Number(completo.ticketTipoSolucionId) : 0,
           asignadoUsuarioId: completo.asignadoUsuarioId ? Number(completo.asignadoUsuarioId) : 0,
           reportadoPorUsuarioId: Number(completo.reportadoPorUsuarioId),
           numeroTicket: completo.numeroTicket,

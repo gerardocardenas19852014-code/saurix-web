@@ -61,14 +61,6 @@ const CATALOGOS: EnlaceCatalogo[] = [
     descripcion: 'Niveles de prioridad de ticket con su SLA (vigencia y aviso en horas) y usuarios a notificar.',
     grupo: 'Gestión de Proyectos',
   },
-  {
-    ruta: 'motivos-solucion',
-    icono: '✅',
-    color: 'generic',
-    titulo: 'Motivos de solución',
-    descripcion: 'Catálogo de motivos con los que se cierra un ticket.',
-    grupo: 'Gestión de Proyectos',
-  },
 ];
 
 interface GrupoCatalogo {

@@ -4,7 +4,6 @@ export interface Ticket {
   tableroColumnaId: number;
   ticketTipoId: number;
   ticketPrioridadId: number;
-  ticketTipoSolucionId: number | null;
   asignadoUsuarioId: number | null;
   reportadoPorUsuarioId: number;
   /** Folio consecutivo tipo 'SAU-0001', armado en la app con Proyecto.Clave (igual que Cotizacion.Folio). */

@@ -192,10 +192,10 @@
 
 @if (modalAbierto()) {
   <div class="modal-overlay show" (click)="modalAbierto.set(false)">
-    <form class="modal-box" style="max-width: 640px;" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardarTicket()">
+    <form class="modal-box" style="max-width: 1120px;" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardarTicket()">
       <h3>Nuevo ticket</h3>
 
-      <div class="edit-form form-grid-2col" style="margin-bottom: 18px;">
+      <div class="edit-form form-grid-4col" style="margin-bottom: 18px;">
         <!-- Campos del ticket: deben ser idénticos aquí y en la pestaña "Detalles" del
              panel de detalle, para que un campo obligatorio nunca quede oculto al crear. -->
           <label>
@@ -236,15 +236,6 @@
             </select>
           </label>
 
-          <label>
-            Motivo de solución
-            <select formControlName="ticketTipoSolucionId">
-              <option [ngValue]="0">Sin definir</option>
-              @for (motivo of tiposSolucion(); track motivo.id) {
-                <option [ngValue]="motivo.id">{{ motivo.nombre }}</option>
-              }
-            </select>
-          </label>
           <label>
             Asignado a
             <select formControlName="asignadoUsuarioId">
@@ -304,7 +295,7 @@
 
 @if (ticketActivo(); as activo) {
   <div class="modal-overlay show" (click)="cerrarDetalle()">
-    <div class="modal-box" style="max-width: 860px; width: 96%; text-align: left;" (click)="$event.stopPropagation()">
+    <div class="modal-box" style="max-width: 1160px; width: 96%; text-align: left;" (click)="$event.stopPropagation()">
       <div class="page-header" style="margin-bottom: 12px;">
         <h3>#{{ activo.numeroTicket }} — {{ activo.titulo }}</h3>
         <div class="page-actions">
@@ -362,7 +353,7 @@
       </div>
 
       @if (tabActiva() === 'detalles') {
-        <form class="tab-panel edit-form form-grid-2col" [formGroup]="form" (ngSubmit)="guardarTicket()">
+        <form class="tab-panel edit-form form-grid-4col" [formGroup]="form" (ngSubmit)="guardarTicket()">
           <!-- Campos del ticket: deben ser idénticos aquí y en la pestaña "Detalles" del
              panel de detalle, para que un campo obligatorio nunca quede oculto al crear. -->
           <label>
@@ -403,15 +394,6 @@
             </select>
           </label>
 
-          <label>
-            Motivo de solución
-            <select formControlName="ticketTipoSolucionId">
-              <option [ngValue]="0">Sin definir</option>
-              @for (motivo of tiposSolucion(); track motivo.id) {
-                <option [ngValue]="motivo.id">{{ motivo.nombre }}</option>
-              }
-            </select>
-          </label>
           <label>
             Asignado a
             <select formControlName="asignadoUsuarioId">
