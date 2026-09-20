@@ -164,7 +164,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
         (!tipoId || Number(t.ticketTipoId) === tipoId) &&
         (!prioridadId || Number(t.ticketPrioridadId) === prioridadId) &&
         (!asignadoId || Number(t.asignadoUsuarioId) === asignadoId) &&
-        (!texto || t.numeroTicket.toLowerCase().includes(texto) || t.titulo.toLowerCase().includes(texto)),
+        (!texto ||
+          t.numeroTicket.toLowerCase().includes(texto) ||
+          (t.folioInterno ?? '').toLowerCase().includes(texto) ||
+          t.titulo.toLowerCase().includes(texto)),
     );
   });
 
