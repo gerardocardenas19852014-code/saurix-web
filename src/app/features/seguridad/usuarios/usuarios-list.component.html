@@ -86,7 +86,7 @@
 
         <label class="checkbox-inline active-field">
           <input type="checkbox" class="form-check-input" formControlName="activo" />
-          Activo
+          <span [class.texto-inactivo]="etiquetaActivo() === 'Inactivo'">{{ etiquetaActivo() }}</span>
         </label>
 
         <label class="floating-field full-span">

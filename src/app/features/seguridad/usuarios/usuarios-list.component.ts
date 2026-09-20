@@ -159,12 +159,56 @@ export class UsuariosListComponent implements OnInit, OnDestroy {
   private readonly passwordEnVivo = toSignal(this.form.controls.password.valueChanges, { initialValue: '' });
   protected readonly fortalezaPassword = computed(() => evaluarFortaleza(this.passwordEnVivo() ?? ''));
 
+  /** Un checkbox marcado/desmarcado a veces es difícil de distinguir a simple vista
+   *  (sobre todo desmarcado vs. marcado con colores parecidos) — se refuerza con
+   *  texto explícito ("Activo"/"Inactivo") en vez de solo el checkbox. */
+  private readonly activoEnVivo = toSignal(this.form.controls.activo.valueChanges, {
+    initialValue: this.form.controls.activo.value,
+  });
+  protected readonly etiquetaActivo = computed(() => (this.activoEnVivo() ? 'Activo' : 'Inactivo'));
+
   ngOnInit(): void {
     // Esta pantalla tiene muchas columnas (grid de usuarios); usa el ancho
     // "wide" del layout para aprovechar el espacio en vez de quedarse en el
     // ancho angosto por defecto (ver html[data-wide='grid'] en styles.scss).
     document.documentElement.setAttribute('data-wide', 'grid');
     this.cargar();
+    this.sincronizarErrorConfirmacionPassword();
+    this.sincronizarErrorUsuarioDuplicado();
+  }
+
+  /** El error "usuarioDuplicado" (ver guardar()) es una comprobación asíncrona que solo
+   *  se corre al intentar guardar — en cuanto se vuelve a escribir el campo, se limpia
+   *  (ya no está verificado ni a favor ni en contra), para no dejar un borde rojo
+   *  "pegado" con un nombre que la persona ya cambió. */
+  private sincronizarErrorUsuarioDuplicado(): void {
+    this.form.controls.nombreUsuario.valueChanges.subscribe(() => {
+      const control = this.form.controls.nombreUsuario;
+      if (!control.errors?.['usuarioDuplicado']) return;
+      const { usuarioDuplicado: _quitado, ...resto } = control.errors;
+      control.setErrors(Object.keys(resto).length ? resto : null);
+    });
+  }
+
+  /**
+   * "No me deja guardar" sin que quede claro por qué era un problema recurrente:
+   * el error de contraseñas-no-coinciden vivía SOLO en el grupo (passwordsCoincidenValidator),
+   * así que ningún campo se marcaba en rojo — el único aviso era un toast, fácil de
+   * perder de vista sobre un modal. Aquí se refleja ese mismo error también en el
+   * control confirmacionPassword, para que se pinte en rojo (.ng-invalid.ng-touched,
+   * ver styles.scss) en cuanto se toca el campo, no solo al intentar guardar.
+   */
+  private sincronizarErrorConfirmacionPassword(): void {
+    this.form.valueChanges.subscribe(() => {
+      const control = this.form.controls.confirmacionPassword;
+      const noCoincide = !!this.form.errors?.['passwordsNoCoinciden'];
+      if (noCoincide && !control.errors?.['passwordsNoCoinciden']) {
+        control.setErrors({ ...control.errors, passwordsNoCoinciden: true });
+      } else if (!noCoincide && control.errors?.['passwordsNoCoinciden']) {
+        const { passwordsNoCoinciden: _quitado, ...resto } = control.errors;
+        control.setErrors(Object.keys(resto).length ? resto : null);
+      }
+    });
   }
 
   ngOnDestroy(): void {
@@ -291,6 +335,12 @@ export class UsuariosListComponent implements OnInit, OnDestroy {
           (u) => u.nombreUsuario.toLowerCase() === nombreUsuarioNuevo && u.id !== valor.id,
         );
         if (yaExiste) {
+          // Igual que con la contraseña: además del toast, se marca el campo en rojo
+          // (se limpia solo en cuanto se vuelve a escribir, más abajo en el subscribe
+          // de nombreUsuario.valueChanges).
+          const control = this.form.controls.nombreUsuario;
+          control.setErrors({ ...control.errors, usuarioDuplicado: true });
+          control.markAsTouched();
           this.toast.error('Ya existe un usuario con ese nombre.');
           return;
         }

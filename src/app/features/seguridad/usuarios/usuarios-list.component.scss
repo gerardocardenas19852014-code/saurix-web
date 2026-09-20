@@ -15,6 +15,11 @@
    de esta pantalla (el grid de 2 columnas y el checkbox de Activo). */
 .active-field { min-height: 28px; justify-content: flex-start; }
 
+/* Un checkbox marcado/desmarcado a veces cuesta distinguirlo a simple vista —
+   se refuerza con texto explícito ("Activo"/"Inactivo", ver etiquetaActivo()
+   en el componente) en vez de depender solo del checkbox. */
+.texto-inactivo { color: var(--ink-soft); }
+
 @media (max-width: 640px) {
 	.user-modal-fields { grid-template-columns: 1fr; }
 }
