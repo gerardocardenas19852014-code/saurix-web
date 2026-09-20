@@ -129,6 +129,15 @@ export class KanbanComponent implements OnInit, OnDestroy {
     return !!activo && this.siguienteColumna(activo) === null;
   });
 
+  /** true si a este ticket todavía le falta la actividad obligatoria antes de poder
+   *  avanzar de estado (misma condición que revisa `mover()`) — controla el aviso
+   *  que se muestra en la pestaña Actividades para explicar por qué es obligatorio. */
+  protected readonly requiereActividadParaAvanzar = computed(() => {
+    const activo = this.ticketActivo();
+    if (!activo || !this.tabsPermitidas().actividades || this.siguienteColumna(activo) === null) return false;
+    return !this.tieneActividadDesdeUltimoCambio(activo);
+  });
+
   protected readonly ticketsDisponiblesParaAsociar = computed(() => {
     const activo = this.ticketActivo();
     if (!activo) return [];
@@ -197,6 +206,13 @@ export class KanbanComponent implements OnInit, OnDestroy {
     if (!fecha) return '—';
     return this.datePipe.transform(fecha, 'short') ?? '—';
   }
+
+  /** Columnas de la pestaña "Comentarios" del detalle, como grid en vez de tarjetas sueltas. */
+  protected readonly columnasComentarios: ColumnaTabla<TicketComentario>[] = [
+    { campo: 'fechaCreacion', etiqueta: 'Fecha', formatear: (fila) => this.formatearFecha(fila.fechaCreacion) },
+    { campo: 'texto', etiqueta: 'Comentario' },
+    { campo: 'creadoPor', etiqueta: 'Registrado por', formatear: (fila) => this.nombreUsuario(fila.creadoPor) },
+  ];
 
   /** Columnas de la pestaña "Actividades" del detalle, como grid en vez de tarjetas sueltas. */
   protected readonly columnasActividades: ColumnaTabla<TicketActividad>[] = [
@@ -513,11 +529,21 @@ export class KanbanComponent implements OnInit, OnDestroy {
       : this.data.alta<Ticket>('Ticket', payload);
 
     peticion.subscribe({
-      next: () => {
+      next: (ticketGuardado) => {
         this.toast.exito(esEdicion ? 'Ticket actualizado.' : 'Ticket creado.');
         if (esEdicion) {
           this.refrescarTicketActivo();
         } else {
+          // Deja registro en Historial de que el ticket nació en esta columna —
+          // si no, la pestaña Historial queda vacía hasta el primer cambio de estado.
+          this.data
+            .alta<TicketHistorialEstado>('TicketHistorialEstado', {
+              ticketId: ticketGuardado.id,
+              tableroColumnaAnteriorId: null,
+              tableroColumnaNuevaId: payload.tableroColumnaId,
+              usuarioId: this.auth.usuarioActual()?.id ?? null,
+            })
+            .subscribe({ error: () => undefined });
           this.modalAbierto.set(false);
         }
         this.cargarTickets();
@@ -921,6 +947,14 @@ export class KanbanComponent implements OnInit, OnDestroy {
     if (ms <= 0) return 'vencido';
     const totalMinutos = Math.round(ms / 60000);
     if (totalMinutos < 60) return `faltan ${totalMinutos}min`;
-    return `faltan ${Math.round(totalMinutos / 60)}h`;
+
+    const totalHoras = Math.round(totalMinutos / 60);
+    if (totalHoras < 24) return `faltan ${totalHoras}h`;
+
+    // A partir de 24h se muestra en días + horas (p.ej. "faltan 3d 12h") en vez de
+    // solo un número grande de horas, más fácil de leer de un vistazo.
+    const dias = Math.floor(totalHoras / 24);
+    const horas = totalHoras % 24;
+    return horas > 0 ? `faltan ${dias}d ${horas}h` : `faltan ${dias}d`;
   }
 }

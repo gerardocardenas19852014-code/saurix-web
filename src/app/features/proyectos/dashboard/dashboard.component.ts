@@ -123,6 +123,20 @@ export class ProyectosDashboardComponent implements OnInit {
     return this.ultimaColumnaPorProyecto().get(Number(ticket.proyectoId)) === Number(ticket.tableroColumnaId);
   }
 
+  /** Igual que en KanbanComponent: por debajo de 1h en minutos, por debajo de 24h en horas
+   *  y a partir de ahí en días + horas (p.ej. "faltan 3d 12h"), más fácil de leer que un
+   *  número grande de horas. */
+  private tiempoRestante(totalMinutos: number): string {
+    if (totalMinutos < 60) return `faltan ${totalMinutos}min`;
+
+    const totalHoras = Math.round(totalMinutos / 60);
+    if (totalHoras < 24) return `faltan ${totalHoras}h`;
+
+    const dias = Math.floor(totalHoras / 24);
+    const horas = totalHoras % 24;
+    return horas > 0 ? `faltan ${dias}d ${horas}h` : `faltan ${dias}d`;
+  }
+
   private slaDe(ticket: Ticket): { clase: ClaseSla | null; texto: string } {
     const prioridad = this.prioridades().find((p) => Number(p.id) === Number(ticket.ticketPrioridadId));
     if (!prioridad?.vigenciaHoras || !ticket.fechaCreacion || this.estaResuelto(ticket)) {
@@ -135,7 +149,7 @@ export class ProyectosDashboardComponent implements OnInit {
     if (ahora >= deadline) return { clase: 'sla-expired', texto: '🔥 Vencido' };
     if (ahora >= warnAt) return { clase: 'sla-warning', texto: '⏰ Por vencer' };
     const totalMin = Math.round((deadline - ahora) / 60000);
-    const texto = totalMin < 60 ? `🕐 faltan ${totalMin}min` : `🕐 faltan ${Math.round(totalMin / 60)}h`;
+    const texto = `🕐 ${this.tiempoRestante(totalMin)}`;
     return { clase: 'sla-ok', texto };
   }
 

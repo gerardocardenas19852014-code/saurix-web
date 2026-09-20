@@ -448,6 +448,11 @@
 
       @if (tabActiva() === 'actividades') {
         <div class="tab-panel">
+          @if (requiereActividadParaAvanzar()) {
+            <p class="form-error" style="margin: 0 0 12px;">
+              ⚠️ Es obligatorio registrar una actividad describiendo el trabajo realizado en este estado antes de poder avanzar al siguiente.
+            </p>
+          }
           <p class="hint" style="margin: 0 0 12px;">Tiempo total registrado: {{ totalMinutosActividad() }} min.</p>
           <form [formGroup]="formActividad" (ngSubmit)="agregarActividad()">
             <div class="edit-form form-grid-2col">
@@ -475,18 +480,7 @@
 
       @if (tabActiva() === 'comentarios') {
         <div class="tab-panel">
-          @if (comentarios().length === 0) {
-            <p class="empty">Aún no hay comentarios.</p>
-          } @else {
-            <ul class="actividades-list">
-              @for (comentario of comentarios(); track comentario.id) {
-                <li class="actividad-item">
-                  <p class="actividad-item-texto">{{ comentario.texto }}</p>
-                </li>
-              }
-            </ul>
-          }
-          <form [formGroup]="formComentario" (ngSubmit)="agregarComentario()" style="margin-top: 14px;">
+          <form [formGroup]="formComentario" (ngSubmit)="agregarComentario()">
             <div class="edit-form">
               <label>
                 Escribe un comentario
@@ -497,6 +491,12 @@
               </div>
             </div>
           </form>
+          <app-data-table
+            [columnas]="columnasComentarios"
+            [filas]="comentarios()"
+            [soloLectura]="true"
+            style="margin-top: 14px; display: block;"
+          />
         </div>
       }
 
