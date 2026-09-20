@@ -40,6 +40,15 @@ export class TicketTiposComponent implements OnInit {
     icono: [''],
   });
 
+  /** Emojis sugeridos para no dejar la elección del ícono a adivinar un nombre o código. */
+  protected readonly iconosSugeridos: string[] = [
+    '🐛', '✨', '🔧', '📋', '❓', '⚠️', '🚀', '🔔', '✅', '🧩', '📌', '🛠️',
+  ];
+
+  elegirIcono(icono: string): void {
+    this.form.controls.icono.setValue(icono);
+  }
+
   ngOnInit(): void {
     this.cargar();
   }

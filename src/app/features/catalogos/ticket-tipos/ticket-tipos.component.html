@@ -41,9 +41,27 @@
         </label>
 
         <label>
-          Icono (emoji o nombre de ícono)
-          <input type="text" formControlName="icono" />
+          Icono
+          <div class="icono-picker-row">
+            <span class="icono-picker-preview">{{ form.controls.icono.value || '·' }}</span>
+            <input type="text" formControlName="icono" placeholder="Elige uno o escribe tu propio emoji" />
+          </div>
         </label>
+
+        <div class="icono-picker-opciones" role="group" aria-label="Íconos sugeridos">
+          @for (opcion of iconosSugeridos; track opcion) {
+            <button
+              type="button"
+              class="icono-picker-opcion"
+              [class.is-active]="form.controls.icono.value === opcion"
+              [attr.aria-pressed]="form.controls.icono.value === opcion"
+              [title]="opcion"
+              (click)="elegirIcono(opcion)"
+            >
+              {{ opcion }}
+            </button>
+          }
+        </div>
       </div>
 
       <div class="modal-actions">

@@ -1,2 +1,50 @@
 // El sistema visual global (page-header, grid-toolbar, grid-table, modal-overlay,
-// edit-form, etc.) vive en src/styles.scss — este componente no necesita estilos propios.
+// edit-form, etc.) vive en src/styles.scss. Lo de aquí es específico del selector
+// de ícono (preview + emojis sugeridos), para que elegir un ícono no dependa de
+// adivinar un emoji o el nombre exacto de un ícono.
+
+.icono-picker-row { display: flex; align-items: center; gap: 10px; }
+
+.icono-picker-preview {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-raised);
+  color: var(--ink-soft);
+}
+
+.icono-picker-row input { flex: 1 1 auto; min-width: 0; }
+
+.icono-picker-opciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: -6px;
+}
+
+.icono-picker-opcion {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-raised);
+  cursor: pointer;
+  transition: border-color .12s ease, background .12s ease;
+}
+
+.icono-picker-opcion:hover { border-color: var(--accent); }
+
+.icono-picker-opcion.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}

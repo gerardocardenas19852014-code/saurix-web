@@ -281,7 +281,7 @@ html[data-wide='grid'] .content { max-width: 1600px; }
 .board-view-toggle button.is-active { background: var(--accent); color: #fff; }
 .board-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; margin: 4px 0 18px; }
 .board-filter-field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--ink-soft); font-family: 'JetBrains Mono', monospace; flex: 1 1 140px; min-width: 0; }
-.board-filter-field select, .board-filter-field input[type='date'], .board-filter-field input[type='month'], .board-filter-field input[type='text'] {
+.board-filter-field select, .board-filter-field input[type='date'], .board-filter-field input[type='month'], .board-filter-field input[type='text'], .board-filter-field input[type='search'] {
   padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 14px;
   color: var(--text-strong); background: var(--paper-raised); width: 100%; min-width: 0; box-sizing: border-box;
 }
@@ -765,6 +765,11 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
 .toggle-switch input:checked + .toggle-switch-track::before { transform: translateX(20px); }
 .checkbox-inline { display: flex; align-items: center; gap: 8px; font-weight: 500; }
 .checkbox-inline input { width: auto; }
+// .checkbox-inline input ya deja auto el ancho (para que no se estire a 100% en un
+// form-grid), pero eso colapsa un <input class="form-check-input"> de Bootstrap: ese
+// checkbox se dibuja con appearance:none + 1em×1em fijo (ver comentario "Bootstrap" más
+// abajo), así que sin un ancho explícito queda como una línea casi invisible.
+.checkbox-inline input.form-check-input { width: 1em; height: 1em; }
 .notify-user-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; min-height: 0; }
 .notify-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--accent-soft); color: var(--accent); border-radius: 16px; padding: 5px 6px 5px 12px; font-size: 13px; font-family: 'JetBrains Mono', monospace; }
 .notify-chip button { background: none; border: none; color: inherit; cursor: pointer; font-size: 12px; line-height: 1; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
