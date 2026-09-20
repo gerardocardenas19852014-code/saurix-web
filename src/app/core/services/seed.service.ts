@@ -44,9 +44,12 @@ const DATOS_ROOT = {
  * 1900–2060) con los datos exactos pedidos por el usuario. Se ejecuta una
  * vez al arrancar la app (ver `provideAppInitializer` en app.config.ts).
  *
- * Si 'root' ya existía de una versión anterior de la app (sin `nombre` ni
- * vigencia, de antes de que esos campos existieran), se repara para que
- * quede igual al estándar actual en vez de quedarse con el registro viejo.
+ * 'root' es la puerta de entrada garantizada mientras no hay backend real
+ * (sin esto, un usuario bloqueado por intentos fallidos, con la contraseña
+ * cambiada por accidente, desactivado o con la vigencia rota se quedaría
+ * sin forma de volver a entrar): en CADA arranque, si algo de eso le pasó a
+ * 'root', se repara para que root/1234 SIEMPRE funcione — sin tocar
+ * `nombre`/`email`/`role` si ya estaban capturados a mano.
  *
  * También migra, una sola vez, cualquier contraseña que haya quedado en
  * texto plano de antes de que existiera el hashing (ver password.util) —
@@ -68,26 +71,50 @@ export class SeedService {
   async ejecutar(): Promise<void> {
     const usuarios = await firstValueFrom(this.data.list<Usuario>('Usuario'));
     const root = usuarios.find((u) => u.nombreUsuario.toLowerCase() === 'root');
+    const hashRoot = await hashPassword(DATOS_ROOT.password);
+    const hoy = new Date().toISOString().slice(0, 10);
 
     if (!root) {
-      const rootConHash = { ...DATOS_ROOT, password: await hashPassword(DATOS_ROOT.password) };
-      await firstValueFrom(this.data.alta<Usuario>('Usuario', rootConHash));
+      await firstValueFrom(this.data.alta<Usuario>('Usuario', { ...DATOS_ROOT, password: hashRoot }));
     } else {
-      const leFaltaAlgo = !root.nombre || !root.fechaInicioVigencia || !root.fechaFinVigencia;
-      if (leFaltaAlgo) {
-        const rootConHash = { ...DATOS_ROOT, password: await hashPassword(DATOS_ROOT.password) };
+      const leFaltanCampos = !root.nombre || !root.fechaInicioVigencia || !root.fechaFinVigencia;
+      const vigenciaRota =
+        !root.fechaInicioVigencia ||
+        !root.fechaFinVigencia ||
+        hoy < root.fechaInicioVigencia ||
+        hoy > root.fechaFinVigencia;
+      const accesoRoto =
+        root.password !== hashRoot ||
+        !root.activo ||
+        !!root.bloqueadoHasta ||
+        (root.intentosFallidos ?? 0) > 0 ||
+        vigenciaRota;
+
+      if (leFaltanCampos || accesoRoto) {
         await firstValueFrom(
-          this.data.modificacion<Usuario>('Usuario', { ...root, ...rootConHash, id: root.id }),
+          this.data.modificacion<Usuario>('Usuario', {
+            ...root,
+            nombre: root.nombre || DATOS_ROOT.nombre,
+            email: root.email || DATOS_ROOT.email,
+            role: root.role || DATOS_ROOT.role,
+            password: hashRoot,
+            activo: true,
+            bloqueadoHasta: null,
+            intentosFallidos: 0,
+            fechaInicioVigencia: DATOS_ROOT.fechaInicioVigencia,
+            fechaFinVigencia: DATOS_ROOT.fechaFinVigencia,
+            id: root.id,
+          }),
         );
       }
     }
 
-    // 'usuarios' es la foto de ANTES de crear/reparar root, así que ya sea
-    // que root se haya creado o reparado arriba, aquí solo migran las
-    // contraseñas de cuentas que YA existían (root nuevo ya se guardó con
-    // hash desde el alta, no necesita pasar por aquí).
-    await this.migrarPasswordsPlanos(usuarios);
-    await this.desactivarVencidos(usuarios);
+    // Root ya queda garantizado arriba (password/activo/vigencia/bloqueo) —
+    // se excluye de estos dos pasos para no pisar ese arreglo con su
+    // snapshot viejo (de antes del alta/reparación de esta misma corrida).
+    const usuariosSinRoot = usuarios.filter((u) => u.nombreUsuario.toLowerCase() !== 'root');
+    await this.migrarPasswordsPlanos(usuariosSinRoot);
+    await this.desactivarVencidos(usuariosSinRoot);
     await this.sembrarValoresLista();
   }
 
