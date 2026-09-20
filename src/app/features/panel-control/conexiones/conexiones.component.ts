@@ -61,7 +61,7 @@ export class ConexionesComponent implements OnInit {
   ngOnInit(): void {
     this.cargar();
     this.data.list<ValorLista>('ValorLista', { grupo: GRUPO_PROVEEDOR }).subscribe((valores) =>
-      this.proveedores.set([...valores].sort((a, b) => a.orden - b.orden)),
+      this.proveedores.set(valores.filter((v) => v.grupo === GRUPO_PROVEEDOR).sort((a, b) => a.orden - b.orden)),
     );
   }
 

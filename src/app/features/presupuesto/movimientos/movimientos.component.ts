@@ -131,7 +131,9 @@ export class MovimientosComponent implements OnInit {
     this.data.list<CuentaPresupuesto>('CuentaPresupuesto').subscribe((cuentas) => this.cuentas.set(cuentas));
     this.data.list<CategoriaPresupuesto>('CategoriaPresupuesto').subscribe((categorias) => this.categorias.set(categorias));
     this.data.list<ValorLista>('ValorLista', { grupo: 'MovimientoPresupuestoTipo' }).subscribe((valores) =>
-      this.tiposMovimiento.set([...valores].sort((a, b) => a.orden - b.orden)),
+      this.tiposMovimiento.set(
+        valores.filter((v) => v.grupo === 'MovimientoPresupuestoTipo').sort((a, b) => a.orden - b.orden),
+      ),
     );
     this.cargar();
   }

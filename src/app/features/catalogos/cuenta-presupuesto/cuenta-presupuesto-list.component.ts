@@ -89,7 +89,8 @@ export class CuentaPresupuestoListComponent implements OnInit {
   ngOnInit(): void {
     this.cargar();
     this.data.list<ValorLista>('ValorLista', { grupo: GRUPO_VALOR_LISTA }).subscribe({
-      next: (valores) => this.tipos.set([...valores].sort((a, b) => a.orden - b.orden)),
+      next: (valores) =>
+        this.tipos.set(valores.filter((v) => v.grupo === GRUPO_VALOR_LISTA).sort((a, b) => a.orden - b.orden)),
       error: () => this.toast.error('No se pudieron cargar los tipos de cuenta.'),
     });
   }

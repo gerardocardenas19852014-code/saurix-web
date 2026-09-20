@@ -82,10 +82,14 @@ export class RecurrentesComponent implements OnInit {
     this.data.list<CuentaPresupuesto>('CuentaPresupuesto').subscribe((c) => this.cuentas.set(c));
     this.data.list<CategoriaPresupuesto>('CategoriaPresupuesto').subscribe((c) => this.categorias.set(c));
     this.data.list<ValorLista>('ValorLista', { grupo: 'MovimientoPresupuestoTipo' }).subscribe((v) =>
-      this.tiposMovimiento.set([...v].sort((a, b) => a.orden - b.orden)),
+      this.tiposMovimiento.set(
+        v.filter((x) => x.grupo === 'MovimientoPresupuestoTipo').sort((a, b) => a.orden - b.orden),
+      ),
     );
     this.data.list<ValorLista>('ValorLista', { grupo: 'MovimientoRecurrenteFrecuencia' }).subscribe((v) =>
-      this.frecuencias.set([...v].sort((a, b) => a.orden - b.orden)),
+      this.frecuencias.set(
+        v.filter((x) => x.grupo === 'MovimientoRecurrenteFrecuencia').sort((a, b) => a.orden - b.orden),
+      ),
     );
     this.cargar();
   }

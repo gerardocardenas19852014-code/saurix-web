@@ -17,6 +17,17 @@ const ENTIDAD = 'ValorLista';
  *  primero y con etiqueta bonita); cualquier grupo nuevo que el usuario cree
  *  aparece igual, mostrando su clave tal cual — sobre demanda, sin tocar
  *  código para agregar un grupo nuevo. */
+// Claves que otras pantallas del sistema usan tal cual en su lógica
+// (no solo como texto de combo): Límites de gasto, Reportes y Calendario
+// de pagos comparan directo contra 'Ingreso'/'Gasto', y el cálculo de
+// ciclo de Fijos compara directo contra 'Mensual'/'Anual'. Borrar o
+// renombrar la CLAVE de estos valores rompería esas pantallas en
+// silencio, así que aquí solo se deja cambiar la Etiqueta.
+const CLAVES_PROTEGIDAS: Record<string, string[]> = {
+  MovimientoPresupuestoTipo: ['Ingreso', 'Gasto'],
+  MovimientoRecurrenteFrecuencia: ['Mensual', 'Anual'],
+};
+
 const ETIQUETAS_GRUPO: Record<string, string> = {
   CuentaPresupuestoTipo: 'Tipo de cuenta · Presupuesto Personal',
   MovimientoPresupuestoTipo: 'Tipo de movimiento · Presupuesto Personal',
@@ -55,6 +66,12 @@ export class ValorListaListComponent implements OnInit {
   protected readonly cargando = signal(false);
   protected readonly grupoSeleccionado = signal<string>('');
   protected readonly grupoNuevoTexto = signal('');
+  // Se activa solo mientras se está creando el PRIMER valor de un grupo
+  // nuevo (ver crearGrupoNuevo); si se cancela sin guardar, el selector
+  // vuelve al grupo anterior en vez de quedarse en uno que no aparece en
+  // la lista (todavía sin ningún valor).
+  protected readonly grupoNuevoPendiente = signal(false);
+  private grupoAnteriorAlCrear = '';
 
   protected readonly gruposDisponibles = computed(() => {
     const claves = new Set(this.registrosTodos().map((r) => r.grupo));
@@ -72,7 +89,11 @@ export class ValorListaListComponent implements OnInit {
 
   protected readonly columnas: ColumnaTabla<ValorLista>[] = [
     { campo: 'etiqueta', etiqueta: 'Etiqueta' },
-    { campo: 'clave', etiqueta: 'Clave (valor guardado)' },
+    {
+      campo: 'clave',
+      etiqueta: 'Clave (valor guardado)',
+      formatear: (r) => (this.esClaveProtegida(r) ? `🔒 ${r.clave}` : r.clave),
+    },
     { campo: 'orden', etiqueta: 'Orden' },
   ];
 
@@ -87,6 +108,15 @@ export class ValorListaListComponent implements OnInit {
     etiqueta: ['', [Validators.required, Validators.minLength(1), Validators.maxLength(80)]],
     orden: [1, [Validators.required, Validators.min(1)]],
   });
+
+  protected readonly claveBloqueada = computed(() => {
+    const registro = this.registroEnEdicion();
+    return !!registro && this.esClaveProtegida(registro);
+  });
+
+  private esClaveProtegida(registro: ValorLista): boolean {
+    return (CLAVES_PROTEGIDAS[registro.grupo] ?? []).includes(registro.clave);
+  }
 
   ngOnInit(): void {
     this.cargar();
@@ -107,6 +137,7 @@ export class ValorListaListComponent implements OnInit {
   }
 
   cambiarGrupo(grupo: string): void {
+    this.grupoNuevoPendiente.set(false);
     this.grupoSeleccionado.set(grupo);
   }
 
@@ -119,9 +150,22 @@ export class ValorListaListComponent implements OnInit {
       this.toast.advertencia('Ya existe un grupo con ese nombre.');
       return;
     }
+    this.grupoAnteriorAlCrear = this.grupoSeleccionado();
     this.grupoSeleccionado.set(grupo);
     this.grupoNuevoTexto.set('');
     this.nuevo();
+    // Se marca DESPUÉS de nuevo() para que no lo resetee a false.
+    this.grupoNuevoPendiente.set(true);
+  }
+
+  /** Cierra el modal; si se estaba creando el primer valor de un grupo
+   *  nuevo y se cancela sin guardar, regresa al grupo anterior. */
+  cerrarModal(): void {
+    if (this.grupoNuevoPendiente()) {
+      this.grupoSeleccionado.set(this.grupoAnteriorAlCrear);
+      this.grupoNuevoPendiente.set(false);
+    }
+    this.modalAbierto.set(false);
   }
 
   private siguienteOrden(): number {
@@ -130,14 +174,22 @@ export class ValorListaListComponent implements OnInit {
   }
 
   nuevo(): void {
+    this.grupoNuevoPendiente.set(false);
     this.registroEnEdicion.set(null);
     this.form.reset({ id: 0, grupo: this.grupoSeleccionado(), clave: '', etiqueta: '', orden: this.siguienteOrden() });
+    this.form.controls.clave.enable();
     this.modalAbierto.set(true);
   }
 
   editar(registro: ValorLista): void {
+    this.grupoNuevoPendiente.set(false);
     this.registroEnEdicion.set(registro);
     this.form.reset({ ...registro });
+    if (this.esClaveProtegida(registro)) {
+      this.form.controls.clave.disable();
+    } else {
+      this.form.controls.clave.enable();
+    }
     this.modalAbierto.set(true);
   }
 
@@ -181,6 +233,7 @@ export class ValorListaListComponent implements OnInit {
           })
           .subscribe();
         this.toast.exito(esEdicion ? 'Valor actualizado.' : 'Valor creado.');
+        this.grupoNuevoPendiente.set(false);
         this.modalAbierto.set(false);
         this.cargar();
       },
@@ -189,6 +242,12 @@ export class ValorListaListComponent implements OnInit {
   }
 
   pedirEliminar(registro: ValorLista): void {
+    if (this.esClaveProtegida(registro)) {
+      this.toast.advertencia(
+        `"${registro.etiqueta}" lo usan otras pantallas del sistema (Límites, Reportes, Calendario) y no se puede eliminar. Puedes cambiar su Etiqueta si quieres.`,
+      );
+      return;
+    }
     this.registroAEliminar.set(registro);
   }
 

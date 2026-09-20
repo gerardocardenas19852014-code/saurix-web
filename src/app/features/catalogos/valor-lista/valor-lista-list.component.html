@@ -53,10 +53,15 @@
 />
 
 @if (modalAbierto()) {
-  <div class="modal-overlay modal show d-block" (click)="modalAbierto.set(false)">
+  <div class="modal-overlay modal show d-block" (click)="cerrarModal()">
     <form class="modal-box modal-dialog modal-content" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
       <h3 class="modal-title mb-3">{{ registroEnEdicion() ? 'Editar valor' : 'Nuevo valor' }}</h3>
       <p class="hint" style="margin:-8px 0 14px;">Grupo: <strong>{{ etiquetaGrupo(grupoSeleccionado()) }}</strong></p>
+      @if (claveBloqueada()) {
+        <p class="hint" style="margin:-8px 0 14px;">
+          🔒 Este valor lo usan otras pantallas del sistema — solo puedes cambiar cómo se muestra (Etiqueta), no la clave interna.
+        </p>
+      }
 
       <div class="edit-form">
         <label class="floating-field">
@@ -76,7 +81,7 @@
       </div>
 
       <div class="modal-actions">
-        <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="cerrarModal()">Cancelar</button>
         <button type="submit" class="btn-primary btn btn-primary">Guardar</button>
       </div>
     </form>

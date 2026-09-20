@@ -54,7 +54,15 @@ export class ConfiguracionAparienciaService {
       const registros = await firstValueFrom(this.data.list<ConfiguracionApariencia>(ENTIDAD, { usuarioId }));
       const registro = registros[0] ?? null;
       this.registroActual = registro;
-      if (!registro) return;
+      if (!registro) {
+        // Sin config propia guardada: se resetea a los valores por defecto en
+        // vez de dejar aplicado lo que haya configurado otro usuario en este
+        // mismo navegador (p.ej. una computadora compartida).
+        this.theme.cambiar('claro');
+        this.preferenciasGrid.cambiarTamanoPagina(10);
+        this.asistenteIaActivo.set(true);
+        return;
+      }
 
       this.theme.cambiar(registro.tema);
       this.preferenciasGrid.cambiarTamanoPagina(registro.tamanoPaginaGrid);
