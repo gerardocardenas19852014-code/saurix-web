@@ -686,19 +686,16 @@
 
       @if (tabActiva() === 'solucion') {
         <form class="tab-panel edit-form" [formGroup]="form" (ngSubmit)="guardarTicket()">
-          @if (enFaseFinal()) {
-            <label class="full-span">
-              Solución <span class="hint">(obligatorio: el ticket está en su último estado)</span>
-              <textarea rows="6" formControlName="solucion"></textarea>
-            </label>
-            <div class="form-actions">
-              <button type="submit" class="btn-primary">Guardar solución</button>
-            </div>
-          } @else {
-            <p class="hint" style="margin:0;">
-              Este campo se habilita cuando el ticket llega a su último estado configurado en el tablero.
-            </p>
-          }
+          <!-- Editable/obligatorio los decide, por columna, Gestor de Estados (igual que
+               el resto de los campos configurables) — ya no depende de si esta es "la
+               última" columna del tablero. -->
+          <label class="full-span">
+            Solución
+            <textarea rows="6" formControlName="solucion"></textarea>
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="btn-primary">Guardar solución</button>
+          </div>
         </form>
       }
     </div>

@@ -137,13 +137,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
     };
   });
 
-  /** La Solución solo se habilita (y se exige) cuando el ticket ya está en el último
-   *  estado configurado en el tablero — antes de eso no hay nada que "cerrar". */
-  protected readonly enFaseFinal = computed(() => {
-    const activo = this.ticketActivo();
-    return !!activo && this.siguienteColumna(activo) === null;
-  });
-
   /** true si a este ticket todavía le falta la actividad obligatoria antes de poder
    *  cambiar de estado —ya sea avanzar o retroceder— (misma condición que revisa
    *  `mover()`) — controla el aviso que se muestra en la pestaña Actividades para
@@ -610,15 +603,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
     const valor = this.form.getRawValue();
     const enEdicion = this.ticketEnEdicion();
-
-    // La Solución es obligatoria únicamente cuando el ticket ya llegó a su último
-    // estado configurado (ver enFaseFinal); antes de eso el campo ni siquiera se
-    // muestra, así que no tiene sentido exigirlo.
-    if (enEdicion && this.enFaseFinal() && !valor.solucion?.trim()) {
-      this.tabActiva.set('solucion');
-      this.toast.advertencia('Antes de guardar es obligatorio capturar la solución: el ticket está en su último estado.');
-      return;
-    }
 
     // El folio es libre y siempre editable — sin este chequeo, dos tickets del
     // mismo proyecto podrían terminar con el mismo folio (o alguien podría
