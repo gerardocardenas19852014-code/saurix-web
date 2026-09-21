@@ -16,7 +16,7 @@ import { Cliente } from './cliente.model';
 })
 export class ClientesComponent implements OnInit {
   private readonly data = inject(DataClientService);
-  private readonly toast = inject(ToastService);
+  protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
 
   protected readonly clientes = signal<Cliente[]>([]);

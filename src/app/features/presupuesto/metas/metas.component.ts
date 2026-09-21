@@ -19,7 +19,7 @@ import { MetaPresupuesto } from './meta.model';
 })
 export class MetasComponent implements OnInit {
   private readonly data = inject(DataClientService);
-  private readonly toast = inject(ToastService);
+  protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
 

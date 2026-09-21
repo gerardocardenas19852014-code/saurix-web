@@ -30,7 +30,7 @@ const ENTIDAD = 'TipoSistema';
 })
 export class TipoSistemaListComponent implements OnInit {
   private readonly data = inject(DataClientService);
-  private readonly toast = inject(ToastService);
+  protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
   private readonly bitacora = inject(BitacoraService);
   private readonly auth = inject(AuthService);

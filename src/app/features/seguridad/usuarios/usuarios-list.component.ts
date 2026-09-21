@@ -74,7 +74,7 @@ function estadoVigenciaInfo(usuario: Usuario): { texto: string; clase: string } 
 })
 export class UsuariosListComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
-  private readonly toast = inject(ToastService);
+  protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
   private readonly bitacora = inject(BitacoraService);
   private readonly auth = inject(AuthService);

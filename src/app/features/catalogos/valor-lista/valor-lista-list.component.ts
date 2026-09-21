@@ -54,7 +54,7 @@ const ETIQUETAS_GRUPO: Record<string, string> = {
 })
 export class ValorListaListComponent implements OnInit {
   private readonly data = inject(DataClientService);
-  private readonly toast = inject(ToastService);
+  protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
   private readonly bitacora = inject(BitacoraService);
   private readonly auth = inject(AuthService);
@@ -161,6 +161,7 @@ export class ValorListaListComponent implements OnInit {
   /** Cierra el modal; si se estaba creando el primer valor de un grupo
    *  nuevo y se cancela sin guardar, regresa al grupo anterior. */
   cerrarModal(): void {
+    this.toast.info('Cambios descartados.');
     if (this.grupoNuevoPendiente()) {
       this.grupoSeleccionado.set(this.grupoAnteriorAlCrear);
       this.grupoNuevoPendiente.set(false);

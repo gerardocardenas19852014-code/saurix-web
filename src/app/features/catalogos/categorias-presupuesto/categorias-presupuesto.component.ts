@@ -24,7 +24,7 @@ import { CategoriaPresupuesto } from './categoria-presupuesto.model';
 })
 export class CategoriasPresupuestoComponent implements OnInit {
   private readonly data = inject(DataClientService);
-  private readonly toast = inject(ToastService);
+  protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
 
   protected readonly categorias = signal<CategoriaPresupuesto[]>([]);

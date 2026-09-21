@@ -53,7 +53,7 @@
       </div>
 
       <div class="modal-actions">
-        <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">Cancelar</button>
         <button type="submit" class="btn-primary btn btn-primary">Guardar</button>
       </div>
     </form>

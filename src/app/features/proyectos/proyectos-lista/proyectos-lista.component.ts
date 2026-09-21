@@ -17,7 +17,7 @@ import { Proyecto } from './proyecto.model';
 })
 export class ProyectosListaComponent implements OnInit {
   private readonly data = inject(DataClientService);
-  private readonly toast = inject(ToastService);
+  protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
 
   protected readonly proyectos = signal<Proyecto[]>([]);

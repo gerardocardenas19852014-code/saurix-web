@@ -46,7 +46,7 @@ interface Migaja {
 export class DocumentosListComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly data = inject(DataClientService);
-  private readonly toast = inject(ToastService);
+  protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
   private readonly sanitizer = inject(DomSanitizer);
 
@@ -206,6 +206,11 @@ export class DocumentosListComponent implements OnInit {
     this.documentoActual.set(null);
     this.vista.set('lista');
     this.cargar();
+  }
+
+  cancelarEdicion(): void {
+    this.toast.info('Cambios descartados.');
+    this.volverALista();
   }
 
   guardar(): void {

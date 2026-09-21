@@ -32,7 +32,7 @@ import { CatalogoSimpleConfig, CatalogoSimpleItem } from './catalogo-simple.mode
 export class CatalogoSimpleComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly data = inject(DataClientService);
-  private readonly toast = inject(ToastService);
+  protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
 
   protected config!: CatalogoSimpleConfig;

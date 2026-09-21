@@ -16,7 +16,7 @@ import { CuentaPresupuesto } from './cuenta-presupuesto.model';
 })
 export class CuentasPresupuestoComponent implements OnInit {
   private readonly data = inject(DataClientService);
-  private readonly toast = inject(ToastService);
+  protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
 
   protected readonly cuentas = signal<CuentaPresupuesto[]>([]);

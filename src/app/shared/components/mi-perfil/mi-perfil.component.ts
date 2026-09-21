@@ -47,7 +47,7 @@ export class MiPerfilComponent {
   private readonly auth = inject(AuthService);
   private readonly data = inject(DataClientService);
   private readonly bitacora = inject(BitacoraService);
-  private readonly toast = inject(ToastService);
+  protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
 
   protected readonly abierta = signal(false);
@@ -90,6 +90,7 @@ export class MiPerfilComponent {
   cerrar(): void {
     if (this.forzado()) return;
     this.abierta.set(false);
+    this.toast.info('Cambios descartados.');
   }
 
   alternarMostrarPassword(): void {

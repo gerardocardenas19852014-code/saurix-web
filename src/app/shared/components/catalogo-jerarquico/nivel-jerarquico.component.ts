@@ -24,7 +24,7 @@ import { NivelJerarquicoConfig, NivelJerarquicoItem } from './nivel-jerarquico.m
 export class NivelJerarquicoComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly data = inject(DataClientService);
-  private readonly toast = inject(ToastService);
+  protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
   private readonly location = inject(Location);
 

@@ -16,7 +16,7 @@ import { TicketTipo } from '../../proyectos/ticket-tipos/ticket-tipo.model';
 })
 export class TicketTiposComponent implements OnInit {
   private readonly data = inject(DataClientService);
-  private readonly toast = inject(ToastService);
+  protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
 
   protected readonly tipos = signal<TicketTipo[]>([]);

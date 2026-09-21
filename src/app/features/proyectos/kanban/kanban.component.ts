@@ -64,7 +64,7 @@ type ClaseSla = 'sla-ok' | 'sla-warning' | 'sla-expired';
 })
 export class KanbanComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
-  private readonly toast = inject(ToastService);
+  protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly configuracionApariencia = inject(ConfiguracionAparienciaService);
