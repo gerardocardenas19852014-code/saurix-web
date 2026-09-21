@@ -20,6 +20,7 @@ import { exportarCsv } from '../../../shared/utils/csv.util';
 import { evaluarFortaleza, generarPasswordTemporal, hashPassword } from '../../../shared/utils/password.util';
 import { debeDesactivarsePorVigenciaVencida, hoyIso } from '../../../shared/utils/vigencia.util';
 import { Usuario, nombreCompletoUsuario } from './usuario.model';
+import { Rol } from '../roles-permisos/rol-permiso.model';
 
 type FiltroEstado = 'todos' | 'activos' | 'inactivos';
 
@@ -81,6 +82,7 @@ export class UsuariosListComponent implements OnInit, OnDestroy {
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
 
   protected readonly usuariosTodos = signal<Usuario[]>([]);
+  protected readonly roles = signal<Rol[]>([]);
   protected readonly cargando = signal(false);
   protected readonly busqueda = signal('');
   protected readonly filtroEstado = signal<FiltroEstado>('todos');
@@ -167,14 +169,43 @@ export class UsuariosListComponent implements OnInit, OnDestroy {
   });
   protected readonly etiquetaActivo = computed(() => (this.activoEnVivo() ? 'Activo' : 'Inactivo'));
 
+  /** El campo Rol pasó de texto libre a un <select> alimentado por el catálogo Rol,
+   *  para consistencia de datos (sin validar permisos client-side: eso, según indica
+   *  el propio comentario de roles-permisos.component.ts, se deja para cuando se
+   *  conecte el backend real). Como Usuario.role sigue siendo un STRING (no un id),
+   *  si el valor actual no calza con ningún Rol activo del catálogo (rol desactivado,
+   *  dato legado, o catálogo vacío) se agrega como opción adicional "sintética" para
+   *  no perderlo/blanquearlo silenciosamente — mismo espíritu que tiposSeleccionables/
+   *  prioridadesSeleccionables/modulosSeleccionables en el tablero Kanban. */
+  private readonly rolEnVivo = toSignal(this.form.controls.role.valueChanges, {
+    initialValue: this.form.controls.role.value,
+  });
+  protected readonly rolesSeleccionables = computed(() => {
+    const actual = this.rolEnVivo();
+    const activos = this.roles().filter((r) => r.activo !== false);
+    if (actual && !activos.some((r) => r.nombre === actual)) {
+      return [...activos, { id: -1, nombre: actual, activo: true } satisfies Rol];
+    }
+    return activos;
+  });
+
   ngOnInit(): void {
     // Esta pantalla tiene muchas columnas (grid de usuarios); usa el ancho
     // "wide" del layout para aprovechar el espacio en vez de quedarse en el
     // ancho angosto por defecto (ver html[data-wide='grid'] en styles.scss).
     document.documentElement.setAttribute('data-wide', 'grid');
     this.cargar();
+    this.cargarRoles();
     this.sincronizarErrorConfirmacionPassword();
     this.sincronizarErrorUsuarioDuplicado();
+  }
+
+  /** Catálogo de Roles para el <select> del modal (ver rolesSeleccionables). */
+  private cargarRoles(): void {
+    this.data.list<Rol>('Rol').subscribe({
+      next: (roles) => this.roles.set(roles),
+      error: () => undefined,
+    });
   }
 
   /** El error "usuarioDuplicado" (ver guardar()) es una comprobación asíncrona que solo
