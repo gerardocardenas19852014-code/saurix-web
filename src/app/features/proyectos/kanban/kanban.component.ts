@@ -154,6 +154,25 @@ export class KanbanComponent implements OnInit, OnDestroy {
     return this.tickets().filter((t) => Number(t.id) !== Number(activo.id) && !yaAsociadosIds.has(Number(t.id)));
   });
 
+  /** Mismo criterio de búsqueda multi-término (coma) que ticketsFiltrados — folio,
+   *  folio interno o título — aplicado sobre ticketsDisponiblesParaAsociar(). */
+  protected readonly ticketsDisponiblesParaAsociarFiltrados = computed(() => {
+    const terminos = this.filtroAsociado()
+      .toLowerCase()
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if (!terminos.length) return this.ticketsDisponiblesParaAsociar();
+    return this.ticketsDisponiblesParaAsociar().filter((t) =>
+      terminos.some(
+        (termino) =>
+          t.numeroTicket.toLowerCase().includes(termino) ||
+          (t.folioInterno ?? '').toLowerCase().includes(termino) ||
+          t.titulo.toLowerCase().includes(termino),
+      ),
+    );
+  });
+
   protected readonly ticketsFiltrados = computed(() => {
     const tipoId = this.filtroTipoId();
     const prioridadId = this.filtroPrioridadId();
@@ -296,6 +315,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
   });
   protected readonly formEtiqueta = this.fb.nonNullable.group({ texto: ['', Validators.required] });
   protected readonly formAsociado = this.fb.nonNullable.group({ ticketRelacionadoId: [0] });
+  /** Texto libre para acotar el combo "Asociar ticket" (pestaña Asociados) — un select nativo con cientos de tickets es imposible de recorrer a ojo, así que se filtra igual que el buscador del tablero: por folio, folio interno o título, admitiendo varios términos separados por coma. */
+  protected readonly filtroAsociado = signal('');
 
   ngOnInit(): void {
     // Deep link desde "Mi Dashboard" (u otra pantalla): ?ticket=123 abre
@@ -755,6 +776,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
         this.formActividad.reset({ texto: '', tiempoHoras: 0.25 });
         this.formEtiqueta.reset({ texto: '' });
         this.formAsociado.reset({ ticketRelacionadoId: 0 });
+        this.filtroAsociado.set('');
         this.cargarDetalle(completo.id);
       },
     });
@@ -865,6 +887,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       .subscribe({
         next: () => {
           this.formAsociado.reset({ ticketRelacionadoId: 0 });
+        this.filtroAsociado.set('');
           this.cargarDetalle(activo.id);
         },
       });

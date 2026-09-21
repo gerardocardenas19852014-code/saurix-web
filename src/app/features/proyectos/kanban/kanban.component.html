@@ -619,10 +619,21 @@
           <form [formGroup]="formAsociado" (ngSubmit)="agregarAsociado()" style="margin-top: 14px;">
             <div class="edit-form form-grid-2col">
               <label class="full-span">
+                Buscar ticket a asociar
+                <input
+                  type="search"
+                  placeholder="Folio, folio interno o título… (varios con coma)"
+                  [value]="filtroAsociado()"
+                  (input)="filtroAsociado.set($any($event.target).value)"
+                />
+              </label>
+              <label class="full-span">
                 Asociar ticket
                 <select formControlName="ticketRelacionadoId">
-                  <option [ngValue]="0" disabled>Selecciona un ticket</option>
-                  @for (ticket of ticketsDisponiblesParaAsociar(); track ticket.id) {
+                  <option [ngValue]="0" disabled>
+                    {{ ticketsDisponiblesParaAsociarFiltrados().length }} resultado(s) — selecciona uno
+                  </option>
+                  @for (ticket of ticketsDisponiblesParaAsociarFiltrados(); track ticket.id) {
                     <option [ngValue]="ticket.id">#{{ ticket.numeroTicket }} — {{ ticket.titulo }}</option>
                   }
                 </select>
