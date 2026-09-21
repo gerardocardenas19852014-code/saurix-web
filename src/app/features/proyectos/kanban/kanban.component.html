@@ -169,6 +169,11 @@
                 <span class="kanban-tag kanban-tag-tipo" [title]="'Tipo: ' + nombreTipo(ticket.ticketTipoId)">
                   {{ iconoTipo(ticket.ticketTipoId) }} {{ nombreTipo(ticket.ticketTipoId) }}
                 </span>
+                @if (ticket.ticketModuloId) {
+                  <span class="kanban-tag" [title]="'Módulo: ' + nombreModulo(ticket.ticketModuloId)">
+                    {{ iconoModulo(ticket.ticketModuloId) }} {{ nombreModulo(ticket.ticketModuloId) }}
+                  </span>
+                }
                 @for (etiqueta of etiquetasDe(ticket.id); track etiqueta.id) {
                   <span class="kanban-tag">{{ etiqueta.texto }}</span>
                 }

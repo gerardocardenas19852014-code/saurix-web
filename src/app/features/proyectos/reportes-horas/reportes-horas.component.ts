@@ -5,6 +5,7 @@ import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario
 import { colorAvatar } from '../kanban/avatar.util';
 import { Ticket, TicketActividad } from '../kanban/ticket.model';
 import { ProyectoOpcion } from '../tableros/tablero-columna.model';
+import { TicketModulo } from '../ticket-modulos/ticket-modulo.model';
 
 type PeriodoId = 'todo' | 'mes-actual' | 'mes-anterior' | 'anio-actual' | 'anio-anterior';
 
@@ -49,8 +50,10 @@ export class ReportesHorasComponent implements OnInit {
   protected readonly tickets = signal<Ticket[]>([]);
   protected readonly actividades = signal<TicketActividad[]>([]);
   protected readonly usuarios = signal<Usuario[]>([]);
+  protected readonly modulos = signal<TicketModulo[]>([]);
 
   protected readonly filtroProyectoId = signal<number>(0);
+  protected readonly filtroModuloId = signal<number>(0);
   protected readonly periodo = signal<PeriodoId>('mes-actual');
   /** Rango de fechas manual — siempre visible en el filtro (formato yyyy-mm-dd,
    *  input type=date). En cuanto se llena Desde y/o Hasta, manda sobre el
@@ -62,6 +65,7 @@ export class ReportesHorasComponent implements OnInit {
   ngOnInit(): void {
     this.cargando.set(true);
     this.data.list<ProyectoOpcion>('Proyecto').subscribe((p) => this.proyectos.set(p));
+    this.data.list<TicketModulo>('TicketModulo').subscribe((m) => this.modulos.set(m));
     this.data.list<Usuario>('Usuario').subscribe((u) => this.usuarios.set(u));
     this.data.list<Ticket>('Ticket').subscribe((t) => this.tickets.set(t));
     this.data.list<TicketActividad>('TicketActividad').subscribe({
@@ -134,6 +138,7 @@ export class ReportesHorasComponent implements OnInit {
   protected readonly actividadesFiltradas = computed(() => {
     const rango = this.rangoActivo();
     const proyectoId = this.filtroProyectoId();
+    const moduloId = this.filtroModuloId();
     return this.actividades().filter((a) => {
       if (rango) {
         if (!a.fechaCreacion) return false;
@@ -143,6 +148,13 @@ export class ReportesHorasComponent implements OnInit {
       if (proyectoId) {
         const ticket = this.ticketDe(a.ticketId);
         if (!ticket || Number(ticket.proyectoId) !== proyectoId) return false;
+      }
+      if (moduloId) {
+        const ticket = this.ticketDe(a.ticketId);
+        // moduloId === -1 es el centinela de "Sin módulo" (mismo criterio que en
+        // Kanban/Dashboard); cualquier otro valor filtra por ese módulo.
+        if (!ticket) return false;
+        if (moduloId === -1 ? !!ticket.ticketModuloId : Number(ticket.ticketModuloId) !== moduloId) return false;
       }
       return true;
     });
@@ -197,6 +209,21 @@ export class ReportesHorasComponent implements OnInit {
     ),
   );
 
+  protected readonly horasPorModulo = computed(() =>
+    this.agrupar(
+      (a) => {
+        const ticket = this.ticketDe(a.ticketId);
+        if (!ticket) return null;
+        return ticket.ticketModuloId ? Number(ticket.ticketModuloId) : 0;
+      },
+      (id) => {
+        if (id === 0) return { nombre: 'Sin módulo' };
+        const modulo = this.modulos().find((m) => Number(m.id) === id);
+        return { nombre: modulo ? `${modulo.icono} ${modulo.nombre}`.trim() : '—' };
+      },
+    ),
+  );
+
   /** Top 10 tickets con más horas registradas en el periodo/proyecto filtrado. */
   protected readonly horasPorTicket = computed(() =>
     this.agrupar(
@@ -210,6 +237,7 @@ export class ReportesHorasComponent implements OnInit {
 
   protected readonly maxUsuario = computed(() => Math.max(1, ...this.horasPorUsuario().map((f) => f.minutos)));
   protected readonly maxProyecto = computed(() => Math.max(1, ...this.horasPorProyecto().map((f) => f.minutos)));
+  protected readonly maxModulo = computed(() => Math.max(1, ...this.horasPorModulo().map((f) => f.minutos)));
   protected readonly maxTicket = computed(() => Math.max(1, ...this.horasPorTicket().map((f) => f.minutos)));
 
   private nombreUsuarioDe(id: number | null): string {

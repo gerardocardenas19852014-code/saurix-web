@@ -29,6 +29,17 @@
     </label>
 
     <label class="board-filter-field">
+      Módulo
+      <select [value]="filtroModuloId()" (change)="filtroModuloId.set(+$any($event.target).value)">
+        <option [value]="0">Todos</option>
+        <option [value]="-1">Sin módulo</option>
+        @for (modulo of modulos(); track modulo.id) {
+          <option [value]="modulo.id">{{ modulo.icono }} {{ modulo.nombre }}</option>
+        }
+      </select>
+    </label>
+
+    <label class="board-filter-field">
       Periodo
       <select [value]="periodo()" (change)="periodo.set($any($event.target).value)" [disabled]="hayRangoManual()">
         <option value="mes-actual">Este mes</option>
@@ -99,6 +110,23 @@
           <span class="wallet-cat-bar-name" [title]="fila.nombre">{{ fila.nombre }}</span>
           <div class="wallet-cat-bar-track">
             <div class="wallet-cat-bar-fill" [style.width.%]="(fila.minutos / maxProyecto()) * 100" [style.background]="fila.color"></div>
+          </div>
+          <span class="wallet-cat-bar-amount">{{ fila.horas }}h</span>
+        </div>
+      }
+    </div>
+  }
+
+  <h2 class="settings-card-title" style="margin:0 0 12px;">Horas por módulo</h2>
+  @if (horasPorModulo().length === 0) {
+    <div class="empty-state-block"><p>Sin actividades registradas en este periodo.</p></div>
+  } @else {
+    <div style="margin-bottom:28px;">
+      @for (fila of horasPorModulo(); track fila.id) {
+        <div class="wallet-cat-bar-row">
+          <span class="wallet-cat-bar-name" [title]="fila.nombre">{{ fila.nombre }}</span>
+          <div class="wallet-cat-bar-track">
+            <div class="wallet-cat-bar-fill" [style.width.%]="(fila.minutos / maxModulo()) * 100" [style.background]="fila.color"></div>
           </div>
           <span class="wallet-cat-bar-amount">{{ fila.horas }}h</span>
         </div>
