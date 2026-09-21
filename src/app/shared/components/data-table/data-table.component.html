@@ -80,12 +80,15 @@
   </table>
 </div>
 
-@if (totalPaginas() > 1) {
+@if (filasOrdenadas().length > 0) {
   <div class="grid-footer">
-    <div class="grid-pagination">
-      <button type="button" [disabled]="paginaActual() === 1" (click)="irAPagina(paginaActual() - 1)">‹ Anterior</button>
-      <span>Página {{ paginaActual() }} de {{ totalPaginas() }}</span>
-      <button type="button" [disabled]="paginaActual() === totalPaginas()" (click)="irAPagina(paginaActual() + 1)">Siguiente ›</button>
-    </div>
+    <span class="hint" style="margin:0;">{{ filasOrdenadas().length }} resultado{{ filasOrdenadas().length === 1 ? '' : 's' }}</span>
+    @if (totalPaginas() > 1) {
+      <div class="grid-pagination">
+        <button type="button" [disabled]="paginaActual() === 1" (click)="irAPagina(paginaActual() - 1)">‹ Anterior</button>
+        <span>Página {{ paginaActual() }} de {{ totalPaginas() }}</span>
+        <button type="button" [disabled]="paginaActual() === totalPaginas()" (click)="irAPagina(paginaActual() + 1)">Siguiente ›</button>
+      </div>
+    }
   </div>
 }
