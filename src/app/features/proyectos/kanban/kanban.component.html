@@ -76,6 +76,16 @@
   </label>
 
   <label class="board-filter-field">
+    Estado
+    <select [value]="filtroEstadoId()" (change)="filtroEstadoId.set(+$any($event.target).value)">
+      <option [value]="0">Todos</option>
+      @for (columna of columnasTablero(); track columna.id) {
+        <option [value]="columna.id">{{ columna.nombre }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="board-filter-field">
     Asignado a
     <select [value]="filtroAsignadoId()" (change)="filtroAsignadoId.set(+$any($event.target).value)">
       <option [value]="0">Todos</option>

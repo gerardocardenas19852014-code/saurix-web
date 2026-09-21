@@ -96,6 +96,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly filtroTipoId = signal<number>(0);
   protected readonly filtroModuloId = signal<number>(0);
   protected readonly filtroPrioridadId = signal<number>(0);
+  protected readonly filtroEstadoId = signal<number>(0);
   protected readonly filtroAsignadoId = signal<number>(0);
   protected readonly filtroTexto = signal('');
   /** false por defecto: los tickets archivados (activo === false) se ocultan del
@@ -107,6 +108,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
         this.filtroTipoId() ||
         this.filtroModuloId() ||
         this.filtroPrioridadId() ||
+        this.filtroEstadoId() ||
         this.filtroAsignadoId() ||
         this.filtroTexto().trim()
       ),
@@ -179,6 +181,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     const tipoId = this.filtroTipoId();
     const moduloId = this.filtroModuloId();
     const prioridadId = this.filtroPrioridadId();
+    const estadoId = this.filtroEstadoId();
     const asignadoId = this.filtroAsignadoId();
     // Admite varios folios separados por coma (p.ej. "55350,55182"): cada término
     // se busca por separado (OR entre términos, igual que antes OR entre campos).
@@ -196,6 +199,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
         // (tickets sin ticketModuloId); cualquier otro valor filtra por ese módulo.
         (!moduloId || (moduloId === -1 ? !t.ticketModuloId : Number(t.ticketModuloId) === moduloId)) &&
         (!prioridadId || Number(t.ticketPrioridadId) === prioridadId) &&
+        (!estadoId || Number(t.tableroColumnaId) === estadoId) &&
         (!asignadoId || Number(t.asignadoUsuarioId) === asignadoId) &&
         (!terminos.length ||
           terminos.some(
@@ -432,6 +436,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.filtroTipoId.set(0);
     this.filtroModuloId.set(0);
     this.filtroPrioridadId.set(0);
+    this.filtroEstadoId.set(0);
     this.filtroAsignadoId.set(0);
     this.filtroTexto.set('');
   }
