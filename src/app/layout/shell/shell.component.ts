@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
@@ -29,12 +29,18 @@ interface DocumentoBuscable {
   styleUrl: './shell.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ShellComponent {
+export class ShellComponent implements OnDestroy {
   private readonly data = inject(DataClientService);
   protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly configuracionApariencia = inject(ConfiguracionAparienciaService);
   protected readonly notificacionesService = inject(NotificacionesService);
+
+  /** Revisión periódica de SLA (ver NotificacionesService.revisarSlaTickets) — cada
+   *  5 minutos mientras la sesión siga abierta, para no depender de tener abierta
+   *  ninguna pantalla de Proyectos en particular. */
+  private static readonly INTERVALO_REVISION_SLA_MS = 5 * 60 * 1000;
+  private intervaloRevisionSla?: ReturnType<typeof setInterval>;
 
   constructor() {
     // Trae y aplica Tema/Asistente IA/Tamaño de página guardados en la
@@ -43,6 +49,15 @@ export class ShellComponent {
     // localStorage de este navegador.
     void this.configuracionApariencia.cargarParaUsuarioActual();
     void this.notificacionesService.cargarParaUsuarioActual();
+    void this.notificacionesService.revisarSlaTickets();
+    this.intervaloRevisionSla = setInterval(
+      () => void this.notificacionesService.revisarSlaTickets(),
+      ShellComponent.INTERVALO_REVISION_SLA_MS,
+    );
+  }
+
+  ngOnDestroy(): void {
+    if (this.intervaloRevisionSla) clearInterval(this.intervaloRevisionSla);
   }
 
   // ── Menú lateral: cada módulo muestra solo su propia sección, nunca la

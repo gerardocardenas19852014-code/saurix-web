@@ -747,10 +747,37 @@ export class KanbanComponent implements OnInit, OnDestroy {
             usuarioId: this.auth.usuarioActual()?.id ?? null,
           })
           .subscribe({ error: () => undefined });
+        this.notificarCambioEstado(ticket, Number(columnaId));
         this.cargarTickets();
         if (this.ticketActivo()?.id === ticket.id) this.refrescarTicketActivo();
       },
       error: () => this.toast.error('No se pudo mover el ticket. Intenta de nuevo.'),
+    });
+  }
+
+  /** Avisa a quien REPORTÓ el ticket y a sus seguidores (TicketSeguidor) cuando cambia
+   *  de columna — antes solo se notificaba al asignado, y solo al asignárselo (ver
+   *  notificarAsignacion), nunca al avanzar/retroceder de estado. Consulta
+   *  TicketSeguidor directo (no this.seguidores(), que solo trae los del detalle
+   *  abierto) para funcionar igual se mueva el ticket desde el detalle o el tablero. */
+  private notificarCambioEstado(ticket: Ticket, columnaNuevaId: number): void {
+    const propioId = this.auth.usuarioActual()?.id ?? null;
+    const columnas = this.columnasTablero();
+    const esResuelto = columnas.length > 0 && Number(columnaNuevaId) === Number(columnas[columnas.length - 1].id);
+    const titulo = `${esResuelto ? '✅ Se resolvió' : '🔄 Cambió de estado'} el ticket #${ticket.numeroTicket} — ${ticket.titulo} (${this.nombreColumna(columnaNuevaId)})`;
+    const link = `/proyectos/tablero?ticket=${ticket.id}`;
+
+    const destinatarios = new Set<number>();
+    if (ticket.reportadoPorUsuarioId && Number(ticket.reportadoPorUsuarioId) !== Number(propioId)) {
+      destinatarios.add(Number(ticket.reportadoPorUsuarioId));
+    }
+    this.data.list<TicketSeguidor>('TicketSeguidor', { ticketId: ticket.id }).subscribe((seguidores) => {
+      for (const s of seguidores) {
+        if (Number(s.usuarioId) !== Number(propioId)) destinatarios.add(Number(s.usuarioId));
+      }
+      for (const usuarioId of destinatarios) {
+        this.notificaciones.notificar(usuarioId, titulo, link);
+      }
     });
   }
 
@@ -992,18 +1019,44 @@ export class KanbanComponent implements OnInit, OnDestroy {
     const activo = this.ticketActivo();
     if (!activo || this.formComentario.invalid) return;
 
+    const texto = this.formComentario.controls.texto.value;
     this.data
       .alta<TicketComentario>('TicketComentario', {
         ticketId: activo.id,
-        texto: this.formComentario.controls.texto.value,
+        texto,
         creadoPor: this.auth.usuarioActual()?.id ?? null,
       })
       .subscribe({
         next: () => {
+          this.notificarMenciones(activo, texto);
           this.formComentario.reset({ texto: '' });
           this.cargarDetalle(activo.id);
         },
       });
+  }
+
+  /** Notifica a cada usuario mencionado con "@primerNombre" en un comentario recién
+   *  guardado. Se compara solo contra el primer nombre (sin apellido, insensible a
+   *  mayúsculas) porque el catálogo de Usuarios no tiene un @usuario/slug propio. */
+  private notificarMenciones(ticket: Ticket, texto: string): void {
+    const tokens = new Set(
+      Array.from(texto.matchAll(/@([\p{L}\p{N}_]+)/gu)).map((m) => m[1].toLowerCase()),
+    );
+    if (!tokens.size) return;
+
+    const propioId = this.auth.usuarioActual()?.id ?? null;
+    const yaNotificados = new Set<number>();
+    for (const usuario of this.usuarios()) {
+      const primerNombre = usuario.nombreCompleto.trim().split(/\s+/)[0]?.toLowerCase();
+      if (!primerNombre || !tokens.has(primerNombre)) continue;
+      if (Number(usuario.id) === Number(propioId) || yaNotificados.has(Number(usuario.id))) continue;
+      yaNotificados.add(Number(usuario.id));
+      this.notificaciones.notificar(
+        Number(usuario.id),
+        `Te mencionaron en el ticket #${ticket.numeroTicket} — ${ticket.titulo}`,
+        `/proyectos/tablero?ticket=${ticket.id}`,
+      );
+    }
   }
 
   agregarActividad(): void {
