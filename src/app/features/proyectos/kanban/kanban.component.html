@@ -133,16 +133,17 @@
                 (keydown.enter)="abrirDetalle(ticket)"
                 (keydown.space)="$event.preventDefault(); abrirDetalle(ticket)"
               >
-                {{ iconoTipo(ticket.ticketTipoId) }} {{ ticket.titulo }}
+                {{ ticket.titulo }}
               </p>
 
-              @if (etiquetasDe(ticket.id).length > 0) {
-                <div class="kanban-card-tags">
-                  @for (etiqueta of etiquetasDe(ticket.id); track etiqueta.id) {
-                    <span class="kanban-tag">{{ etiqueta.texto }}</span>
-                  }
-                </div>
-              }
+              <div class="kanban-card-tags">
+                <span class="kanban-tag kanban-tag-tipo" [title]="'Tipo: ' + nombreTipo(ticket.ticketTipoId)">
+                  {{ iconoTipo(ticket.ticketTipoId) }} {{ nombreTipo(ticket.ticketTipoId) }}
+                </span>
+                @for (etiqueta of etiquetasDe(ticket.id); track etiqueta.id) {
+                  <span class="kanban-tag">{{ etiqueta.texto }}</span>
+                }
+              </div>
 
               @if (claseSla(ticket); as clase) {
                 <span [class]="'sla-badge ' + clase">{{ textoSla(ticket) }}</span>
