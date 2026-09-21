@@ -88,11 +88,22 @@ export interface TicketHistorialEstado {
   fechaCreacion?: string;
 }
 
+/** Tipo del vínculo Ticket → TicketRelacionado (ver TicketDependencia), guardado
+ *  desde la perspectiva del ticket que crea el vínculo (agregarAsociado en
+ *  kanban.component.ts). Al mostrarlo del lado del ticket relacionado se usa la
+ *  etiqueta inversa (bloquea ↔ bloqueado_por, duplica ↔ duplicado_por;
+ *  "relacionado" es simétrico) — igual que los "issue links" de Jira: un solo
+ *  vínculo, visible y editable desde cualquiera de los dos tickets. */
+export type TipoVinculoTicket = 'relacionado' | 'bloquea' | 'bloqueado_por' | 'duplica' | 'duplicado_por';
+
 /** Auto-referencia a Ticket — pestaña "Asociados" (tickets relacionados/dependientes). */
 export interface TicketDependencia {
   id: number;
   ticketId: number;
   ticketRelacionadoId: number;
+  /** Opcional: registros dados de alta antes de que existiera este campo no lo
+   *  traen — se tratan como 'relacionado' (ver etiquetaVinculo). */
+  tipo?: TipoVinculoTicket;
 }
 
 /** Usuarios que siguen el ticket, para recibir avisos aunque no estén asignados. */

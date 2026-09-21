@@ -682,18 +682,19 @@
 
       @if (tabActiva() === 'asociados' && tabsPermitidas().asociados) {
         <div class="tab-panel">
-          @if (dependencias().length === 0) {
+          @if (vinculosDelTicket().length === 0) {
             <p class="empty">Este ticket todavía no tiene tickets asociados.</p>
           } @else {
             <ul class="actividades-list">
-              @for (dependencia of dependencias(); track dependencia.id) {
+              @for (vinculo of vinculosDelTicket(); track vinculo.dependencia.id) {
                 <li class="actividad-item">
                   <div class="actividad-item-head">
                     <span class="actividad-item-texto">
-                      #{{ ticketPorId(dependencia.ticketRelacionadoId)?.numeroTicket ?? '—' }} —
-                      {{ ticketPorId(dependencia.ticketRelacionadoId)?.titulo ?? 'Ticket eliminado' }}
+                      <span class="kanban-tag" style="margin-right: 6px;">{{ vinculo.etiqueta }}</span>
+                      #{{ ticketPorId(vinculo.otroTicketId)?.numeroTicket ?? '—' }} —
+                      {{ ticketPorId(vinculo.otroTicketId)?.titulo ?? 'Ticket eliminado' }}
                     </span>
-                    <button type="button" class="btn-danger small" aria-label="Quitar ticket asociado" title="Quitar ticket asociado" (click)="eliminarAsociado(dependencia)">✕</button>
+                    <button type="button" class="btn-danger small" aria-label="Quitar ticket asociado" title="Quitar ticket asociado" (click)="eliminarAsociado(vinculo.dependencia)">✕</button>
                   </div>
                 </li>
               }
@@ -710,7 +711,15 @@
                   (input)="filtroAsociado.set($any($event.target).value)"
                 />
               </label>
-              <label class="full-span">
+              <label>
+                Tipo de vínculo
+                <select formControlName="tipo">
+                  @for (t of tiposVinculo; track t.clave) {
+                    <option [ngValue]="t.clave">{{ t.etiqueta }}</option>
+                  }
+                </select>
+              </label>
+              <label>
                 Asociar ticket
                 <select formControlName="ticketRelacionadoId">
                   <option [ngValue]="0" disabled>

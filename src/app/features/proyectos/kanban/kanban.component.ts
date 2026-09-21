@@ -32,6 +32,7 @@ import {
   TicketEtiqueta,
   TicketHistorialEstado,
   TicketSeguidor,
+  TipoVinculoTicket,
   UsuarioOpcion,
 } from './ticket.model';
 import { colorAvatar, iniciales } from './avatar.util';
@@ -84,9 +85,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly etiquetasPorTicket = signal<Map<number, TicketEtiqueta[]>>(new Map());
   /** Igual que etiquetasPorTicket, pero para Asociados (TicketDependencia) — para
    *  poder mostrar un contador en la tarjeta del tablero sin tener que abrir el
-   *  detalle de cada ticket. Mismo criterio que la pestaña "Asociados": cuenta
-   *  las filas donde ESTE ticket es el que asoció a otro (ticketId), no al revés
-   *  (la relación no es bidireccional — ver agregarAsociado). */
+   *  detalle de cada ticket. Cuenta el vínculo del lado de AMBOS tickets
+   *  (ticketId y ticketRelacionadoId), igual que la pestaña "Asociados" ahora
+   *  muestra también los vínculos entrantes (ver vinculosDelTicket) — antes solo
+   *  contaba del lado que lo creó. */
   protected readonly dependenciasPorTicket = signal<Map<number, TicketDependencia[]>>(new Map());
   protected readonly cargando = signal(false);
   protected readonly ahora = signal(Date.now());
@@ -160,7 +162,35 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly etiquetas = signal<TicketEtiqueta[]>([]);
   protected readonly historial = signal<TicketHistorialEstado[]>([]);
   protected readonly dependencias = signal<TicketDependencia[]>([]);
+  /** Vínculos donde ESTE ticket es el relacionado (el otro ticket lo creó) — ver
+   *  vinculosDelTicket, que junta esto con `dependencias` para mostrar ambos
+   *  lados del vínculo con la etiqueta correcta según de qué lado se ve. */
+  protected readonly dependenciasEntrantes = signal<TicketDependencia[]>([]);
   protected readonly seguidores = signal<TicketSeguidor[]>([]);
+
+  /** Catálogo fijo de tipos de vínculo entre tickets (pestaña Asociados) — mismo
+   *  concepto que los "issue links" de Jira (bloquea/duplica/relacionado). */
+  protected static readonly TIPOS_VINCULO: { clave: TipoVinculoTicket; etiqueta: string }[] = [
+    { clave: 'relacionado', etiqueta: 'Relacionado con' },
+    { clave: 'bloquea', etiqueta: 'Bloquea a' },
+    { clave: 'bloqueado_por', etiqueta: 'Bloqueado por' },
+    { clave: 'duplica', etiqueta: 'Duplica a' },
+    { clave: 'duplicado_por', etiqueta: 'Duplicado por' },
+  ];
+  protected readonly tiposVinculo = KanbanComponent.TIPOS_VINCULO;
+  private static readonly ETIQUETA_VINCULO = new Map(
+    KanbanComponent.TIPOS_VINCULO.map((t) => [t.clave, t.etiqueta]),
+  );
+  /** El inverso de cada tipo, para mostrar la etiqueta correcta del lado del
+   *  ticket relacionado (ver dependenciasEntrantes/vinculosDelTicket). "relacionado"
+   *  es simétrico: su inverso es él mismo. */
+  private static readonly INVERSO_VINCULO: Record<TipoVinculoTicket, TipoVinculoTicket> = {
+    relacionado: 'relacionado',
+    bloquea: 'bloqueado_por',
+    bloqueado_por: 'bloquea',
+    duplica: 'duplicado_por',
+    duplicado_por: 'duplica',
+  };
 
   /** Pestañas cuya visibilidad depende de la columna actual del ticket (permiteActividades/permiteAnexos/permiteAsociados). */
   protected readonly tabsPermitidas = computed(() => {
@@ -188,8 +218,35 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly ticketsDisponiblesParaAsociar = computed(() => {
     const activo = this.ticketActivo();
     if (!activo) return [];
-    const yaAsociadosIds = new Set(this.dependencias().map((d) => Number(d.ticketRelacionadoId)));
-    return this.tickets().filter((t) => Number(t.id) !== Number(activo.id) && !yaAsociadosIds.has(Number(t.id)));
+    // Se excluyen los tickets ya vinculados en CUALQUIER dirección (este ticket
+    // los asoció, o al revés) para no ofrecer crear un vínculo duplicado.
+    const yaVinculadosIds = new Set([
+      ...this.dependencias().map((d) => Number(d.ticketRelacionadoId)),
+      ...this.dependenciasEntrantes().map((d) => Number(d.ticketId)),
+    ]);
+    return this.tickets().filter((t) => Number(t.id) !== Number(activo.id) && !yaVinculadosIds.has(Number(t.id)));
+  });
+
+  /** Une dependencias() (vínculos creados por este ticket) y dependenciasEntrantes()
+   *  (vínculos creados por el otro ticket, que apuntan a este) en una sola lista
+   *  para la pestaña Asociados — con la etiqueta ya orientada del lado correcto
+   *  (ver INVERSO_VINCULO) y el id del OTRO ticket a mostrar. eliminarAsociado()
+   *  funciona igual para ambos casos: solo necesita dependencia.id. */
+  protected readonly vinculosDelTicket = computed(() => {
+    const salientes = this.dependencias().map((d) => ({
+      dependencia: d,
+      otroTicketId: d.ticketRelacionadoId,
+      etiqueta: KanbanComponent.ETIQUETA_VINCULO.get(d.tipo ?? 'relacionado') ?? 'Relacionado con',
+    }));
+    const entrantes = this.dependenciasEntrantes().map((d) => {
+      const tipoInverso = KanbanComponent.INVERSO_VINCULO[d.tipo ?? 'relacionado'];
+      return {
+        dependencia: d,
+        otroTicketId: d.ticketId,
+        etiqueta: KanbanComponent.ETIQUETA_VINCULO.get(tipoInverso) ?? 'Relacionado con',
+      };
+    });
+    return [...salientes, ...entrantes];
   });
 
   /** Mismo criterio de búsqueda multi-término (coma) que ticketsFiltrados — folio,
@@ -375,7 +432,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
     tiempoHoras: [0.25, [Validators.required, Validators.min(0.01)]],
   });
   protected readonly formEtiqueta = this.fb.nonNullable.group({ texto: ['', Validators.required] });
-  protected readonly formAsociado = this.fb.nonNullable.group({ ticketRelacionadoId: [0] });
+  protected readonly formAsociado = this.fb.nonNullable.group({
+    ticketRelacionadoId: [0],
+    tipo: ['relacionado' as TipoVinculoTicket],
+  });
   /** Texto libre para acotar el combo "Asociar ticket" (pestaña Asociados) — un select nativo con cientos de tickets es imposible de recorrer a ojo, así que se filtra igual que el buscador del tablero: por folio, folio interno o título, admitiendo varios términos separados por coma. */
   protected readonly filtroAsociado = signal('');
 
@@ -592,6 +652,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
         for (const id of ticketIds) mapa.set(id, []);
         for (const dependencia of todas) {
           mapa.get(dependencia.ticketId)?.push(dependencia);
+          if (dependencia.ticketRelacionadoId !== dependencia.ticketId) {
+            mapa.get(dependencia.ticketRelacionadoId)?.push(dependencia);
+          }
         }
         this.dependenciasPorTicket.set(mapa);
       },
@@ -1029,6 +1092,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.data
       .list<TicketDependencia>('TicketDependencia', { ticketId })
       .subscribe((dependencias) => this.dependencias.set(dependencias));
+    this.data
+      .list<TicketDependencia>('TicketDependencia', { ticketRelacionadoId: ticketId })
+      .subscribe((entrantes) => this.dependenciasEntrantes.set(entrantes));
     this.data.list<TicketSeguidor>('TicketSeguidor', { ticketId }).subscribe((seguidores) => this.seguidores.set(seguidores));
   }
 
@@ -1041,13 +1107,14 @@ export class KanbanComponent implements OnInit, OnDestroy {
   agregarAsociado(): void {
     const activo = this.ticketActivo();
     const ticketRelacionadoId = Number(this.formAsociado.controls.ticketRelacionadoId.value);
+    const tipo = this.formAsociado.controls.tipo.value;
     if (!activo || !ticketRelacionadoId) return;
 
     this.data
-      .alta<TicketDependencia>('TicketDependencia', { ticketId: activo.id, ticketRelacionadoId })
+      .alta<TicketDependencia>('TicketDependencia', { ticketId: activo.id, ticketRelacionadoId, tipo })
       .subscribe({
         next: () => {
-          this.formAsociado.reset({ ticketRelacionadoId: 0 });
+          this.formAsociado.reset({ ticketRelacionadoId: 0, tipo: 'relacionado' });
         this.filtroAsociado.set('');
           this.cargarDetalle(activo.id);
           this.cargarDependenciasDeTablero(this.tickets().map((t) => t.id));
