@@ -829,12 +829,12 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
 .quick-login-btn { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 5px 12px; font-size: 12px; font-family: 'JetBrains Mono', monospace; cursor: pointer; }
 .quick-login-btn:hover { background: var(--ink); color: #fff; border-color: var(--ink); }
 
-/* Tarjetas de notificación (mensajes de éxito/error/info) — fijas abajo al
-   centro (fáciles de ver pase lo que pase arriba, incluso con un modal
-   abierto), apiladas, y cada una se retira sola (ver ToastService, 6s). */
-.toast-contenedor { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 400; display: flex; flex-direction: column; gap: 10px; align-items: center; width: max-content; max-width: calc(100vw - 32px); }
-.toast { display: flex; align-items: center; gap: 12px; width: max-content; max-width: min(480px, calc(100vw - 32px)); padding: 14px 20px; border-radius: 999px; font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; font-weight: 600; color: #fff; box-shadow: 0 12px 28px -10px rgba(0, 0, 0, .45); animation: toast-entrada .2s ease; }
-@keyframes toast-entrada { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+/* Tarjetas de notificación (mensajes de éxito/error/info) — fijas arriba a
+   la derecha, justo debajo de la barra superior (búsqueda/notificaciones/Salir),
+   apiladas, y cada una se retira sola (ver ToastService, 5s). */
+.toast-contenedor { position: fixed; top: 76px; right: 24px; z-index: 500; display: flex; flex-direction: column; gap: 10px; align-items: flex-end; width: max-content; max-width: min(420px, calc(100vw - 32px)); }
+.toast { display: flex; align-items: center; gap: 12px; width: max-content; max-width: 100%; padding: 14px 20px; border-radius: 999px; font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; font-weight: 600; color: #fff; box-shadow: 0 12px 28px -10px rgba(0, 0, 0, .45); animation: toast-entrada .2s ease; }
+@keyframes toast-entrada { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 .toast--exito, .toast.success { background: #256b3f; }
 .toast--error, .toast.error { background: var(--danger); }
 .toast--info { background: var(--indigo); }

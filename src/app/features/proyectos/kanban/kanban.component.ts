@@ -2,7 +2,7 @@ import { DatePipe } from '@angular/common';
 import { forkJoin, of, switchMap } from 'rxjs';
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
 import { DataClientService } from '../../../core/services/data-client.service';
@@ -57,7 +57,7 @@ type ClaseSla = 'sla-ok' | 'sla-warning' | 'sla-expired';
 @Component({
   selector: 'app-kanban',
   standalone: true,
-  imports: [ReactiveFormsModule, ConfirmDialogComponent, AdjuntosPanelComponent, DataTableComponent],
+  imports: [ReactiveFormsModule, ConfirmDialogComponent, AdjuntosPanelComponent, DataTableComponent, RouterLink],
   templateUrl: './kanban.component.html',
   styleUrl: './kanban.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

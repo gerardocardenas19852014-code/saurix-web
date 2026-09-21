@@ -92,8 +92,16 @@
   <p class="hint">Cargando tablero…</p>
 } @else if (!columnasTablero().length) {
   <div class="empty-state-block">
-    <p>Este proyecto todavía no tiene columnas configuradas.</p>
-    <p>Créalas en Panel de Control → Gestión de Proyectos → Gestor de Estados.</p>
+    <p>Este proyecto todavía no tiene columnas configuradas — hace falta al menos una para poder dar de alta tickets (cada ticket necesita un estado inicial).</p>
+    <p>
+      <a
+        class="btn-primary small"
+        [routerLink]="['/panel-control/gestion-proyectos/gestor-estados']"
+        [queryParams]="{ proyecto: proyectoSeleccionadoId() }"
+      >
+        Crear columnas para este proyecto →
+      </a>
+    </p>
   </div>
 } @else if (modoVista() === 'lista') {
   <app-data-table

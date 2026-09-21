@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../../shared/services/toast.service';
@@ -40,6 +41,7 @@ export class TablerosComponent implements OnInit {
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
+  private readonly route = inject(ActivatedRoute);
 
   protected readonly proyectos = signal<ProyectoOpcion[]>([]);
   protected readonly proyectoSeleccionadoId = signal<number>(0);
@@ -75,11 +77,16 @@ export class TablerosComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    // Deep link desde "Ticket" (aviso de "este proyecto no tiene columnas"):
+    // ?proyecto=123 selecciona directo ese proyecto en vez del primero de la lista.
+    const proyectoIdParam = Number(this.route.snapshot.queryParamMap.get('proyecto')) || 0;
+
     this.data.list<ProyectoOpcion>('Proyecto').subscribe({
       next: (proyectos) => {
         this.proyectos.set(proyectos);
         if (proyectos.length) {
-          this.proyectoSeleccionadoId.set(proyectos[0].id);
+          const existe = proyectoIdParam && proyectos.some((p) => Number(p.id) === proyectoIdParam);
+          this.proyectoSeleccionadoId.set(existe ? proyectoIdParam : proyectos[0].id);
           this.cargar();
         }
       },

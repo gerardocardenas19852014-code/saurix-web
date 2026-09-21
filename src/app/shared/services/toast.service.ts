@@ -37,6 +37,6 @@ export class ToastService {
   private mostrar(mensaje: string, tipo: ToastTipo): void {
     const id = this.siguienteId++;
     this._toasts.update((lista) => [...lista, { id, mensaje, tipo }]);
-    setTimeout(() => this.cerrar(id), 6000);
+    setTimeout(() => this.cerrar(id), 5000);
   }
 }
