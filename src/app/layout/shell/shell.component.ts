@@ -55,11 +55,20 @@ export class ShellComponent {
     { initialValue: this.router.url },
   );
 
-  /** El Tablero Kanban (y su vista Lista) se ahoga en el ancho de lectura de
-   *  980px que usan el resto de pantallas — con varias columnas o una tabla
-   *  ancha, ese límite obliga a hacer scroll horizontal sin necesidad, así
-   *  que ahí se le da todo el ancho disponible (ver .content-wide). */
-  protected readonly contenidoAncho = computed(() => this.urlActual().startsWith('/proyectos/tablero'));
+  /** El Tablero Kanban (y su vista Lista), Mi Dashboard, Proyectos y Reportes
+   *  de horas se ahogan en el ancho de lectura de 980px que usan el resto de
+   *  pantallas — con varias columnas o tablas anchas, ese límite obliga a
+   *  hacer scroll horizontal sin necesidad, así que a las cuatro se les da
+   *  todo el ancho disponible, igual que a Ticket (ver .content-wide). */
+  private static readonly RUTAS_ANCHO_COMPLETO = [
+    '/proyectos/tablero',
+    '/proyectos/dashboard',
+    '/proyectos/proyectos',
+    '/proyectos/reportes-horas',
+  ];
+  protected readonly contenidoAncho = computed(() =>
+    ShellComponent.RUTAS_ANCHO_COMPLETO.some((ruta) => this.urlActual().startsWith(ruta)),
+  );
 
   protected readonly moduloActivo = computed<
     'seguridad' | 'catalogos' | 'wikidocs' | 'presupuesto' | 'proyectos' | 'panel-control' | null
