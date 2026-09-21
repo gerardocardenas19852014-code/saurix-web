@@ -74,7 +74,7 @@
 
   <h2 class="settings-card-title" style="margin:0 0 12px;">Horas por usuario</h2>
   @if (horasPorUsuario().length === 0) {
-    <p class="empty" style="margin-bottom:28px;">Sin actividades registradas en este periodo.</p>
+    <div class="empty-state-block"><p>Sin actividades registradas en este periodo.</p></div>
   } @else {
     <div style="margin-bottom:28px;">
       @for (fila of horasPorUsuario(); track fila.id) {
@@ -91,7 +91,7 @@
 
   <h2 class="settings-card-title" style="margin:0 0 12px;">Horas por proyecto</h2>
   @if (horasPorProyecto().length === 0) {
-    <p class="empty" style="margin-bottom:28px;">Sin actividades registradas en este periodo.</p>
+    <div class="empty-state-block"><p>Sin actividades registradas en este periodo.</p></div>
   } @else {
     <div style="margin-bottom:28px;">
       @for (fila of horasPorProyecto(); track fila.id) {
@@ -108,7 +108,7 @@
 
   <h2 class="settings-card-title" style="margin:0 0 12px;">Top 10 tickets con más horas</h2>
   @if (horasPorTicket().length === 0) {
-    <p class="empty">Sin actividades registradas en este periodo.</p>
+    <div class="empty-state-block"><p>Sin actividades registradas en este periodo.</p></div>
   } @else {
     <div>
       @for (fila of horasPorTicket(); track fila.id) {

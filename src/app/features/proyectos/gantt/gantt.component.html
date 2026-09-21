@@ -32,7 +32,7 @@
 @if (cargando()) {
   <p class="hint">Cargando…</p>
 } @else if (!proyectos().length) {
-  <p class="hint">Todavía no hay proyectos registrados.</p>
+  <div class="empty-state-block"><p>Todavía no hay proyectos registrados.</p></div>
 } @else if (!ticketsConFecha().length) {
   @if (hayRangoManual()) {
     <p class="hint">Ningún ticket cae dentro del rango de fechas elegido.</p>
