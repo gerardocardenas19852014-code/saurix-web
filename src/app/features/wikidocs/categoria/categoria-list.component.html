@@ -59,7 +59,7 @@
 }
 
 @if (modalAbierto()) {
-  <div class="modal-overlay modal show d-block" (click)="modalAbierto.set(false)">
+  <div class="modal-overlay modal show d-block" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
     <form class="modal-box modal-dialog modal-content" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
       <h3 class="modal-title mb-3">{{ registroEnEdicion() ? 'Editar categoría' : 'Nueva categoría' }}</h3>
 

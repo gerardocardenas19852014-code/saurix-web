@@ -14,7 +14,7 @@
 />
 
 @if (modalAbierto()) {
-  <div class="modal-overlay show" (click)="modalAbierto.set(false)">
+  <div class="modal-overlay show" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
     <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
       <h3>{{ conexionEnEdicion() ? 'Editar conexión' : 'Nueva conexión' }}</h3>
 
