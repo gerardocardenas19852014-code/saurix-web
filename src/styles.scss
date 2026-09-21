@@ -904,6 +904,30 @@ button { font-family: inherit; }
    un choque de especificidad puntual con .modal-overlay.
    ==================================================================== */
 
+/* Bootstrap 5.3 está armado alrededor de sus propias variables --bs-* (todo
+   selector interno de .table/.alert/etc. las consume), así que sobreescribir
+   solo "color"/"background" en .table, .alert-light, etc. no alcanza: en
+   cuanto Bootstrap tiene un selector interno igual o más específico
+   (p.ej. ".table>:not(caption)>*>*"), ese selector vuelve a leer sus propias
+   variables (--bs-emphasis-color, --bs-body-bg...) que nunca se tocaron y
+   siguen en sus valores de fábrica para tema claro (negro sobre blanco) —
+   esto es justo lo que hacía que la Bitácora se viera lavada/ilegible en
+   cualquier tema que no fuera el claro original. La forma correcta de
+   Bootstrap 5.3 es remapear las variables mismas a nuestros tokens de tema
+   (--paper/--text-strong/...), UNA sola vez aquí: como esos tokens ya
+   cambian por tema (ver los bloques html[data-theme='...'] arriba), esto
+   se resuelve solo en cualquier tema sin repetir nada por tema. */
+:root {
+  --bs-body-bg: var(--paper-raised);
+  --bs-body-color: var(--text-strong);
+  --bs-emphasis-color: var(--text-strong);
+  --bs-secondary-color: var(--ink-soft);
+  --bs-tertiary-color: var(--ink-soft);
+  --bs-tertiary-bg: var(--paper);
+  --bs-border-color: var(--line);
+  --bs-border-color-translucent: var(--line);
+}
+
 /* Bootstrap trae ".modal.show { display: block }" (2 clases, más específico
    que nuestro ".modal-overlay { display: flex }" de una sola clase), así que
    sin esto el centrado del modal se rompería en cualquier elemento que
