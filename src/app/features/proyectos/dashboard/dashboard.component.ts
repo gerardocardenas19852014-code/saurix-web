@@ -37,6 +37,9 @@ interface TicketResumen {
   asignadoNombre: string;
   clase: ClaseSla | null;
   texto: string;
+  /** true si la Prioridad de este ticket está marcada como "crítica" en su catálogo
+   *  (p.ej. "DETIENE OPERACION") — se resalta en Mi Dashboard sin importar su SLA. */
+  critica: boolean;
 }
 
 /**
@@ -252,6 +255,7 @@ export class ProyectosDashboardComponent implements OnInit {
       asignadoNombre: this.nombreUsuario(Number(ticket.asignadoUsuarioId)),
       clase: sla.clase,
       texto: sla.texto,
+      critica: prioridad?.critica === true,
     };
   }
 
@@ -271,6 +275,11 @@ export class ProyectosDashboardComponent implements OnInit {
   protected readonly resueltos = computed(() => this.ticketsDeUsuarioViendo().filter((r) => this.estaResuelto(r.ticket)));
   protected readonly porVencer = computed(() => this.ticketsDeUsuarioViendo().filter((r) => r.clase === 'sla-warning'));
   protected readonly vencidos = computed(() => this.ticketsDeUsuarioViendo().filter((r) => r.clase === 'sla-expired'));
+  /** Tickets con Prioridad crítica (p.ej. "DETIENE OPERACION") que aún no están resueltos —
+   *  igual que "Vencidos"/"Por vencer", es un subconjunto de ticketsDeUsuarioViendo(). */
+  protected readonly criticos = computed(() =>
+    this.ticketsDeUsuarioViendo().filter((r) => r.critica && !this.estaResuelto(r.ticket)),
+  );
 
   private readonly pesoSla: Record<'sla-expired' | 'sla-warning' | 'sla-ok' | 'sin-sla', number> = {
     'sla-expired': 0,

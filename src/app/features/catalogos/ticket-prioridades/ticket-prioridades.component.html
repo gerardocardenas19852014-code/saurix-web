@@ -24,6 +24,7 @@
         <th>SLA (hrs)</th>
         <th>Aviso (hrs antes)</th>
         <th>Activa</th>
+        <th>Crítica</th>
         <th class="grid-actions-col">Acciones</th>
       </tr>
     </thead>
@@ -40,6 +41,13 @@
               {{ prioridad.activo !== false ? 'Sí' : 'No' }}
             </span>
           </td>
+          <td data-label="Crítica">
+            @if (prioridad.critica) {
+              <span class="grid-badge grid-badge-danger">🚨 Sí</span>
+            } @else {
+              <span class="grid-badge grid-badge-muted">No</span>
+            }
+          </td>
           <td class="grid-actions-col" data-label="Acciones">
             <button type="button" class="btn-secondary small" (click)="editar(prioridad)">Editar</button>
             <button type="button" class="btn-danger small" (click)="pedirEliminar(prioridad)">Eliminar</button>
@@ -47,7 +55,7 @@
         </tr>
       } @empty {
         <tr>
-          <td colspan="7">
+          <td colspan="8">
             <div class="empty-state-block">
               <p>Sin registros para mostrar.</p>
             </div>
@@ -100,6 +108,10 @@
         <label class="checkbox-inline">
           <input type="checkbox" formControlName="activo" />
           Activa
+        </label>
+        <label class="checkbox-inline">
+          <input type="checkbox" formControlName="critica" />
+          🚨 Crítica (se resalta en Mi Dashboard, p.ej. "Detiene operación")
         </label>
       </div>
 

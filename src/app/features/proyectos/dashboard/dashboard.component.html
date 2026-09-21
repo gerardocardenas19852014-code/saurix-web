@@ -82,6 +82,12 @@
   <p class="empty">Cargando…</p>
 } @else {
   <div class="dashboard-stats">
+    @if (criticos().length > 0) {
+      <div class="dashboard-stat-card dashboard-stat-critica">
+        <div class="num">{{ criticos().length }}</div>
+        <div class="label">🚨 Críticos</div>
+      </div>
+    }
     <div class="dashboard-stat-card">
       <div class="num">{{ ticketsDeUsuarioViendo().length }}</div>
       <div class="label">Asignados</div>
@@ -134,7 +140,7 @@
         </thead>
         <tbody>
           @for (r of pendientesOrdenados(); track r.ticket.id) {
-            <tr>
+            <tr [class.grid-row-critica]="r.critica">
               <td data-label="Folio">#{{ r.ticket.numeroTicket }}</td>
               <td data-label="Folio interno">{{ r.ticket.folioInterno || '—' }}</td>
               <td data-label="Título">{{ r.ticket.titulo }}</td>
@@ -197,7 +203,7 @@
         </thead>
         <tbody>
           @for (r of resueltosMostrados(); track r.ticket.id) {
-            <tr>
+            <tr [class.grid-row-critica]="r.critica">
               <td data-label="Folio">#{{ r.ticket.numeroTicket }}</td>
               <td data-label="Folio interno">{{ r.ticket.folioInterno || '—' }}</td>
               <td data-label="Título">{{ r.ticket.titulo }}</td>

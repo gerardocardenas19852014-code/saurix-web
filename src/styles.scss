@@ -278,6 +278,10 @@ html[data-wide='grid'] .content { max-width: 1600px; }
 }
 .bulk-action-bar select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; font-family: inherit; font-size: 13px; }
 .grid-table tr.is-selected { background: var(--accent-soft); }
+/* Fila de ticket con Prioridad crítica (p.ej. "DETIENE OPERACION") en Mi Dashboard —
+ * se mantiene visible incluso en hover, a diferencia de .is-selected. */
+.grid-table tr.grid-row-critica td { background-color: var(--danger-soft); }
+.grid-table tbody tr.grid-row-critica:hover td { background-color: var(--danger-soft); }
 .board-view-toggle button { padding: 8px 14px; border: none; background: var(--paper-raised); color: var(--ink-soft); font-family: inherit; font-size: 13px; cursor: pointer; }
 .board-view-toggle button.is-active { background: var(--accent); color: #fff; }
 .board-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; margin: 4px 0 18px; }
@@ -352,6 +356,12 @@ html[data-wide='grid'] .content { max-width: 1600px; }
 .dashboard-stat-warning .num { color: var(--amber); }
 .dashboard-stat-danger { border-color: var(--danger); }
 .dashboard-stat-danger .num { color: var(--danger); }
+/* Tarjeta "🚨 Críticos": fondo sólido (no solo borde) para que resalte más que
+ * "Vencidos" a simple vista — son tickets con Prioridad marcada como crítica
+ * (p.ej. "DETIENE OPERACION"), sin importar su estado de SLA. */
+.dashboard-stat-critica { background: var(--danger); border-color: var(--danger); }
+.dashboard-stat-critica .num { color: #fff; }
+.dashboard-stat-critica .label { color: rgba(255, 255, 255, .85); }
 .dashboard-row { cursor: pointer; transition: background-color .12s ease; }
 .dashboard-row:hover { background-color: var(--accent-soft); }
 .dashboard-user-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

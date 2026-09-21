@@ -52,6 +52,7 @@ export class TicketPrioridadesComponent implements OnInit {
     vigenciaHoras: [24, [Validators.required, Validators.min(1)]],
     avisoHoras: [4, [Validators.required, Validators.min(1)]],
     activo: [true],
+    critica: [false],
   });
 
   /** Texto de ayuda "≈ X d Y h" bajo cada campo de horas — 504/250 horas es
@@ -108,6 +109,7 @@ export class TicketPrioridadesComponent implements OnInit {
       vigenciaHoras: 24,
       avisoHoras: 4,
       activo: true,
+      critica: false,
     });
     this.notificacionesOriginales = [];
     this.usuarioIdsNotificar.set([]);
@@ -124,6 +126,7 @@ export class TicketPrioridadesComponent implements OnInit {
       vigenciaHoras: prioridad.vigenciaHoras,
       avisoHoras: prioridad.avisoHoras,
       activo: prioridad.activo !== false,
+      critica: prioridad.critica === true,
     });
     this.notificacionesOriginales = [];
     this.usuarioIdsNotificar.set([]);
