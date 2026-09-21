@@ -1,0 +1,183 @@
+<div class="page-header">
+  <h1>Backlog</h1>
+  <div class="page-actions">
+    <button type="button" class="toolbar-btn" (click)="toggleFormSprint()">
+      {{ mostrarFormSprint() ? 'Cancelar' : '+ Nuevo sprint' }}
+    </button>
+  </div>
+</div>
+
+<div class="board-filters">
+  <label class="board-filter-field">
+    Proyecto
+    <select [value]="proyectoSeleccionadoId()" (change)="cambiarProyecto($any($event.target).value)">
+      @for (proyecto of proyectos(); track proyecto.id) {
+        <option [value]="proyecto.id">{{ proyecto.clave }} — {{ proyecto.nombre }}</option>
+      }
+    </select>
+  </label>
+</div>
+
+@if (mostrarFormSprint()) {
+  <div class="panel" style="margin-top: 16px;">
+    <div class="panel-head">
+      <h2>Nuevo sprint</h2>
+    </div>
+    <form [formGroup]="formSprint" (ngSubmit)="crearSprint()">
+      <div class="edit-form form-grid-2col">
+        <label class="full-span">
+          Nombre <b>*</b>
+          <input type="text" class="form-control" formControlName="nombre" placeholder="Ej. Sprint 1" />
+        </label>
+        <label class="full-span">
+          Objetivo (opcional)
+          <input type="text" class="form-control" formControlName="objetivo" placeholder="¿Qué se busca lograr en este sprint?" />
+        </label>
+        <label>
+          Fecha inicio
+          <input type="date" class="form-control" formControlName="fechaInicio" />
+        </label>
+        <label>
+          Fecha fin
+          <input type="date" class="form-control" formControlName="fechaFin" />
+        </label>
+        <div class="form-actions">
+          <button type="submit" class="btn-secondary">Crear sprint</button>
+        </div>
+      </div>
+    </form>
+  </div>
+}
+
+@if (cargando()) {
+  <p class="hint" style="margin-top:16px;">Cargando…</p>
+} @else {
+  @for (sprint of sprintsAbiertos(); track sprint.id) {
+    <div class="panel" style="margin-top: 16px;">
+      <div class="panel-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div>
+          <h2 style="margin-bottom: 4px;">
+            {{ sprint.nombre }}
+            <span class="grid-badge" [class.grid-badge-success]="sprint.estado === 'activo'" [class.grid-badge-neutral]="sprint.estado === 'planeado'">
+              {{ sprint.estado === 'activo' ? 'Activo' : 'Planeado' }}
+            </span>
+          </h2>
+          @if (sprint.objetivo) {
+            <p class="hint" style="margin: 0 0 4px;">🎯 {{ sprint.objetivo }}</p>
+          }
+          @if (sprint.fechaInicio || sprint.fechaFin) {
+            <p class="hint" style="margin: 0;">{{ sprint.fechaInicio || '—' }} → {{ sprint.fechaFin || '—' }}</p>
+          }
+        </div>
+        <div class="page-actions">
+          @if (sprint.estado === 'planeado') {
+            <button type="button" class="btn-secondary small" (click)="iniciarSprint(sprint)">▶ Iniciar sprint</button>
+            <button type="button" class="btn-danger small" (click)="eliminarSprint(sprint)">Eliminar</button>
+          } @else {
+            <button type="button" class="btn-secondary small" (click)="completarSprint(sprint)">✓ Completar sprint</button>
+          }
+        </div>
+      </div>
+
+      @if (ticketsDeSprint(sprint.id).length === 0) {
+        <p class="empty">Todavía no hay tickets en este sprint — muévelos desde el Backlog, más abajo.</p>
+      } @else {
+        <ul class="actividades-list">
+          @for (ticket of ticketsDeSprint(sprint.id); track ticket.id) {
+            <li class="actividad-item">
+              <div class="actividad-item-head" style="align-items:center; gap:10px; flex-wrap:wrap;">
+                <a
+                  [routerLink]="['/proyectos/tablero']"
+                  [queryParams]="{ ticket: ticket.id }"
+                  class="actividad-item-texto"
+                  style="text-decoration:none;"
+                >
+                  #{{ ticket.numeroTicket }} — {{ ticket.titulo }}
+                </a>
+                <span
+                  class="kanban-tag"
+                  [style.color]="colorPrioridad(ticket.ticketPrioridadId)"
+                  [title]="'Prioridad: ' + nombrePrioridad(ticket.ticketPrioridadId)"
+                >
+                  {{ nombrePrioridad(ticket.ticketPrioridadId) }}
+                </span>
+                <span class="hint" style="margin:0;">{{ nombreUsuarioAsignado(ticket.asignadoUsuarioId) }}</span>
+                <select [value]="ticket.sprintId ?? 0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
+                  <option [value]="0">Backlog</option>
+                  @for (s of sprintsDestino(); track s.id) {
+                    <option [value]="s.id">{{ s.nombre }}</option>
+                  }
+                </select>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  }
+
+  <div class="panel" style="margin-top: 16px;">
+    <div class="panel-head">
+      <h2>Backlog ({{ ticketsBacklog().length }})</h2>
+      <p class="hint" style="margin: 4px 0 0;">Tickets sin sprint asignado. Usa "Mover a" para meterlos a un sprint.</p>
+    </div>
+
+    @if (ticketsBacklog().length === 0) {
+      <p class="empty">No hay tickets en el Backlog.</p>
+    } @else {
+      <ul class="actividades-list">
+        @for (ticket of ticketsBacklog(); track ticket.id) {
+          <li class="actividad-item">
+            <div class="actividad-item-head" style="align-items:center; gap:10px; flex-wrap:wrap;">
+              <a
+                [routerLink]="['/proyectos/tablero']"
+                [queryParams]="{ ticket: ticket.id }"
+                class="actividad-item-texto"
+                style="text-decoration:none;"
+              >
+                #{{ ticket.numeroTicket }} — {{ ticket.titulo }}
+              </a>
+              <span
+                class="kanban-tag"
+                [style.color]="colorPrioridad(ticket.ticketPrioridadId)"
+                [title]="'Prioridad: ' + nombrePrioridad(ticket.ticketPrioridadId)"
+              >
+                {{ nombrePrioridad(ticket.ticketPrioridadId) }}
+              </span>
+              <span class="hint" style="margin:0;">{{ nombreUsuarioAsignado(ticket.asignadoUsuarioId) }}</span>
+              @if (sprintsDestino().length > 0) {
+                <select [value]="0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
+                  <option [value]="0" disabled>Mover a…</option>
+                  @for (s of sprintsDestino(); track s.id) {
+                    <option [value]="s.id">{{ s.nombre }}</option>
+                  }
+                </select>
+              }
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+
+  @if (sprintsCerrados().length > 0) {
+    <div class="panel" style="margin-top: 16px;">
+      <div class="panel-head">
+        <h2>Sprints completados</h2>
+      </div>
+      <ul class="actividades-list">
+        @for (sprint of sprintsCerrados(); track sprint.id) {
+          <li class="actividad-item">
+            <div class="actividad-item-head">
+              <span class="actividad-item-texto">
+                {{ sprint.nombre }}
+                <span class="grid-badge grid-badge-muted">Cerrado</span>
+                — {{ ticketsDeSprint(sprint.id).length }} ticket(s)
+              </span>
+            </div>
+          </li>
+        }
+      </ul>
+    </div>
+  }
+}

@@ -10,6 +10,10 @@ export const PROYECTOS_ROUTES: Routes = [
     loadComponent: () => import('./kanban/kanban.component').then((m) => m.KanbanComponent),
   },
   {
+    path: 'backlog',
+    loadComponent: () => import('./backlog/backlog.component').then((m) => m.BacklogComponent),
+  },
+  {
     path: 'proyectos',
     loadComponent: () =>
       import('./proyectos-lista/proyectos-lista.component').then((m) => m.ProyectosListaComponent),

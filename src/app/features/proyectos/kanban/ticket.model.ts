@@ -40,6 +40,9 @@ export interface Ticket {
    *  Jira, no se permiten subtareas de subtareas: un ticket que ya tiene
    *  ticketPadreId no puede a su vez ser padre de otras (ver puedeTenerSubtareas). */
   ticketPadreId?: number | null;
+  /** Sprint al que pertenece — null/ausente significa "está en el Backlog" (ver
+   *  Sprint en sprints/sprint.model.ts y backlog.component.ts). */
+  sprintId?: number | null;
 }
 
 export interface UsuarioOpcion {
