@@ -490,6 +490,17 @@ html[data-wide='grid'] .content { max-width: 1600px; }
 }
 .tab-more-item:hover { background: var(--accent-soft); color: var(--text-strong); }
 .tab-more-item.is-active { color: var(--accent); }
+
+/* Barra de progreso genérica (estimado vs. real de un ticket; progreso de
+ * subtareas de un ticket padre) — un solo par de clases reutilizado en
+ * ambos lugares para que se vean/comporten igual. */
+.progreso-barra {
+  height: 8px; border-radius: 999px; background: var(--line); overflow: hidden;
+}
+.progreso-relleno {
+  height: 100%; border-radius: inherit; background: var(--accent); transition: width .2s ease;
+}
+.progreso-relleno-exceso { background: var(--danger); }
 .tab-panel { gap: 16px 24px; }
 .edit-form label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-family: 'JetBrains Mono', monospace; color: var(--ink-soft); min-width: 0; }
 .edit-form label.checkbox-inline { flex-direction: row; align-items: center; }

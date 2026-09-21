@@ -1188,6 +1188,19 @@ export class KanbanComponent implements OnInit, OnDestroy {
     return this.actividades().reduce((acc, a) => acc + a.tiempoMin, 0);
   }
 
+  /** Comparación estimado vs. registrado del ticket abierto (pestaña Actividades) —
+   *  mismo criterio que "Horas est./Horas reales" de Resumen ejecutivo, pero a
+   *  nivel de un solo ticket (ahí ya se comparaba por proyecto; aquí faltaba verlo
+   *  en el propio ticket, como la barra de "time tracking" de Jira). null cuando
+   *  el ticket no tiene nada estimado (no hay contra qué comparar). */
+  protected readonly progresoTiempoActividad = computed(() => {
+    const estimadoMin = this.ticketActivo()?.tiempoEstimadoMin ?? null;
+    if (!estimadoMin || estimadoMin <= 0) return null;
+    const realMin = this.actividades().reduce((acc, a) => acc + a.tiempoMin, 0);
+    const pct = Math.round((realMin / estimadoMin) * 100);
+    return { estimadoMin, realMin, pct, sobrepasado: realMin > estimadoMin };
+  });
+
   /** Formatea minutos como horas para la UI (el dato real sigue en minutos — ver
    *  formActividad — para no romper las sumas de Reportes de horas/Dashboard, que
    *  asumen TicketActividad.tiempoMin en minutos). */

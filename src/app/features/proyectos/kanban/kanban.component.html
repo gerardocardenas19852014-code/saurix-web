@@ -581,6 +581,21 @@
             </p>
           }
           <p class="hint" style="margin: 0 0 12px;">Tiempo total registrado: {{ formatearHoras(totalMinutosActividad()) }} h.</p>
+          @if (progresoTiempoActividad(); as progreso) {
+            <div style="margin: 0 0 14px;">
+              <p class="hint" style="margin: 0 0 4px;">
+                Estimado: {{ formatearHoras(progreso.estimadoMin) }} h. — {{ progreso.pct }}%
+                {{ progreso.sobrepasado ? 'sobrepasado' : 'usado' }}
+              </p>
+              <div class="progreso-barra">
+                <div
+                  class="progreso-relleno"
+                  [class.progreso-relleno-exceso]="progreso.sobrepasado"
+                  [style.width.%]="progreso.pct > 100 ? 100 : progreso.pct"
+                ></div>
+              </div>
+            </div>
+          }
           <form [formGroup]="formActividad" (ngSubmit)="agregarActividad()">
             <div class="edit-form form-grid-2col">
               <label class="full-span">
