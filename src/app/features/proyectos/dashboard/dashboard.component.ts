@@ -59,6 +59,45 @@ export class ProyectosDashboardComponent implements OnInit {
   /** A quién se le está viendo el dashboard — por defecto, quien tiene la sesión iniciada. */
   protected readonly usuarioViendoId = signal<number>(this.auth.usuarioActual()?.id ?? 0);
 
+  // Filtros adicionales — mismo criterio que en Kanban/Lista de tickets (proyecto,
+  // prioridad y texto libre), para poder acotar el dashboard cuando "Todos" o un
+  // usuario con muchos tickets asignados hacen la lista larga de revisar.
+  protected readonly filtroProyectoId = signal<number>(0);
+  protected readonly filtroPrioridadId = signal<number>(0);
+  protected readonly filtroTexto = signal('');
+  protected readonly hayFiltros = computed(
+    () => !!(this.filtroProyectoId() || this.filtroPrioridadId() || this.filtroTexto().trim()),
+  );
+
+  limpiarFiltros(): void {
+    this.filtroProyectoId.set(0);
+    this.filtroPrioridadId.set(0);
+    this.filtroTexto.set('');
+  }
+
+  /** Admite varios términos separados por coma (folio, folio interno o título),
+   *  igual que el buscador de Kanban/Lista de tickets. */
+  private coincideFiltros(ticket: Ticket): boolean {
+    const proyectoId = this.filtroProyectoId();
+    const prioridadId = this.filtroPrioridadId();
+    const terminos = this.filtroTexto()
+      .toLowerCase()
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+    return (
+      (!proyectoId || Number(ticket.proyectoId) === proyectoId) &&
+      (!prioridadId || Number(ticket.ticketPrioridadId) === prioridadId) &&
+      (!terminos.length ||
+        terminos.some(
+          (termino) =>
+            ticket.numeroTicket.toLowerCase().includes(termino) ||
+            (ticket.folioInterno ?? '').toLowerCase().includes(termino) ||
+            ticket.titulo.toLowerCase().includes(termino),
+        ))
+    );
+  }
+
   private get usuarioActualId(): number {
     return this.auth.usuarioActual()?.id ?? 0;
   }
@@ -191,7 +230,11 @@ export class ProyectosDashboardComponent implements OnInit {
    *  o de TODOS los usuarios si se eligió "Todos" en el selector. */
   protected readonly ticketsDeUsuarioViendo = computed(() =>
     this.tickets()
-      .filter((t) => this.usuarioViendoId() === this.ID_TODOS || Number(t.asignadoUsuarioId) === this.usuarioViendoId())
+      .filter(
+        (t) =>
+          (this.usuarioViendoId() === this.ID_TODOS || Number(t.asignadoUsuarioId) === this.usuarioViendoId()) &&
+          this.coincideFiltros(t),
+      )
       .map((t) => this.aResumen(t)),
   );
 
@@ -249,7 +292,7 @@ export class ProyectosDashboardComponent implements OnInit {
   protected readonly ticketsQueSigo = computed(() => {
     const idsSeguidos = new Set(this.seguidos().map((s) => Number(s.ticketId)));
     return this.tickets()
-      .filter((t) => idsSeguidos.has(Number(t.id)))
+      .filter((t) => idsSeguidos.has(Number(t.id)) && this.coincideFiltros(t))
       .map((t) => this.aResumen(t));
   });
 }

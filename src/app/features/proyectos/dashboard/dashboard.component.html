@@ -19,6 +19,44 @@
   </label>
 </div>
 
+<div class="board-filters">
+  <label class="board-filter-field">
+    Proyecto
+    <select [value]="filtroProyectoId()" (change)="filtroProyectoId.set(+$any($event.target).value)">
+      <option [value]="0">Todos</option>
+      @for (proyecto of proyectos(); track proyecto.id) {
+        <option [value]="proyecto.id">{{ proyecto.clave }} — {{ proyecto.nombre }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="board-filter-field">
+    Prioridad
+    <select [value]="filtroPrioridadId()" (change)="filtroPrioridadId.set(+$any($event.target).value)">
+      <option [value]="0">Todas</option>
+      @for (prioridad of prioridades(); track prioridad.id) {
+        <option [value]="prioridad.id">{{ prioridad.nombre }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="board-filter-field">
+    Buscar
+    <input
+      type="search"
+      placeholder="Folio, folio interno o título… (varios con coma)"
+      [value]="filtroTexto()"
+      (input)="filtroTexto.set($any($event.target).value)"
+    />
+  </label>
+
+  @if (hayFiltros()) {
+    <button type="button" class="btn-secondary small" style="align-self:flex-end;" (click)="limpiarFiltros()">
+      ✕ Limpiar filtros
+    </button>
+  }
+</div>
+
 <p class="hint" style="margin:14px 0 24px;">
   @if (usuarioViendoId() === ID_TODOS) {
     Resumen de los tickets de <strong>todos</strong>, en todos los proyectos.
