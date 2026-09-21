@@ -561,6 +561,27 @@ export class KanbanComponent implements OnInit, OnDestroy {
     return `${proyecto?.clave ?? 'TCK'}-${String(siguiente).padStart(4, '0')}`;
   }
 
+  /** Config editable/obligatorio (Gestor de Estados → "⚙ Campos") de los 4 campos
+   *  de "Fechas" para la columna del ticket en edición, o la columna de alta si se
+   *  está creando uno nuevo — se usa en el modal "Nuevo ticket" para NO mostrar un
+   *  campo que la columna inicial tiene deshabilitado: vacío y sin poder tocarlo, no
+   *  aporta nada al dar de alta (se captura después, ya con el ticket creado, desde
+   *  la pestaña "Fechas"). Si la columna SÍ lo tiene habilitado (o es obligatorio),
+   *  se sigue mostrando aquí mismo — igual que antes — para no repetir el bug de un
+   *  campo obligatorio oculto que impedía guardar sin ninguna pista. */
+  protected readonly configCamposFecha = computed(() => {
+    const enEdicion = this.ticketEnEdicion();
+    const columnaId = enEdicion ? Number(enEdicion.tableroColumnaId) : this.columnaCreacionId();
+    const columna = this.columnasTablero().find((c) => Number(c.id) === Number(columnaId));
+    const config = parsearConfiguracionCampos(columna?.configuracionCamposJson);
+    return {
+      fechaFinAnalisis: reglaCampo(config, 'fechaFinAnalisis'),
+      fechaFinDesarrollo: reglaCampo(config, 'fechaFinDesarrollo'),
+      fechaFinCliente: reglaCampo(config, 'fechaFinCliente'),
+      tiempoEstimadoDias: reglaCampo(config, 'tiempoEstimadoDias'),
+    };
+  });
+
   /** Aplica, sobre `this.form`, las reglas editable/obligatorio configuradas para
    *  la columna actual (Panel de Control → Gestión de Proyectos → Gestor de Estados → "⚙ Campos").
    *  Se llama cada vez que se abre/actualiza el formulario (alta, detalle, tras
