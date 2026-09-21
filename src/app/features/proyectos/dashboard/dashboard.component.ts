@@ -4,7 +4,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { exportarCsv } from '../../../shared/utils/csv.util';
-import { Ticket, TicketSeguidor, UsuarioOpcion } from '../kanban/ticket.model';
+import { Ticket, TicketEtiqueta, TicketSeguidor, UsuarioOpcion } from '../kanban/ticket.model';
 import { TicketPrioridad } from '../ticket-prioridades/ticket-prioridad.model';
 import { TicketModulo } from '../ticket-modulos/ticket-modulo.model';
 import { ProyectoOpcion, TableroColumna } from '../tableros/tablero-columna.model';
@@ -74,9 +74,22 @@ export class ProyectosDashboardComponent implements OnInit {
   protected readonly usuarios = signal<UsuarioOpcion[]>([]);
   protected readonly modulos = signal<TicketModulo[]>([]);
   protected readonly seguidos = signal<TicketSeguidor[]>([]);
+  /** Todas las etiquetas de todos los tickets (no solo las de "Todos" filtrado) —
+   *  para poder buscar por etiqueta, igual que en Kanban/Lista de tickets. */
+  protected readonly etiquetasPorTicket = signal<Map<number, TicketEtiqueta[]>>(new Map());
 
   /** A quién se le está viendo el dashboard — por defecto, quien tiene la sesión iniciada. */
   protected readonly usuarioViendoId = signal<number>(this.auth.usuarioActual()?.id ?? 0);
+
+  /** 'asignado' (por defecto): tickets ASIGNADOS a la persona seleccionada — igual
+   *  que siempre. 'reportado': tickets que esa persona DIO DE ALTA (Ticket.reportadoPorUsuarioId),
+   *  sin importar a quién se le asignaron — para poder darle seguimiento a lo que uno
+   *  reportó para otra persona, sin depender de seguirlo manualmente (TicketSeguidor). */
+  protected readonly modoAsignacion = signal<'asignado' | 'reportado'>('asignado');
+
+  cambiarModoAsignacion(modo: 'asignado' | 'reportado'): void {
+    this.modoAsignacion.set(modo);
+  }
 
   // Filtros adicionales — mismo criterio que en Kanban/Lista de tickets (proyecto,
   // prioridad y texto libre), para poder acotar el dashboard cuando "Todos" o un
@@ -119,7 +132,8 @@ export class ProyectosDashboardComponent implements OnInit {
           (termino) =>
             ticket.numeroTicket.toLowerCase().includes(termino) ||
             (ticket.folioInterno ?? '').toLowerCase().includes(termino) ||
-            ticket.titulo.toLowerCase().includes(termino),
+            ticket.titulo.toLowerCase().includes(termino) ||
+            this.etiquetasDe(ticket.id).some((e) => e.texto.toLowerCase().includes(termino)),
         ))
     );
   }
@@ -149,6 +163,19 @@ export class ProyectosDashboardComponent implements OnInit {
     this.data
       .list<TicketSeguidor>('TicketSeguidor', { usuarioId: this.usuarioActualId })
       .subscribe((seguidos) => this.seguidos.set(seguidos));
+    this.data.list<TicketEtiqueta>('TicketEtiqueta').subscribe((etiquetas) => {
+      const mapa = new Map<number, TicketEtiqueta[]>();
+      for (const e of etiquetas) {
+        const arr = mapa.get(e.ticketId) ?? [];
+        arr.push(e);
+        mapa.set(e.ticketId, arr);
+      }
+      this.etiquetasPorTicket.set(mapa);
+    });
+  }
+
+  private etiquetasDe(ticketId: number): TicketEtiqueta[] {
+    return this.etiquetasPorTicket().get(ticketId) ?? [];
   }
 
   cambiarUsuarioViendo(id: string | number): void {
@@ -259,17 +286,17 @@ export class ProyectosDashboardComponent implements OnInit {
     };
   }
 
-  /** Todos los tickets asignados a la persona que se está viendo (resueltos y pendientes),
-   *  o de TODOS los usuarios si se eligió "Todos" en el selector. */
-  protected readonly ticketsDeUsuarioViendo = computed(() =>
-    this.tickets()
-      .filter(
-        (t) =>
-          (this.usuarioViendoId() === this.ID_TODOS || Number(t.asignadoUsuarioId) === this.usuarioViendoId()) &&
-          this.coincideFiltros(t),
-      )
-      .map((t) => this.aResumen(t)),
-  );
+  /** Todos los tickets asignados a (o, en modo "reportado", dados de alta por) la
+   *  persona que se está viendo (resueltos y pendientes), o de TODOS los usuarios
+   *  si se eligió "Todos" en el selector. */
+  protected readonly ticketsDeUsuarioViendo = computed(() => {
+    const id = this.usuarioViendoId();
+    const campo: keyof Pick<Ticket, 'asignadoUsuarioId' | 'reportadoPorUsuarioId'> =
+      this.modoAsignacion() === 'reportado' ? 'reportadoPorUsuarioId' : 'asignadoUsuarioId';
+    return this.tickets()
+      .filter((t) => (id === this.ID_TODOS || Number(t[campo]) === id) && this.coincideFiltros(t))
+      .map((t) => this.aResumen(t));
+  });
 
   protected readonly pendientes = computed(() => this.ticketsDeUsuarioViendo().filter((r) => !this.estaResuelto(r.ticket)));
   protected readonly resueltos = computed(() => this.ticketsDeUsuarioViendo().filter((r) => this.estaResuelto(r.ticket)));

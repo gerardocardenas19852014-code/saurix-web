@@ -38,7 +38,7 @@
     Buscar
     <input
       type="search"
-      placeholder="Folio, folio interno o título… (varios con coma)"
+      placeholder="Folio, folio interno, título o etiqueta… (varios con coma)"
       [value]="filtroTexto()"
       (input)="filtroTexto.set($any($event.target).value)"
     />
@@ -92,6 +92,15 @@
       @for (usuario of usuarios(); track usuario.id) {
         <option [value]="usuario.id">{{ usuario.nombreCompleto }}</option>
       }
+    </select>
+  </label>
+
+  <label class="board-filter-field">
+    Planeado
+    <select [value]="filtroPlaneado()" (change)="filtroPlaneado.set(+$any($event.target).value)">
+      <option [value]="0">Todos</option>
+      <option [value]="1">Planeados</option>
+      <option [value]="2">No planeados</option>
     </select>
   </label>
 
@@ -173,6 +182,9 @@
                   <span class="kanban-tag" [title]="'Módulo: ' + nombreModulo(ticket.ticketModuloId)">
                     {{ iconoModulo(ticket.ticketModuloId) }} {{ nombreModulo(ticket.ticketModuloId) }}
                   </span>
+                }
+                @if (ticket.planeado === false) {
+                  <span class="kanban-tag" title="Este ticket no está planeado">📌 No planeado</span>
                 }
                 @for (etiqueta of etiquetasDe(ticket.id); track etiqueta.id) {
                   <span class="kanban-tag">{{ etiqueta.texto }}</span>

@@ -98,6 +98,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly filtroPrioridadId = signal<number>(0);
   protected readonly filtroEstadoId = signal<number>(0);
   protected readonly filtroAsignadoId = signal<number>(0);
+  /** 0 = Todos (sin filtro), 1 = solo planeados, 2 = solo no planeados — mismo
+   *  patrón de centinelas por número que el resto de los filtros de esta pantalla. */
+  protected readonly filtroPlaneado = signal<number>(0);
   protected readonly filtroTexto = signal('');
   /** false por defecto: los tickets archivados (activo === false) se ocultan del
    *  tablero/lista salvo que se marque esta casilla — alternativa al borrado duro. */
@@ -110,6 +113,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
         this.filtroPrioridadId() ||
         this.filtroEstadoId() ||
         this.filtroAsignadoId() ||
+        this.filtroPlaneado() ||
         this.filtroTexto().trim()
       ),
   );
@@ -183,6 +187,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     const prioridadId = this.filtroPrioridadId();
     const estadoId = this.filtroEstadoId();
     const asignadoId = this.filtroAsignadoId();
+    const planeadoFiltro = this.filtroPlaneado();
     // Admite varios folios separados por coma (p.ej. "55350,55182"): cada término
     // se busca por separado (OR entre términos, igual que antes OR entre campos).
     const terminos = this.filtroTexto()
@@ -201,12 +206,17 @@ export class KanbanComponent implements OnInit, OnDestroy {
         (!prioridadId || Number(t.ticketPrioridadId) === prioridadId) &&
         (!estadoId || Number(t.tableroColumnaId) === estadoId) &&
         (!asignadoId || Number(t.asignadoUsuarioId) === asignadoId) &&
+        // planeadoFiltro === 1 es "solo planeados" (planeado !== false); === 2 es "solo no planeados".
+        (!planeadoFiltro || (planeadoFiltro === 1 ? t.planeado !== false : t.planeado === false)) &&
         (!terminos.length ||
           terminos.some(
             (termino) =>
               t.numeroTicket.toLowerCase().includes(termino) ||
               (t.folioInterno ?? '').toLowerCase().includes(termino) ||
-              t.titulo.toLowerCase().includes(termino),
+              t.titulo.toLowerCase().includes(termino) ||
+              // También busca por etiqueta (p.ej. "urgente-cliente") — mismo mapa
+              // etiquetasPorTicket que ya se usa para pintar los tags en la tarjeta.
+              this.etiquetasDe(t.id).some((e) => e.texto.toLowerCase().includes(termino)),
           )),
     );
   });
@@ -245,6 +255,12 @@ export class KanbanComponent implements OnInit, OnDestroy {
       claseValor: () => 'grid-badge-neutral',
     },
     { campo: 'asignadoUsuarioId', etiqueta: 'Asignado a', formatear: (fila) => this.nombreUsuario(fila.asignadoUsuarioId) },
+    {
+      campo: 'planeado',
+      etiqueta: 'Planeado',
+      formatear: (fila) => (fila.planeado !== false ? 'Sí' : 'No'),
+      claseValor: (fila) => (fila.planeado !== false ? 'grid-badge-success' : 'grid-badge-muted'),
+    },
     {
       campo: 'fechaCreacion',
       etiqueta: 'Vigencia',
@@ -456,6 +472,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.filtroModuloId.set(0);
     this.filtroPrioridadId.set(0);
     this.filtroEstadoId.set(0);
+    this.filtroPlaneado.set(0);
     this.filtroAsignadoId.set(0);
     this.filtroTexto.set('');
   }

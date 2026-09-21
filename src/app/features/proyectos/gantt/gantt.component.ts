@@ -19,6 +19,10 @@ interface TicketConBarra {
   leftPx: number;
   widthPx: number;
   sinEstimacion: boolean;
+  /** Ticket.planeado === false — se resalta con un patrón de rayas en la barra
+   *  (independiente de sinEstimacion: un ticket puede no estar planeado y aun así
+   *  tener estimación, o viceversa). */
+  noPlaneado: boolean;
   color: string;
   colorTexto: '#fff' | '#1a1a1a';
   asignadoNombre: string;
@@ -257,6 +261,7 @@ export class GanttComponent implements OnInit {
       leftPx,
       widthPx: Math.max(widthPx, 14),
       sinEstimacion: !ticket.fechaFin && !ticket.tiempoEstimadoMin,
+      noPlaneado: ticket.planeado === false,
       color,
       colorTexto: this.colorLegiblePara(color),
       asignadoNombre: this.nombreUsuario(ticket.asignadoUsuarioId),

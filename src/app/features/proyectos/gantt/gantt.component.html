@@ -111,6 +111,7 @@
               <div
                 class="gantt-bar"
                 [class.sin-estimacion]="item.sinEstimacion"
+                [class.no-planeado]="item.noPlaneado"
                 [style.left.px]="item.leftPx"
                 [style.width.px]="item.widthPx"
                 [style.background]="item.color"
@@ -119,7 +120,8 @@
                   ' · ' +
                   nombrePrioridad(item.ticket.ticketPrioridadId) +
                   ' · Asignado a: ' + item.asignadoNombre +
-                  (item.sinEstimacion ? ' · sin estimación (barra mínima)' : '')
+                  (item.sinEstimacion ? ' · sin estimación (barra mínima)' : '') +
+                  (item.noPlaneado ? ' · no planeado' : '')
                 "
               >
                 <span class="gantt-bar-texto" [style.color]="item.colorTexto">
@@ -135,6 +137,7 @@
 
   <p class="hint gantt-leyenda">
     El color de cada barra corresponde a la prioridad del ticket; el ancho es el tiempo estimado (con un
-    mínimo visual de medio día para tickets sin estimación). La línea roja marca el día de hoy.
+    mínimo visual de medio día para tickets sin estimación). Las rayas diagonales marcan un ticket no
+    planeado. La línea roja marca el día de hoy.
   </p>
 }
