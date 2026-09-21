@@ -219,7 +219,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   private readonly datePipe = new DatePipe('es-MX');
 
-  private formatearFecha(fecha?: string | null): string {
+  protected formatearFecha(fecha?: string | null): string {
     if (!fecha) return '—';
     return this.datePipe.transform(fecha, 'short') ?? '—';
   }
