@@ -66,11 +66,46 @@ export class GanttComponent implements OnInit {
   protected readonly usuarios = signal<UsuarioOpcion[]>([]);
   protected readonly cargando = signal(false);
 
-  protected readonly ticketsConFecha = computed(() =>
+  /** Rango de fechas manual — igual que en Reportes de horas: siempre visible,
+   *  formato yyyy-mm-dd (input type=date). Filtra el diagrama a los tickets cuya
+   *  barra (inicio→fin) se cruza con el rango elegido; no toca el cálculo de la
+   *  barra en sí, solo qué tickets se muestran. */
+  protected readonly rangoDesde = signal<string>('');
+  protected readonly rangoHasta = signal<string>('');
+  protected readonly hayRangoManual = computed(() => !!(this.rangoDesde() || this.rangoHasta()));
+
+  limpiarRangoManual(): void {
+    this.rangoDesde.set('');
+    this.rangoHasta.set('');
+  }
+
+  private readonly ticketsConFechaSinRango = computed(() =>
     this.tickets().filter((t) => t.activo !== false && !!(t.fechaInicio || t.fechaCreacion)),
   );
   protected readonly cantidadSinFecha = computed(
     () => this.tickets().filter((t) => t.activo !== false && !t.fechaInicio && !t.fechaCreacion).length,
+  );
+
+  protected readonly ticketsConFecha = computed(() => {
+    const desde = this.rangoDesde();
+    const hasta = this.rangoHasta();
+    const base = this.ticketsConFechaSinRango();
+    if (!desde && !hasta) return base;
+
+    const desdeMs = desde ? new Date(`${desde}T00:00:00`).getTime() : -Infinity;
+    const hastaMs = hasta ? new Date(`${hasta}T23:59:59`).getTime() : Infinity;
+    return base.filter((t) => {
+      const inicioMs = this.inicioDeTicket(t);
+      const finMs = inicioMs + this.duracionDiasDe(t) * this.MS_POR_DIA;
+      // Se cruza con el rango elegido (no hace falta que quede totalmente adentro).
+      return inicioMs <= hastaMs && finMs >= desdeMs;
+    });
+  });
+
+  /** De los tickets con fecha, cuántos quedaron fuera solo por el rango manual
+   *  (para poder avisar sin confundirlo con "sin fecha de creación"). */
+  protected readonly cantidadFueraDeRango = computed(
+    () => this.ticketsConFechaSinRango().length - this.ticketsConFecha().length,
   );
 
   protected readonly rango = computed(() => {

@@ -11,6 +11,22 @@
       }
     </select>
   </label>
+
+  <!-- Rango de fechas siempre visible (mismo patrón que Reportes de horas): filtra
+       a los tickets cuya barra se cruza con el rango, sin tocar cómo se calcula. -->
+  <label class="board-filter-field">
+    Desde
+    <input type="date" [value]="rangoDesde()" (change)="rangoDesde.set($any($event.target).value)" />
+  </label>
+  <label class="board-filter-field">
+    Hasta
+    <input type="date" [value]="rangoHasta()" (change)="rangoHasta.set($any($event.target).value)" />
+  </label>
+  @if (hayRangoManual()) {
+    <button type="button" class="btn-secondary small" style="align-self:flex-end;" (click)="limpiarRangoManual()">
+      ✕ Quitar rango
+    </button>
+  }
 </div>
 
 @if (cargando()) {
@@ -18,11 +34,20 @@
 } @else if (!proyectos().length) {
   <p class="hint">Todavía no hay proyectos registrados.</p>
 } @else if (!ticketsConFecha().length) {
-  <p class="hint">Este proyecto no tiene tickets con fecha de creación para mostrar en el diagrama.</p>
+  @if (hayRangoManual()) {
+    <p class="hint">Ningún ticket cae dentro del rango de fechas elegido.</p>
+  } @else {
+    <p class="hint">Este proyecto no tiene tickets con fecha de creación para mostrar en el diagrama.</p>
+  }
 } @else {
   @if (cantidadSinFecha() > 0) {
     <p class="hint">
       {{ cantidadSinFecha() }} ticket(s) sin fecha de creación no se muestran en el diagrama.
+    </p>
+  }
+  @if (hayRangoManual() && cantidadFueraDeRango() > 0) {
+    <p class="hint">
+      {{ cantidadFueraDeRango() }} ticket(s) fuera del rango de fechas elegido no se muestran.
     </p>
   }
 
