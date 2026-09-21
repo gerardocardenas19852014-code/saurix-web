@@ -169,10 +169,6 @@ h1, h2 { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(
 .brand-mark { color: var(--technical); font-size: 20px; }
 .brand-name em { font-style: normal; color: var(--client); }
 .role-tag { font-size: 10px; background: var(--accent-soft); color: var(--accent); padding: 2px 7px; border-radius: 10px; text-transform: uppercase; }
-
-.search-form { flex: 1; max-width: 360px; }
-.search-form input { width: 100%; padding: 8px 14px; border-radius: 20px; border: 1px solid var(--line); background: var(--paper); font-family: inherit; font-size: 14px; }
-.search-form input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .topbar-user { display: flex; align-items: center; gap: 8px; margin-right: 4px; }
 .topbar-user-icon { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: var(--accent-soft); font-size: 16px; }
@@ -925,7 +921,6 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   .hero h1 { font-size: 26px; }
   .section-header h1 { font-size: 24px; }
   .page-header h1 { font-size: 24px; }
-  .search-form { flex-basis: 100%; max-width: none; order: 10; }
   .grid-toolbar { padding: 10px 12px; }
   .settings-card { padding: 18px 16px; }
 }
