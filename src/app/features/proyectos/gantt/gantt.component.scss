@@ -1,0 +1,151 @@
+.gantt-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper-raised);
+}
+
+.gantt-table {
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  min-width: 100%;
+}
+
+.gantt-row {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.gantt-row-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--paper-raised);
+  font-weight: 600;
+  border-bottom: 2px solid var(--line);
+}
+
+.gantt-row-grupo {
+  background: var(--paper);
+}
+
+.gantt-row-label {
+  flex: 0 0 260px;
+  max-width: 260px;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--paper-raised);
+  padding: 8px 12px;
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.gantt-row-grupo .gantt-row-label {
+  background: var(--paper);
+}
+
+.gantt-grupo-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  letter-spacing: 0.03em;
+}
+
+.gantt-folio {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.gantt-titulo {
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gantt-row-timeline {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 40px;
+}
+
+.gantt-row-header .gantt-grid-days {
+  display: flex;
+  height: 100%;
+}
+
+.gantt-day {
+  flex: 0 0 auto;
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+  padding: 6px 0;
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+
+  small {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  &.es-fin-semana {
+    background: var(--paper);
+  }
+
+  &.es-hoy {
+    color: var(--danger, #c0392b);
+    font-weight: 700;
+  }
+}
+
+.gantt-linea-hoy {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--danger, #c0392b);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.gantt-bar {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+
+  &.sin-estimacion {
+    border: 1px dashed rgba(255, 255, 255, 0.6);
+  }
+}
+
+.gantt-bar-texto {
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+}
+
+.gantt-leyenda {
+  margin-top: 10px;
+}

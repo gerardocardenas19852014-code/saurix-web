@@ -1,0 +1,228 @@
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { DataClientService } from '../../../core/services/data-client.service';
+import { ProyectoOpcion, TableroColumna } from '../tableros/tablero-columna.model';
+import { Ticket } from '../kanban/ticket.model';
+import { TicketTipo } from '../ticket-tipos/ticket-tipo.model';
+import { TicketPrioridad } from '../ticket-prioridades/ticket-prioridad.model';
+
+interface DiaEncabezado {
+  numero: number;
+  mesCorto: string;
+  primerDiaDelMes: boolean;
+  finDeSemana: boolean;
+  esHoy: boolean;
+}
+
+interface TicketConBarra {
+  ticket: Ticket;
+  leftPx: number;
+  widthPx: number;
+  sinEstimacion: boolean;
+  color: string;
+}
+
+interface GrupoEstado {
+  columna: TableroColumna | null;
+  tickets: TicketConBarra[];
+}
+
+/**
+ * Diagrama de Gantt de un proyecto a la vez. La línea de tiempo de cada
+ * ticket se calcula así (decisión confirmada con el usuario):
+ *  - Inicio de la barra = Ticket.fechaCreacion.
+ *  - Duración de la barra = Ticket.tiempoEstimadoMin / 1440 (días) — el campo
+ *    real sigue en MINUTOS (igual que en Kanban/Reportes de horas), aquí solo
+ *    se convierte para dibujar; nunca se lee como si ya fueran días.
+ * Los tickets sin fecha de creación no tienen dónde ubicarse en la línea de
+ * tiempo y se excluyen del diagrama (se informa cuántos quedaron fuera).
+ */
+@Component({
+  selector: 'app-gantt',
+  standalone: true,
+  imports: [],
+  templateUrl: './gantt.component.html',
+  styleUrl: './gantt.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class GanttComponent implements OnInit {
+  private readonly data = inject(DataClientService);
+
+  /** Ancho, en píxeles, de un día en la línea de tiempo. */
+  protected readonly ANCHO_DIA = 36;
+  private readonly MS_POR_DIA = 86400000;
+
+  protected readonly proyectos = signal<ProyectoOpcion[]>([]);
+  protected readonly proyectoSeleccionadoId = signal<number>(0);
+  protected readonly columnasTablero = signal<TableroColumna[]>([]);
+  protected readonly tickets = signal<Ticket[]>([]);
+  protected readonly tipos = signal<TicketTipo[]>([]);
+  protected readonly prioridades = signal<TicketPrioridad[]>([]);
+  protected readonly cargando = signal(false);
+
+  protected readonly ticketsConFecha = computed(() =>
+    this.tickets().filter((t) => t.activo !== false && !!t.fechaCreacion),
+  );
+  protected readonly cantidadSinFecha = computed(
+    () => this.tickets().filter((t) => t.activo !== false && !t.fechaCreacion).length,
+  );
+
+  protected readonly rango = computed(() => {
+    const ticks = this.ticketsConFecha();
+    if (!ticks.length) return null;
+
+    let minMs = Infinity;
+    let maxMs = -Infinity;
+    for (const t of ticks) {
+      const inicioMs = this.inicioDeTicket(t);
+      const finMs = inicioMs + this.duracionDiasDe(t) * this.MS_POR_DIA;
+      if (inicioMs < minMs) minMs = inicioMs;
+      if (finMs > maxMs) maxMs = finMs;
+    }
+    // Un día de aire a cada lado para que las barras de los extremos no queden pegadas al borde.
+    minMs -= this.MS_POR_DIA;
+    maxMs += this.MS_POR_DIA;
+    const totalDias = Math.max(1, Math.ceil((maxMs - minMs) / this.MS_POR_DIA));
+    return { minMs, maxMs, totalDias };
+  });
+
+  protected readonly anchoTimelinePx = computed(() => (this.rango()?.totalDias ?? 0) * this.ANCHO_DIA);
+
+  /** Gridlines verticales (una por día) dibujadas como fondo, en vez de repetir
+   *  un div por día en cada fila de ticket — mismo resultado visual, mucho más barato. */
+  protected readonly fondoDias = computed(
+    () => `repeating-linear-gradient(90deg, var(--line) 0, var(--line) 1px, transparent 1px, transparent ${this.ANCHO_DIA}px)`,
+  );
+
+  protected readonly diasEncabezado = computed<DiaEncabezado[]>(() => {
+    const rango = this.rango();
+    if (!rango) return [];
+    const hoyInicio = this.inicioDelDia(Date.now());
+    const dias: DiaEncabezado[] = [];
+    for (let ms = rango.minMs; ms < rango.maxMs; ms += this.MS_POR_DIA) {
+      const fecha = new Date(ms);
+      dias.push({
+        numero: fecha.getDate(),
+        mesCorto: fecha.toLocaleDateString('es-MX', { month: 'short' }),
+        primerDiaDelMes: fecha.getDate() === 1,
+        finDeSemana: fecha.getDay() === 0 || fecha.getDay() === 6,
+        esHoy: ms === hoyInicio,
+      });
+    }
+    return dias;
+  });
+
+  protected readonly offsetHoyPx = computed(() => {
+    const rango = this.rango();
+    if (!rango) return null;
+    const hoy = this.inicioDelDia(Date.now());
+    if (hoy < rango.minMs || hoy > rango.maxMs) return null;
+    return Math.round(((hoy - rango.minMs) / this.MS_POR_DIA) * this.ANCHO_DIA);
+  });
+
+  /** Tickets agrupados por columna del tablero (estado), en el mismo orden que
+   *  el Kanban, y dentro de cada grupo ordenados por fecha de creación. */
+  protected readonly gruposPorEstado = computed<GrupoEstado[]>(() => {
+    const columnas = this.columnasTablero();
+    const ticks = this.ticketsConFecha();
+    const grupos: GrupoEstado[] = [];
+
+    for (const columna of columnas) {
+      const deEstaColumna = ticks
+        .filter((t) => Number(t.tableroColumnaId) === Number(columna.id))
+        .sort((a, b) => (a.fechaCreacion ?? '').localeCompare(b.fechaCreacion ?? ''))
+        .map((t) => this.aTicketConBarra(t));
+      if (deEstaColumna.length) grupos.push({ columna, tickets: deEstaColumna });
+    }
+
+    const idsConocidos = new Set(columnas.map((c) => Number(c.id)));
+    const huerfanos = ticks
+      .filter((t) => !idsConocidos.has(Number(t.tableroColumnaId)))
+      .sort((a, b) => (a.fechaCreacion ?? '').localeCompare(b.fechaCreacion ?? ''))
+      .map((t) => this.aTicketConBarra(t));
+    if (huerfanos.length) grupos.push({ columna: null, tickets: huerfanos });
+
+    return grupos;
+  });
+
+  ngOnInit(): void {
+    this.data.list<ProyectoOpcion>('Proyecto').subscribe({
+      next: (proyectos) => {
+        this.proyectos.set(proyectos);
+        if (!proyectos.length) return;
+        this.proyectoSeleccionadoId.set(proyectos[0].id);
+        this.cargarTablero();
+      },
+    });
+    this.data.list<TicketTipo>('TicketTipo').subscribe((tipos) => this.tipos.set(tipos));
+    this.data.list<TicketPrioridad>('TicketPrioridad').subscribe((prioridades) => this.prioridades.set(prioridades));
+  }
+
+  cambiarProyecto(id: number): void {
+    this.proyectoSeleccionadoId.set(Number(id));
+    this.cargarTablero();
+  }
+
+  nombreTipo(id: number): string {
+    return this.tipos().find((t) => Number(t.id) === Number(id))?.nombre ?? '—';
+  }
+
+  nombrePrioridad(id: number): string {
+    return this.prioridades().find((p) => Number(p.id) === Number(id))?.nombre ?? '—';
+  }
+
+  colorPrioridad(id: number): string {
+    return this.prioridades().find((p) => Number(p.id) === Number(id))?.codigoHex ?? '#999';
+  }
+
+  private cargarTablero(): void {
+    const proyectoId = this.proyectoSeleccionadoId();
+    if (!proyectoId) return;
+
+    this.cargando.set(true);
+    this.data.list<TableroColumna>('TableroColumna', { proyectoId }).subscribe({
+      next: (columnas) => {
+        this.columnasTablero.set(columnas.sort((a, b) => a.orden - b.orden));
+        this.data.list<Ticket>('Ticket', { proyectoId }).subscribe({
+          next: (tickets) => {
+            this.tickets.set(tickets);
+            this.cargando.set(false);
+          },
+          error: () => this.cargando.set(false),
+        });
+      },
+      error: () => this.cargando.set(false),
+    });
+  }
+
+  private aTicketConBarra(ticket: Ticket): TicketConBarra {
+    const rango = this.rango();
+    const inicioMs = this.inicioDeTicket(ticket);
+    const leftPx = rango ? Math.round(((inicioMs - rango.minMs) / this.MS_POR_DIA) * this.ANCHO_DIA) : 0;
+    const widthPx = Math.round(this.duracionDiasDe(ticket) * this.ANCHO_DIA);
+    return {
+      ticket,
+      leftPx,
+      widthPx: Math.max(widthPx, 14),
+      sinEstimacion: !ticket.tiempoEstimadoMin,
+      color: this.colorPrioridad(ticket.ticketPrioridadId),
+    };
+  }
+
+  private inicioDeTicket(ticket: Ticket): number {
+    return this.inicioDelDia(ticket.fechaCreacion ? new Date(ticket.fechaCreacion).getTime() : Date.now());
+  }
+
+  private inicioDelDia(ms: number): number {
+    const fecha = new Date(ms);
+    fecha.setHours(0, 0, 0, 0);
+    return fecha.getTime();
+  }
+
+  /** tiempoEstimadoMin está en MINUTOS (ver esquema-tablas-saurix.md) — se divide
+   *  entre 1440 solo para dibujar la barra; nunca se guarda ni se lee como días. */
+  private duracionDiasDe(ticket: Ticket): number {
+    const minutos = ticket.tiempoEstimadoMin;
+    if (!minutos || minutos <= 0) return 0.5; // sin estimación: barra mínima visible
+    return Math.max(minutos / 1440, 0.5);
+  }
+}

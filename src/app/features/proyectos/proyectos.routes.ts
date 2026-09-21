@@ -22,4 +22,8 @@ export const PROYECTOS_ROUTES: Routes = [
     path: 'reportes-horas',
     loadComponent: () => import('./reportes-horas/reportes-horas.component').then((m) => m.ReportesHorasComponent),
   },
+  {
+    path: 'gantt',
+    loadComponent: () => import('./gantt/gantt.component').then((m) => m.GanttComponent),
+  },
 ];

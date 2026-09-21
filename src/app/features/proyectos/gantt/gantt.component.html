@@ -1,0 +1,104 @@
+<div class="page-header">
+  <h1>Diagrama de Gantt</h1>
+</div>
+
+<div class="board-filters">
+  <label class="board-filter-field">
+    Proyecto
+    <select [value]="proyectoSeleccionadoId()" (change)="cambiarProyecto($any($event.target).value)">
+      @for (proyecto of proyectos(); track proyecto.id) {
+        <option [value]="proyecto.id">{{ proyecto.clave }} — {{ proyecto.nombre }}</option>
+      }
+    </select>
+  </label>
+</div>
+
+@if (cargando()) {
+  <p class="hint">Cargando…</p>
+} @else if (!proyectos().length) {
+  <p class="hint">Todavía no hay proyectos registrados.</p>
+} @else if (!ticketsConFecha().length) {
+  <p class="hint">Este proyecto no tiene tickets con fecha de creación para mostrar en el diagrama.</p>
+} @else {
+  @if (cantidadSinFecha() > 0) {
+    <p class="hint">
+      {{ cantidadSinFecha() }} ticket(s) sin fecha de creación no se muestran en el diagrama.
+    </p>
+  }
+
+  <div class="gantt-scroll">
+    <div class="gantt-table">
+      <div class="gantt-row gantt-row-header">
+        <div class="gantt-row-label">Ticket</div>
+        <div class="gantt-row-timeline" [style.width.px]="anchoTimelinePx()">
+          <div class="gantt-grid-days">
+            @for (dia of diasEncabezado(); track $index) {
+              <div
+                class="gantt-day"
+                [class.es-fin-semana]="dia.finDeSemana"
+                [class.es-hoy]="dia.esHoy"
+                [style.width.px]="ANCHO_DIA"
+              >
+                <small>{{ dia.primerDiaDelMes ? dia.mesCorto : '' }}</small>
+                {{ dia.numero }}
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      @for (grupo of gruposPorEstado(); track grupo.columna?.id ?? 'sin-estado') {
+        <div class="gantt-row gantt-row-grupo">
+          <div class="gantt-row-label gantt-grupo-label">{{ grupo.columna?.nombre ?? 'Sin estado' }}</div>
+          <div
+            class="gantt-row-timeline"
+            [style.width.px]="anchoTimelinePx()"
+            [style.backgroundImage]="fondoDias()"
+          >
+            @if (offsetHoyPx() !== null) {
+              <div class="gantt-linea-hoy" [style.left.px]="offsetHoyPx()"></div>
+            }
+          </div>
+        </div>
+
+        @for (item of grupo.tickets; track item.ticket.id) {
+          <div class="gantt-row">
+            <div class="gantt-row-label">
+              <span class="gantt-folio">{{ item.ticket.numeroTicket }}</span>
+              <span class="gantt-titulo" [title]="item.ticket.titulo">{{ item.ticket.titulo }}</span>
+            </div>
+            <div
+              class="gantt-row-timeline"
+              [style.width.px]="anchoTimelinePx()"
+              [style.backgroundImage]="fondoDias()"
+            >
+              @if (offsetHoyPx() !== null) {
+                <div class="gantt-linea-hoy" [style.left.px]="offsetHoyPx()"></div>
+              }
+              <div
+                class="gantt-bar"
+                [class.sin-estimacion]="item.sinEstimacion"
+                [style.left.px]="item.leftPx"
+                [style.width.px]="item.widthPx"
+                [style.background]="item.color"
+                [title]="
+                  nombreTipo(item.ticket.ticketTipoId) +
+                  ' · ' +
+                  nombrePrioridad(item.ticket.ticketPrioridadId) +
+                  (item.sinEstimacion ? ' · sin estimación (barra mínima)' : '')
+                "
+              >
+                <span class="gantt-bar-texto">{{ item.ticket.folioInterno || item.ticket.numeroTicket }}</span>
+              </div>
+            </div>
+          </div>
+        }
+      }
+    </div>
+  </div>
+
+  <p class="hint gantt-leyenda">
+    El color de cada barra corresponde a la prioridad del ticket; el ancho es el tiempo estimado (con un
+    mínimo visual de medio día para tickets sin estimación). La línea roja marca el día de hoy.
+  </p>
+}
