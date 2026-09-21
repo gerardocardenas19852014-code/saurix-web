@@ -45,7 +45,7 @@
   </div>
 
   @if (gastoPorCategoria().length === 0) {
-    <p class="empty" style="margin-bottom:28px;">Sin gastos registrados en este periodo.</p>
+    <div class="empty-state-block"><p>Sin gastos registrados en este periodo.</p></div>
   } @else if (vistaCategoria() === 'dona') {
     <div class="wallet-donut-wrap" style="margin-bottom:28px;">
       <div class="wallet-donut" [style.background]="gradienteDona()"></div>
