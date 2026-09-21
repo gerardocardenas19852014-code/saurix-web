@@ -16,6 +16,11 @@ interface ResumenProyecto {
   resueltos: number;
   vencidos: number;
   porVencer: number;
+  /** Pendientes cuya Prioridad está marcada como "crítica" (p.ej. "DETIENE
+   *  OPERACION") — igual criterio que la tarjeta "🚨 Críticos" de Mi Dashboard.
+   *  Un ticket así puede no estar vencido todavía y aun así ser el más urgente
+   *  del proyecto, por eso también cuenta para estadoSalud. */
+  criticos: number;
   estadoSalud: EstadoSalud;
   horasEstimadas: number;
   horasReales: number;
@@ -184,6 +189,9 @@ export class ResumenEjecutivoComponent implements OnInit {
       const resueltos = deEsteProyecto.filter((t) => this.estaResuelto(t));
       const vencidos = pendientes.filter((t) => this.claseSla(t) === 'sla-expired');
       const porVencer = pendientes.filter((t) => this.claseSla(t) === 'sla-warning');
+      const criticos = pendientes.filter(
+        (t) => this.prioridades().find((p) => Number(p.id) === Number(t.ticketPrioridadId))?.critica === true,
+      );
 
       const horasEstimadas = deEsteProyecto.reduce((s, t) => s + (t.tiempoEstimadoMin || 0), 0) / 60;
       const idsTicketsProyecto = new Set(deEsteProyecto.map((t) => Number(t.id)));
@@ -206,7 +214,7 @@ export class ResumenEjecutivoComponent implements OnInit {
 
       let estadoSalud: EstadoSalud;
       if (deEsteProyecto.length === 0) estadoSalud = 'sin-datos';
-      else if (vencidos.length > 0) estadoSalud = 'critico';
+      else if (vencidos.length > 0 || criticos.length > 0) estadoSalud = 'critico';
       else if (porVencer.length > 0) estadoSalud = 'atencion';
       else estadoSalud = 'ok';
 
@@ -216,6 +224,7 @@ export class ResumenEjecutivoComponent implements OnInit {
         resueltos: resueltos.length,
         vencidos: vencidos.length,
         porVencer: porVencer.length,
+        criticos: criticos.length,
         estadoSalud,
         horasEstimadas: Math.round(horasEstimadas * 10) / 10,
         horasReales: Math.round(horasReales * 10) / 10,
@@ -227,6 +236,7 @@ export class ResumenEjecutivoComponent implements OnInit {
 
   protected readonly totalVencidos = computed(() => this.resumenPorProyecto().reduce((s, r) => s + r.vencidos, 0));
   protected readonly totalPorVencer = computed(() => this.resumenPorProyecto().reduce((s, r) => s + r.porVencer, 0));
+  protected readonly totalCriticos = computed(() => this.resumenPorProyecto().reduce((s, r) => s + r.criticos, 0));
   protected readonly proyectosEnRiesgo = computed(
     () => this.resumenPorProyecto().filter((r) => r.estadoSalud === 'critico').length,
   );
@@ -239,6 +249,7 @@ export class ResumenEjecutivoComponent implements OnInit {
       resueltos: r.resueltos,
       vencidos: r.vencidos,
       porVencer: r.porVencer,
+      criticos: r.criticos,
       horasEstimadas: r.horasEstimadas,
       horasReales: r.horasReales,
       desviacionPct: r.desviacionPct ?? '',
@@ -252,6 +263,7 @@ export class ResumenEjecutivoComponent implements OnInit {
         { clave: 'pendientes', etiqueta: 'Pendientes' },
         { clave: 'resueltos', etiqueta: 'Resueltos' },
         { clave: 'vencidos', etiqueta: 'Vencidos' },
+        { clave: 'criticos', etiqueta: 'Críticos' },
         { clave: 'porVencer', etiqueta: 'Por vencer' },
         { clave: 'horasEstimadas', etiqueta: 'Horas estimadas' },
         { clave: 'horasReales', etiqueta: 'Horas reales' },

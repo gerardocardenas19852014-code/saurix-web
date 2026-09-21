@@ -28,6 +28,12 @@
       <div class="num">{{ proyectos().length }}</div>
       <div class="label">Proyectos</div>
     </div>
+    @if (totalCriticos() > 0) {
+      <div class="dashboard-stat-card dashboard-stat-critica">
+        <div class="num">{{ totalCriticos() }}</div>
+        <div class="label">🚨 Críticos</div>
+      </div>
+    }
     <div class="dashboard-stat-card dashboard-stat-danger">
       <div class="num">{{ totalVencidos() }}</div>
       <div class="label">Tickets vencidos (SLA)</div>
@@ -53,6 +59,7 @@
             <th>Proyecto</th>
             <th>Estado</th>
             <th>Pendientes</th>
+            <th>Críticos</th>
             <th>Vencidos</th>
             <th>Por vencer</th>
             <th>Resueltos</th>
@@ -91,6 +98,13 @@
                 }
               </td>
               <td data-label="Pendientes">{{ r.pendientes }}</td>
+              <td data-label="Críticos">
+                @if (r.criticos > 0) {
+                  <span class="grid-badge grid-badge-danger">🚨 {{ r.criticos }}</span>
+                } @else {
+                  <span class="hint" style="margin:0;">—</span>
+                }
+              </td>
               <td data-label="Vencidos">{{ r.vencidos }}</td>
               <td data-label="Por vencer">{{ r.porVencer }}</td>
               <td data-label="Resueltos">{{ r.resueltos }}</td>

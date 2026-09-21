@@ -82,6 +82,12 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly columnasTablero = signal<TableroColumna[]>([]);
   protected readonly tickets = signal<Ticket[]>([]);
   protected readonly etiquetasPorTicket = signal<Map<number, TicketEtiqueta[]>>(new Map());
+  /** Igual que etiquetasPorTicket, pero para Asociados (TicketDependencia) — para
+   *  poder mostrar un contador en la tarjeta del tablero sin tener que abrir el
+   *  detalle de cada ticket. Mismo criterio que la pestaña "Asociados": cuenta
+   *  las filas donde ESTE ticket es el que asoció a otro (ticketId), no al revés
+   *  (la relación no es bidireccional — ver agregarAsociado). */
+  protected readonly dependenciasPorTicket = signal<Map<number, TicketDependencia[]>>(new Map());
   protected readonly cargando = signal(false);
   protected readonly ahora = signal(Date.now());
   private intervaloReloj?: ReturnType<typeof setInterval>;
@@ -556,6 +562,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
         this.tickets.set(tickets);
         this.cargando.set(false);
         this.cargarEtiquetasDeTablero(tickets.map((t) => t.id));
+        this.cargarDependenciasDeTablero(tickets.map((t) => t.id));
         if (abrirTicketId) {
           const ticket = tickets.find((t) => Number(t.id) === Number(abrirTicketId));
           if (ticket) this.abrirDetalle(ticket);
@@ -576,6 +583,24 @@ export class KanbanComponent implements OnInit, OnDestroy {
         this.etiquetasPorTicket.set(mapa);
       },
     });
+  }
+
+  private cargarDependenciasDeTablero(ticketIds: number[]): void {
+    this.data.list<TicketDependencia>('TicketDependencia').subscribe({
+      next: (todas) => {
+        const mapa = new Map<number, TicketDependencia[]>();
+        for (const id of ticketIds) mapa.set(id, []);
+        for (const dependencia of todas) {
+          mapa.get(dependencia.ticketId)?.push(dependencia);
+        }
+        this.dependenciasPorTicket.set(mapa);
+      },
+    });
+  }
+
+  /** Cuántos "Asociados" tiene este ticket — para el 🔗 de la tarjeta del tablero. */
+  protected dependenciasDe(ticketId: number): TicketDependencia[] {
+    return this.dependenciasPorTicket().get(ticketId) ?? [];
   }
 
   private folioSugerido(): string {
@@ -1025,6 +1050,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
           this.formAsociado.reset({ ticketRelacionadoId: 0 });
         this.filtroAsociado.set('');
           this.cargarDetalle(activo.id);
+          this.cargarDependenciasDeTablero(this.tickets().map((t) => t.id));
         },
       });
   }
@@ -1033,7 +1059,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
     const activo = this.ticketActivo();
     if (!activo) return;
     this.data.baja('TicketDependencia', dependencia.id).subscribe({
-      next: () => this.cargarDetalle(activo.id),
+      next: () => {
+        this.cargarDetalle(activo.id);
+        this.cargarDependenciasDeTablero(this.tickets().map((t) => t.id));
+      },
     });
   }
 

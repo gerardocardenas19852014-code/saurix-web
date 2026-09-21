@@ -186,6 +186,11 @@
                 @if (ticket.planeado === false) {
                   <span class="kanban-tag" title="Este ticket no está planeado">📌 No planeado</span>
                 }
+                @if (dependenciasDe(ticket.id).length > 0) {
+                  <span class="kanban-tag" [title]="dependenciasDe(ticket.id).length + ' ticket(s) asociado(s)'">
+                    🔗 {{ dependenciasDe(ticket.id).length }}
+                  </span>
+                }
                 @for (etiqueta of etiquetasDe(ticket.id); track etiqueta.id) {
                   <span class="kanban-tag">{{ etiqueta.texto }}</span>
                 }
