@@ -117,19 +117,12 @@
             <th><button type="button" class="grid-sort-button" aria-label="Ordenar por Estado" (click)="ordenarPendientesPor('estado')">Estado <span aria-hidden="true">{{ indicadorOrdenPendientes('estado') }}</span></button></th>
             <th><button type="button" class="grid-sort-button" aria-label="Ordenar por Prioridad" (click)="ordenarPendientesPor('prioridad')">Prioridad <span aria-hidden="true">{{ indicadorOrdenPendientes('prioridad') }}</span></button></th>
             <th><button type="button" class="grid-sort-button" aria-label="Ordenar por Vigencia" (click)="ordenarPendientesPor('vigencia')">Vigencia <span aria-hidden="true">{{ indicadorOrdenPendientes('vigencia') }}</span></button></th>
+            <th class="grid-actions-col">Acciones</th>
           </tr>
         </thead>
         <tbody>
           @for (r of pendientesOrdenados(); track r.ticket.id) {
-            <tr
-              class="dashboard-row"
-              role="button"
-              tabindex="0"
-              [attr.aria-label]="'Abrir ticket ' + r.ticket.titulo"
-              (click)="abrirTicket(r.ticket)"
-              (keydown.enter)="abrirTicket(r.ticket)"
-              (keydown.space)="$event.preventDefault(); abrirTicket(r.ticket)"
-            >
+            <tr>
               <td data-label="Folio">#{{ r.ticket.numeroTicket }}</td>
               <td data-label="Folio interno">{{ r.ticket.folioInterno || '—' }}</td>
               <td data-label="Título">{{ r.ticket.titulo }}</td>
@@ -148,6 +141,19 @@
                 } @else {
                   <span class="hint" style="margin:0;">—</span>
                 }
+              </td>
+              <td class="grid-actions-col" data-label="Acciones">
+                <div class="grid-actions-inner">
+                  <button
+                    type="button"
+                    class="btn-secondary small grid-action-icon"
+                    title="Ver ticket"
+                    aria-label="Ver ticket"
+                    (click)="abrirTicket(r.ticket)"
+                  >
+                    👁
+                  </button>
+                </div>
               </td>
             </tr>
           }
@@ -172,19 +178,12 @@
             <th>Estado</th>
             <th>Prioridad</th>
             <th>Vigencia</th>
+            <th class="grid-actions-col">Acciones</th>
           </tr>
         </thead>
         <tbody>
           @for (r of resueltosMostrados(); track r.ticket.id) {
-            <tr
-              class="dashboard-row"
-              role="button"
-              tabindex="0"
-              [attr.aria-label]="'Abrir ticket ' + r.ticket.titulo"
-              (click)="abrirTicket(r.ticket)"
-              (keydown.enter)="abrirTicket(r.ticket)"
-              (keydown.space)="$event.preventDefault(); abrirTicket(r.ticket)"
-            >
+            <tr>
               <td data-label="Folio">#{{ r.ticket.numeroTicket }}</td>
               <td data-label="Folio interno">{{ r.ticket.folioInterno || '—' }}</td>
               <td data-label="Título">{{ r.ticket.titulo }}</td>
@@ -198,6 +197,19 @@
                 {{ r.prioridadNombre }}
               </td>
               <td data-label="Vigencia"><span class="hint" style="margin:0;">—</span></td>
+              <td class="grid-actions-col" data-label="Acciones">
+                <div class="grid-actions-inner">
+                  <button
+                    type="button"
+                    class="btn-secondary small grid-action-icon"
+                    title="Ver ticket"
+                    aria-label="Ver ticket"
+                    (click)="abrirTicket(r.ticket)"
+                  >
+                    👁
+                  </button>
+                </div>
+              </td>
             </tr>
           }
         </tbody>
