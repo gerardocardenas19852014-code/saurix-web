@@ -161,9 +161,14 @@ export class ProyectosDashboardComponent implements OnInit {
     return Number(id) === this.usuarioActualId;
   }
 
-  /** Abre el ticket directo en el tablero Kanban de su proyecto (mismo comportamiento que el prototipo). */
+  /** Abre el ticket directo en el tablero Kanban de su proyecto, en una pestaña nueva —
+   *  a diferencia de router.navigate(), esto deja Mi Dashboard tal cual estaba (con sus
+   *  filtros y desplazamiento) en la pestaña original, en vez de perderla al navegar. */
   abrirTicket(ticket: Ticket): void {
-    this.router.navigate(['/proyectos/tablero'], { queryParams: { ticket: ticket.id } });
+    const url = this.router.serializeUrl(
+      this.router.createUrlTree(['/proyectos/tablero'], { queryParams: { ticket: ticket.id } }),
+    );
+    window.open(url, '_blank');
   }
 
   protected readonly viendoAMi = computed(() => this.usuarioViendoId() === this.usuarioActualId);
