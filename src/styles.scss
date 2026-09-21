@@ -318,6 +318,10 @@ html[data-wide='grid'] .content { max-width: 1600px; }
 .kanban-card-title { margin: 0 0 12px; font-size: 14.5px; line-height: 1.45; color: var(--text-strong); cursor: pointer; }
 .kanban-card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
 .kanban-tag { background: var(--accent-soft); color: var(--accent); font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: 10px; }
+// Tag de "tipo" (siempre presente, generado por el sistema): se distingue de una
+// etiqueta común (kanban-tag de arriba, creada a mano) con un estilo neutro/outline
+// en vez de un color sólido, para no confundir una con la otra.
+.kanban-tag-tipo { background: transparent; border: 1px solid var(--line); color: var(--ink-soft); }
 .sla-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-bottom: 10px; }
 .sla-badge.sla-ok { background: var(--client-soft); color: var(--client); }
 .sla-badge.sla-warning { background: var(--amber-soft); color: var(--amber); }
@@ -611,7 +615,7 @@ html[data-theme='dark'] .edit-form input[type=date], html[data-theme='ocean'] .e
 .anexo-item-icon { font-size: 20px; }
 .anexo-item-body { flex: 1; }
 .form-actions { display: flex; gap: 12px; }
-.form-error { background: #fbe7e2; color: var(--danger); padding: 10px 14px; border-radius: 8px; font-size: 14px; }
+.form-error { background: var(--danger-soft); color: var(--danger); padding: 10px 14px; border-radius: 8px; font-size: 14px; }
 
 .btn-primary, .btn-secondary, .btn-danger { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 13px; border-radius: 20px; padding: 9px 18px; border: 2px solid transparent; cursor: pointer; text-align: center; display: inline-block; transition: background .15s ease, color .15s ease, transform .1s ease; }
 .btn-primary { background: var(--client); color: #fff; border-color: var(--client); box-shadow: 0 2px 0 rgba(0, 0, 0, .08); }
@@ -689,7 +693,12 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
 .grid-table tbody tr { transition: background-color .1s ease; }
 .grid-table tbody tr:hover td { background-color: var(--accent-soft); }
 .grid-actions-col { text-align: right; }
-.grid-table td.grid-actions-col { display: flex; flex-wrap: nowrap; gap: 6px; justify-content: flex-end; align-items: center; white-space: nowrap; }
+.grid-table td.grid-actions-col { white-space: nowrap; }
+// El flex vive en un <div> interno (.grid-actions-inner), no en el propio <td>:
+// un <td> con display:flex deja de comportarse como celda de tabla para el
+// cálculo de ancho de columna, y eso es justo lo que hacía que el borde de
+// esta columna quedara desalineado respecto al resto del encabezado.
+.grid-actions-inner { display: flex; flex-wrap: nowrap; gap: 6px; justify-content: flex-end; align-items: center; }
 .grid-action-icon { width: 30px; height: 30px; padding: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-family: 'IBM Plex Sans', sans-serif; font-size: 15px; line-height: 1; }
 .grid-actions-col button { margin-left: 0; }
 
