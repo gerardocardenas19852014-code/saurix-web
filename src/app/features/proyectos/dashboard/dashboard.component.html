@@ -1,7 +1,7 @@
 <div class="page-header">
   <div>
     <span class="eyebrow">§ Gestión de Proyectos</span>
-    <h1>{{ viendoAMi() ? 'Mi Dashboard' : 'Dashboard de ' + nombreUsuario(usuarioViendoId()) }}</h1>
+    <h1>{{ viendoAMi() ? 'Mi Dashboard' : 'Dashboard de ' + etiquetaUsuarioViendo(usuarioViendoId()) }}</h1>
   </div>
 </div>
 
@@ -9,6 +9,7 @@
   <label class="dashboard-user-filter-label">
     Viendo tareas de
     <select [value]="usuarioViendoId()" (change)="cambiarUsuarioViendo($any($event.target).value)">
+      <option [value]="ID_TODOS">Todos</option>
       @for (usuario of usuarios(); track usuario.id) {
         <option [value]="usuario.id">
           {{ usuario.nombreCompleto }}{{ esUsuarioActual(usuario.id) ? ' (yo)' : '' }}
@@ -19,12 +20,16 @@
 </div>
 
 <p class="hint" style="margin:14px 0 24px;">
-  Resumen de los tickets asignados a
-  @if (viendoAMi()) {
-    <strong>ti</strong>
+  @if (usuarioViendoId() === ID_TODOS) {
+    Resumen de los tickets de <strong>todos</strong>, en todos los proyectos.
   } @else {
-    <strong>{{ nombreUsuario(usuarioViendoId()) }}</strong>
-  }, en todos los proyectos.
+    Resumen de los tickets asignados a
+    @if (viendoAMi()) {
+      <strong>ti</strong>
+    } @else {
+      <strong>{{ nombreUsuario(usuarioViendoId()) }}</strong>
+    }, en todos los proyectos.
+  }
 </p>
 
 @if (cargando()) {
@@ -70,6 +75,9 @@
             <th>Folio</th>
             <th>Título</th>
             <th>Proyecto</th>
+            @if (usuarioViendoId() === ID_TODOS) {
+              <th>Asignado a</th>
+            }
             <th>Estado</th>
             <th>Prioridad</th>
             <th>Vigencia</th>
@@ -89,6 +97,9 @@
               <td data-label="Folio">#{{ r.ticket.numeroTicket }}</td>
               <td data-label="Título">{{ r.ticket.titulo }}</td>
               <td data-label="Proyecto">{{ r.proyectoClave }} — {{ r.proyectoNombre }}</td>
+              @if (usuarioViendoId() === ID_TODOS) {
+                <td data-label="Asignado a">{{ r.asignadoNombre }}</td>
+              }
               <td data-label="Estado">{{ r.columnaNombre }}</td>
               <td data-label="Prioridad">
                 <span class="kanban-card-priority" style="display:inline-block;" [style.background]="r.prioridadColor"></span>
@@ -117,6 +128,9 @@
             <th>Folio</th>
             <th>Título</th>
             <th>Proyecto</th>
+            @if (usuarioViendoId() === ID_TODOS) {
+              <th>Asignado a</th>
+            }
             <th>Estado</th>
             <th>Prioridad</th>
             <th>Vigencia</th>
@@ -136,6 +150,9 @@
               <td data-label="Folio">#{{ r.ticket.numeroTicket }}</td>
               <td data-label="Título">{{ r.ticket.titulo }}</td>
               <td data-label="Proyecto">{{ r.proyectoClave }} — {{ r.proyectoNombre }}</td>
+              @if (usuarioViendoId() === ID_TODOS) {
+                <td data-label="Asignado a">{{ r.asignadoNombre }}</td>
+              }
               <td data-label="Estado">{{ r.columnaNombre }}</td>
               <td data-label="Prioridad">
                 <span class="kanban-card-priority" style="display:inline-block;" [style.background]="r.prioridadColor"></span>

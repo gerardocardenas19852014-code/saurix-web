@@ -17,6 +17,9 @@ interface TicketResumen {
   columnaNombre: string;
   prioridadNombre: string;
   prioridadColor: string;
+  /** Solo se muestra en la tabla cuando se está viendo "Todos" (ver ID_TODOS) —
+   *  si no, es redundante: ya se sabe de quién son todos los tickets listados. */
+  asignadoNombre: string;
   clase: ClaseSla | null;
   texto: string;
 }
@@ -86,8 +89,21 @@ export class ProyectosDashboardComponent implements OnInit {
     this.usuarioViendoId.set(Number(id));
   }
 
+  /** id 0 es el valor centinela de "Todos" en el selector "Viendo tareas de"
+   *  (misma convención que filtroAsignadoId en KanbanComponent) — NO se resuelve
+   *  aquí adentro de nombreUsuario(), porque esa misma función también se usa
+   *  para pintar el "asignado a" de un ticket individual (donde 0/sin asignar
+   *  debe seguir mostrando "—", nunca "Todos"). */
+  protected readonly ID_TODOS = 0;
+
   nombreUsuario(id: number): string {
     return this.usuarios().find((u) => Number(u.id) === Number(id))?.nombreCompleto ?? '—';
+  }
+
+  /** Etiqueta para "a quién se está viendo" en el encabezado/selector — a diferencia
+   *  de nombreUsuario(), aquí sí resuelve el centinela ID_TODOS a "Todos". */
+  protected etiquetaUsuarioViendo(id: number): string {
+    return Number(id) === this.ID_TODOS ? 'Todos' : this.nombreUsuario(id);
   }
 
   esUsuarioActual(id: number): boolean {
@@ -165,15 +181,17 @@ export class ProyectosDashboardComponent implements OnInit {
       columnaNombre: columna?.nombre ?? '—',
       prioridadNombre: prioridad?.nombre ?? '—',
       prioridadColor: prioridad?.codigoHex ?? '#999',
+      asignadoNombre: this.nombreUsuario(Number(ticket.asignadoUsuarioId)),
       clase: sla.clase,
       texto: sla.texto,
     };
   }
 
-  /** Todos los tickets asignados a la persona que se está viendo (resueltos y pendientes). */
+  /** Todos los tickets asignados a la persona que se está viendo (resueltos y pendientes),
+   *  o de TODOS los usuarios si se eligió "Todos" en el selector. */
   protected readonly ticketsDeUsuarioViendo = computed(() =>
     this.tickets()
-      .filter((t) => Number(t.asignadoUsuarioId) === this.usuarioViendoId())
+      .filter((t) => this.usuarioViendoId() === this.ID_TODOS || Number(t.asignadoUsuarioId) === this.usuarioViendoId())
       .map((t) => this.aResumen(t)),
   );
 
@@ -206,7 +224,7 @@ export class ProyectosDashboardComponent implements OnInit {
   );
 
   exportarPendientesCsv(): void {
-    const nombre = this.nombreUsuario(this.usuarioViendoId());
+    const nombre = this.etiquetaUsuarioViendo(this.usuarioViendoId());
     const filas = this.pendientesOrdenados().map((r) => ({
       folio: r.ticket.numeroTicket,
       titulo: r.ticket.titulo,
