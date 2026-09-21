@@ -38,6 +38,7 @@ import { colorAvatar, iniciales } from './avatar.util';
 
 type TabDetalle =
   | 'detalles'
+  | 'fechas'
   | 'actividades'
   | 'comentarios'
   | 'etiquetas'
