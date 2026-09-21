@@ -231,6 +231,16 @@
           </label>
 
           <label>
+            Módulo
+            <select formControlName="ticketModuloId">
+              <option [ngValue]="0">Sin módulo</option>
+              @for (modulo of modulos(); track modulo.id) {
+                <option [ngValue]="modulo.id">{{ modulo.icono }} {{ modulo.nombre }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
             Asignado a
             <select formControlName="asignadoUsuarioId">
               <option [ngValue]="0">Sin asignar</option>
@@ -412,6 +422,16 @@
               <option [ngValue]="0" disabled>Selecciona una prioridad</option>
               @for (prioridad of prioridades(); track prioridad.id) {
                 <option [ngValue]="prioridad.id">{{ prioridad.nombre }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            Módulo
+            <select formControlName="ticketModuloId">
+              <option [ngValue]="0">Sin módulo</option>
+              @for (modulo of modulos(); track modulo.id) {
+                <option [ngValue]="modulo.id">{{ modulo.icono }} {{ modulo.nombre }}</option>
               }
             </select>
           </label>

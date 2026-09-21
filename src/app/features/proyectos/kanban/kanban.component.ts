@@ -23,6 +23,7 @@ import {
 } from '../tableros/tablero-columna.model';
 import { TicketTipo } from '../ticket-tipos/ticket-tipo.model';
 import { TicketPrioridad } from '../ticket-prioridades/ticket-prioridad.model';
+import { TicketModulo } from '../ticket-modulos/ticket-modulo.model';
 import {
   Ticket,
   TicketActividad,
@@ -86,6 +87,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   protected readonly tipos = signal<TicketTipo[]>([]);
   protected readonly prioridades = signal<TicketPrioridad[]>([]);
+  protected readonly modulos = signal<TicketModulo[]>([]);
   protected readonly usuarios = signal<UsuarioOpcion[]>([]);
 
   /** 'tablero' (Kanban) o 'lista' (tabla) — recuerda la preferencia del usuario (Panel de Control › Apariencia). */
@@ -255,6 +257,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
     id: [0],
     ticketTipoId: [0, Validators.required],
     ticketPrioridadId: [0, Validators.required],
+    // Opcional (a diferencia de Tipo/Prioridad): no todos los tickets necesariamente
+    // pertenecen a un módulo/área concreta, y no se quiso volverlo obligatorio de golpe
+    // sobre tickets ya existentes que no lo tenían.
+    ticketModuloId: [0],
     asignadoUsuarioId: [0],
     reportadoPorUsuarioId: [0, Validators.required],
     numeroTicket: ['', Validators.required],
@@ -325,6 +331,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     });
     this.data.list<TicketTipo>('TicketTipo').subscribe((tipos) => this.tipos.set(tipos));
     this.data.list<TicketPrioridad>('TicketPrioridad').subscribe((prioridades) => this.prioridades.set(prioridades));
+    this.data.list<TicketModulo>('TicketModulo').subscribe((modulos) => this.modulos.set(modulos));
     // 'Usuario' no trae un campo nombreCompleto propio (ver Usuario.model.ts) — hay que
     // armarlo con nombreCompletoUsuario(), si no los combos de Asignado a / Reportado por
     // quedan con opciones en blanco.
@@ -346,6 +353,16 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   iconoTipo(id: number): string {
     return this.tipos().find((t) => Number(t.id) === Number(id))?.icono ?? '';
+  }
+
+  nombreModulo(id: number | null): string {
+    if (!id) return '—';
+    return this.modulos().find((m) => Number(m.id) === Number(id))?.nombre ?? '—';
+  }
+
+  iconoModulo(id: number | null): string {
+    if (!id) return '';
+    return this.modulos().find((m) => Number(m.id) === Number(id))?.icono ?? '';
   }
 
   nombrePrioridad(id: number): string {
@@ -504,6 +521,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       id: 0,
       ticketTipoId: 0,
       ticketPrioridadId: 0,
+      ticketModuloId: 0,
       asignadoUsuarioId: 0,
       reportadoPorUsuarioId: this.auth.usuarioActual()?.id ?? 0,
       numeroTicket: this.folioSugerido(),
@@ -561,6 +579,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       tableroColumnaId: enEdicion ? Number(enEdicion.tableroColumnaId) : this.columnaCreacionId(),
       ticketTipoId: Number(valor.ticketTipoId),
       ticketPrioridadId: Number(valor.ticketPrioridadId),
+      ticketModuloId: valor.ticketModuloId ? Number(valor.ticketModuloId) : null,
       asignadoUsuarioId: valor.asignadoUsuarioId ? Number(valor.asignadoUsuarioId) : null,
       reportadoPorUsuarioId: Number(valor.reportadoPorUsuarioId),
       numeroTicket: valor.numeroTicket,
@@ -714,6 +733,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
           id: completo.id,
           ticketTipoId: Number(completo.ticketTipoId),
           ticketPrioridadId: Number(completo.ticketPrioridadId),
+          ticketModuloId: completo.ticketModuloId ? Number(completo.ticketModuloId) : 0,
           asignadoUsuarioId: completo.asignadoUsuarioId ? Number(completo.asignadoUsuarioId) : 0,
           reportadoPorUsuarioId: Number(completo.reportadoPorUsuarioId),
           numeroTicket: completo.numeroTicket,

@@ -46,4 +46,9 @@ export const CATALOGOS_ROUTES: Routes = [
     loadComponent: () =>
       import('./ticket-prioridades/ticket-prioridades.component').then((m) => m.TicketPrioridadesComponent),
   },
+  {
+    path: 'modulos',
+    loadComponent: () =>
+      import('./ticket-modulos/ticket-modulos.component').then((m) => m.TicketModulosComponent),
+  },
 ];

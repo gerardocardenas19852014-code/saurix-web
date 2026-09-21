@@ -22,13 +22,14 @@ export interface ProyectoOpcion {
   clave: string;
 }
 
-/** Los 12 campos del Ticket que el "Gestor de Estados" permite configurar por
+/** Los 13 campos del Ticket que el "Gestor de Estados" permite configurar por
  *  columna (editable/obligatorio) — mismo conjunto fijo que en el prototipo. */
 export type CampoTicketConfigurable =
   | 'folioInterno'
   | 'descripcion'
   | 'ticketTipoId'
   | 'ticketPrioridadId'
+  | 'ticketModuloId'
   | 'asignadoUsuarioId'
   | 'reportadoPorUsuarioId'
   | 'planeado'
@@ -51,6 +52,7 @@ export const TICKET_CAMPOS_CONFIGURABLES: { clave: CampoTicketConfigurable; etiq
   { clave: 'descripcion', etiqueta: 'Descripción' },
   { clave: 'ticketTipoId', etiqueta: 'Tipo' },
   { clave: 'ticketPrioridadId', etiqueta: 'Prioridad' },
+  { clave: 'ticketModuloId', etiqueta: 'Módulo' },
   { clave: 'asignadoUsuarioId', etiqueta: 'Asignado a' },
   { clave: 'reportadoPorUsuarioId', etiqueta: 'Reportado por' },
   { clave: 'planeado', etiqueta: 'Planeado' },
