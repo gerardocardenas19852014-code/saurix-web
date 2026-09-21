@@ -1,0 +1,175 @@
+<div class="page-header">
+  <div>
+    <span class="eyebrow">§ Gestión de Proyectos</span>
+    <h1>Resumen ejecutivo</h1>
+  </div>
+  <div class="page-actions">
+    <button
+      type="button"
+      class="btn-secondary small toolbar-icon-button"
+      title="Exportar CSV"
+      aria-label="Exportar salud de proyectos a CSV"
+      [disabled]="resumenPorProyecto().length === 0"
+      (click)="exportarSaludCsv()"
+    >
+      ⬇️
+    </button>
+  </div>
+</div>
+
+<p class="hint" style="margin:0 0 24px;">
+  Vista de portafolio: salud de cada proyecto, horas estimadas vs. reales, carga de trabajo del
+  equipo y en qué estado se atoran más los tickets — para decidir dónde meterle mano sin entrar
+  tablero por tablero.
+</p>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else {
+  <div class="dashboard-stats" style="margin-bottom:28px;">
+    <div class="dashboard-stat-card">
+      <div class="num">{{ proyectos().length }}</div>
+      <div class="label">Proyectos</div>
+    </div>
+    <div class="dashboard-stat-card dashboard-stat-danger">
+      <div class="num">{{ totalVencidos() }}</div>
+      <div class="label">Tickets vencidos (SLA)</div>
+    </div>
+    <div class="dashboard-stat-card dashboard-stat-warning">
+      <div class="num">{{ totalPorVencer() }}</div>
+      <div class="label">Por vencer</div>
+    </div>
+    <div class="dashboard-stat-card dashboard-stat-danger">
+      <div class="num">{{ proyectosEnRiesgo() }}</div>
+      <div class="label">Proyectos en riesgo</div>
+    </div>
+  </div>
+
+  <h2 class="settings-card-title" style="margin:0 0 12px;">Salud por proyecto</h2>
+  @if (resumenPorProyecto().length === 0) {
+    <p class="empty" style="margin-bottom:28px;">Todavía no hay proyectos.</p>
+  } @else {
+    <div class="grid-table-scroll" style="margin-bottom:28px;">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th>Proyecto</th>
+            <th>Estado</th>
+            <th>Pendientes</th>
+            <th>Vencidos</th>
+            <th>Por vencer</th>
+            <th>Resueltos</th>
+            <th>Horas est.</th>
+            <th>Horas reales</th>
+            <th>Desviación</th>
+            <th>Cierre estimado</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of resumenPorProyecto(); track r.proyecto.id) {
+            <tr
+              class="dashboard-row"
+              role="button"
+              tabindex="0"
+              [attr.aria-label]="'Abrir tablero de ' + r.proyecto.nombre"
+              (click)="abrirProyecto(r)"
+              (keydown.enter)="abrirProyecto(r)"
+              (keydown.space)="$event.preventDefault(); abrirProyecto(r)"
+            >
+              <td data-label="Proyecto">{{ r.proyecto.clave }} — {{ r.proyecto.nombre }}</td>
+              <td data-label="Estado">
+                @switch (r.estadoSalud) {
+                  @case ('ok') {
+                    <span class="sla-badge sla-ok" style="margin:0;">🟢 Al día</span>
+                  }
+                  @case ('atencion') {
+                    <span class="sla-badge sla-warning" style="margin:0;">🟡 Atención</span>
+                  }
+                  @case ('critico') {
+                    <span class="sla-badge sla-expired" style="margin:0;">🔴 Crítico</span>
+                  }
+                  @default {
+                    <span class="hint" style="margin:0;">Sin tickets</span>
+                  }
+                }
+              </td>
+              <td data-label="Pendientes">{{ r.pendientes }}</td>
+              <td data-label="Vencidos">{{ r.vencidos }}</td>
+              <td data-label="Por vencer">{{ r.porVencer }}</td>
+              <td data-label="Resueltos">{{ r.resueltos }}</td>
+              <td data-label="Horas est.">{{ r.horasEstimadas || '—' }}</td>
+              <td data-label="Horas reales">{{ r.horasReales || '—' }}</td>
+              <td data-label="Desviación">
+                @if (r.desviacionPct === null) {
+                  <span class="hint" style="margin:0;">—</span>
+                } @else if (r.desviacionPct > 15) {
+                  <span class="sla-badge sla-expired" style="margin:0;">+{{ r.desviacionPct }}%</span>
+                } @else if (r.desviacionPct < -15) {
+                  <span class="sla-badge sla-ok" style="margin:0;">{{ r.desviacionPct }}%</span>
+                } @else {
+                  <span class="hint" style="margin:0;">{{ r.desviacionPct > 0 ? '+' : '' }}{{ r.desviacionPct }}%</span>
+                }
+              </td>
+              <td data-label="Cierre estimado">{{ r.fechaCierreEstimada || '—' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <h2 class="settings-card-title" style="margin:28px 0 12px;">Carga de trabajo (tickets pendientes por persona)</h2>
+  @if (cargaPorUsuario().length === 0) {
+    <p class="empty" style="margin-bottom:28px;">No hay tickets pendientes asignados todavía.</p>
+  } @else {
+    <div style="margin-bottom:28px;">
+      @for (fila of cargaPorUsuario(); track fila.id) {
+        <div class="wallet-cat-bar-row">
+          <span class="wallet-cat-bar-name" [title]="fila.nombre">{{ fila.nombre }}</span>
+          <div class="wallet-cat-bar-track">
+            <div
+              class="wallet-cat-bar-fill"
+              [style.width.%]="(fila.pendientes / maxCargaUsuario()) * 100"
+              [style.background]="fila.color"
+            ></div>
+          </div>
+          <span class="wallet-cat-bar-amount">
+            {{ fila.pendientes }}{{ fila.vencidos > 0 ? ' (' + fila.vencidos + ' vencido' + (fila.vencidos === 1 ? '' : 's') + ')' : '' }}
+          </span>
+        </div>
+      }
+    </div>
+  }
+
+  <h2 class="settings-card-title" style="margin:28px 0 4px;">Cuellos de botella por estado</h2>
+  <p class="hint" style="margin:0 0 12px;">
+    Promedio de días que un ticket pasa en cada estado, con el tiempo real transcurrido (la
+    columna final de un proyecto no sale aquí: cuánto lleva cerrado un ticket no es un cuello
+    de botella).
+  </p>
+  <div class="board-filters" style="margin-bottom:16px;">
+    <label class="board-filter-field">
+      Proyecto
+      <select [value]="proyectoDetalleId()" (change)="cambiarProyectoDetalle($any($event.target).value)">
+        @for (proyecto of proyectos(); track proyecto.id) {
+          <option [value]="proyecto.id">{{ proyecto.clave }} — {{ proyecto.nombre }}</option>
+        }
+      </select>
+    </label>
+  </div>
+  @if (tiempoPorColumna().length === 0) {
+    <p class="empty">Sin historial de movimientos todavía para este proyecto.</p>
+  } @else {
+    <div>
+      @for (fila of tiempoPorColumna(); track fila.id) {
+        <div class="wallet-cat-bar-row">
+          <span class="wallet-cat-bar-name" [title]="fila.nombre">{{ fila.nombre }}</span>
+          <div class="wallet-cat-bar-track">
+            <div class="wallet-cat-bar-fill" [style.width.%]="(fila.promedioDias / maxTiempoColumna()) * 100"></div>
+          </div>
+          <span class="wallet-cat-bar-amount">{{ fila.promedioDias }}d</span>
+        </div>
+      }
+    </div>
+  }
+}

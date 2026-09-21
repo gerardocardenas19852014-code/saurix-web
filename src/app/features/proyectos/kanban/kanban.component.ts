@@ -295,6 +295,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
     // Deep link desde "Mi Dashboard" (u otra pantalla): ?ticket=123 abre
     // directo el detalle de ese ticket, en el proyecto al que pertenece.
     const ticketIdParam = Number(this.route.snapshot.queryParamMap.get('ticket')) || 0;
+    // Deep link desde "Resumen ejecutivo": ?proyecto=123 abre el tablero directo en
+    // ese proyecto en vez del primero de la lista (se ignora si viene junto con
+    // ?ticket=, que ya trae su propio proyecto resuelto por el ticket).
+    const proyectoIdParam = Number(this.route.snapshot.queryParamMap.get('proyecto')) || 0;
 
     this.data.list<ProyectoOpcion>('Proyecto').subscribe({
       next: (proyectos) => {
@@ -313,7 +317,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
             },
           });
         } else {
-          this.proyectoSeleccionadoId.set(proyectos[0].id);
+          const existe = proyectoIdParam && proyectos.some((p) => Number(p.id) === proyectoIdParam);
+          this.proyectoSeleccionadoId.set(existe ? proyectoIdParam : proyectos[0].id);
           this.cargarTablero();
         }
       },

@@ -66,6 +66,7 @@ export class ShellComponent {
     '/proyectos/proyectos',
     '/proyectos/reportes-horas',
     '/proyectos/gantt',
+    '/proyectos/resumen-ejecutivo',
   ];
   protected readonly contenidoAncho = computed(() =>
     ShellComponent.RUTAS_ANCHO_COMPLETO.some((ruta) => this.urlActual().startsWith(ruta)),

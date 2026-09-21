@@ -70,6 +70,14 @@ const GRUPOS: GrupoModulo[] = [
         descripcion: 'Línea de tiempo de los tickets de un proyecto.',
         grupo: 'Reportes',
       },
+      {
+        ruta: 'resumen-ejecutivo',
+        icono: '📈',
+        color: 'personal',
+        titulo: 'Resumen ejecutivo',
+        descripcion: 'Salud de cada proyecto, estimado vs. horas reales, carga del equipo y cuellos de botella.',
+        grupo: 'Reportes',
+      },
     ],
   },
 ];

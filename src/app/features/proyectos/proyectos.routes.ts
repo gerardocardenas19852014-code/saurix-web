@@ -26,4 +26,9 @@ export const PROYECTOS_ROUTES: Routes = [
     path: 'gantt',
     loadComponent: () => import('./gantt/gantt.component').then((m) => m.GanttComponent),
   },
+  {
+    path: 'resumen-ejecutivo',
+    loadComponent: () =>
+      import('./resumen-ejecutivo/resumen-ejecutivo.component').then((m) => m.ResumenEjecutivoComponent),
+  },
 ];
