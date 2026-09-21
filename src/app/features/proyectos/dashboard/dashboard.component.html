@@ -107,16 +107,16 @@
       <table class="grid-table">
         <thead>
           <tr>
-            <th>Folio</th>
-            <th>Folio interno</th>
-            <th>Título</th>
-            <th>Proyecto</th>
+            <th><button type="button" class="grid-sort-button" aria-label="Ordenar por Folio" (click)="ordenarPendientesPor('folio')">Folio <span aria-hidden="true">{{ indicadorOrdenPendientes('folio') }}</span></button></th>
+            <th><button type="button" class="grid-sort-button" aria-label="Ordenar por Folio interno" (click)="ordenarPendientesPor('folioInterno')">Folio interno <span aria-hidden="true">{{ indicadorOrdenPendientes('folioInterno') }}</span></button></th>
+            <th><button type="button" class="grid-sort-button" aria-label="Ordenar por Título" (click)="ordenarPendientesPor('titulo')">Título <span aria-hidden="true">{{ indicadorOrdenPendientes('titulo') }}</span></button></th>
+            <th><button type="button" class="grid-sort-button" aria-label="Ordenar por Proyecto" (click)="ordenarPendientesPor('proyecto')">Proyecto <span aria-hidden="true">{{ indicadorOrdenPendientes('proyecto') }}</span></button></th>
             @if (usuarioViendoId() === ID_TODOS) {
-              <th>Asignado a</th>
+              <th><button type="button" class="grid-sort-button" aria-label="Ordenar por Asignado a" (click)="ordenarPendientesPor('asignado')">Asignado a <span aria-hidden="true">{{ indicadorOrdenPendientes('asignado') }}</span></button></th>
             }
-            <th>Estado</th>
-            <th>Prioridad</th>
-            <th>Vigencia</th>
+            <th><button type="button" class="grid-sort-button" aria-label="Ordenar por Estado" (click)="ordenarPendientesPor('estado')">Estado <span aria-hidden="true">{{ indicadorOrdenPendientes('estado') }}</span></button></th>
+            <th><button type="button" class="grid-sort-button" aria-label="Ordenar por Prioridad" (click)="ordenarPendientesPor('prioridad')">Prioridad <span aria-hidden="true">{{ indicadorOrdenPendientes('prioridad') }}</span></button></th>
+            <th><button type="button" class="grid-sort-button" aria-label="Ordenar por Vigencia" (click)="ordenarPendientesPor('vigencia')">Vigencia <span aria-hidden="true">{{ indicadorOrdenPendientes('vigencia') }}</span></button></th>
           </tr>
         </thead>
         <tbody>
@@ -205,12 +205,36 @@
     </div>
   }
 
-  <h2 class="settings-card-title" style="margin:28px 0 12px;">Tickets que sigo</h2>
+  <div style="display:flex; align-items:center; justify-content:space-between; margin:28px 0 12px; gap:12px; flex-wrap:wrap;">
+    <h2 class="settings-card-title" style="margin:0;">Tickets que sigo</h2>
+    @if (ticketsQueSigo().length > 0) {
+      <div class="dashboard-user-filter">
+        <label class="dashboard-user-filter-label">
+          Ordenar por
+          <select [value]="campoOrdenSeguidos()" (change)="cambiarCampoOrdenSeguidos($any($event.target).value)">
+            <option value="vigencia">Vigencia</option>
+            <option value="folio">Folio</option>
+            <option value="titulo">Título</option>
+            <option value="proyecto">Proyecto</option>
+            <option value="estado">Estado</option>
+          </select>
+        </label>
+        <button
+          type="button"
+          class="btn-secondary small"
+          [attr.aria-label]="direccionOrdenSeguidos() === 'asc' ? 'Orden ascendente' : 'Orden descendente'"
+          (click)="alternarDireccionOrdenSeguidos()"
+        >
+          {{ direccionOrdenSeguidos() === 'asc' ? '↑ Ascendente' : '↓ Descendente' }}
+        </button>
+      </div>
+    }
+  </div>
   @if (ticketsQueSigo().length === 0) {
     <div class="empty-state-block"><p>No sigues ningún ticket todavía. Actívalo desde la pestaña &quot;Seguidores&quot; en el detalle de un ticket.</p></div>
   } @else {
     <ul class="actividades-list">
-      @for (r of ticketsQueSigo(); track r.ticket.id) {
+      @for (r of ticketsQueSigoOrdenados(); track r.ticket.id) {
         <li
           class="actividad-item dashboard-row"
           role="button"

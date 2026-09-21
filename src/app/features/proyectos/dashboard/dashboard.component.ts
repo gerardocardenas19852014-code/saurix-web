@@ -10,6 +10,18 @@ import { ProyectoOpcion, TableroColumna } from '../tableros/tablero-columna.mode
 
 type ClaseSla = 'sla-ok' | 'sla-warning' | 'sla-expired';
 
+type CampoOrdenPendientes =
+  | 'folio'
+  | 'folioInterno'
+  | 'titulo'
+  | 'proyecto'
+  | 'asignado'
+  | 'estado'
+  | 'prioridad'
+  | 'vigencia';
+
+type CampoOrdenSeguidos = 'folio' | 'titulo' | 'proyecto' | 'estado' | 'vigencia';
+
 interface TicketResumen {
   ticket: Ticket;
   proyectoClave: string;
@@ -250,14 +262,72 @@ export class ProyectosDashboardComponent implements OnInit {
     'sin-sla': 3,
   };
 
-  /** Pendientes ordenados: primero lo más urgente (SLA), luego lo más reciente — igual que el prototipo. */
-  protected readonly pendientesOrdenados = computed(() =>
-    [...this.pendientes()].sort(
-      (a, b) =>
-        this.pesoSla[a.clase ?? 'sin-sla'] - this.pesoSla[b.clase ?? 'sin-sla'] ||
-        (b.ticket.fechaCreacion ?? '').localeCompare(a.ticket.fechaCreacion ?? ''),
-    ),
-  );
+  /** Columnas por las que se puede ordenar manualmente la tabla "Tareas pendientes"
+   *  (clic en el encabezado, mismo patrón/iconos ↕ ↑ ↓ que app-data-table). */
+  protected readonly campoOrdenPendientes = signal<CampoOrdenPendientes | null>(null);
+  protected readonly direccionOrdenPendientes = signal<'asc' | 'desc'>('asc');
+
+  ordenarPendientesPor(campo: CampoOrdenPendientes): void {
+    if (this.campoOrdenPendientes() === campo) {
+      this.direccionOrdenPendientes.update((direccion) => (direccion === 'asc' ? 'desc' : 'asc'));
+    } else {
+      this.campoOrdenPendientes.set(campo);
+      this.direccionOrdenPendientes.set('asc');
+    }
+  }
+
+  indicadorOrdenPendientes(campo: CampoOrdenPendientes): string {
+    if (this.campoOrdenPendientes() !== campo) return '↕';
+    return this.direccionOrdenPendientes() === 'asc' ? '↑' : '↓';
+  }
+
+  private valorOrdenPendientes(r: TicketResumen, campo: CampoOrdenPendientes): string {
+    switch (campo) {
+      case 'folio':
+        return r.ticket.numeroTicket ?? '';
+      case 'folioInterno':
+        return r.ticket.folioInterno ?? '';
+      case 'titulo':
+        return r.ticket.titulo ?? '';
+      case 'proyecto':
+        return `${r.proyectoClave} ${r.proyectoNombre}`;
+      case 'asignado':
+        return r.asignadoNombre ?? '';
+      case 'estado':
+        return r.columnaNombre ?? '';
+      case 'prioridad':
+        return r.prioridadNombre ?? '';
+      case 'vigencia':
+        return r.texto ?? '';
+    }
+  }
+
+  /** Pendientes ordenados: por defecto, primero lo más urgente (SLA) y luego lo más
+   *  reciente (igual que el prototipo); si el usuario le da clic a un encabezado de
+   *  columna, se ordena por ese campo en su lugar (asc/desc, alternando con cada clic). */
+  protected readonly pendientesOrdenados = computed(() => {
+    const base = this.pendientes();
+    const campo = this.campoOrdenPendientes();
+    if (!campo) {
+      return [...base].sort(
+        (a, b) =>
+          this.pesoSla[a.clase ?? 'sin-sla'] - this.pesoSla[b.clase ?? 'sin-sla'] ||
+          (b.ticket.fechaCreacion ?? '').localeCompare(a.ticket.fechaCreacion ?? ''),
+      );
+    }
+    const direccion = this.direccionOrdenPendientes() === 'asc' ? 1 : -1;
+    return base
+      .map((r, indice) => ({ r, indice }))
+      .sort((a, b) => {
+        const resultado = this.valorOrdenPendientes(a.r, campo).localeCompare(
+          this.valorOrdenPendientes(b.r, campo),
+          undefined,
+          { numeric: true, sensitivity: 'base' },
+        );
+        return resultado === 0 ? a.indice - b.indice : resultado * direccion;
+      })
+      .map(({ r }) => r);
+  });
 
   /** Resueltos: solo los 8 más recientes, igual que el prototipo. */
   protected readonly resueltosMostrados = computed(() =>
@@ -294,5 +364,50 @@ export class ProyectosDashboardComponent implements OnInit {
     return this.tickets()
       .filter((t) => idsSeguidos.has(Number(t.id)) && this.coincideFiltros(t))
       .map((t) => this.aResumen(t));
+  });
+
+  /** "Tickets que sigo" es una lista de tarjetas, no una tabla — el orden se elige
+   *  con un selector "Ordenar por" en vez de encabezados clicables. Por defecto,
+   *  igual criterio de urgencia que "Tareas pendientes". */
+  protected readonly campoOrdenSeguidos = signal<CampoOrdenSeguidos>('vigencia');
+  protected readonly direccionOrdenSeguidos = signal<'asc' | 'desc'>('asc');
+
+  cambiarCampoOrdenSeguidos(valor: string): void {
+    this.campoOrdenSeguidos.set(valor as CampoOrdenSeguidos);
+  }
+
+  alternarDireccionOrdenSeguidos(): void {
+    this.direccionOrdenSeguidos.update((direccion) => (direccion === 'asc' ? 'desc' : 'asc'));
+  }
+
+  private valorOrdenSeguidos(r: TicketResumen, campo: CampoOrdenSeguidos): string {
+    switch (campo) {
+      case 'folio':
+        return r.ticket.numeroTicket ?? '';
+      case 'titulo':
+        return r.ticket.titulo ?? '';
+      case 'proyecto':
+        return `${r.proyectoClave} ${r.proyectoNombre}`;
+      case 'estado':
+        return r.columnaNombre ?? '';
+      case 'vigencia':
+        return String(this.pesoSla[r.clase ?? 'sin-sla']);
+    }
+  }
+
+  protected readonly ticketsQueSigoOrdenados = computed(() => {
+    const campo = this.campoOrdenSeguidos();
+    const direccion = this.direccionOrdenSeguidos() === 'asc' ? 1 : -1;
+    return this.ticketsQueSigo()
+      .map((r, indice) => ({ r, indice }))
+      .sort((a, b) => {
+        const resultado = this.valorOrdenSeguidos(a.r, campo).localeCompare(
+          this.valorOrdenSeguidos(b.r, campo),
+          undefined,
+          { numeric: true, sensitivity: 'base' },
+        );
+        return resultado === 0 ? a.indice - b.indice : resultado * direccion;
+      })
+      .map(({ r }) => r);
   });
 }
