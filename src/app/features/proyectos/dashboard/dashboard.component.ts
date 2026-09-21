@@ -6,6 +6,7 @@ import { DataClientService } from '../../../core/services/data-client.service';
 import { exportarCsv } from '../../../shared/utils/csv.util';
 import { Ticket, TicketSeguidor, UsuarioOpcion } from '../kanban/ticket.model';
 import { TicketPrioridad } from '../ticket-prioridades/ticket-prioridad.model';
+import { TicketModulo } from '../ticket-modulos/ticket-modulo.model';
 import { ProyectoOpcion, TableroColumna } from '../tableros/tablero-columna.model';
 
 type ClaseSla = 'sla-ok' | 'sla-warning' | 'sla-expired';
@@ -15,6 +16,7 @@ type CampoOrdenPendientes =
   | 'folioInterno'
   | 'titulo'
   | 'proyecto'
+  | 'modulo'
   | 'asignado'
   | 'estado'
   | 'prioridad'
@@ -27,6 +29,7 @@ interface TicketResumen {
   proyectoClave: string;
   proyectoNombre: string;
   columnaNombre: string;
+  moduloNombre: string;
   prioridadNombre: string;
   prioridadColor: string;
   /** Solo se muestra en la tabla cuando se está viendo "Todos" (ver ID_TODOS) —
@@ -66,6 +69,7 @@ export class ProyectosDashboardComponent implements OnInit {
   protected readonly tickets = signal<Ticket[]>([]);
   protected readonly prioridades = signal<TicketPrioridad[]>([]);
   protected readonly usuarios = signal<UsuarioOpcion[]>([]);
+  protected readonly modulos = signal<TicketModulo[]>([]);
   protected readonly seguidos = signal<TicketSeguidor[]>([]);
 
   /** A quién se le está viendo el dashboard — por defecto, quien tiene la sesión iniciada. */
@@ -75,14 +79,17 @@ export class ProyectosDashboardComponent implements OnInit {
   // prioridad y texto libre), para poder acotar el dashboard cuando "Todos" o un
   // usuario con muchos tickets asignados hacen la lista larga de revisar.
   protected readonly filtroProyectoId = signal<number>(0);
+  protected readonly filtroModuloId = signal<number>(0);
   protected readonly filtroPrioridadId = signal<number>(0);
   protected readonly filtroTexto = signal('');
   protected readonly hayFiltros = computed(
-    () => !!(this.filtroProyectoId() || this.filtroPrioridadId() || this.filtroTexto().trim()),
+    () =>
+      !!(this.filtroProyectoId() || this.filtroModuloId() || this.filtroPrioridadId() || this.filtroTexto().trim()),
   );
 
   limpiarFiltros(): void {
     this.filtroProyectoId.set(0);
+    this.filtroModuloId.set(0);
     this.filtroPrioridadId.set(0);
     this.filtroTexto.set('');
   }
@@ -91,6 +98,7 @@ export class ProyectosDashboardComponent implements OnInit {
    *  igual que el buscador de Kanban/Lista de tickets. */
   private coincideFiltros(ticket: Ticket): boolean {
     const proyectoId = this.filtroProyectoId();
+    const moduloId = this.filtroModuloId();
     const prioridadId = this.filtroPrioridadId();
     const terminos = this.filtroTexto()
       .toLowerCase()
@@ -99,6 +107,7 @@ export class ProyectosDashboardComponent implements OnInit {
       .filter(Boolean);
     return (
       (!proyectoId || Number(ticket.proyectoId) === proyectoId) &&
+      (!moduloId || Number(ticket.ticketModuloId) === moduloId) &&
       (!prioridadId || Number(ticket.ticketPrioridadId) === prioridadId) &&
       (!terminos.length ||
         terminos.some(
@@ -119,6 +128,7 @@ export class ProyectosDashboardComponent implements OnInit {
     this.data.list<ProyectoOpcion>('Proyecto').subscribe((p) => this.proyectos.set(p));
     this.data.list<TableroColumna>('TableroColumna').subscribe((c) => this.columnas.set(c));
     this.data.list<TicketPrioridad>('TicketPrioridad').subscribe((p) => this.prioridades.set(p));
+    this.data.list<TicketModulo>('TicketModulo').subscribe((m) => this.modulos.set(m));
     // 'Usuario' no trae un campo nombreCompleto propio — hay que armarlo con
     // nombreCompletoUsuario(), si no el selector "Viendo tareas de" queda en blanco.
     this.data
@@ -227,12 +237,14 @@ export class ProyectosDashboardComponent implements OnInit {
     const proyecto = this.proyectos().find((p) => Number(p.id) === Number(ticket.proyectoId));
     const columna = this.columnas().find((c) => Number(c.id) === Number(ticket.tableroColumnaId));
     const prioridad = this.prioridades().find((p) => Number(p.id) === Number(ticket.ticketPrioridadId));
+    const modulo = this.modulos().find((m) => Number(m.id) === Number(ticket.ticketModuloId));
     const sla = this.slaDe(ticket);
     return {
       ticket,
       proyectoClave: proyecto?.clave ?? '—',
       proyectoNombre: proyecto?.nombre ?? '—',
       columnaNombre: columna?.nombre ?? '—',
+      moduloNombre: modulo ? `${modulo.icono} ${modulo.nombre}`.trim() : 'Sin módulo',
       prioridadNombre: prioridad?.nombre ?? '—',
       prioridadColor: prioridad?.codigoHex ?? '#999',
       asignadoNombre: this.nombreUsuario(Number(ticket.asignadoUsuarioId)),
@@ -294,6 +306,8 @@ export class ProyectosDashboardComponent implements OnInit {
         return r.ticket.titulo ?? '';
       case 'proyecto':
         return `${r.proyectoClave} ${r.proyectoNombre}`;
+      case 'modulo':
+        return r.moduloNombre ?? '';
       case 'asignado':
         return r.asignadoNombre ?? '';
       case 'estado':
@@ -345,6 +359,7 @@ export class ProyectosDashboardComponent implements OnInit {
       folio: r.ticket.numeroTicket,
       titulo: r.ticket.titulo,
       proyecto: `${r.proyectoClave} — ${r.proyectoNombre}`,
+      modulo: r.moduloNombre,
       estado: r.columnaNombre,
       prioridad: r.prioridadNombre,
     }));
@@ -355,6 +370,7 @@ export class ProyectosDashboardComponent implements OnInit {
         { clave: 'folio', etiqueta: 'Folio' },
         { clave: 'titulo', etiqueta: 'Título' },
         { clave: 'proyecto', etiqueta: 'Proyecto' },
+        { clave: 'modulo', etiqueta: 'Módulo' },
         { clave: 'estado', etiqueta: 'Estado' },
         { clave: 'prioridad', etiqueta: 'Prioridad' },
       ],

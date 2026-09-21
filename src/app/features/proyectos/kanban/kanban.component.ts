@@ -94,6 +94,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   /** 'tablero' (Kanban) o 'lista' (tabla) — recuerda la preferencia del usuario (Panel de Control › Apariencia). */
   protected readonly modoVista = signal<'tablero' | 'lista'>(this.configuracionApariencia.vistaProyectosPreferida());
   protected readonly filtroTipoId = signal<number>(0);
+  protected readonly filtroModuloId = signal<number>(0);
   protected readonly filtroPrioridadId = signal<number>(0);
   protected readonly filtroAsignadoId = signal<number>(0);
   protected readonly filtroTexto = signal('');
@@ -101,7 +102,14 @@ export class KanbanComponent implements OnInit, OnDestroy {
    *  tablero/lista salvo que se marque esta casilla — alternativa al borrado duro. */
   protected readonly mostrarInactivos = signal(false);
   protected readonly hayFiltros = computed(
-    () => !!(this.filtroTipoId() || this.filtroPrioridadId() || this.filtroAsignadoId() || this.filtroTexto().trim()),
+    () =>
+      !!(
+        this.filtroTipoId() ||
+        this.filtroModuloId() ||
+        this.filtroPrioridadId() ||
+        this.filtroAsignadoId() ||
+        this.filtroTexto().trim()
+      ),
   );
 
   protected readonly modalAbierto = signal(false);
@@ -176,6 +184,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   protected readonly ticketsFiltrados = computed(() => {
     const tipoId = this.filtroTipoId();
+    const moduloId = this.filtroModuloId();
     const prioridadId = this.filtroPrioridadId();
     const asignadoId = this.filtroAsignadoId();
     // Admite varios folios separados por coma (p.ej. "55350,55182"): cada término
@@ -190,6 +199,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       (t) =>
         (conInactivos || t.activo !== false) &&
         (!tipoId || Number(t.ticketTipoId) === tipoId) &&
+        (!moduloId || Number(t.ticketModuloId) === moduloId) &&
         (!prioridadId || Number(t.ticketPrioridadId) === prioridadId) &&
         (!asignadoId || Number(t.asignadoUsuarioId) === asignadoId) &&
         (!terminos.length ||
@@ -222,6 +232,11 @@ export class KanbanComponent implements OnInit, OnDestroy {
       campo: 'ticketTipoId',
       etiqueta: 'Tipo',
       formatear: (fila) => `${this.iconoTipo(fila.ticketTipoId)} ${this.nombreTipo(fila.ticketTipoId)}`.trim(),
+    },
+    {
+      campo: 'ticketModuloId',
+      etiqueta: 'Módulo',
+      formatear: (fila) => (fila.ticketModuloId ? `${this.iconoModulo(fila.ticketModuloId)} ${this.nombreModulo(fila.ticketModuloId)}`.trim() : 'Sin módulo'),
     },
     { campo: 'ticketPrioridadId', etiqueta: 'Prioridad', formatear: (fila) => this.nombrePrioridad(fila.ticketPrioridadId) },
     {
@@ -420,6 +435,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   limpiarFiltros(): void {
     this.filtroTipoId.set(0);
+    this.filtroModuloId.set(0);
     this.filtroPrioridadId.set(0);
     this.filtroAsignadoId.set(0);
     this.filtroTexto.set('');
