@@ -46,6 +46,7 @@ type TabDetalle =
   | 'adjuntos'
   | 'historial'
   | 'asociados'
+  | 'subtareas'
   | 'seguidores'
   | 'solucion';
 type ClaseSla = 'sla-ok' | 'sla-warning' | 'sla-expired';
@@ -141,6 +142,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     'etiquetas',
     'adjuntos',
     'asociados',
+    'subtareas',
     'seguidores',
     'historial',
   ];
@@ -167,6 +169,79 @@ export class KanbanComponent implements OnInit, OnDestroy {
    *  lados del vínculo con la etiqueta correcta según de qué lado se ve. */
   protected readonly dependenciasEntrantes = signal<TicketDependencia[]>([]);
   protected readonly seguidores = signal<TicketSeguidor[]>([]);
+
+  /** Búsqueda de texto libre para "Convertir en subtarea" — mismo patrón que
+   *  filtroAsociado (folio, folio interno o título, varios términos con coma). */
+  protected readonly filtroSubtarea = signal('');
+  protected readonly formSubtarea = this.fb.nonNullable.group({ titulo: ['', Validators.required] });
+  protected readonly formSubtareaExistente = this.fb.nonNullable.group({ ticketId: [0] });
+
+  /** Subtareas por ticket padre — a diferencia de dependenciasPorTicket/etiquetasPorTicket
+   *  (entidades aparte), una subtarea ES un Ticket (con ticketPadreId apuntando al padre),
+   *  así que se deriva directo de `tickets()` (ya cargado para el tablero) sin ninguna
+   *  consulta extra. */
+  protected readonly subtareasPorTicket = computed(() => {
+    const mapa = new Map<number, Ticket[]>();
+    for (const t of this.tickets()) {
+      if (!t.ticketPadreId) continue;
+      const padreId = Number(t.ticketPadreId);
+      if (!mapa.has(padreId)) mapa.set(padreId, []);
+      mapa.get(padreId)!.push(t);
+    }
+    return mapa;
+  });
+
+  /** Subtareas (hijos) del ticket actualmente abierto en el detalle. */
+  protected readonly subtareasDelActivo = computed(() => {
+    const activo = this.ticketActivo();
+    if (!activo) return [];
+    return this.subtareasPorTicket().get(Number(activo.id)) ?? [];
+  });
+
+  /** "3 de 5 completadas" del ticket abierto — null si todavía no tiene ninguna
+   *  subtarea (no hay contra qué mostrar barra de progreso). "Completada" = misma
+   *  regla que el resto del sistema para "resuelto": está en la última columna
+   *  configurada del tablero (ver estaResuelto). */
+  protected readonly progresoSubtareasActivo = computed(() => {
+    const hijos = this.subtareasDelActivo();
+    if (!hijos.length) return null;
+    const completadas = hijos.filter((h) => this.estaResuelto(h)).length;
+    return { completadas, total: hijos.length, pct: Math.round((completadas / hijos.length) * 100) };
+  });
+
+  /** Jira no permite subtareas de subtareas: un ticket que ya es subtarea de otro
+   *  no puede a su vez tener sus propias subtareas — controla si se ofrece la
+   *  sección para agregar subtareas o solo el aviso "Este ticket ya es subtarea". */
+  protected readonly puedeTenerSubtareas = computed(() => !this.ticketActivo()?.ticketPadreId);
+
+  /** Candidatos para "convertir ticket existente en subtarea": del mismo proyecto,
+   *  que no sean ya subtarea de otro ni tengan ellos mismos subtareas (mismo límite
+   *  de un solo nivel que puedeTenerSubtareas) y no sea el propio ticket activo. */
+  protected readonly ticketsDisponiblesParaSubtarea = computed(() => {
+    const activo = this.ticketActivo();
+    if (!activo) return [];
+    const conHijos = this.subtareasPorTicket();
+    return this.tickets().filter(
+      (t) => Number(t.id) !== Number(activo.id) && !t.ticketPadreId && !conHijos.has(Number(t.id)),
+    );
+  });
+
+  protected readonly ticketsDisponiblesParaSubtareaFiltrados = computed(() => {
+    const terminos = this.filtroSubtarea()
+      .toLowerCase()
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if (!terminos.length) return this.ticketsDisponiblesParaSubtarea();
+    return this.ticketsDisponiblesParaSubtarea().filter((t) =>
+      terminos.some(
+        (termino) =>
+          t.numeroTicket.toLowerCase().includes(termino) ||
+          (t.folioInterno ?? '').toLowerCase().includes(termino) ||
+          t.titulo.toLowerCase().includes(termino),
+      ),
+    );
+  });
 
   /** Catálogo fijo de tipos de vínculo entre tickets (pestaña Asociados) — mismo
    *  concepto que los "issue links" de Jira (bloquea/duplica/relacionado). */
@@ -999,8 +1074,11 @@ export class KanbanComponent implements OnInit, OnDestroy {
         this.formComentario.reset({ texto: '' });
         this.formActividad.reset({ texto: '', tiempoHoras: 0.25 });
         this.formEtiqueta.reset({ texto: '' });
-        this.formAsociado.reset({ ticketRelacionadoId: 0 });
+        this.formAsociado.reset({ ticketRelacionadoId: 0, tipo: 'relacionado' });
         this.filtroAsociado.set('');
+        this.formSubtarea.reset({ titulo: '' });
+        this.formSubtareaExistente.reset({ ticketId: 0 });
+        this.filtroSubtarea.set('');
         this.cargarDetalle(completo.id);
       },
     });
@@ -1129,6 +1207,94 @@ export class KanbanComponent implements OnInit, OnDestroy {
       next: () => {
         this.cargarDetalle(activo.id);
         this.cargarDependenciasDeTablero(this.tickets().map((t) => t.id));
+      },
+    });
+  }
+
+  // ---------------- Subtareas (Ticket.ticketPadreId) ----------------
+
+  /** true si esta subtarea ya se dio por terminada — misma regla que "resuelto"
+   *  para cualquier ticket (última columna del tablero). Wrapper protected porque
+   *  estaResuelto() es privado y el template necesita leerlo (progresoSubtareasActivo/lista). */
+  protected subtareaCompletada(ticket: Ticket): boolean {
+    return this.estaResuelto(ticket);
+  }
+
+  /** Cuántas de estas subtareas ya están completadas — para el tag "🧩 X/Y" de
+   *  la tarjeta del tablero (ver subtareasPorTicket). Método aparte en vez de
+   *  `hijos.filter(this.subtareaCompletada)` en el template: pasar un método de
+   *  la clase como callback de filter() pierde el `this` (no es un arrow bound). */
+  protected subtareasCompletadasDe(hijos: Ticket[]): number {
+    return hijos.filter((h) => this.estaResuelto(h)).length;
+  }
+
+  /** Alta rápida de una subtarea: solo pide título (como el "+ agregar subtarea"
+   *  de Jira) y hereda proyecto/tipo/prioridad/módulo del ticket padre — el resto
+   *  se captura después, ya con el ticket creado, igual que cualquier otro ticket. */
+  crearSubtarea(): void {
+    const activo = this.ticketActivo();
+    if (!activo || this.formSubtarea.invalid) return;
+    const titulo = this.formSubtarea.controls.titulo.value.trim();
+    if (!titulo) return;
+
+    this.data
+      .alta<Ticket>('Ticket', {
+        proyectoId: activo.proyectoId,
+        tableroColumnaId: this.columnaPorDefecto(),
+        ticketTipoId: activo.ticketTipoId,
+        ticketPrioridadId: activo.ticketPrioridadId,
+        ticketModuloId: activo.ticketModuloId ?? null,
+        asignadoUsuarioId: null,
+        reportadoPorUsuarioId: this.auth.usuarioActual()?.id ?? activo.reportadoPorUsuarioId,
+        numeroTicket: this.folioSugerido(),
+        folioInterno: null,
+        titulo,
+        descripcion: null,
+        planeado: true,
+        tiempoEstimadoMin: null,
+        fechaFinAnalisis: null,
+        fechaFinDesarrollo: null,
+        fechaFinCliente: null,
+        fechaInicio: null,
+        fechaFin: null,
+        solucion: null,
+        activo: true,
+        ticketPadreId: activo.id,
+      })
+      .subscribe({
+        next: () => {
+          this.formSubtarea.reset({ titulo: '' });
+          this.toast.exito('Subtarea creada.');
+          this.cargarTickets();
+        },
+      });
+  }
+
+  /** Convierte un ticket ya existente (sin padre ni subtareas propias) en
+   *  subtarea del ticket abierto — ver ticketsDisponiblesParaSubtarea. */
+  convertirEnSubtarea(): void {
+    const activo = this.ticketActivo();
+    const ticketId = Number(this.formSubtareaExistente.controls.ticketId.value);
+    if (!activo || !ticketId) return;
+    const candidato = this.tickets().find((t) => Number(t.id) === ticketId);
+    if (!candidato) return;
+
+    this.data.modificacion<Ticket>('Ticket', { ...candidato, ticketPadreId: activo.id }).subscribe({
+      next: () => {
+        this.formSubtareaExistente.reset({ ticketId: 0 });
+        this.filtroSubtarea.set('');
+        this.toast.exito('Ticket convertido en subtarea.');
+        this.cargarTickets();
+      },
+    });
+  }
+
+  /** Quita el vínculo (no elimina el ticket, solo deja de ser subtarea). */
+  quitarDeSubtareas(ticket: Ticket): void {
+    this.data.modificacion<Ticket>('Ticket', { ...ticket, ticketPadreId: null }).subscribe({
+      next: () => {
+        this.toast.exito('Se quitó como subtarea.');
+        this.cargarTickets();
       },
     });
   }

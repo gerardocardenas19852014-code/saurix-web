@@ -191,6 +191,13 @@
                     🔗 {{ dependenciasDe(ticket.id).length }}
                   </span>
                 }
+                @if (subtareasPorTicket().get(ticket.id); as hijos) {
+                  @if (hijos.length > 0) {
+                    <span class="kanban-tag" title="Subtareas completadas">
+                      🧩 {{ subtareasCompletadasDe(hijos) }}/{{ hijos.length }}
+                    </span>
+                  }
+                }
                 @for (etiqueta of etiquetasDe(ticket.id); track etiqueta.id) {
                   <span class="kanban-tag">{{ etiqueta.texto }}</span>
                 }
@@ -425,6 +432,7 @@
               @case ('etiquetas') { 🏷️ Etiquetas }
               @case ('adjuntos') { 📎 Adjuntos }
               @case ('asociados') { 🔗 Asociados }
+              @case ('subtareas') { 🧩 Subtareas }
               @case ('seguidores') { 👀 Seguidores }
               @case ('historial') { 🕘 Historial }
               @default { ⋯ Más }
@@ -442,9 +450,12 @@
             }
             @if (tabsPermitidas().asociados) {
               <button type="button" class="tab-more-item" [class.is-active]="tabActiva() === 'asociados'" (click)="seleccionarTab('asociados')">
-                🔗 Asociados ({{ dependencias().length }})
+                🔗 Asociados ({{ vinculosDelTicket().length }})
               </button>
             }
+            <button type="button" class="tab-more-item" [class.is-active]="tabActiva() === 'subtareas'" (click)="seleccionarTab('subtareas')">
+              🧩 Subtareas ({{ subtareasDelActivo().length }})
+            </button>
             <button type="button" class="tab-more-item" [class.is-active]="tabActiva() === 'seguidores'" (click)="seleccionarTab('seguidores')">
               👀 Seguidores ({{ seguidores().length }})
             </button>
@@ -735,6 +746,87 @@
               </div>
             </div>
           </form>
+        </div>
+      }
+
+      @if (tabActiva() === 'subtareas') {
+        <div class="tab-panel">
+          @if (!puedeTenerSubtareas()) {
+            <p class="hint">
+              Este ticket ya es subtarea de #{{ ticketPorId(activo.ticketPadreId ?? 0)?.numeroTicket ?? '—' }} —
+              no se le pueden agregar subtareas propias (igual que en Jira, no hay subtareas de subtareas).
+            </p>
+          } @else {
+            @if (progresoSubtareasActivo(); as progreso) {
+              <div style="margin: 0 0 14px;">
+                <p class="hint" style="margin: 0 0 4px;">
+                  {{ progreso.completadas }} de {{ progreso.total }} completadas ({{ progreso.pct }}%)
+                </p>
+                <div class="progreso-barra">
+                  <div class="progreso-relleno" [style.width.%]="progreso.pct"></div>
+                </div>
+              </div>
+            }
+            @if (subtareasDelActivo().length === 0) {
+              <p class="empty">Este ticket todavía no tiene subtareas.</p>
+            } @else {
+              <ul class="actividades-list">
+                @for (subtarea of subtareasDelActivo(); track subtarea.id) {
+                  <li class="actividad-item">
+                    <div class="actividad-item-head">
+                      <span class="actividad-item-texto">
+                        <span class="kanban-tag" style="margin-right: 6px;">
+                          {{ subtareaCompletada(subtarea) ? '✅ Completada' : '⏳ Pendiente' }}
+                        </span>
+                        #{{ subtarea.numeroTicket }} — {{ subtarea.titulo }}
+                      </span>
+                      <button type="button" class="btn-danger small" aria-label="Quitar de subtareas" title="Quitar de subtareas (no elimina el ticket)" (click)="quitarDeSubtareas(subtarea)">✕</button>
+                    </div>
+                  </li>
+                }
+              </ul>
+            }
+
+            <form [formGroup]="formSubtarea" (ngSubmit)="crearSubtarea()" style="margin-top: 14px;">
+              <div class="edit-form form-grid-2col">
+                <label class="full-span">
+                  Nueva subtarea (solo título — el resto se captura después)
+                  <input type="text" formControlName="titulo" placeholder="Título de la subtarea" />
+                </label>
+                <div class="form-actions">
+                  <button type="submit" class="btn-secondary">+ Crear subtarea</button>
+                </div>
+              </div>
+            </form>
+
+            <form [formGroup]="formSubtareaExistente" (ngSubmit)="convertirEnSubtarea()" style="margin-top: 14px;">
+              <div class="edit-form form-grid-2col">
+                <label class="full-span">
+                  Buscar ticket existente para convertir en subtarea
+                  <input
+                    type="search"
+                    placeholder="Folio, folio interno o título… (varios con coma)"
+                    [value]="filtroSubtarea()"
+                    (input)="filtroSubtarea.set($any($event.target).value)"
+                  />
+                </label>
+                <label class="full-span">
+                  Convertir en subtarea
+                  <select formControlName="ticketId">
+                    <option [ngValue]="0" disabled>
+                      {{ ticketsDisponiblesParaSubtareaFiltrados().length }} resultado(s) — selecciona uno
+                    </option>
+                    @for (ticket of ticketsDisponiblesParaSubtareaFiltrados(); track ticket.id) {
+                      <option [ngValue]="ticket.id">#{{ ticket.numeroTicket }} — {{ ticket.titulo }}</option>
+                    }
+                  </select>
+                </label>
+                <div class="form-actions">
+                  <button type="submit" class="btn-secondary">+ Convertir</button>
+                </div>
+              </div>
+            </form>
+          }
         </div>
       }
 

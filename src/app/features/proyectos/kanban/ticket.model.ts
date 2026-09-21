@@ -35,6 +35,11 @@ export interface Ticket {
    *  de la Prioridad — evita mandar el mismo aviso una y otra vez en cada revisión
    *  periódica. No se edita desde ningún formulario. */
   slaAvisoNivel?: 'warning' | 'expired' | null;
+  /** Ticket "padre" del que este es subtarea — null/ausente si es un ticket de
+   *  nivel superior (ver pestaña "Subtareas" en kanban.component.ts). Igual que
+   *  Jira, no se permiten subtareas de subtareas: un ticket que ya tiene
+   *  ticketPadreId no puede a su vez ser padre de otras (ver puedeTenerSubtareas). */
+  ticketPadreId?: number | null;
 }
 
 export interface UsuarioOpcion {
