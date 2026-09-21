@@ -1,0 +1,44 @@
+<div class="page-header">
+  <h1>Respaldo y restauración</h1>
+</div>
+
+<div class="settings-card">
+  <h2 class="settings-card-title">⬇️ Descargar respaldo</h2>
+  <p class="hint" style="margin:0 0 16px;">
+    Todo lo que capturas en Saurix se guarda solo en el navegador de este dispositivo —
+    nada se sincroniza solo entre computadoras todavía. Descarga un archivo con TODA la
+    información (usuarios, proyectos, tickets, presupuesto, catálogos…) para guardarlo
+    o llevarlo a otro dispositivo.
+  </p>
+  <button type="button" class="toolbar-btn" [disabled]="generandoRespaldo()" (click)="descargarRespaldo()">
+    {{ generandoRespaldo() ? 'Generando…' : '⬇️ Descargar respaldo' }}
+  </button>
+</div>
+
+<div class="settings-card">
+  <h2 class="settings-card-title">⬆️ Restaurar desde un respaldo</h2>
+  <p class="hint" style="margin:0 0 16px;">
+    Elige el archivo .json que descargaste antes (de este dispositivo o de otro) para
+    recuperar toda esa información aquí.
+  </p>
+  <p class="form-error" style="margin:0 0 16px;">
+    ⚠️ Restaurar REEMPLAZA todo lo que ya está guardado en este dispositivo por lo que
+    traiga el archivo — no se puede deshacer. Si no estás seguro, descarga primero un
+    respaldo de lo que tienes ahora.
+  </p>
+  <label class="btn-secondary" style="display:inline-block; cursor:pointer;">
+    📂 Elegir archivo de respaldo…
+    <input type="file" accept="application/json,.json" style="display:none;" (change)="archivoSeleccionado($event)" />
+  </label>
+</div>
+
+<app-confirm-dialog
+  [visible]="respaldoPendiente() !== null"
+  titulo="Restaurar respaldo"
+  [mensaje]="
+    '¿Restaurar \'' + nombreArchivoPendiente() + '\' (' + totalRegistros(respaldoPendiente()) + ' registros)? ' +
+    'Esto reemplaza TODO lo que hay guardado en este dispositivo y no se puede deshacer.'
+  "
+  (confirmar)="confirmarRestauracion()"
+  (cancelar)="cancelarRestauracion()"
+/>

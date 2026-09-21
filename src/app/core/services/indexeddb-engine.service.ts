@@ -189,6 +189,61 @@ export class IndexedDbEngineService {
     });
   }
 
+  /**
+   * Respaldo completo: TODOS los stores que existen hoy en la base, con
+   * todos sus registros tal cual (incluye el `id`, indispensable para que
+   * al restaurar las relaciones entre entidades — usuarioId, proyectoId,
+   * etc. — sigan apuntando a lo correcto). Pensado para "Panel de Control →
+   * Respaldo y restauración": exportar aquí y restaurar en otro dispositivo,
+   * mientras no exista un backend real que sincronice esto solo.
+   */
+  async exportarTodo(): Promise<Record<string, unknown[]>> {
+    return this.encolar(async () => {
+      const db = await this.abrir();
+      const resultado: Record<string, unknown[]> = {};
+      for (const nombre of Array.from(db.objectStoreNames)) {
+        resultado[nombre] = await new Promise<unknown[]>((resolve, reject) => {
+          const tx = db.transaction(nombre, 'readonly');
+          const request = tx.objectStore(nombre).getAll();
+          request.onsuccess = () => resolve(request.result as unknown[]);
+          request.onerror = () => reject(request.error);
+        });
+      }
+      return resultado;
+    });
+  }
+
+  /**
+   * Restaura un respaldo de exportarTodo(): por cada store del respaldo,
+   * BORRA lo que haya en este dispositivo y pone en su lugar los registros
+   * del respaldo (con put, no add, para conservar los mismos id — si se
+   * regeneraran, todas las relaciones entre entidades quedarían rotas).
+   * Un store que el respaldo trae pero este dispositivo todavía no conoce
+   * se crea sobre la marcha, igual que asegurarStore(); un store que este
+   * dispositivo ya tiene pero el respaldo no incluye se deja intacto (no se
+   * borra "lo que no venía en el respaldo").
+   */
+  async restaurarTodo(datosPorEntidad: Record<string, unknown[]>): Promise<void> {
+    return this.encolar(async () => {
+      let db: IDBDatabase | null = null;
+      for (const entidad of Object.keys(datosPorEntidad)) {
+        db = await this.asegurarStore(entidad);
+      }
+      db ??= await this.abrir();
+
+      for (const [entidad, filas] of Object.entries(datosPorEntidad)) {
+        await new Promise<void>((resolve, reject) => {
+          const tx = db!.transaction(entidad, 'readwrite');
+          const store = tx.objectStore(entidad);
+          store.clear();
+          for (const fila of filas) store.put(fila as Record<string, unknown>);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+      }
+    });
+  }
+
   /** Inserta datos de ejemplo solo si el store todavía está vacío (útil para "sembrar" catálogos base). */
   async seedSiVacio<T extends Record<string, unknown>>(entidad: string, filas: T[]): Promise<void> {
     return this.encolar(async () => {

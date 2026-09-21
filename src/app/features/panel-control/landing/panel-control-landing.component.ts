@@ -42,6 +42,14 @@ const GRUPOS: GrupoConfig[] = [
         descripcion: 'Orígenes de datos y conexiones externas de la app.',
         grupo: 'General',
       },
+      {
+        ruta: 'respaldo',
+        icono: '💾',
+        color: 'generic',
+        titulo: 'Respaldo y restauración',
+        descripcion: 'Descarga toda tu información o restáurala en otro dispositivo.',
+        grupo: 'General',
+      },
     ],
   },
   {
