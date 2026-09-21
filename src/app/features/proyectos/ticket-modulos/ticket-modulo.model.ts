@@ -13,4 +13,5 @@ export interface TicketModulo {
   nombre: string;
   clave: string;
   icono: string | null;
+  activo: boolean;
 }

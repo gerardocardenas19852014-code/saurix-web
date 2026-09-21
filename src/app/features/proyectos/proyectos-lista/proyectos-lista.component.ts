@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
@@ -23,6 +23,14 @@ export class ProyectosListaComponent implements OnInit {
   protected readonly proyectos = signal<Proyecto[]>([]);
   protected readonly cargando = signal(false);
   protected readonly busqueda = signal('');
+  /** false por defecto: los proyectos archivados se ocultan de la lista (y de los
+   *  combos "Proyecto" al filtrar reportes/tableros) salvo que se marque esta
+   *  casilla — alternativa al borrado duro (que ya se bloquea si tiene tickets o
+   *  columnas propias). */
+  protected readonly mostrarInactivos = signal(false);
+  protected readonly proyectosFiltrados = computed(() =>
+    this.proyectos().filter((p) => this.mostrarInactivos() || p.activo !== false),
+  );
 
   protected readonly modalAbierto = signal(false);
   protected readonly proyectoEnEdicion = signal<Proyecto | null>(null);
@@ -31,6 +39,12 @@ export class ProyectosListaComponent implements OnInit {
   protected readonly columnas: ColumnaTabla<Proyecto>[] = [
     { campo: 'clave', etiqueta: 'Clave' },
     { campo: 'nombre', etiqueta: 'Nombre' },
+    {
+      campo: 'activo',
+      etiqueta: 'Activo',
+      formatear: (fila) => (fila.activo !== false ? 'Sí' : 'No'),
+      claseValor: (fila) => (fila.activo !== false ? 'grid-badge-success' : 'grid-badge-muted'),
+    },
   ];
 
   protected readonly form = this.fb.nonNullable.group({
@@ -38,6 +52,7 @@ export class ProyectosListaComponent implements OnInit {
     nombre: ['', Validators.required],
     clave: ['', [Validators.required, Validators.maxLength(6)]],
     codigoHex: ['#4f8cff', Validators.required],
+    activo: [true],
   });
 
   ngOnInit(): void {
@@ -57,7 +72,7 @@ export class ProyectosListaComponent implements OnInit {
 
   nuevo(): void {
     this.proyectoEnEdicion.set(null);
-    this.form.reset({ id: 0, nombre: '', clave: '', codigoHex: '#4f8cff' });
+    this.form.reset({ id: 0, nombre: '', clave: '', codigoHex: '#4f8cff', activo: true });
     this.modalAbierto.set(true);
   }
 
@@ -68,6 +83,7 @@ export class ProyectosListaComponent implements OnInit {
       nombre: proyecto.nombre,
       clave: proyecto.clave,
       codigoHex: proyecto.codigoHex,
+      activo: proyecto.activo !== false,
     });
     this.modalAbierto.set(true);
   }

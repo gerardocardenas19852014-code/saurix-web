@@ -5,6 +5,15 @@
   </div>
 </div>
 
+<div class="grid-toolbar">
+  <div class="grid-filter">
+    <label class="board-filter-field board-filter-checkbox" style="margin:0;">
+      <input type="checkbox" [checked]="mostrarInactivos()" (change)="mostrarInactivos.set($any($event.target).checked)" />
+      Mostrar inactivas
+    </label>
+  </div>
+</div>
+
 <div class="grid-table-scroll">
   <table class="grid-table">
     <thead>
@@ -14,17 +23,23 @@
         <th>Color</th>
         <th>SLA (hrs)</th>
         <th>Aviso (hrs antes)</th>
+        <th>Activa</th>
         <th class="grid-actions-col">Acciones</th>
       </tr>
     </thead>
     <tbody>
-      @for (prioridad of prioridades(); track prioridad.id) {
+      @for (prioridad of prioridadesFiltradas(); track prioridad.id) {
         <tr>
           <td data-label="Clave">{{ prioridad.clave }}</td>
           <td data-label="Nombre">{{ prioridad.nombre }}</td>
           <td data-label="Color"><span class="color-swatch" [style.background]="prioridad.codigoHex"></span></td>
           <td data-label="SLA (hrs)">{{ prioridad.vigenciaHoras }}</td>
           <td data-label="Aviso (hrs antes)">{{ prioridad.avisoHoras }}</td>
+          <td data-label="Activa">
+            <span class="grid-badge {{ prioridad.activo !== false ? 'grid-badge-success' : 'grid-badge-muted' }}">
+              {{ prioridad.activo !== false ? 'Sí' : 'No' }}
+            </span>
+          </td>
           <td class="grid-actions-col" data-label="Acciones">
             <button type="button" class="btn-secondary small" (click)="editar(prioridad)">Editar</button>
             <button type="button" class="btn-danger small" (click)="pedirEliminar(prioridad)">Eliminar</button>
@@ -32,7 +47,7 @@
         </tr>
       } @empty {
         <tr>
-          <td colspan="6">
+          <td colspan="7">
             <div class="empty-state-block">
               <p>Sin registros para mostrar.</p>
             </div>
@@ -78,6 +93,13 @@
           @if (equivalenciaAviso()) {
             <span class="hint" style="display:block; margin-top: 4px;">{{ equivalenciaAviso() }}</span>
           }
+        </label>
+      </div>
+
+      <div class="edit-form" style="margin-bottom: 18px;">
+        <label class="checkbox-inline">
+          <input type="checkbox" formControlName="activo" />
+          Activa
         </label>
       </div>
 

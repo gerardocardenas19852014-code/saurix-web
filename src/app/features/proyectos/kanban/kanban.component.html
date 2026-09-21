@@ -241,7 +241,7 @@
             Tipo
             <select formControlName="ticketTipoId">
               <option [ngValue]="0" disabled>Selecciona un tipo</option>
-              @for (tipo of tipos(); track tipo.id) {
+              @for (tipo of tiposSeleccionables(); track tipo.id) {
                 <option [ngValue]="tipo.id">{{ tipo.icono }} {{ tipo.nombre }}</option>
               }
             </select>
@@ -250,7 +250,7 @@
             Prioridad
             <select formControlName="ticketPrioridadId">
               <option [ngValue]="0" disabled>Selecciona una prioridad</option>
-              @for (prioridad of prioridades(); track prioridad.id) {
+              @for (prioridad of prioridadesSeleccionables(); track prioridad.id) {
                 <option [ngValue]="prioridad.id">{{ prioridad.nombre }}</option>
               }
             </select>
@@ -260,7 +260,7 @@
             Módulo
             <select formControlName="ticketModuloId">
               <option [ngValue]="0">Sin módulo</option>
-              @for (modulo of modulos(); track modulo.id) {
+              @for (modulo of modulosSeleccionables(); track modulo.id) {
                 <option [ngValue]="modulo.id">{{ modulo.icono }} {{ modulo.nombre }}</option>
               }
             </select>
@@ -440,7 +440,7 @@
             Tipo
             <select formControlName="ticketTipoId">
               <option [ngValue]="0" disabled>Selecciona un tipo</option>
-              @for (tipo of tipos(); track tipo.id) {
+              @for (tipo of tiposSeleccionables(); track tipo.id) {
                 <option [ngValue]="tipo.id">{{ tipo.icono }} {{ tipo.nombre }}</option>
               }
             </select>
@@ -449,7 +449,7 @@
             Prioridad
             <select formControlName="ticketPrioridadId">
               <option [ngValue]="0" disabled>Selecciona una prioridad</option>
-              @for (prioridad of prioridades(); track prioridad.id) {
+              @for (prioridad of prioridadesSeleccionables(); track prioridad.id) {
                 <option [ngValue]="prioridad.id">{{ prioridad.nombre }}</option>
               }
             </select>
@@ -459,7 +459,7 @@
             Módulo
             <select formControlName="ticketModuloId">
               <option [ngValue]="0">Sin módulo</option>
-              @for (modulo of modulos(); track modulo.id) {
+              @for (modulo of modulosSeleccionables(); track modulo.id) {
                 <option [ngValue]="modulo.id">{{ modulo.icono }} {{ modulo.nombre }}</option>
               }
             </select>

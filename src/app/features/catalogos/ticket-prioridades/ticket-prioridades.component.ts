@@ -24,6 +24,13 @@ export class TicketPrioridadesComponent implements OnInit {
 
   protected readonly prioridades = signal<TicketPrioridad[]>([]);
   protected readonly cargando = signal(false);
+  /** false por defecto: las prioridades desactivadas se ocultan de la lista (y de
+   *  los combos de selección al crear/editar un ticket) salvo que se marque esta
+   *  casilla — alternativa al borrado duro (que ya se bloquea si algún ticket la usa). */
+  protected readonly mostrarInactivos = signal(false);
+  protected readonly prioridadesFiltradas = computed(() =>
+    this.prioridades().filter((p) => this.mostrarInactivos() || p.activo !== false),
+  );
 
   protected readonly modalAbierto = signal(false);
   protected readonly prioridadEnEdicion = signal<TicketPrioridad | null>(null);
@@ -44,6 +51,7 @@ export class TicketPrioridadesComponent implements OnInit {
     // desde el instante en que se crea (siempre se ve "🔥 Vencido").
     vigenciaHoras: [24, [Validators.required, Validators.min(1)]],
     avisoHoras: [4, [Validators.required, Validators.min(1)]],
+    activo: [true],
   });
 
   /** Texto de ayuda "≈ X d Y h" bajo cada campo de horas — 504/250 horas es
@@ -92,7 +100,15 @@ export class TicketPrioridadesComponent implements OnInit {
 
   nueva(): void {
     this.prioridadEnEdicion.set(null);
-    this.form.reset({ id: 0, nombre: '', clave: '', codigoHex: '#ff4f4f', vigenciaHoras: 24, avisoHoras: 4 });
+    this.form.reset({
+      id: 0,
+      nombre: '',
+      clave: '',
+      codigoHex: '#ff4f4f',
+      vigenciaHoras: 24,
+      avisoHoras: 4,
+      activo: true,
+    });
     this.notificacionesOriginales = [];
     this.usuarioIdsNotificar.set([]);
     this.modalAbierto.set(true);
@@ -107,6 +123,7 @@ export class TicketPrioridadesComponent implements OnInit {
       codigoHex: prioridad.codigoHex,
       vigenciaHoras: prioridad.vigenciaHoras,
       avisoHoras: prioridad.avisoHoras,
+      activo: prioridad.activo !== false,
     });
     this.notificacionesOriginales = [];
     this.usuarioIdsNotificar.set([]);

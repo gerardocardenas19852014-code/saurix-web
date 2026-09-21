@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
@@ -28,6 +28,13 @@ export class TicketModulosComponent implements OnInit {
   protected readonly modulos = signal<TicketModulo[]>([]);
   protected readonly cargando = signal(false);
   protected readonly busqueda = signal('');
+  /** false por defecto: los módulos desactivados se ocultan de la lista (y de los
+   *  combos de selección al crear/editar un ticket) salvo que se marque esta
+   *  casilla — alternativa al borrado duro (que ya se bloquea si algún ticket lo usa). */
+  protected readonly mostrarInactivos = signal(false);
+  protected readonly modulosFiltrados = computed(() =>
+    this.modulos().filter((m) => this.mostrarInactivos() || m.activo !== false),
+  );
 
   protected readonly modalAbierto = signal(false);
   protected readonly moduloEnEdicion = signal<TicketModulo | null>(null);
@@ -37,6 +44,12 @@ export class TicketModulosComponent implements OnInit {
     { campo: 'clave', etiqueta: 'Clave' },
     { campo: 'nombre', etiqueta: 'Nombre' },
     { campo: 'icono', etiqueta: 'Icono' },
+    {
+      campo: 'activo',
+      etiqueta: 'Activo',
+      formatear: (fila) => (fila.activo !== false ? 'Sí' : 'No'),
+      claseValor: (fila) => (fila.activo !== false ? 'grid-badge-success' : 'grid-badge-muted'),
+    },
   ];
 
   protected readonly form = this.fb.nonNullable.group({
@@ -44,6 +57,7 @@ export class TicketModulosComponent implements OnInit {
     nombre: ['', Validators.required],
     clave: ['', Validators.required],
     icono: [''],
+    activo: [true],
   });
 
   /** Emojis sugeridos pensando en áreas/módulos típicos de un sistema. */
@@ -72,13 +86,19 @@ export class TicketModulosComponent implements OnInit {
 
   nuevo(): void {
     this.moduloEnEdicion.set(null);
-    this.form.reset({ id: 0, nombre: '', clave: '', icono: '' });
+    this.form.reset({ id: 0, nombre: '', clave: '', icono: '', activo: true });
     this.modalAbierto.set(true);
   }
 
   editar(modulo: TicketModulo): void {
     this.moduloEnEdicion.set(modulo);
-    this.form.reset({ id: modulo.id, nombre: modulo.nombre, clave: modulo.clave, icono: modulo.icono ?? '' });
+    this.form.reset({
+      id: modulo.id,
+      nombre: modulo.nombre,
+      clave: modulo.clave,
+      icono: modulo.icono ?? '',
+      activo: modulo.activo !== false,
+    });
     this.modalAbierto.set(true);
   }
 

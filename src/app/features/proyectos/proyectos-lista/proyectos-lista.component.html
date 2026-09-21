@@ -13,12 +13,16 @@
       [value]="busqueda()"
       (input)="busqueda.set($any($event.target).value); cargar()"
     />
+    <label class="board-filter-field board-filter-checkbox" style="margin:0;">
+      <input type="checkbox" [checked]="mostrarInactivos()" (change)="mostrarInactivos.set($any($event.target).checked)" />
+      Mostrar inactivos
+    </label>
   </div>
 </div>
 
 <app-data-table
   [columnas]="columnas"
-  [filas]="proyectos()"
+  [filas]="proyectosFiltrados()"
   [cargando]="cargando()"
   (editar)="editar($event)"
   (eliminar)="pedirEliminar($event)"
@@ -43,6 +47,11 @@
         <label>
           Color
           <input type="color" formControlName="codigoHex" />
+        </label>
+
+        <label class="checkbox-inline">
+          <input type="checkbox" formControlName="activo" />
+          Activo
         </label>
       </div>
 

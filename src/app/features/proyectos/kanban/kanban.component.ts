@@ -414,6 +414,25 @@ export class KanbanComponent implements OnInit, OnDestroy {
     return this.usuarios().find((u) => Number(u.id) === Number(id))?.nombreCompleto ?? '—';
   }
 
+  /** Opciones que se ofrecen al crear/editar un ticket (Tipo/Prioridad/Módulo): un
+   *  catálogo desactivado deja de ofrecerse para asignaciones nuevas, pero si el
+   *  ticket en edición ya lo tenía asignado, se sigue mostrando esa opción — si no,
+   *  el <select> nativo se queda sin ninguna opción que calce con el valor guardado
+   *  y aparenta (visualmente) haber cambiado de tipo/prioridad/módulo sin que nadie
+   *  lo haya tocado. */
+  protected readonly tiposSeleccionables = computed(() => {
+    const actual = this.ticketEnEdicion()?.ticketTipoId ?? null;
+    return this.tipos().filter((t) => t.activo !== false || Number(t.id) === Number(actual));
+  });
+  protected readonly prioridadesSeleccionables = computed(() => {
+    const actual = this.ticketEnEdicion()?.ticketPrioridadId ?? null;
+    return this.prioridades().filter((p) => p.activo !== false || Number(p.id) === Number(actual));
+  });
+  protected readonly modulosSeleccionables = computed(() => {
+    const actual = this.ticketEnEdicion()?.ticketModuloId ?? null;
+    return this.modulos().filter((m) => m.activo !== false || Number(m.id) === Number(actual));
+  });
+
   columnaActualDe(ticket: Ticket): TableroColumna | undefined {
     return this.columnasTablero().find((c) => Number(c.id) === Number(ticket.tableroColumnaId));
   }
