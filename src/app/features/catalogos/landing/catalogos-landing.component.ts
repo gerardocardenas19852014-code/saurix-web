@@ -67,7 +67,7 @@ const CATALOGOS: EnlaceCatalogo[] = [
     color: 'generic',
     titulo: 'Módulos',
     descripcion: 'Módulo o área del sistema al que pertenece un ticket (Frontend, Backend, Base de datos, etc.).',
-    grupo: 'Gestión de Proyectos',
+    grupo: 'General',
   },
 ];
 

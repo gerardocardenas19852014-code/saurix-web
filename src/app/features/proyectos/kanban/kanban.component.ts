@@ -585,6 +585,26 @@ export class KanbanComponent implements OnInit, OnDestroy {
   guardarTicket(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      // Con los campos repartidos en pestañas (Detalles/Fechas/Solución), un campo
+      // obligatorio vacío en una pestaña que no es la activa dejaba "Guardar cambios"
+      // sin hacer nada, sin ninguna pista de qué faltaba — hay que saltar a la
+      // pestaña con el problema y avisar, si no parece que el botón no funciona.
+      const controlesFechas = [
+        this.form.controls.tiempoEstimadoDias,
+        this.form.controls.fechaFinAnalisis,
+        this.form.controls.fechaFinDesarrollo,
+        this.form.controls.fechaFinCliente,
+      ];
+      if (controlesFechas.some((c) => c.invalid)) {
+        this.tabActiva.set('fechas');
+        this.toast.advertencia('Antes de guardar hay campos obligatorios sin llenar en la pestaña "Fechas".');
+      } else if (this.form.controls.solucion.invalid) {
+        this.tabActiva.set('solucion');
+        this.toast.advertencia('Antes de guardar hay campos obligatorios sin llenar en la pestaña "Solución".');
+      } else {
+        this.tabActiva.set('detalles');
+        this.toast.advertencia('Antes de guardar hay campos obligatorios sin llenar en "Detalles".');
+      }
       return;
     }
 
