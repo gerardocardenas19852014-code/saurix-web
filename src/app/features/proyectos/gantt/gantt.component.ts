@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DataClientService } from '../../../core/services/data-client.service';
+import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
 import { ProyectoOpcion, TableroColumna } from '../tableros/tablero-columna.model';
-import { Ticket } from '../kanban/ticket.model';
+import { Ticket, UsuarioOpcion } from '../kanban/ticket.model';
 import { TicketTipo } from '../ticket-tipos/ticket-tipo.model';
 import { TicketPrioridad } from '../ticket-prioridades/ticket-prioridad.model';
 
@@ -19,6 +20,8 @@ interface TicketConBarra {
   widthPx: number;
   sinEstimacion: boolean;
   color: string;
+  colorTexto: '#fff' | '#1a1a1a';
+  asignadoNombre: string;
 }
 
 interface GrupoEstado {
@@ -28,13 +31,16 @@ interface GrupoEstado {
 
 /**
  * Diagrama de Gantt de un proyecto a la vez. La línea de tiempo de cada
- * ticket se calcula así (decisión confirmada con el usuario):
- *  - Inicio de la barra = Ticket.fechaCreacion.
- *  - Duración de la barra = Ticket.tiempoEstimadoMin / 1440 (días) — el campo
- *    real sigue en MINUTOS (igual que en Kanban/Reportes de horas), aquí solo
+ * ticket se calcula así:
+ *  - Inicio de la barra = Ticket.fechaInicio si se capturó, si no Ticket.fechaCreacion.
+ *  - Fin/duración de la barra = Ticket.fechaFin si se capturó (duración = fechaFin -
+ *    inicio); si no hay fechaFin, se usa Ticket.tiempoEstimadoMin / 1440 (días) — el
+ *    campo real sigue en MINUTOS (igual que en Kanban/Reportes de horas), aquí solo
  *    se convierte para dibujar; nunca se lee como si ya fueran días.
- * Los tickets sin fecha de creación no tienen dónde ubicarse en la línea de
- * tiempo y se excluyen del diagrama (se informa cuántos quedaron fuera).
+ * fechaInicio/fechaFin son opcionales (pensados solo para este diagrama); un ticket
+ * sin ninguno de los dos sigue mostrándose con el cálculo original (creación + estimado).
+ * Los tickets sin fecha de creación NI de inicio no tienen dónde ubicarse en la línea
+ * de tiempo y se excluyen del diagrama (se informa cuántos quedaron fuera).
  */
 @Component({
   selector: 'app-gantt',
@@ -57,13 +63,14 @@ export class GanttComponent implements OnInit {
   protected readonly tickets = signal<Ticket[]>([]);
   protected readonly tipos = signal<TicketTipo[]>([]);
   protected readonly prioridades = signal<TicketPrioridad[]>([]);
+  protected readonly usuarios = signal<UsuarioOpcion[]>([]);
   protected readonly cargando = signal(false);
 
   protected readonly ticketsConFecha = computed(() =>
-    this.tickets().filter((t) => t.activo !== false && !!t.fechaCreacion),
+    this.tickets().filter((t) => t.activo !== false && !!(t.fechaInicio || t.fechaCreacion)),
   );
   protected readonly cantidadSinFecha = computed(
-    () => this.tickets().filter((t) => t.activo !== false && !t.fechaCreacion).length,
+    () => this.tickets().filter((t) => t.activo !== false && !t.fechaInicio && !t.fechaCreacion).length,
   );
 
   protected readonly rango = computed(() => {
@@ -155,6 +162,11 @@ export class GanttComponent implements OnInit {
     });
     this.data.list<TicketTipo>('TicketTipo').subscribe((tipos) => this.tipos.set(tipos));
     this.data.list<TicketPrioridad>('TicketPrioridad').subscribe((prioridades) => this.prioridades.set(prioridades));
+    // 'Usuario' no trae un campo nombreCompleto propio (ver Usuario.model.ts) — hay que
+    // armarlo con nombreCompletoUsuario(), igual que en Kanban.
+    this.data.list<Usuario>('Usuario').subscribe((usuarios) =>
+      this.usuarios.set(usuarios.map((u) => ({ id: u.id, nombreCompleto: nombreCompletoUsuario(u) }))),
+    );
   }
 
   cambiarProyecto(id: number): void {
@@ -172,6 +184,11 @@ export class GanttComponent implements OnInit {
 
   colorPrioridad(id: number): string {
     return this.prioridades().find((p) => Number(p.id) === Number(id))?.codigoHex ?? '#999';
+  }
+
+  nombreUsuario(id: number | null): string {
+    if (!id) return 'Sin asignar';
+    return this.usuarios().find((u) => Number(u.id) === Number(id))?.nombreCompleto ?? '—';
   }
 
   private cargarTablero(): void {
@@ -199,17 +216,31 @@ export class GanttComponent implements OnInit {
     const inicioMs = this.inicioDeTicket(ticket);
     const leftPx = rango ? Math.round(((inicioMs - rango.minMs) / this.MS_POR_DIA) * this.ANCHO_DIA) : 0;
     const widthPx = Math.round(this.duracionDiasDe(ticket) * this.ANCHO_DIA);
+    const color = this.colorPrioridad(ticket.ticketPrioridadId);
     return {
       ticket,
       leftPx,
       widthPx: Math.max(widthPx, 14),
-      sinEstimacion: !ticket.tiempoEstimadoMin,
-      color: this.colorPrioridad(ticket.ticketPrioridadId),
+      sinEstimacion: !ticket.fechaFin && !ticket.tiempoEstimadoMin,
+      color,
+      colorTexto: this.colorLegiblePara(color),
+      asignadoNombre: this.nombreUsuario(ticket.asignadoUsuarioId),
     };
   }
 
+  /** Colores de prioridad claros (amarillo, verde, etc.) dejan el texto blanco
+   *  ilegible encima — se elige negro o blanco según qué tan clara sea la barra. */
+  private colorLegiblePara(hex: string): '#fff' | '#1a1a1a' {
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex.trim());
+    if (!m) return '#fff';
+    const [r, g, b] = [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
+    const luminancia = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    return luminancia > 165 ? '#1a1a1a' : '#fff';
+  }
+
   private inicioDeTicket(ticket: Ticket): number {
-    return this.inicioDelDia(ticket.fechaCreacion ? new Date(ticket.fechaCreacion).getTime() : Date.now());
+    const fecha = ticket.fechaInicio || ticket.fechaCreacion;
+    return this.inicioDelDia(fecha ? new Date(fecha).getTime() : Date.now());
   }
 
   private inicioDelDia(ms: number): number {
@@ -218,9 +249,18 @@ export class GanttComponent implements OnInit {
     return fecha.getTime();
   }
 
-  /** tiempoEstimadoMin está en MINUTOS (ver esquema-tablas-saurix.md) — se divide
-   *  entre 1440 solo para dibujar la barra; nunca se guarda ni se lee como días. */
+  /** Si el ticket tiene fechaFin capturada, esa manda sobre el estimado (se calcula
+   *  la duración real entre inicio y fin). Si no, tiempoEstimadoMin —que está en
+   *  MINUTOS, ver esquema-tablas-saurix.md— se divide entre 1440 solo para dibujar
+   *  la barra; nunca se guarda ni se lee como si ya fueran días. */
   private duracionDiasDe(ticket: Ticket): number {
+    if (ticket.fechaFin) {
+      const inicioMs = this.inicioDeTicket(ticket);
+      const finMs = this.inicioDelDia(new Date(ticket.fechaFin).getTime());
+      // +1 para incluir por completo el día de fin (si inicio === fin, dura ese mismo día).
+      const dias = (finMs - inicioMs) / this.MS_POR_DIA + 1;
+      return Math.max(dias, 0.5);
+    }
     const minutos = ticket.tiempoEstimadoMin;
     if (!minutos || minutos <= 0) return 0.5; // sin estimación: barra mínima visible
     return Math.max(minutos / 1440, 0.5);

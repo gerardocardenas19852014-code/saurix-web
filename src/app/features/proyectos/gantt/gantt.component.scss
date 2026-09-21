@@ -74,6 +74,14 @@
   text-overflow: ellipsis;
 }
 
+.gantt-asignado {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .gantt-row-timeline {
   position: relative;
   flex: 0 0 auto;
@@ -139,11 +147,15 @@
 }
 
 .gantt-bar-texto {
-  color: #fff;
   font-size: 0.72rem;
   font-weight: 600;
   white-space: nowrap;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+  // La sombra ayuda a separar el texto del color de fondo tanto en texto claro
+  // (sombra oscura) como oscuro (sombra clara) — sin esto, texto negro sobre un
+  // amarillo/verde saturado se sigue viendo "pegado" al color de la barra.
+  text-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.35),
+    0 1px 1px rgba(255, 255, 255, 0.35);
 }
 
 .gantt-leyenda {
