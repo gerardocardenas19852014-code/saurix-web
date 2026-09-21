@@ -6,7 +6,7 @@ import { colorAvatar } from '../kanban/avatar.util';
 import { Ticket, TicketActividad } from '../kanban/ticket.model';
 import { ProyectoOpcion } from '../tableros/tablero-columna.model';
 
-type PeriodoId = 'todo' | 'mes-actual' | 'mes-anterior' | 'anio-actual' | 'anio-anterior' | 'rango';
+type PeriodoId = 'todo' | 'mes-actual' | 'mes-anterior' | 'anio-actual' | 'anio-anterior';
 
 interface RangoFecha {
   inicio: Date;
@@ -52,9 +52,12 @@ export class ReportesHorasComponent implements OnInit {
 
   protected readonly filtroProyectoId = signal<number>(0);
   protected readonly periodo = signal<PeriodoId>('mes-actual');
-  /** Solo se usan cuando periodo() === 'rango' — formato yyyy-mm-dd (input type=date). */
+  /** Rango de fechas manual — siempre visible en el filtro (formato yyyy-mm-dd,
+   *  input type=date). En cuanto se llena Desde y/o Hasta, manda sobre el
+   *  preset de "Periodo" (que sigue disponible como atajo rápido). */
   protected readonly rangoDesde = signal<string>('');
   protected readonly rangoHasta = signal<string>('');
+  protected readonly hayRangoManual = computed(() => !!(this.rangoDesde() || this.rangoHasta()));
 
   ngOnInit(): void {
     this.cargando.set(true);
@@ -72,14 +75,6 @@ export class ReportesHorasComponent implements OnInit {
 
   private rangoDe(id: PeriodoId): RangoFecha | null {
     if (id === 'todo') return null;
-    if (id === 'rango') {
-      const desde = this.rangoDesde();
-      const hasta = this.rangoHasta();
-      if (!desde && !hasta) return null;
-      const inicio = desde ? new Date(`${desde}T00:00:00`) : new Date(0);
-      const fin = hasta ? new Date(`${hasta}T23:59:59`) : new Date(8640000000000000);
-      return { inicio, fin };
-    }
     const hoy = new Date();
     if (id === 'mes-actual' || id === 'mes-anterior') {
       const offset = id === 'mes-actual' ? 0 : -1;
@@ -93,7 +88,30 @@ export class ReportesHorasComponent implements OnInit {
     return { inicio: new Date(anio, 0, 1), fin: new Date(anio, 11, 31, 23, 59, 59) };
   }
 
+  /** Rango efectivo a aplicar: si hay un rango manual (Desde/Hasta) capturado,
+   *  ese manda; si no, se usa el preset de "Periodo" como antes. */
+  private readonly rangoManual = computed<RangoFecha | null>(() => {
+    const desde = this.rangoDesde();
+    const hasta = this.rangoHasta();
+    if (!desde && !hasta) return null;
+    const inicio = desde ? new Date(`${desde}T00:00:00`) : new Date(0);
+    const fin = hasta ? new Date(`${hasta}T23:59:59`) : new Date(8640000000000000);
+    return { inicio, fin };
+  });
+
+  protected readonly rangoActivo = computed<RangoFecha | null>(
+    () => this.rangoManual() ?? this.rangoDe(this.periodo()),
+  );
+
+  limpiarRangoManual(): void {
+    this.rangoDesde.set('');
+    this.rangoHasta.set('');
+  }
+
   protected readonly etiquetaPeriodo = computed(() => {
+    const desde = this.rangoDesde();
+    const hasta = this.rangoHasta();
+    if (desde || hasta) return `del ${desde || '…'} al ${hasta || '…'}`;
     switch (this.periodo()) {
       case 'todo':
         return 'todo el historial';
@@ -105,12 +123,6 @@ export class ReportesHorasComponent implements OnInit {
         return 'este año';
       case 'anio-anterior':
         return 'el año anterior';
-      case 'rango': {
-        const desde = this.rangoDesde();
-        const hasta = this.rangoHasta();
-        if (!desde && !hasta) return 'el rango elegido';
-        return `del ${desde || '…'} al ${hasta || '…'}`;
-      }
     }
   });
 
@@ -120,7 +132,7 @@ export class ReportesHorasComponent implements OnInit {
 
   /** Actividades que caen dentro del periodo elegido y, si aplica, del proyecto filtrado. */
   protected readonly actividadesFiltradas = computed(() => {
-    const rango = this.rangoDe(this.periodo());
+    const rango = this.rangoActivo();
     const proyectoId = this.filtroProyectoId();
     return this.actividades().filter((a) => {
       if (rango) {

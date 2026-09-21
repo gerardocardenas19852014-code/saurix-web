@@ -30,25 +30,30 @@
 
     <label class="board-filter-field">
       Periodo
-      <select [value]="periodo()" (change)="periodo.set($any($event.target).value)">
+      <select [value]="periodo()" (change)="periodo.set($any($event.target).value)" [disabled]="hayRangoManual()">
         <option value="mes-actual">Este mes</option>
         <option value="mes-anterior">Mes anterior</option>
         <option value="anio-actual">Este año</option>
         <option value="anio-anterior">Año anterior</option>
         <option value="todo">Todo el historial</option>
-        <option value="rango">Rango de fechas…</option>
       </select>
     </label>
 
-    @if (periodo() === 'rango') {
-      <label class="board-filter-field">
-        Desde
-        <input type="date" [value]="rangoDesde()" (change)="rangoDesde.set($any($event.target).value)" />
-      </label>
-      <label class="board-filter-field">
-        Hasta
-        <input type="date" [value]="rangoHasta()" (change)="rangoHasta.set($any($event.target).value)" />
-      </label>
+    <!-- Rango de fechas siempre visible (sin tener que elegir un modo aparte primero,
+         igual que el selector de Proyecto en Gantt) — en cuanto se llena Desde y/o
+         Hasta, manda sobre el preset de "Periodo" de arriba. -->
+    <label class="board-filter-field">
+      Desde
+      <input type="date" [value]="rangoDesde()" (change)="rangoDesde.set($any($event.target).value)" />
+    </label>
+    <label class="board-filter-field">
+      Hasta
+      <input type="date" [value]="rangoHasta()" (change)="rangoHasta.set($any($event.target).value)" />
+    </label>
+    @if (hayRangoManual()) {
+      <button type="button" class="btn-secondary small" style="align-self:flex-end;" (click)="limpiarRangoManual()">
+        ✕ Quitar rango
+      </button>
     }
   </div>
 
