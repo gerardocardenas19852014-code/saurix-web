@@ -107,7 +107,9 @@ export class ProyectosDashboardComponent implements OnInit {
       .filter(Boolean);
     return (
       (!proyectoId || Number(ticket.proyectoId) === proyectoId) &&
-      (!moduloId || Number(ticket.ticketModuloId) === moduloId) &&
+      // moduloId === 0 es "Todos" (sin filtro); -1 es el centinela de "Sin módulo"
+      // (tickets sin ticketModuloId); cualquier otro valor filtra por ese módulo.
+      (!moduloId || (moduloId === -1 ? !ticket.ticketModuloId : Number(ticket.ticketModuloId) === moduloId)) &&
       (!prioridadId || Number(ticket.ticketPrioridadId) === prioridadId) &&
       (!terminos.length ||
         terminos.some(

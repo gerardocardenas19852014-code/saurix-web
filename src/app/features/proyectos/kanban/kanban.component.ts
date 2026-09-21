@@ -199,7 +199,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
       (t) =>
         (conInactivos || t.activo !== false) &&
         (!tipoId || Number(t.ticketTipoId) === tipoId) &&
-        (!moduloId || Number(t.ticketModuloId) === moduloId) &&
+        // moduloId === 0 es "Todos" (sin filtro); -1 es el centinela de "Sin módulo"
+        // (tickets sin ticketModuloId); cualquier otro valor filtra por ese módulo.
+        (!moduloId || (moduloId === -1 ? !t.ticketModuloId : Number(t.ticketModuloId) === moduloId)) &&
         (!prioridadId || Number(t.ticketPrioridadId) === prioridadId) &&
         (!asignadoId || Number(t.asignadoUsuarioId) === asignadoId) &&
         (!terminos.length ||

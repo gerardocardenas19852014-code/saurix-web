@@ -31,6 +31,7 @@
     Módulo
     <select [value]="filtroModuloId()" (change)="filtroModuloId.set(+$any($event.target).value)">
       <option [value]="0">Todos</option>
+      <option [value]="-1">Sin módulo</option>
       @for (modulo of modulos(); track modulo.id) {
         <option [value]="modulo.id">{{ modulo.icono }} {{ modulo.nombre }}</option>
       }
