@@ -62,6 +62,14 @@ const GRUPOS: GrupoModulo[] = [
         descripcion: 'Horas registradas por usuario, por proyecto y por ticket.',
         grupo: 'Reportes',
       },
+      {
+        ruta: 'gantt',
+        icono: '📅',
+        color: 'personal',
+        titulo: 'Gantt',
+        descripcion: 'Línea de tiempo de los tickets de un proyecto.',
+        grupo: 'Reportes',
+      },
     ],
   },
 ];
