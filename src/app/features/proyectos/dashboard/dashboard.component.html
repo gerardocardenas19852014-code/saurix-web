@@ -73,6 +73,7 @@
         <thead>
           <tr>
             <th>Folio</th>
+            <th>Folio interno</th>
             <th>Título</th>
             <th>Proyecto</th>
             @if (usuarioViendoId() === ID_TODOS) {
@@ -95,6 +96,7 @@
               (keydown.space)="$event.preventDefault(); abrirTicket(r.ticket)"
             >
               <td data-label="Folio">#{{ r.ticket.numeroTicket }}</td>
+              <td data-label="Folio interno">{{ r.ticket.folioInterno || '—' }}</td>
               <td data-label="Título">{{ r.ticket.titulo }}</td>
               <td data-label="Proyecto">{{ r.proyectoClave }} — {{ r.proyectoNombre }}</td>
               @if (usuarioViendoId() === ID_TODOS) {
@@ -126,6 +128,7 @@
         <thead>
           <tr>
             <th>Folio</th>
+            <th>Folio interno</th>
             <th>Título</th>
             <th>Proyecto</th>
             @if (usuarioViendoId() === ID_TODOS) {
@@ -148,6 +151,7 @@
               (keydown.space)="$event.preventDefault(); abrirTicket(r.ticket)"
             >
               <td data-label="Folio">#{{ r.ticket.numeroTicket }}</td>
+              <td data-label="Folio interno">{{ r.ticket.folioInterno || '—' }}</td>
               <td data-label="Título">{{ r.ticket.titulo }}</td>
               <td data-label="Proyecto">{{ r.proyectoClave }} — {{ r.proyectoNombre }}</td>
               @if (usuarioViendoId() === ID_TODOS) {
