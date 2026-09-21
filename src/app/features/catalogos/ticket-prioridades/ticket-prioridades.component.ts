@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { forkJoin, of, switchMap } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
@@ -44,6 +45,26 @@ export class TicketPrioridadesComponent implements OnInit {
     vigenciaHoras: [24, [Validators.required, Validators.min(1)]],
     avisoHoras: [4, [Validators.required, Validators.min(1)]],
   });
+
+  /** Texto de ayuda "≈ X d Y h" bajo cada campo de horas — 504/250 horas es
+   *  difícil de leer de un vistazo, así que se muestra también en días+horas
+   *  (solo de lectura: el dato real que se guarda sigue siendo horas). */
+  private readonly vigenciaHorasEnVivo = toSignal(this.form.controls.vigenciaHoras.valueChanges, {
+    initialValue: this.form.controls.vigenciaHoras.value,
+  });
+  protected readonly equivalenciaVigencia = computed(() => this.equivalenciaEnDias(this.vigenciaHorasEnVivo()));
+
+  private readonly avisoHorasEnVivo = toSignal(this.form.controls.avisoHoras.valueChanges, {
+    initialValue: this.form.controls.avisoHoras.value,
+  });
+  protected readonly equivalenciaAviso = computed(() => this.equivalenciaEnDias(this.avisoHorasEnVivo()));
+
+  private equivalenciaEnDias(horas: number): string {
+    if (!horas || horas < 24) return '';
+    const dias = Math.floor(horas / 24);
+    const resto = horas % 24;
+    return resto > 0 ? `≈ ${dias} d ${resto} h` : `≈ ${dias} d`;
+  }
 
   ngOnInit(): void {
     this.cargar();

@@ -67,11 +67,17 @@
         <label>
           Vigencia SLA (horas)
           <input type="number" min="1" formControlName="vigenciaHoras" />
+          @if (equivalenciaVigencia()) {
+            <span class="hint" style="display:block; margin-top: 4px;">{{ equivalenciaVigencia() }}</span>
+          }
         </label>
 
         <label>
           Aviso antes de vencer (horas)
           <input type="number" min="1" formControlName="avisoHoras" />
+          @if (equivalenciaAviso()) {
+            <span class="hint" style="display:block; margin-top: 4px;">{{ equivalenciaAviso() }}</span>
+          }
         </label>
       </div>
 
