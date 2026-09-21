@@ -121,6 +121,15 @@
           />
         </label>
 
+        @if (usuarioEnEdicion()) {
+          <p class="hint full-span" style="margin: -8px 0 0;">
+            🔒 Por seguridad, la contraseña actual no se puede mostrar ni recuperar (se guarda como hash,
+            no en texto plano). Estos campos se ven vacíos porque dejarlos así conserva la contraseña que
+            ya tiene — no significa que no se haya guardado. Escribe una nueva aquí solo si quieres
+            cambiarla, o usa "Resetear contraseña" en la lista si el usuario la olvidó.
+          </p>
+        }
+
         <div class="toggle-row full-span">
           <span class="hint" style="margin:0;">Ver contraseñas</span>
           <label class="toggle-switch">
