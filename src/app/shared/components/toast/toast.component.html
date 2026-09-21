@@ -1,8 +1,8 @@
-<div class="toast-contenedor">
+<div class="sx-toast-contenedor">
   @for (toast of toastService.toasts(); track toast.id) {
-    <div class="toast" [class]="'toast--' + toast.tipo">
+    <div class="sx-toast" [class]="'sx-toast--' + toast.tipo">
       <span>{{ toast.mensaje }}</span>
-      <button type="button" class="toast__cerrar" (click)="toastService.cerrar(toast.id)" aria-label="Cerrar">
+      <button type="button" class="sx-toast__cerrar" (click)="toastService.cerrar(toast.id)" aria-label="Cerrar">
         ×
       </button>
     </div>
