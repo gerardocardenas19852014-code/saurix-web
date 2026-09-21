@@ -475,6 +475,25 @@ html[data-wide='grid'] .content { max-width: 1600px; }
 .tab-btn { background: none; border: none; border-bottom: 2px solid transparent; padding: 10px 4px; margin-right: 18px; font-family: 'JetBrains Mono', monospace; font-size: 13.5px; font-weight: 600; color: var(--ink-soft); cursor: pointer; transition: color .12s ease, border-color .12s ease; white-space: nowrap; flex-shrink: 0; }
 .tab-btn:hover { color: var(--text-strong); }
 .tab-btn.is-active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Menú "Más ▾" del detalle de ticket (kanban.component.html) — mismo patrón visual
+ * que .notif-panel (panel de notificaciones), pero colgando de una pestaña en vez
+ * de la campanita. */
+.tab-more-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+.tab-more-btn { display: inline-flex; align-items: center; gap: 4px; }
+.tab-more-menu {
+  display: none; position: absolute; top: 100%; left: 0; min-width: 180px;
+  background: var(--paper-raised); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 16px 32px -14px rgba(0, 0, 0, .35); z-index: 60; padding: 6px;
+}
+.tab-more-menu.open { display: block; }
+.tab-more-item {
+  display: block; width: 100%; text-align: left; padding: 8px 10px; border-radius: 8px;
+  background: none; border: none; cursor: pointer; font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; font-weight: 600; color: var(--ink-soft); margin-bottom: 2px;
+}
+.tab-more-item:hover { background: var(--accent-soft); color: var(--text-strong); }
+.tab-more-item.is-active { color: var(--accent); }
 .tab-panel { gap: 16px 24px; }
 .edit-form label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-family: 'JetBrains Mono', monospace; color: var(--ink-soft); min-width: 0; }
 .edit-form label.checkbox-inline { flex-direction: row; align-items: center; }

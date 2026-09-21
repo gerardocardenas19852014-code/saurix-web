@@ -125,6 +125,30 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly ticketActivo = signal<Ticket | null>(null);
   protected readonly ticketAEliminar = signal<Ticket | null>(null);
   protected readonly tabActiva = signal<TabDetalle>('detalles');
+
+  /** Pestañas del detalle agrupadas bajo el botón "Más ▾" — las 5 que menos se
+   *  consultan día a día, para no saturar la fila principal con las 10 juntas
+   *  (antes se desbordaba con scroll horizontal). */
+  private static readonly TABS_EN_MENU_MAS: readonly TabDetalle[] = [
+    'etiquetas',
+    'adjuntos',
+    'asociados',
+    'seguidores',
+    'historial',
+  ];
+  protected readonly menuTabsMasAbierto = signal(false);
+  protected readonly tabActivaEnMenuMas = computed(() =>
+    KanbanComponent.TABS_EN_MENU_MAS.includes(this.tabActiva()),
+  );
+
+  toggleMenuTabsMas(): void {
+    this.menuTabsMasAbierto.update((v) => !v);
+  }
+
+  seleccionarTab(tab: TabDetalle): void {
+    this.tabActiva.set(tab);
+    this.menuTabsMasAbierto.set(false);
+  }
   protected readonly comentarios = signal<TicketComentario[]>([]);
   protected readonly actividades = signal<TicketActividad[]>([]);
   protected readonly etiquetas = signal<TicketEtiqueta[]>([]);

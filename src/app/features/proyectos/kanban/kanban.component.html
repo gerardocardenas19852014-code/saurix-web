@@ -387,39 +387,67 @@
         </div>
       </div>
 
-      <div class="tab-bar">
-        <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'detalles'" (click)="tabActiva.set('detalles')">Detalles</button>
-        <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'fechas'" (click)="tabActiva.set('fechas')">Fechas</button>
+      <div class="tab-bar" style="overflow: visible;">
+        <!-- overflow: visible (a diferencia del resto de .tab-bar en la app): con
+             solo 6 elementos en la fila (5 pestañas + "Más ▾") ya no hace falta el
+             scroll horizontal, y así el menú desplegable de "Más ▾" no se corta
+             por el propio scroll del contenedor. -->
+        <!-- Solo las 5 más consultadas quedan en la fila principal, cada una como
+             ícono + contador (el nombre completo va en title/aria-label) — el resto
+             vive en el menú "Más ▾" de abajo. Antes las 10 pestañas juntas se
+             desbordaban con scroll horizontal. -->
+        <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'detalles'" (click)="seleccionarTab('detalles')" title="Detalles" aria-label="Detalles">
+          📋 Detalles
+        </button>
+        <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'fechas'" (click)="seleccionarTab('fechas')" title="Fechas" aria-label="Fechas">
+          📅 Fechas
+        </button>
         @if (tabsPermitidas().actividades) {
-          <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'actividades'" (click)="tabActiva.set('actividades')">
-            Actividades ({{ actividades().length }})
+          <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'actividades'" (click)="seleccionarTab('actividades')" title="Actividades" aria-label="Actividades">
+            ⏱️ {{ actividades().length }}
           </button>
         }
-        <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'comentarios'" (click)="tabActiva.set('comentarios')">
-          Comentarios ({{ comentarios().length }})
+        <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'comentarios'" (click)="seleccionarTab('comentarios')" title="Comentarios" aria-label="Comentarios">
+          💬 {{ comentarios().length }}
         </button>
-        <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'etiquetas'" (click)="tabActiva.set('etiquetas')">
-          Etiquetas ({{ etiquetas().length }})
+        <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'solucion'" (click)="seleccionarTab('solucion')" title="Solución" aria-label="Solución">
+          ✅ Solución
         </button>
-        @if (tabsPermitidas().adjuntos) {
-          <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'adjuntos'" (click)="tabActiva.set('adjuntos')">
-            Adjuntos
+
+        <div class="tab-more-wrap">
+          <button type="button" class="tab-btn tab-more-btn" [class.is-active]="tabActivaEnMenuMas()" (click)="toggleMenuTabsMas()">
+            @switch (tabActiva()) {
+              @case ('etiquetas') { 🏷️ Etiquetas }
+              @case ('adjuntos') { 📎 Adjuntos }
+              @case ('asociados') { 🔗 Asociados }
+              @case ('seguidores') { 👀 Seguidores }
+              @case ('historial') { 🕘 Historial }
+              @default { ⋯ Más }
+            }
+            <span aria-hidden="true">▾</span>
           </button>
-        }
-        @if (tabsPermitidas().asociados) {
-          <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'asociados'" (click)="tabActiva.set('asociados')">
-            Asociados ({{ dependencias().length }})
-          </button>
-        }
-        <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'seguidores'" (click)="tabActiva.set('seguidores')">
-          Seguidores ({{ seguidores().length }})
-        </button>
-        <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'historial'" (click)="tabActiva.set('historial')">
-          Historial
-        </button>
-        <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'solucion'" (click)="tabActiva.set('solucion')">
-          Solución
-        </button>
+          <div class="tab-more-menu" [class.open]="menuTabsMasAbierto()">
+            <button type="button" class="tab-more-item" [class.is-active]="tabActiva() === 'etiquetas'" (click)="seleccionarTab('etiquetas')">
+              🏷️ Etiquetas ({{ etiquetas().length }})
+            </button>
+            @if (tabsPermitidas().adjuntos) {
+              <button type="button" class="tab-more-item" [class.is-active]="tabActiva() === 'adjuntos'" (click)="seleccionarTab('adjuntos')">
+                📎 Adjuntos
+              </button>
+            }
+            @if (tabsPermitidas().asociados) {
+              <button type="button" class="tab-more-item" [class.is-active]="tabActiva() === 'asociados'" (click)="seleccionarTab('asociados')">
+                🔗 Asociados ({{ dependencias().length }})
+              </button>
+            }
+            <button type="button" class="tab-more-item" [class.is-active]="tabActiva() === 'seguidores'" (click)="seleccionarTab('seguidores')">
+              👀 Seguidores ({{ seguidores().length }})
+            </button>
+            <button type="button" class="tab-more-item" [class.is-active]="tabActiva() === 'historial'" (click)="seleccionarTab('historial')">
+              🕘 Historial
+            </button>
+          </div>
+        </div>
       </div>
 
       @if (tabActiva() === 'detalles') {
