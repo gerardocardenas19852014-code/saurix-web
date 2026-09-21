@@ -64,8 +64,16 @@
         @for (item of grupo.tickets; track item.ticket.id) {
           <div class="gantt-row">
             <div class="gantt-row-label">
-              <span class="gantt-folio">{{ item.ticket.numeroTicket }}</span>
+              <span class="gantt-folio">
+                {{ item.ticket.numeroTicket }}
+                @if (item.ticket.folioInterno) {
+                  · {{ item.ticket.folioInterno }}
+                }
+              </span>
               <span class="gantt-titulo" [title]="item.ticket.titulo">{{ item.ticket.titulo }}</span>
+              <span class="gantt-asignado" [title]="'Asignado a: ' + item.asignadoNombre">
+                👤 {{ item.asignadoNombre }}
+              </span>
             </div>
             <div
               class="gantt-row-timeline"
@@ -85,10 +93,13 @@
                   nombreTipo(item.ticket.ticketTipoId) +
                   ' · ' +
                   nombrePrioridad(item.ticket.ticketPrioridadId) +
+                  ' · Asignado a: ' + item.asignadoNombre +
                   (item.sinEstimacion ? ' · sin estimación (barra mínima)' : '')
                 "
               >
-                <span class="gantt-bar-texto">{{ item.ticket.folioInterno || item.ticket.numeroTicket }}</span>
+                <span class="gantt-bar-texto" [style.color]="item.colorTexto">
+                  {{ item.ticket.folioInterno || item.ticket.numeroTicket }}
+                </span>
               </div>
             </div>
           </div>

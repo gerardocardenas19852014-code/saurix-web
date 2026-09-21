@@ -270,6 +270,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
     fechaFinAnalisis: [''],
     fechaFinDesarrollo: [''],
     fechaFinCliente: [''],
+    // Opcionales, solo para el diagrama de Gantt — si se dejan en blanco, el Gantt
+    // sigue calculando con fechaCreacion + tiempoEstimadoDias, como antes.
+    fechaInicio: [''],
+    fechaFin: [''],
     solucion: [''],
     activo: [true],
   });
@@ -506,6 +510,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
       fechaFinAnalisis: '',
       fechaFinDesarrollo: '',
       fechaFinCliente: '',
+      fechaInicio: '',
+      fechaFin: '',
       solucion: '',
       activo: true,
     });
@@ -561,6 +567,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
       fechaFinAnalisis: valor.fechaFinAnalisis || null,
       fechaFinDesarrollo: valor.fechaFinDesarrollo || null,
       fechaFinCliente: valor.fechaFinCliente || null,
+      fechaInicio: valor.fechaInicio || null,
+      fechaFin: valor.fechaFin || null,
       solucion: valor.solucion || null,
       activo: valor.activo,
     };
@@ -712,6 +720,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
           fechaFinAnalisis: (completo.fechaFinAnalisis ?? '').slice(0, 10),
           fechaFinDesarrollo: (completo.fechaFinDesarrollo ?? '').slice(0, 10),
           fechaFinCliente: (completo.fechaFinCliente ?? '').slice(0, 10),
+          fechaInicio: (completo.fechaInicio ?? '').slice(0, 10),
+          fechaFin: (completo.fechaFin ?? '').slice(0, 10),
           solucion: completo.solucion ?? '',
           activo: completo.activo ?? true,
         });

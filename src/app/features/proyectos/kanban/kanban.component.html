@@ -258,6 +258,19 @@
           </label>
           <span></span>
 
+          <!-- Fechas planeadas SOLO para el diagrama de Gantt: si se dejan en blanco,
+               el Gantt sigue usando fecha de creación + tiempo estimado, como antes. -->
+          <label>
+            Inicio (Gantt)
+            <input type="date" formControlName="fechaInicio" />
+          </label>
+          <label>
+            Fin (Gantt)
+            <input type="date" formControlName="fechaFin" />
+          </label>
+          <span></span>
+          <span></span>
+
           <label>
             Tiempo estimado (días)
             <input type="number" min="0" step="0.5" formControlName="tiempoEstimadoDias" />
@@ -428,6 +441,19 @@
             Fin cliente
             <input type="date" formControlName="fechaFinCliente" />
           </label>
+          <span></span>
+
+          <!-- Fechas planeadas SOLO para el diagrama de Gantt: si se dejan en blanco,
+               el Gantt sigue usando fecha de creación + tiempo estimado, como antes. -->
+          <label>
+            Inicio (Gantt)
+            <input type="date" formControlName="fechaInicio" />
+          </label>
+          <label>
+            Fin (Gantt)
+            <input type="date" formControlName="fechaFin" />
+          </label>
+          <span></span>
           <span></span>
 
           <label>

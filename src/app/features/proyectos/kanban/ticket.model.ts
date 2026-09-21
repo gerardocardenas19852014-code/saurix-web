@@ -17,6 +17,11 @@ export interface Ticket {
   fechaFinAnalisis: string | null;
   fechaFinDesarrollo: string | null;
   fechaFinCliente: string | null;
+  /** Fecha de inicio/fin planeadas para el diagrama de Gantt — opcionales; si no
+   *  se capturan, el Gantt usa fechaCreacion (inicio) y tiempoEstimadoMin (duración),
+   *  igual que antes de que existieran estos dos campos. */
+  fechaInicio: string | null;
+  fechaFin: string | null;
   /** blob_text: no viene en GetList, solo se carga con GetById. */
   solucion?: string | null;
   activo: boolean;
