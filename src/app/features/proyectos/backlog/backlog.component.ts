@@ -114,6 +114,27 @@ export class BacklogComponent implements OnInit {
   }
 
   protected readonly ticketsBacklog = computed(() => this.tickets().filter((t) => !t.sprintId));
+
+  /** Búsqueda de texto libre para el Backlog — con muchos tickets sin sprint la
+   *  lista plana se vuelve difícil de manejar; mismo patrón (folio/folio interno/
+   *  título, varios términos con coma) que el resto de buscadores del sistema. */
+  protected readonly filtroBacklog = signal('');
+  protected readonly ticketsBacklogFiltrados = computed(() => {
+    const terminos = this.filtroBacklog()
+      .toLowerCase()
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if (!terminos.length) return this.ticketsBacklog();
+    return this.ticketsBacklog().filter((t) =>
+      terminos.some(
+        (termino) =>
+          t.numeroTicket.toLowerCase().includes(termino) ||
+          (t.folioInterno ?? '').toLowerCase().includes(termino) ||
+          t.titulo.toLowerCase().includes(termino),
+      ),
+    );
+  });
   protected ticketsDeSprint(sprintId: number): Ticket[] {
     return this.tickets().filter((t) => Number(t.sprintId) === Number(sprintId));
   }

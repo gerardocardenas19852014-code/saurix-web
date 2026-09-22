@@ -732,10 +732,9 @@
               </label>
               <label>
                 Asociar ticket
+                <p class="hint" style="margin: 0 0 6px;">{{ ticketsDisponiblesParaAsociarFiltrados().length }} resultado(s)</p>
                 <select formControlName="ticketRelacionadoId">
-                  <option [ngValue]="0" disabled>
-                    {{ ticketsDisponiblesParaAsociarFiltrados().length }} resultado(s) — selecciona uno
-                  </option>
+                  <option [ngValue]="0" disabled>Selecciona uno</option>
                   @for (ticket of ticketsDisponiblesParaAsociarFiltrados(); track ticket.id) {
                     <option [ngValue]="ticket.id">#{{ ticket.numeroTicket }} — {{ ticket.titulo }}</option>
                   }
@@ -812,10 +811,9 @@
                 </label>
                 <label class="full-span">
                   Convertir en subtarea
+                  <p class="hint" style="margin: 0 0 6px;">{{ ticketsDisponiblesParaSubtareaFiltrados().length }} resultado(s)</p>
                   <select formControlName="ticketId">
-                    <option [ngValue]="0" disabled>
-                      {{ ticketsDisponiblesParaSubtareaFiltrados().length }} resultado(s) — selecciona uno
-                    </option>
+                    <option [ngValue]="0" disabled>Selecciona uno</option>
                     @for (ticket of ticketsDisponiblesParaSubtareaFiltrados(); track ticket.id) {
                       <option [ngValue]="ticket.id">#{{ ticket.numeroTicket }} — {{ ticket.titulo }}</option>
                     }

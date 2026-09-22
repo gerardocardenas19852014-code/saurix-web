@@ -102,7 +102,7 @@
                   {{ nombrePrioridad(ticket.ticketPrioridadId) }}
                 </span>
                 <span class="hint" style="margin:0;">{{ nombreUsuarioAsignado(ticket.asignadoUsuarioId) }}</span>
-                <select [value]="ticket.sprintId ?? 0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
+                <select class="toolbar-select" [value]="ticket.sprintId ?? 0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
                   <option [value]="0">Backlog</option>
                   @for (s of sprintsDestino(); track s.id) {
                     <option [value]="s.id">{{ s.nombre }}</option>
@@ -117,16 +117,27 @@
   }
 
   <div class="panel" style="margin-top: 16px;">
-    <div class="panel-head">
-      <h2>Backlog ({{ ticketsBacklog().length }})</h2>
-      <p class="hint" style="margin: 4px 0 0;">Tickets sin sprint asignado. Usa "Mover a" para meterlos a un sprint.</p>
+    <div class="panel-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <div>
+        <h2>Backlog ({{ ticketsBacklogFiltrados().length }} de {{ ticketsBacklog().length }})</h2>
+        <p class="hint" style="margin: 4px 0 0;">Tickets sin sprint asignado. Usa "Mover a" para meterlos a un sprint.</p>
+      </div>
+      <input
+        type="search"
+        placeholder="Folio, folio interno o título… (varios con coma)"
+        style="max-width: 320px;"
+        [value]="filtroBacklog()"
+        (input)="filtroBacklog.set($any($event.target).value)"
+      />
     </div>
 
     @if (ticketsBacklog().length === 0) {
       <p class="empty">No hay tickets en el Backlog.</p>
+    } @else if (ticketsBacklogFiltrados().length === 0) {
+      <p class="empty">Ningún ticket del Backlog coincide con "{{ filtroBacklog() }}".</p>
     } @else {
       <ul class="actividades-list">
-        @for (ticket of ticketsBacklog(); track ticket.id) {
+        @for (ticket of ticketsBacklogFiltrados(); track ticket.id) {
           <li class="actividad-item">
             <div class="actividad-item-head" style="align-items:center; gap:10px; flex-wrap:wrap;">
               <a
@@ -146,7 +157,7 @@
               </span>
               <span class="hint" style="margin:0;">{{ nombreUsuarioAsignado(ticket.asignadoUsuarioId) }}</span>
               @if (sprintsDestino().length > 0) {
-                <select [value]="0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
+                <select class="toolbar-select" [value]="0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
                   <option [value]="0" disabled>Mover a…</option>
                   @for (s of sprintsDestino(); track s.id) {
                     <option [value]="s.id">{{ s.nombre }}</option>
