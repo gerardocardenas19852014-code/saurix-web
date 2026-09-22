@@ -96,6 +96,15 @@ export class BacklogComponent implements OnInit {
     return true;
   }
 
+  /** 2 vistas a elegir para esta pantalla (mismo patrón de pestañas que
+   *  Tablero Kanban/Lista) — antes se mostraban SIEMPRE los sprints Y el
+   *  Backlog agrupado por fecha en la misma página larga; ahora se elige
+   *  cuál ver, para no tener que hacer scroll por todo junto. */
+  protected readonly vistaBacklog = signal<'sprints' | 'backlog'>('sprints');
+  cambiarVistaBacklog(vista: 'sprints' | 'backlog'): void {
+    this.vistaBacklog.set(vista);
+  }
+
   protected readonly mostrarFormSprint = signal(false);
   protected readonly formSprint = this.fb.nonNullable.group({
     nombre: ['', Validators.required],

@@ -1,6 +1,14 @@
 <div class="page-header">
   <h1>Backlog</h1>
   <div class="page-actions">
+    <div class="tab-bar" style="margin: 0;">
+      <button type="button" class="tab-btn" [class.is-active]="vistaBacklog() === 'sprints'" (click)="cambiarVistaBacklog('sprints')">
+        🏃 Sprints
+      </button>
+      <button type="button" class="tab-btn" [class.is-active]="vistaBacklog() === 'backlog'" (click)="cambiarVistaBacklog('backlog')">
+        📋 Backlog
+      </button>
+    </div>
     <button type="button" class="toolbar-btn" (click)="toggleFormSprint()">
       {{ mostrarFormSprint() ? 'Cancelar' : '+ Nuevo sprint' }}
     </button>
@@ -97,6 +105,7 @@
 @if (cargando()) {
   <p class="hint" style="margin-top:16px;">Cargando…</p>
 } @else {
+  @if (vistaBacklog() === 'sprints') {
   @for (sprint of sprintsAbiertos(); track sprint.id) {
     <div class="panel" style="margin-top: 16px;">
       <div class="panel-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
@@ -151,7 +160,11 @@
                     class="actividad-item-texto"
                     style="text-decoration:none;"
                   >
-                    #{{ ticket.numeroTicket }} — {{ ticket.titulo }}
+                    #{{ ticket.numeroTicket }}
+                    @if (ticket.folioInterno) {
+                      <span class="hint" style="margin:0;">({{ ticket.folioInterno }})</span>
+                    }
+                    — {{ ticket.titulo }}
                   </a>
                   <span
                     class="kanban-tag"
@@ -181,6 +194,29 @@
     </div>
   }
 
+  @if (sprintsCerrados().length > 0) {
+    <div class="panel" style="margin-top: 16px;">
+      <div class="panel-head">
+        <h2>Sprints completados</h2>
+      </div>
+      <ul class="actividades-list">
+        @for (sprint of sprintsCerrados(); track sprint.id) {
+          <li class="actividad-item">
+            <div class="actividad-item-head">
+              <span class="actividad-item-texto">
+                {{ sprint.nombre }}
+                <span class="grid-badge grid-badge-muted">Cerrado</span>
+                — {{ ticketsDeSprintFiltrados(sprint.id).length }} ticket(s)
+              </span>
+            </div>
+          </li>
+        }
+      </ul>
+    </div>
+  }
+  }
+
+  @if (vistaBacklog() === 'backlog') {
   <div class="panel" style="margin-top: 16px;">
     <div class="panel-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
       <div>
@@ -238,7 +274,11 @@
                       class="actividad-item-texto"
                       style="text-decoration:none;"
                     >
-                      #{{ ticket.numeroTicket }} — {{ ticket.titulo }}
+                      #{{ ticket.numeroTicket }}
+                      @if (ticket.folioInterno) {
+                        <span class="hint" style="margin:0;">({{ ticket.folioInterno }})</span>
+                      }
+                      — {{ ticket.titulo }}
                     </a>
                     <span
                       class="kanban-tag"
@@ -271,24 +311,5 @@
     }
   </div>
 
-  @if (sprintsCerrados().length > 0) {
-    <div class="panel" style="margin-top: 16px;">
-      <div class="panel-head">
-        <h2>Sprints completados</h2>
-      </div>
-      <ul class="actividades-list">
-        @for (sprint of sprintsCerrados(); track sprint.id) {
-          <li class="actividad-item">
-            <div class="actividad-item-head">
-              <span class="actividad-item-texto">
-                {{ sprint.nombre }}
-                <span class="grid-badge grid-badge-muted">Cerrado</span>
-                — {{ ticketsDeSprintFiltrados(sprint.id).length }} ticket(s)
-              </span>
-            </div>
-          </li>
-        }
-      </ul>
-    </div>
   }
 }
