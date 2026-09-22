@@ -70,11 +70,13 @@ export class ShellComponent implements OnDestroy {
     { initialValue: this.router.url },
   );
 
-  /** El Tablero Kanban (y su vista Lista), Mi Dashboard, Proyectos y Reportes
-   *  de horas se ahogan en el ancho de lectura de 980px que usan el resto de
-   *  pantallas — con varias columnas o tablas anchas, ese límite obliga a
-   *  hacer scroll horizontal sin necesidad, así que a las cuatro se les da
-   *  todo el ancho disponible, igual que a Ticket (ver .content-wide). */
+  /** El Tablero Kanban (y su vista Lista), Mi Dashboard, Proyectos, Reportes
+   *  de horas, Gantt, Resumen ejecutivo y Backlog se ahogan en el ancho de
+   *  lectura de 980px que usan el resto de pantallas — con varias columnas o
+   *  tablas anchas, ese límite obliga a hacer scroll horizontal sin
+   *  necesidad, así que a todas se les da todo el ancho disponible, igual
+   *  que a Ticket (ver .content-wide). Backlog se agregó a pedido del
+   *  usuario, para que ocupe el mismo ancho que Reportes de horas. */
   private static readonly RUTAS_ANCHO_COMPLETO = [
     '/proyectos/tablero',
     '/proyectos/dashboard',
@@ -82,6 +84,7 @@ export class ShellComponent implements OnDestroy {
     '/proyectos/reportes-horas',
     '/proyectos/gantt',
     '/proyectos/resumen-ejecutivo',
+    '/proyectos/backlog',
   ];
   protected readonly contenidoAncho = computed(() =>
     ShellComponent.RUTAS_ANCHO_COMPLETO.some((ruta) => this.urlActual().startsWith(ruta)),

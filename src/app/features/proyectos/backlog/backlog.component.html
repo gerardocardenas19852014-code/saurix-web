@@ -101,7 +101,16 @@
     <div class="panel" style="margin-top: 16px;">
       <div class="panel-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
         <div>
-          <h2 style="margin-bottom: 4px;">
+          <h2 style="margin-bottom: 4px; display:flex; align-items:center; gap:8px;">
+            <button
+              type="button"
+              class="tab-more-item"
+              style="width:auto; padding:2px 6px;"
+              (click)="toggleSprint(sprint.id)"
+              [attr.aria-label]="sprintAbierto(sprint.id) ? 'Colapsar sprint' : 'Expandir sprint'"
+            >
+              <span aria-hidden="true">{{ sprintAbierto(sprint.id) ? '▾' : '▸' }}</span>
+            </button>
             {{ sprint.nombre }}
             <span class="grid-badge" [class.grid-badge-success]="sprint.estado === 'activo'" [class.grid-badge-neutral]="sprint.estado === 'planeado'">
               {{ sprint.estado === 'activo' ? 'Activo' : 'Planeado' }}
@@ -124,47 +133,49 @@
         </div>
       </div>
 
-      @if (ticketsDeSprintFiltrados(sprint.id).length === 0) {
-        <p class="empty">
-          {{ ticketsDeSprint(sprint.id).length === 0
-            ? 'Todavía no hay tickets en este sprint — muévelos desde el Backlog, más abajo.'
-            : 'Ningún ticket de este sprint coincide con los filtros activos.' }}
-        </p>
-      } @else {
-        <ul class="actividades-list compacta">
-          @for (ticket of ticketsDeSprintFiltrados(sprint.id).slice(0, cantidadVisible('sprint-' + sprint.id)); track ticket.id) {
-            <li class="actividad-item">
-              <div class="actividad-item-head" style="align-items:center; gap:10px; flex-wrap:wrap;">
-                <a
-                  [routerLink]="['/proyectos/tablero']"
-                  [queryParams]="{ ticket: ticket.id }"
-                  class="actividad-item-texto"
-                  style="text-decoration:none;"
-                >
-                  #{{ ticket.numeroTicket }} — {{ ticket.titulo }}
-                </a>
-                <span
-                  class="kanban-tag"
-                  [style.color]="colorPrioridad(ticket.ticketPrioridadId)"
-                  [title]="'Prioridad: ' + nombrePrioridad(ticket.ticketPrioridadId)"
-                >
-                  {{ nombrePrioridad(ticket.ticketPrioridadId) }}
-                </span>
-                <span class="hint" style="margin:0;">{{ nombreUsuarioAsignado(ticket.asignadoUsuarioId) }}</span>
-                <select class="toolbar-select" [value]="ticket.sprintId ?? 0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
-                  <option [value]="0">Backlog</option>
-                  @for (s of sprintsDestino(); track s.id) {
-                    <option [value]="s.id">{{ s.nombre }}</option>
-                  }
-                </select>
-              </div>
-            </li>
+      @if (sprintAbierto(sprint.id)) {
+        @if (ticketsDeSprintFiltrados(sprint.id).length === 0) {
+          <p class="empty">
+            {{ ticketsDeSprint(sprint.id).length === 0
+              ? 'Todavía no hay tickets en este sprint — muévelos desde el Backlog, más abajo.'
+              : 'Ningún ticket de este sprint coincide con los filtros activos.' }}
+          </p>
+        } @else {
+          <ul class="actividades-list compacta">
+            @for (ticket of ticketsDeSprintFiltrados(sprint.id).slice(0, cantidadVisible('sprint-' + sprint.id)); track ticket.id) {
+              <li class="actividad-item">
+                <div class="actividad-item-head" style="align-items:center; gap:10px; flex-wrap:wrap;">
+                  <a
+                    [routerLink]="['/proyectos/tablero']"
+                    [queryParams]="{ ticket: ticket.id }"
+                    class="actividad-item-texto"
+                    style="text-decoration:none;"
+                  >
+                    #{{ ticket.numeroTicket }} — {{ ticket.titulo }}
+                  </a>
+                  <span
+                    class="kanban-tag"
+                    [style.color]="colorPrioridad(ticket.ticketPrioridadId)"
+                    [title]="'Prioridad: ' + nombrePrioridad(ticket.ticketPrioridadId)"
+                  >
+                    {{ nombrePrioridad(ticket.ticketPrioridadId) }}
+                  </span>
+                  <span class="hint" style="margin:0;">{{ nombreUsuarioAsignado(ticket.asignadoUsuarioId) }}</span>
+                  <select class="toolbar-select" [value]="ticket.sprintId ?? 0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
+                    <option [value]="0">Backlog</option>
+                    @for (s of sprintsDestino(); track s.id) {
+                      <option [value]="s.id">{{ s.nombre }}</option>
+                    }
+                  </select>
+                </div>
+              </li>
+            }
+          </ul>
+          @if (ticketsDeSprintFiltrados(sprint.id).length > cantidadVisible('sprint-' + sprint.id)) {
+            <button type="button" class="btn-secondary small" style="margin-top:8px;" (click)="verMas('sprint-' + sprint.id)">
+              Ver más ({{ ticketsDeSprintFiltrados(sprint.id).length - cantidadVisible('sprint-' + sprint.id) }} restantes)
+            </button>
           }
-        </ul>
-        @if (ticketsDeSprintFiltrados(sprint.id).length > cantidadVisible('sprint-' + sprint.id)) {
-          <button type="button" class="btn-secondary small" style="margin-top:8px;" (click)="verMas('sprint-' + sprint.id)">
-            Ver más ({{ ticketsDeSprintFiltrados(sprint.id).length - cantidadVisible('sprint-' + sprint.id) }} restantes)
-          </button>
         }
       }
     </div>

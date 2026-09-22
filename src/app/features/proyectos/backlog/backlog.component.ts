@@ -307,6 +307,25 @@ export class BacklogComponent implements OnInit {
    *  (planeado o el activo); uno cerrado no se puede volver a usar. */
   protected readonly sprintsDestino = computed(() => this.sprints().filter((s) => s.estado !== 'cerrado'));
 
+  /** Colapsar/expandir cada panel de sprint por separado — a pedido del
+   *  usuario, cuando hay varios sprints abiertos a la vez conviene poder
+   *  ocultar el detalle (lista de tickets) de los que no se están usando en
+   *  ese momento, sin perder de vista el encabezado (nombre/fechas/acciones).
+   *  Arrancan todos expandidos (mismo comportamiento que antes de este
+   *  cambio); colapsado es un estado explícito por sprint. */
+  private readonly sprintsColapsados = signal<Set<number>>(new Set());
+  protected sprintAbierto(sprintId: number): boolean {
+    return !this.sprintsColapsados().has(sprintId);
+  }
+  protected toggleSprint(sprintId: number): void {
+    this.sprintsColapsados.update((set) => {
+      const nuevo = new Set(set);
+      if (nuevo.has(sprintId)) nuevo.delete(sprintId);
+      else nuevo.add(sprintId);
+      return nuevo;
+    });
+  }
+
   protected nombrePrioridad(id: number): string {
     return this.prioridades().find((p) => Number(p.id) === Number(id))?.nombre ?? '—';
   }
