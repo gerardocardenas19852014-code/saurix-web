@@ -4,7 +4,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Observable, forkJoin, of } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ToastService } from '../../../shared/services/toast.service';
-import { colorAvatar } from '../kanban/avatar.util';
+import { colorAvatar, iniciales } from '../kanban/avatar.util';
 import { Ticket } from '../kanban/ticket.model';
 import { ProyectoOpcion, TableroColumna } from '../tableros/tablero-columna.model';
 import { TicketPrioridad } from '../ticket-prioridades/ticket-prioridad.model';
@@ -41,6 +41,7 @@ export class BacklogComponent implements OnInit {
   protected readonly toast = inject(ToastService);
 
   protected readonly colorAvatar = colorAvatar;
+  protected readonly iniciales = iniciales;
   protected readonly nombreCompletoUsuario = nombreCompletoUsuario;
 
   protected readonly cargando = signal(false);
@@ -103,6 +104,22 @@ export class BacklogComponent implements OnInit {
   protected readonly vistaBacklog = signal<'sprints' | 'backlog'>('sprints');
   cambiarVistaBacklog(vista: 'sprints' | 'backlog'): void {
     this.vistaBacklog.set(vista);
+  }
+
+  /** Formato de cada ticket dentro de un sprint o del Backlog: Lista (filas
+   *  compactas, el default de siempre) o Tarjetas (mismo diseño .kanban-card
+   *  que el Tablero Kanban) — a pedido del usuario, para poder elegir entre
+   *  las dos formas de ver los tickets, igual que Tablero/Lista. */
+  protected readonly formatoTicket = signal<'lista' | 'tarjeta'>('lista');
+  cambiarFormatoTicket(formato: 'lista' | 'tarjeta'): void {
+    this.formatoTicket.set(formato);
+  }
+
+  /** Recorta una lista de tickets a lo visible según la paginación de esa
+   *  clave — evita repetir el .slice(...) en la vista de Lista y la de
+   *  Tarjetas para la misma lista. */
+  protected ticketsVisibles(lista: Ticket[], clave: string): Ticket[] {
+    return lista.slice(0, this.cantidadVisible(clave));
   }
 
   protected readonly mostrarFormSprint = signal(false);
@@ -349,6 +366,19 @@ export class BacklogComponent implements OnInit {
 
   protected nombrePrioridad(id: number): string {
     return this.prioridades().find((p) => Number(p.id) === Number(id))?.nombre ?? '—';
+  }
+
+  protected nombreTipo(id: number | null): string {
+    return this.tipos().find((t) => Number(t.id) === Number(id))?.nombre ?? '—';
+  }
+  protected iconoTipo(id: number | null): string {
+    return this.tipos().find((t) => Number(t.id) === Number(id))?.icono ?? '';
+  }
+  protected nombreModulo(id: number | null): string {
+    return this.modulos().find((m) => Number(m.id) === Number(id))?.nombre ?? '—';
+  }
+  protected iconoModulo(id: number | null): string {
+    return this.modulos().find((m) => Number(m.id) === Number(id))?.icono ?? '';
   }
   protected colorPrioridad(id: number): string {
     return this.prioridades().find((p) => Number(p.id) === Number(id))?.codigoHex ?? '#999';

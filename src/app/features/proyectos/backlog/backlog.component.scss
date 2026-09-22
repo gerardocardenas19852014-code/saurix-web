@@ -17,3 +17,22 @@
   font-size: 12.5px;
   gap: 6px;
 }
+
+/* Vista "Tarjetas" (☰ Lista / ▦ Tarjetas, ver formatoTicket): reutiliza el
+ * diseño .kanban-card del Tablero Kanban tal cual, solo se agrega la
+ * cuadrícula que las envuelve — a diferencia del Tablero, aquí las tarjetas
+ * no se arrastran (no hay drag&drop en Backlog), así que se quita el cursor
+ * "grab" heredado y se permite que el "Mover a" quede en varias líneas. */
+.tarjetas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin-top: 4px;
+}
+.tarjetas-grid .kanban-card {
+  cursor: default;
+}
+.tarjetas-grid .kanban-card-foot {
+  flex-wrap: wrap;
+  gap: 8px;
+}
