@@ -135,6 +135,62 @@ export class BacklogComponent implements OnInit {
       ),
     );
   });
+
+  /** Agrupa el Backlog por mes de creación (Ticket.fechaCreacion) — con muchos
+   *  tickets sin sprint, una sola lista plana es difícil de manejar; agruparlos
+   *  en bloques por fecha (más reciente primero) da anclas visuales para
+   *  ubicarse, en vez de tener que hacer scroll por una lista gigante. Los
+   *  tickets sin fechaCreacion (dato legado) caen en un bloque "Sin fecha" al
+   *  final, no se pierden ni rompen el orden cronológico del resto. */
+  protected readonly gruposBacklogPorFecha = computed(() => {
+    const grupos = new Map<string, Ticket[]>();
+    for (const t of this.ticketsBacklogFiltrados()) {
+      const clave = t.fechaCreacion ? t.fechaCreacion.slice(0, 7) : 'sin-fecha';
+      if (!grupos.has(clave)) grupos.set(clave, []);
+      grupos.get(clave)!.push(t);
+    }
+    const claves = [...grupos.keys()].sort((a, b) => {
+      if (a === 'sin-fecha') return 1;
+      if (b === 'sin-fecha') return -1;
+      return b.localeCompare(a);
+    });
+    return claves.map((clave, indice) => ({
+      clave,
+      etiqueta: this.etiquetaGrupoFecha(clave),
+      tickets: grupos.get(clave)!,
+      esPrimero: indice === 0,
+    }));
+  });
+
+  private etiquetaGrupoFecha(clave: string): string {
+    if (clave === 'sin-fecha') return 'Sin fecha';
+    const [anioTexto, mesTexto] = clave.split('-');
+    const meses = [
+      'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+      'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+    ];
+    const nombreMes = meses[Number(mesTexto) - 1];
+    if (!nombreMes) return clave;
+    return `${nombreMes.charAt(0).toUpperCase()}${nombreMes.slice(1)} ${anioTexto}`;
+  }
+
+  /** Solo el primer grupo (más reciente) empieza expandido — el resto arranca
+   *  colapsado para no volver a caer en la "mega lista" de antes. Cada clic
+   *  invierte el estado de ESE grupo (ver grupoBacklogAbierto). */
+  private readonly gruposBacklogToggleados = signal<Set<string>>(new Set());
+  protected grupoBacklogAbierto(clave: string, esPrimero: boolean): boolean {
+    const toggleado = this.gruposBacklogToggleados().has(clave);
+    return esPrimero ? !toggleado : toggleado;
+  }
+  protected toggleGrupoBacklog(clave: string): void {
+    this.gruposBacklogToggleados.update((set) => {
+      const nuevo = new Set(set);
+      if (nuevo.has(clave)) nuevo.delete(clave);
+      else nuevo.add(clave);
+      return nuevo;
+    });
+  }
+
   protected ticketsDeSprint(sprintId: number): Ticket[] {
     return this.tickets().filter((t) => Number(t.sprintId) === Number(sprintId));
   }

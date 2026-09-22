@@ -264,7 +264,7 @@
           <label>
             Tipo
             <select formControlName="ticketTipoId">
-              <option [ngValue]="0" disabled>Selecciona un tipo</option>
+              <option [ngValue]="0">Selecciona un tipo</option>
               @for (tipo of tiposSeleccionables(); track tipo.id) {
                 <option [ngValue]="tipo.id">{{ tipo.icono }} {{ tipo.nombre }}</option>
               }
@@ -273,7 +273,7 @@
           <label>
             Prioridad
             <select formControlName="ticketPrioridadId">
-              <option [ngValue]="0" disabled>Selecciona una prioridad</option>
+              <option [ngValue]="0">Selecciona una prioridad</option>
               @for (prioridad of prioridadesSeleccionables(); track prioridad.id) {
                 <option [ngValue]="prioridad.id">{{ prioridad.nombre }}</option>
               }
@@ -303,7 +303,7 @@
           <label>
             Reportado por
             <select formControlName="reportadoPorUsuarioId">
-              <option [ngValue]="0" disabled>Selecciona quién reportó</option>
+              <option [ngValue]="0">Selecciona quién reportó</option>
               @for (usuario of usuarios(); track usuario.id) {
                 <option [ngValue]="usuario.id">{{ usuario.nombreCompleto }}</option>
               }
@@ -492,7 +492,7 @@
           <label>
             Tipo
             <select formControlName="ticketTipoId">
-              <option [ngValue]="0" disabled>Selecciona un tipo</option>
+              <option [ngValue]="0">Selecciona un tipo</option>
               @for (tipo of tiposSeleccionables(); track tipo.id) {
                 <option [ngValue]="tipo.id">{{ tipo.icono }} {{ tipo.nombre }}</option>
               }
@@ -501,7 +501,7 @@
           <label>
             Prioridad
             <select formControlName="ticketPrioridadId">
-              <option [ngValue]="0" disabled>Selecciona una prioridad</option>
+              <option [ngValue]="0">Selecciona una prioridad</option>
               @for (prioridad of prioridadesSeleccionables(); track prioridad.id) {
                 <option [ngValue]="prioridad.id">{{ prioridad.nombre }}</option>
               }
@@ -531,7 +531,7 @@
           <label>
             Reportado por
             <select formControlName="reportadoPorUsuarioId">
-              <option [ngValue]="0" disabled>Selecciona quién reportó</option>
+              <option [ngValue]="0">Selecciona quién reportó</option>
               @for (usuario of usuarios(); track usuario.id) {
                 <option [ngValue]="usuario.id">{{ usuario.nombreCompleto }}</option>
               }
@@ -734,7 +734,7 @@
                 Asociar ticket
                 <p class="hint" style="margin: 0 0 6px;">{{ ticketsDisponiblesParaAsociarFiltrados().length }} resultado(s)</p>
                 <select formControlName="ticketRelacionadoId">
-                  <option [ngValue]="0" disabled>Selecciona uno</option>
+                  <option [ngValue]="0">Selecciona uno</option>
                   @for (ticket of ticketsDisponiblesParaAsociarFiltrados(); track ticket.id) {
                     <option [ngValue]="ticket.id">#{{ ticket.numeroTicket }} — {{ ticket.titulo }}</option>
                   }
@@ -813,7 +813,7 @@
                   Convertir en subtarea
                   <p class="hint" style="margin: 0 0 6px;">{{ ticketsDisponiblesParaSubtareaFiltrados().length }} resultado(s)</p>
                   <select formControlName="ticketId">
-                    <option [ngValue]="0" disabled>Selecciona uno</option>
+                    <option [ngValue]="0">Selecciona uno</option>
                     @for (ticket of ticketsDisponiblesParaSubtareaFiltrados(); track ticket.id) {
                       <option [ngValue]="ticket.id">#{{ ticket.numeroTicket }} — {{ ticket.titulo }}</option>
                     }

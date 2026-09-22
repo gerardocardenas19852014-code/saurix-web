@@ -136,38 +136,54 @@
     } @else if (ticketsBacklogFiltrados().length === 0) {
       <p class="empty">Ningún ticket del Backlog coincide con "{{ filtroBacklog() }}".</p>
     } @else {
-      <ul class="actividades-list">
-        @for (ticket of ticketsBacklogFiltrados(); track ticket.id) {
-          <li class="actividad-item">
-            <div class="actividad-item-head" style="align-items:center; gap:10px; flex-wrap:wrap;">
-              <a
-                [routerLink]="['/proyectos/tablero']"
-                [queryParams]="{ ticket: ticket.id }"
-                class="actividad-item-texto"
-                style="text-decoration:none;"
-              >
-                #{{ ticket.numeroTicket }} — {{ ticket.titulo }}
-              </a>
-              <span
-                class="kanban-tag"
-                [style.color]="colorPrioridad(ticket.ticketPrioridadId)"
-                [title]="'Prioridad: ' + nombrePrioridad(ticket.ticketPrioridadId)"
-              >
-                {{ nombrePrioridad(ticket.ticketPrioridadId) }}
-              </span>
-              <span class="hint" style="margin:0;">{{ nombreUsuarioAsignado(ticket.asignadoUsuarioId) }}</span>
-              @if (sprintsDestino().length > 0) {
-                <select class="toolbar-select" [value]="0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
-                  <option [value]="0" disabled>Mover a…</option>
-                  @for (s of sprintsDestino(); track s.id) {
-                    <option [value]="s.id">{{ s.nombre }}</option>
-                  }
-                </select>
+      @for (grupo of gruposBacklogPorFecha(); track grupo.clave) {
+        <div style="margin-top: 10px;">
+          <button
+            type="button"
+            class="tab-more-item"
+            style="width:auto; display:inline-flex; align-items:center; gap:6px; margin-bottom:6px;"
+            (click)="toggleGrupoBacklog(grupo.clave)"
+          >
+            <span aria-hidden="true">{{ grupoBacklogAbierto(grupo.clave, grupo.esPrimero) ? '▾' : '▸' }}</span>
+            {{ grupo.etiqueta }} ({{ grupo.tickets.length }})
+          </button>
+
+          @if (grupoBacklogAbierto(grupo.clave, grupo.esPrimero)) {
+            <ul class="actividades-list">
+              @for (ticket of grupo.tickets; track ticket.id) {
+                <li class="actividad-item">
+                  <div class="actividad-item-head" style="align-items:center; gap:10px; flex-wrap:wrap;">
+                    <a
+                      [routerLink]="['/proyectos/tablero']"
+                      [queryParams]="{ ticket: ticket.id }"
+                      class="actividad-item-texto"
+                      style="text-decoration:none;"
+                    >
+                      #{{ ticket.numeroTicket }} — {{ ticket.titulo }}
+                    </a>
+                    <span
+                      class="kanban-tag"
+                      [style.color]="colorPrioridad(ticket.ticketPrioridadId)"
+                      [title]="'Prioridad: ' + nombrePrioridad(ticket.ticketPrioridadId)"
+                    >
+                      {{ nombrePrioridad(ticket.ticketPrioridadId) }}
+                    </span>
+                    <span class="hint" style="margin:0;">{{ nombreUsuarioAsignado(ticket.asignadoUsuarioId) }}</span>
+                    @if (sprintsDestino().length > 0) {
+                      <select class="toolbar-select" [value]="0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
+                        <option [value]="0">Mover a…</option>
+                        @for (s of sprintsDestino(); track s.id) {
+                          <option [value]="s.id">{{ s.nombre }}</option>
+                        }
+                      </select>
+                    }
+                  </div>
+                </li>
               }
-            </div>
-          </li>
-        }
-      </ul>
+            </ul>
+          }
+        </div>
+      }
     }
   </div>
 
