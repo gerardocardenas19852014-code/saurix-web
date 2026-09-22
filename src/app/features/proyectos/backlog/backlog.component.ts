@@ -200,6 +200,14 @@ export class BacklogComponent implements OnInit {
     return columnas.length > 0 && Number(ticket.tableroColumnaId) === Number(columnas[columnas.length - 1].id);
   }
 
+  /** Nombre de la columna del Tablero (BACKLOG/ANÁLISIS/DESARROLLO/...) en la
+   *  que está el ticket ahora mismo — se muestra en la tarjeta para dar ese
+   *  mismo contexto de estado que ya se ve en el Tablero Kanban, ya que aquí
+   *  los tickets no están agrupados por columna (sino por sprint/fecha). */
+  protected nombreColumna(id: number): string {
+    return this.columnasTablero().find((c) => Number(c.id) === Number(id))?.nombre ?? '—';
+  }
+
   protected readonly ticketsBacklog = computed(() => this.tickets().filter((t) => !t.sprintId));
 
   /** Búsqueda de texto libre para el Backlog — con muchos tickets sin sprint la

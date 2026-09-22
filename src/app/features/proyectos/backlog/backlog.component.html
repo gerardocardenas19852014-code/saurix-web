@@ -212,6 +212,9 @@
                     {{ ticket.titulo }}
                   </a>
                   <div class="kanban-card-tags">
+                    <span class="grid-badge" [class.grid-badge-success]="estaResuelto(ticket)" [class.grid-badge-neutral]="!estaResuelto(ticket)" title="Estado en el Tablero">
+                      {{ nombreColumna(ticket.tableroColumnaId) }}
+                    </span>
                     <span class="kanban-tag kanban-tag-tipo" [title]="'Tipo: ' + nombreTipo(ticket.ticketTipoId)">
                       {{ iconoTipo(ticket.ticketTipoId) }} {{ nombreTipo(ticket.ticketTipoId) }}
                     </span>
@@ -380,6 +383,9 @@
                       {{ ticket.titulo }}
                     </a>
                     <div class="kanban-card-tags">
+                      <span class="grid-badge" [class.grid-badge-success]="estaResuelto(ticket)" [class.grid-badge-neutral]="!estaResuelto(ticket)" title="Estado en el Tablero">
+                        {{ nombreColumna(ticket.tableroColumnaId) }}
+                      </span>
                       <span class="kanban-tag kanban-tag-tipo" [title]="'Tipo: ' + nombreTipo(ticket.ticketTipoId)">
                         {{ iconoTipo(ticket.ticketTipoId) }} {{ nombreTipo(ticket.ticketTipoId) }}
                       </span>
