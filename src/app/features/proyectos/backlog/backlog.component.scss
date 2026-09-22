@@ -1,3 +1,19 @@
-/* Sin estilos propios: reutiliza .panel/.panel-head, .actividades-list/.actividad-item,
- * .kanban-tag, .grid-badge y .board-filters ya definidos en styles.scss, igual que
- * el resto de pantallas de Gestión de Proyectos. */
+/* Reutiliza .panel/.panel-head, .actividades-list/.actividad-item, .kanban-tag,
+ * .grid-badge y .board-filters ya definidos en styles.scss, igual que el resto
+ * de pantallas de Gestión de Proyectos. Lo único propio de esta pantalla es el
+ * modo "compacto" de las listas (sprint y grupos de fecha del Backlog), para
+ * que quepan más tickets visibles sin tanto scroll cuando hay muchos — se deja
+ * scoped aquí (y no en .actividad-item global) para no afectar Kanban ni otras
+ * pantallas que reutilizan esa misma clase. */
+.actividades-list.compacta {
+  gap: 4px;
+}
+.actividades-list.compacta .actividad-item {
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+.actividades-list.compacta .actividad-item-head {
+  margin-bottom: 0;
+  font-size: 12.5px;
+  gap: 6px;
+}

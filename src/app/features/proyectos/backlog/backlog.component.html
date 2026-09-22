@@ -16,6 +16,51 @@
       }
     </select>
   </label>
+
+  <label class="board-filter-field">
+    Tipo
+    <select [value]="filtroTipoId()" (change)="filtroTipoId.set(+$any($event.target).value)">
+      <option [value]="0">Todos</option>
+      @for (tipo of tipos(); track tipo.id) {
+        <option [value]="tipo.id">{{ tipo.icono }} {{ tipo.nombre }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="board-filter-field">
+    Módulo
+    <select [value]="filtroModuloId()" (change)="filtroModuloId.set(+$any($event.target).value)">
+      <option [value]="0">Todos</option>
+      <option [value]="-1">Sin módulo</option>
+      @for (modulo of modulos(); track modulo.id) {
+        <option [value]="modulo.id">{{ modulo.icono }} {{ modulo.nombre }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="board-filter-field">
+    Prioridad
+    <select [value]="filtroPrioridadId()" (change)="filtroPrioridadId.set(+$any($event.target).value)">
+      <option [value]="0">Todas</option>
+      @for (prioridad of prioridades(); track prioridad.id) {
+        <option [value]="prioridad.id">{{ prioridad.nombre }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="board-filter-field">
+    Asignado a
+    <select [value]="filtroAsignadoId()" (change)="filtroAsignadoId.set(+$any($event.target).value)">
+      <option [value]="0">Todos</option>
+      @for (usuario of usuarios(); track usuario.id) {
+        <option [value]="usuario.id">{{ nombreCompletoUsuario(usuario) }}</option>
+      }
+    </select>
+  </label>
+
+  @if (hayFiltros()) {
+    <button type="button" class="btn-secondary small" (click)="limpiarFiltros()">Limpiar filtros</button>
+  }
 </div>
 
 @if (mostrarFormSprint()) {
@@ -79,11 +124,15 @@
         </div>
       </div>
 
-      @if (ticketsDeSprint(sprint.id).length === 0) {
-        <p class="empty">Todavía no hay tickets en este sprint — muévelos desde el Backlog, más abajo.</p>
+      @if (ticketsDeSprintFiltrados(sprint.id).length === 0) {
+        <p class="empty">
+          {{ ticketsDeSprint(sprint.id).length === 0
+            ? 'Todavía no hay tickets en este sprint — muévelos desde el Backlog, más abajo.'
+            : 'Ningún ticket de este sprint coincide con los filtros activos.' }}
+        </p>
       } @else {
-        <ul class="actividades-list">
-          @for (ticket of ticketsDeSprint(sprint.id); track ticket.id) {
+        <ul class="actividades-list compacta">
+          @for (ticket of ticketsDeSprintFiltrados(sprint.id).slice(0, cantidadVisible('sprint-' + sprint.id)); track ticket.id) {
             <li class="actividad-item">
               <div class="actividad-item-head" style="align-items:center; gap:10px; flex-wrap:wrap;">
                 <a
@@ -112,6 +161,11 @@
             </li>
           }
         </ul>
+        @if (ticketsDeSprintFiltrados(sprint.id).length > cantidadVisible('sprint-' + sprint.id)) {
+          <button type="button" class="btn-secondary small" style="margin-top:8px;" (click)="verMas('sprint-' + sprint.id)">
+            Ver más ({{ ticketsDeSprintFiltrados(sprint.id).length - cantidadVisible('sprint-' + sprint.id) }} restantes)
+          </button>
+        }
       }
     </div>
   }
@@ -136,8 +190,22 @@
     } @else if (ticketsBacklogFiltrados().length === 0) {
       <p class="empty">Ningún ticket del Backlog coincide con "{{ filtroBacklog() }}".</p>
     } @else {
+      @if (gruposBacklogPorFecha().length > 1) {
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+          <div style="display:flex; flex-wrap:wrap; gap:6px;">
+            @for (grupo of gruposBacklogPorFecha(); track grupo.clave) {
+              <button type="button" class="btn-secondary small" (click)="irAGrupo(grupo.clave)">{{ grupo.etiqueta }} ({{ grupo.tickets.length }})</button>
+            }
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="btn-secondary small" (click)="expandirTodosGrupos()">Expandir todo</button>
+            <button type="button" class="btn-secondary small" (click)="colapsarTodosGrupos()">Colapsar todo</button>
+          </div>
+        </div>
+      }
+
       @for (grupo of gruposBacklogPorFecha(); track grupo.clave) {
-        <div style="margin-top: 10px;">
+        <div style="margin-top: 10px;" [id]="'backlog-grupo-' + grupo.clave">
           <button
             type="button"
             class="tab-more-item"
@@ -149,8 +217,8 @@
           </button>
 
           @if (grupoBacklogAbierto(grupo.clave, grupo.esPrimero)) {
-            <ul class="actividades-list">
-              @for (ticket of grupo.tickets; track ticket.id) {
+            <ul class="actividades-list compacta">
+              @for (ticket of grupo.tickets.slice(0, cantidadVisible(grupo.clave)); track ticket.id) {
                 <li class="actividad-item">
                   <div class="actividad-item-head" style="align-items:center; gap:10px; flex-wrap:wrap;">
                     <a
@@ -181,6 +249,11 @@
                 </li>
               }
             </ul>
+            @if (grupo.tickets.length > cantidadVisible(grupo.clave)) {
+              <button type="button" class="btn-secondary small" style="margin-top:8px;" (click)="verMas(grupo.clave)">
+                Ver más ({{ grupo.tickets.length - cantidadVisible(grupo.clave) }} restantes)
+              </button>
+            }
           }
         </div>
       }
@@ -199,7 +272,7 @@
               <span class="actividad-item-texto">
                 {{ sprint.nombre }}
                 <span class="grid-badge grid-badge-muted">Cerrado</span>
-                — {{ ticketsDeSprint(sprint.id).length }} ticket(s)
+                — {{ ticketsDeSprintFiltrados(sprint.id).length }} ticket(s)
               </span>
             </div>
           </li>

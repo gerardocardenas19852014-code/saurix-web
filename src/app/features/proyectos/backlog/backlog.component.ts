@@ -8,6 +8,8 @@ import { colorAvatar } from '../kanban/avatar.util';
 import { Ticket } from '../kanban/ticket.model';
 import { ProyectoOpcion, TableroColumna } from '../tableros/tablero-columna.model';
 import { TicketPrioridad } from '../ticket-prioridades/ticket-prioridad.model';
+import { TicketTipo } from '../ticket-tipos/ticket-tipo.model';
+import { TicketModulo } from '../ticket-modulos/ticket-modulo.model';
 import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
 import { Sprint } from '../sprints/sprint.model';
 
@@ -39,6 +41,7 @@ export class BacklogComponent implements OnInit {
   protected readonly toast = inject(ToastService);
 
   protected readonly colorAvatar = colorAvatar;
+  protected readonly nombreCompletoUsuario = nombreCompletoUsuario;
 
   protected readonly cargando = signal(false);
   protected readonly proyectos = signal<ProyectoOpcion[]>([]);
@@ -48,6 +51,50 @@ export class BacklogComponent implements OnInit {
   protected readonly sprints = signal<Sprint[]>([]);
   protected readonly prioridades = signal<TicketPrioridad[]>([]);
   protected readonly usuarios = signal<Usuario[]>([]);
+  protected readonly tipos = signal<TicketTipo[]>([]);
+  protected readonly modulos = signal<TicketModulo[]>([]);
+
+  /** Mismos filtros de catálogo que la pantalla Ticket (Tipo/Módulo/Prioridad/
+   *  Asignado a) — aplican a TODO lo que se muestra en esta pantalla (Backlog y
+   *  cada sprint), para poder acotar la lista cuando hay muchos tickets. */
+  protected readonly filtroTipoId = signal<number>(0);
+  protected readonly filtroModuloId = signal<number>(0);
+  protected readonly filtroPrioridadId = signal<number>(0);
+  protected readonly filtroAsignadoId = signal<number>(0);
+  protected readonly hayFiltros = computed(
+    () =>
+      !!(
+        this.filtroTipoId() ||
+        this.filtroModuloId() ||
+        this.filtroPrioridadId() ||
+        this.filtroAsignadoId() ||
+        this.filtroBacklog().trim()
+      ),
+  );
+
+  limpiarFiltros(): void {
+    this.filtroTipoId.set(0);
+    this.filtroModuloId.set(0);
+    this.filtroPrioridadId.set(0);
+    this.filtroAsignadoId.set(0);
+    this.filtroBacklog.set('');
+  }
+
+  /** true si el ticket pasa los filtros de catálogo (Tipo/Módulo/Prioridad/
+   *  Asignado a) — el filtro de texto del Backlog se aplica aparte, en
+   *  ticketsBacklogFiltrados, porque solo existe ahí (los sprints ya suelen
+   *  traer pocos tickets). -1 en Módulo significa "Sin módulo", igual que en
+   *  la pantalla Ticket. */
+  private coincideFiltrosCatalogo(t: Ticket): boolean {
+    if (this.filtroTipoId() && Number(t.ticketTipoId) !== Number(this.filtroTipoId())) return false;
+    if (this.filtroModuloId()) {
+      if (this.filtroModuloId() === -1 && t.ticketModuloId) return false;
+      if (this.filtroModuloId() !== -1 && Number(t.ticketModuloId) !== Number(this.filtroModuloId())) return false;
+    }
+    if (this.filtroPrioridadId() && Number(t.ticketPrioridadId) !== Number(this.filtroPrioridadId())) return false;
+    if (this.filtroAsignadoId() && Number(t.asignadoUsuarioId) !== Number(this.filtroAsignadoId())) return false;
+    return true;
+  }
 
   protected readonly mostrarFormSprint = signal(false);
   protected readonly formSprint = this.fb.nonNullable.group({
@@ -72,6 +119,8 @@ export class BacklogComponent implements OnInit {
     });
     this.data.list<TicketPrioridad>('TicketPrioridad').subscribe((p) => this.prioridades.set(p));
     this.data.list<Usuario>('Usuario').subscribe((u) => this.usuarios.set(u));
+    this.data.list<TicketTipo>('TicketTipo').subscribe((t) => this.tipos.set(t));
+    this.data.list<TicketModulo>('TicketModulo').subscribe((m) => this.modulos.set(m));
   }
 
   cambiarProyecto(idTexto: string): void {
@@ -125,8 +174,9 @@ export class BacklogComponent implements OnInit {
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean);
-    if (!terminos.length) return this.ticketsBacklog();
-    return this.ticketsBacklog().filter((t) =>
+    const base = this.ticketsBacklog().filter((t) => this.coincideFiltrosCatalogo(t));
+    if (!terminos.length) return base;
+    return base.filter((t) =>
       terminos.some(
         (termino) =>
           t.numeroTicket.toLowerCase().includes(termino) ||
@@ -175,24 +225,74 @@ export class BacklogComponent implements OnInit {
   }
 
   /** Solo el primer grupo (más reciente) empieza expandido — el resto arranca
-   *  colapsado para no volver a caer en la "mega lista" de antes. Cada clic
-   *  invierte el estado de ESE grupo (ver grupoBacklogAbierto). */
-  private readonly gruposBacklogToggleados = signal<Set<string>>(new Set());
+   *  colapsado para no volver a caer en la "mega lista" de antes. null =
+   *  modo automático (solo el primero abierto, como al cargar la pantalla);
+   *  un Set = modo explícito, una vez que el usuario toca CUALQUIER control
+   *  de expandir/colapsar (individual o "todos"), para que "Expandir todo"/
+   *  "Colapsar todo" tengan un estado real que sobreescribir. */
+  private readonly gruposAbiertosExplicito = signal<Set<string> | null>(null);
   protected grupoBacklogAbierto(clave: string, esPrimero: boolean): boolean {
-    const toggleado = this.gruposBacklogToggleados().has(clave);
-    return esPrimero ? !toggleado : toggleado;
+    const explicito = this.gruposAbiertosExplicito();
+    if (explicito) return explicito.has(clave);
+    return esPrimero;
   }
   protected toggleGrupoBacklog(clave: string): void {
-    this.gruposBacklogToggleados.update((set) => {
-      const nuevo = new Set(set);
+    this.gruposAbiertosExplicito.update((set) => {
+      // Primera interacción manual: parte del estado automático actual
+      // (solo el primer grupo) para no cerrar de golpe lo demás.
+      const base = set ?? new Set(this.gruposBacklogPorFecha().filter((g) => g.esPrimero).map((g) => g.clave));
+      const nuevo = new Set(base);
       if (nuevo.has(clave)) nuevo.delete(clave);
       else nuevo.add(clave);
       return nuevo;
     });
   }
+  protected expandirTodosGrupos(): void {
+    this.gruposAbiertosExplicito.set(new Set(this.gruposBacklogPorFecha().map((g) => g.clave)));
+  }
+  protected colapsarTodosGrupos(): void {
+    this.gruposAbiertosExplicito.set(new Set());
+  }
+  protected irAGrupo(clave: string): void {
+    // Asegura que el grupo destino quede abierto antes de saltar a él.
+    this.gruposAbiertosExplicito.update((set) => {
+      const base = set ?? new Set(this.gruposBacklogPorFecha().filter((g) => g.esPrimero).map((g) => g.clave));
+      if (base.has(clave)) return base;
+      return new Set([...base, clave]);
+    });
+    setTimeout(() => {
+      document.getElementById(`backlog-grupo-${clave}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
 
   protected ticketsDeSprint(sprintId: number): Ticket[] {
     return this.tickets().filter((t) => Number(t.sprintId) === Number(sprintId));
+  }
+
+  /** Misma lista pero con los filtros de catálogo aplicados — solo para lo que
+   *  se MUESTRA en pantalla. completarSprint()/eliminarSprint() siguen usando
+   *  ticketsDeSprint() sin filtrar: completar un sprint debe procesar TODOS sus
+   *  tickets, no solo los que un filtro activo deja visibles en ese momento. */
+  protected ticketsDeSprintFiltrados(sprintId: number): Ticket[] {
+    return this.ticketsDeSprint(sprintId).filter((t) => this.coincideFiltrosCatalogo(t));
+  }
+
+  /** Paginación por grupo/sprint — cada lista (un sprint o un grupo de fecha
+   *  del Backlog) se identifica con una "clave" propia ('sprint-' + id, o la
+   *  clave del grupo de fecha) y arranca mostrando solo PAGINA_INICIAL
+   *  tickets; "Ver más" suma otra tanda SOLO a esa clave, sin afectar las
+   *  demás listas. */
+  private static readonly PAGINA_INICIAL = 10;
+  private readonly paginacion = signal<Map<string, number>>(new Map());
+  protected cantidadVisible(clave: string): number {
+    return this.paginacion().get(clave) ?? BacklogComponent.PAGINA_INICIAL;
+  }
+  protected verMas(clave: string): void {
+    this.paginacion.update((mapa) => {
+      const nuevo = new Map(mapa);
+      nuevo.set(clave, this.cantidadVisible(clave) + BacklogComponent.PAGINA_INICIAL);
+      return nuevo;
+    });
   }
 
   protected readonly sprintsActivos = computed(() => this.sprints().filter((s) => s.estado === 'activo'));
