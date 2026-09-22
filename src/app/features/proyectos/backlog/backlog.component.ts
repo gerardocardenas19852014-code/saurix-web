@@ -143,13 +143,25 @@ export class BacklogComponent implements OnInit {
     });
   }
 
+  /** Carga Sprint y Ticket JUNTOS (forkJoin) y recién entonces actualiza las
+   *  señales — antes se pedían por separado y, si Ticket resolvía primero,
+   *  el <select> "Mover a" se pintaba con SOLO la opción "Backlog" (todavía
+   *  sin las <option> de los sprints, que llegaban después). Angular no
+   *  vuelve a aplicar el binding [value] de un <select> si el valor de JS no
+   *  cambió, así que aunque las opciones de sprint aparecieran un instante
+   *  después, el navegador se quedaba mostrando "Backlog" como seleccionado
+   *  aunque el ticket.sprintId real fuera otro — haciendo parecer que "Mover
+   *  a Backlog" no hacía nada (el navegador ya lo consideraba seleccionado y
+   *  no disparaba 'change' al hacer clic ahí). Cargando ambas listas a la
+   *  vez, todas las <option> ya existen desde el primer render. */
   private cargarSprintsYTickets(): void {
     const proyectoId = this.proyectoSeleccionadoId();
-    this.data.list<Sprint>('Sprint', { proyectoId }).subscribe((sprints) =>
-      this.sprints.set([...sprints].sort((a, b) => (a.fechaInicio ?? '').localeCompare(b.fechaInicio ?? ''))),
-    );
-    this.data.list<Ticket>('Ticket', { proyectoId }).subscribe({
-      next: (tickets) => {
+    forkJoin({
+      sprints: this.data.list<Sprint>('Sprint', { proyectoId }),
+      tickets: this.data.list<Ticket>('Ticket', { proyectoId }),
+    }).subscribe({
+      next: ({ sprints, tickets }) => {
+        this.sprints.set([...sprints].sort((a, b) => (a.fechaInicio ?? '').localeCompare(b.fechaInicio ?? '')));
         this.tickets.set(tickets);
         this.cargando.set(false);
       },
