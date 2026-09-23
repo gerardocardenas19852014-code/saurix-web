@@ -159,12 +159,32 @@ export class ReportesEjecutivosComponent implements OnInit {
     return this.columnas().find((c) => Number(c.id) === Number(id))?.nombre ?? '—';
   }
 
-  /** Recorta la lista de tickets del sprint a lo que la preferencia "Registros
-   *  por página" (Panel de Control → Apariencia → Tablas y listados) diga mostrar
-   *  — mismo servicio/convención que ya usan Usuarios y el resto de los listados
-   *  del sistema (PreferenciasGridService). El CSV exporta siempre todos. */
+  /** Página actual de la lista de tickets del sprint — mismo footer/paginación
+   *  (◂ Anterior · Página X de Y · Siguiente ▸) que <app-data-table>, con el
+   *  tamaño de página que diga la preferencia "Registros por página" (Panel de
+   *  Control → Apariencia → Tablas y listados / PreferenciasGridService). El CSV
+   *  exporta siempre TODOS los tickets, sin importar la página en pantalla. */
+  protected readonly paginaTicketsSprint = signal(1);
+
+  protected totalPaginasTickets(totalTickets: number): number {
+    return Math.max(1, Math.ceil(totalTickets / this.preferenciasGrid.tamanoPagina()));
+  }
+
+  /** Página realmente aplicada — nunca mayor al total actual, por si el sprint
+   *  cambió o la preferencia de tamaño de página se redujo mientras se veía
+   *  una página más adelante. */
+  protected paginaActualTickets(totalTickets: number): number {
+    return Math.min(this.paginaTicketsSprint(), this.totalPaginasTickets(totalTickets));
+  }
+
   protected ticketsVisibles(tickets: Ticket[]): Ticket[] {
-    return tickets.slice(0, this.preferenciasGrid.tamanoPagina());
+    const tamano = this.preferenciasGrid.tamanoPagina();
+    const inicio = (this.paginaActualTickets(tickets.length) - 1) * tamano;
+    return tickets.slice(inicio, inicio + tamano);
+  }
+
+  protected irAPaginaTickets(pagina: number): void {
+    this.paginaTicketsSprint.set(pagina);
   }
 
   protected exportarTicketsSprintCsv(sprint: Sprint, tickets: Ticket[]): void {
@@ -201,10 +221,12 @@ export class ReportesEjecutivosComponent implements OnInit {
   protected cambiarProyecto(idTexto: string): void {
     this.proyectoId.set(Number(idTexto) || 0);
     this.sprintSeleccionadoId.set(0);
+    this.paginaTicketsSprint.set(1);
   }
 
   protected cambiarSprintSeleccionado(idTexto: string): void {
     this.sprintSeleccionadoId.set(Number(idTexto) || 0);
+    this.paginaTicketsSprint.set(1);
   }
 
   protected cambiarDiasCfd(diasTexto: string): void {

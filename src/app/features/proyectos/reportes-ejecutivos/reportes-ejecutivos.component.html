@@ -256,12 +256,6 @@
         @if (reporte.tickets.length === 0) {
           <p class="empty">Este sprint todavía no tiene tickets.</p>
         } @else {
-          @if (reporte.tickets.length > preferenciasGrid.tamanoPagina()) {
-            <p class="hint" style="margin: 0 0 8px;">
-              Mostrando los primeros {{ preferenciasGrid.tamanoPagina() }} de {{ reporte.tickets.length }} —
-              cambia cuántos ver en Panel de Control → Apariencia → Tablas y listados. El CSV exporta todos.
-            </p>
-          }
           <div class="grid-table-scroll">
             <table class="grid-table">
               <thead>
@@ -297,6 +291,31 @@
                 }
               </tbody>
             </table>
+          </div>
+
+          <div class="grid-footer">
+            <span class="hint" style="margin:0;">
+              {{ reporte.tickets.length }} resultado{{ reporte.tickets.length === 1 ? '' : 's' }}
+            </span>
+            @if (totalPaginasTickets(reporte.tickets.length) > 1) {
+              <div class="grid-pagination">
+                <button
+                  type="button"
+                  [disabled]="paginaActualTickets(reporte.tickets.length) === 1"
+                  (click)="irAPaginaTickets(paginaActualTickets(reporte.tickets.length) - 1)"
+                >
+                  ‹ Anterior
+                </button>
+                <span>Página {{ paginaActualTickets(reporte.tickets.length) }} de {{ totalPaginasTickets(reporte.tickets.length) }}</span>
+                <button
+                  type="button"
+                  [disabled]="paginaActualTickets(reporte.tickets.length) === totalPaginasTickets(reporte.tickets.length)"
+                  (click)="irAPaginaTickets(paginaActualTickets(reporte.tickets.length) + 1)"
+                >
+                  Siguiente ›
+                </button>
+              </div>
+            }
           </div>
         }
       </div>
