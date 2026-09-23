@@ -188,12 +188,26 @@ export class BacklogComponent implements OnInit {
       tickets: this.data.list<Ticket>('Ticket', { proyectoId }),
     }).subscribe({
       next: ({ sprints, tickets }) => {
-        this.sprints.set([...sprints].sort((a, b) => (a.fechaInicio ?? '').localeCompare(b.fechaInicio ?? '')));
+        this.sprints.set([...sprints].sort(this.compararSprints));
         this.tickets.set(tickets);
         this.cargando.set(false);
       },
       error: () => this.cargando.set(false),
     });
+  }
+
+  /** Orden de los sprints de un proyecto: los que ya tienen 'orden' explícito (ver
+   *  moverSprint más abajo) van primero, ordenados entre sí por ese valor; el resto
+   *  (todavía no reordenado a mano) cae al final, ordenado por fecha de inicio como
+   *  se hacía antes de que existiera este campo. No usa 'this', se puede pasar
+   *  directo a Array.sort. */
+  private compararSprints(a: Sprint, b: Sprint): number {
+    const ordenA = a.orden ?? null;
+    const ordenB = b.orden ?? null;
+    if (ordenA !== null && ordenB !== null) return ordenA - ordenB;
+    if (ordenA !== null) return -1;
+    if (ordenB !== null) return 1;
+    return (a.fechaInicio ?? '').localeCompare(b.fechaInicio ?? '');
   }
 
   protected estaResuelto(ticket: Ticket): boolean {
@@ -406,11 +420,32 @@ export class BacklogComponent implements OnInit {
     return usuario ? nombreCompletoUsuario(usuario) : '—';
   }
 
+  /** Sprint que se está editando (null = el form crea uno nuevo) — el mismo
+   *  form/panel de "Nuevo sprint" se reusa para editar, en vez de duplicar
+   *  campos: ver editarSprint() y crearSprint(). */
+  protected readonly sprintEditando = signal<Sprint | null>(null);
+
   toggleFormSprint(): void {
     this.mostrarFormSprint.update((v) => !v);
+    this.sprintEditando.set(null);
     if (this.mostrarFormSprint()) {
       this.formSprint.reset({ nombre: '', objetivo: '', fechaInicio: '', fechaFin: '' });
     }
+  }
+
+  /** Abre el mismo panel de "Nuevo sprint", precargado con los datos de este
+   *  sprint — a pedido del usuario, para poder corregir nombre/objetivo/fechas
+   *  sin tener que eliminarlo y crearlo de nuevo (lo que además le haría perder
+   *  sus tickets asignados y su historial). */
+  editarSprint(sprint: Sprint): void {
+    this.sprintEditando.set(sprint);
+    this.formSprint.reset({
+      nombre: sprint.nombre,
+      objetivo: sprint.objetivo ?? '',
+      fechaInicio: sprint.fechaInicio ?? '',
+      fechaFin: sprint.fechaFin ?? '',
+    });
+    this.mostrarFormSprint.set(true);
   }
 
   crearSprint(): void {
@@ -419,22 +454,64 @@ export class BacklogComponent implements OnInit {
       return;
     }
     const valor = this.formSprint.getRawValue();
-    this.data
-      .alta<Sprint>('Sprint', {
-        proyectoId: this.proyectoSeleccionadoId(),
-        nombre: valor.nombre,
-        objetivo: valor.objetivo || null,
-        fechaInicio: valor.fechaInicio || null,
-        fechaFin: valor.fechaFin || null,
-        estado: 'planeado',
-      })
-      .subscribe({
-        next: () => {
-          this.toast.exito('Sprint creado.');
-          this.mostrarFormSprint.set(false);
-          this.cargarSprintsYTickets();
-        },
-      });
+    const editando = this.sprintEditando();
+    const operacion = editando
+      ? this.data.modificacion<Sprint>('Sprint', {
+          ...editando,
+          nombre: valor.nombre,
+          objetivo: valor.objetivo || null,
+          fechaInicio: valor.fechaInicio || null,
+          fechaFin: valor.fechaFin || null,
+        })
+      : this.data.alta<Sprint>('Sprint', {
+          proyectoId: this.proyectoSeleccionadoId(),
+          nombre: valor.nombre,
+          objetivo: valor.objetivo || null,
+          fechaInicio: valor.fechaInicio || null,
+          fechaFin: valor.fechaFin || null,
+          estado: 'planeado',
+        });
+    operacion.subscribe({
+      next: () => {
+        this.toast.exito(editando ? 'Sprint actualizado.' : 'Sprint creado.');
+        this.mostrarFormSprint.set(false);
+        this.sprintEditando.set(null);
+        this.cargarSprintsYTickets();
+      },
+      error: () => this.toast.error('No se pudo guardar el sprint. Intenta de nuevo.'),
+    });
+  }
+
+  /** true si `sprint` es el primero/último entre los sprints PLANEADOS (para
+   *  deshabilitar la flecha correspondiente) — el o los sprints 'activo' van
+   *  siempre primero en sprintsAbiertos() y no participan de este reordenado
+   *  manual, así que solo tiene sentido mover un planeado contra otro planeado. */
+  protected esPrimerPlaneado(sprint: Sprint): boolean {
+    return this.sprintsPlaneados()[0]?.id === sprint.id;
+  }
+  protected esUltimoPlaneado(sprint: Sprint): boolean {
+    const lista = this.sprintsPlaneados();
+    return lista.length > 0 && lista[lista.length - 1].id === sprint.id;
+  }
+
+  /** Reordena un sprint PLANEADO un lugar hacia arriba/abajo — a pedido del
+   *  usuario, para poder priorizar manualmente qué sigue sin depender solo de
+   *  la fecha de inicio (útil, por ejemplo, con sprints que todavía no tienen
+   *  fechas definidas). Al mover, se fija un 'orden' explícito y consecutivo
+   *  en TODOS los sprints planeados (no solo los dos que intercambian lugar),
+   *  para que el resultado quede determinista la próxima vez que se cargue la
+   *  pantalla (ver compararSprints). */
+  protected moverSprint(sprint: Sprint, direccion: -1 | 1): void {
+    const lista = [...this.sprintsPlaneados()];
+    const indice = lista.findIndex((s) => Number(s.id) === Number(sprint.id));
+    const destino = indice + direccion;
+    if (indice === -1 || destino < 0 || destino >= lista.length) return;
+    [lista[indice], lista[destino]] = [lista[destino], lista[indice]];
+    const actualizaciones = lista.map((s, i) => this.data.modificacion<Sprint>('Sprint', { ...s, orden: i }));
+    forkJoin(actualizaciones).subscribe({
+      next: () => this.cargarSprintsYTickets(),
+      error: () => this.toast.error('No se pudo reordenar el sprint. Intenta de nuevo.'),
+    });
   }
 
   /** Solo puede haber un sprint 'activo' por proyecto a la vez — mismo límite

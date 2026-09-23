@@ -24,4 +24,8 @@ export interface Sprint {
   fechaInicio: string | null;
   fechaFin: string | null;
   estado: EstadoSprint;
+  /** Orden manual elegido por el usuario (ver moverSprint en backlog.component.ts) —
+   *  null en sprints creados antes de este campo, que se siguen ordenando por
+   *  fechaInicio hasta que alguien los reordene por primera vez. */
+  orden?: number | null;
 }

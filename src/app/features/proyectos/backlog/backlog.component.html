@@ -80,12 +80,10 @@
 </div>
 
 @if (mostrarFormSprint()) {
-  <div class="panel" style="margin-top: 16px;">
-    <div class="panel-head">
-      <h2>Nuevo sprint</h2>
-    </div>
-    <form [formGroup]="formSprint" (ngSubmit)="crearSprint()">
-      <div class="edit-form form-grid-2col">
+  <div class="modal-overlay show" (click)="toggleFormSprint(); toast.info('Cambios descartados.')">
+    <form class="modal-box" style="max-width: 560px;" [formGroup]="formSprint" (click)="$event.stopPropagation()" (ngSubmit)="crearSprint()">
+      <h3>{{ sprintEditando() ? 'Editar sprint' : 'Nuevo sprint' }}</h3>
+      <div class="edit-form form-grid-2col" style="margin-bottom: 18px;">
         <label class="full-span">
           Nombre <b>*</b>
           <input type="text" class="form-control" formControlName="nombre" placeholder="Ej. Sprint 1" />
@@ -102,9 +100,10 @@
           Fecha fin
           <input type="date" class="form-control" formControlName="fechaFin" />
         </label>
-        <div class="form-actions">
-          <button type="submit" class="btn-secondary">Crear sprint</button>
-        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="toggleFormSprint(); toast.info('Cambios descartados.')">Cancelar</button>
+        <button type="submit" class="btn-primary">{{ sprintEditando() ? 'Guardar cambios' : 'Crear sprint' }}</button>
       </div>
     </form>
   </div>
@@ -141,6 +140,25 @@
           }
         </div>
         <div class="page-actions">
+          @if (sprint.estado === 'planeado') {
+            <button
+              type="button"
+              class="btn-secondary small"
+              title="Subir"
+              aria-label="Subir en el orden"
+              [disabled]="esPrimerPlaneado(sprint)"
+              (click)="moverSprint(sprint, -1)"
+            >▲</button>
+            <button
+              type="button"
+              class="btn-secondary small"
+              title="Bajar"
+              aria-label="Bajar en el orden"
+              [disabled]="esUltimoPlaneado(sprint)"
+              (click)="moverSprint(sprint, 1)"
+            >▼</button>
+          }
+          <button type="button" class="btn-secondary small" (click)="editarSprint(sprint)">✏️ Editar</button>
           @if (sprint.estado === 'planeado') {
             <button type="button" class="btn-secondary small" (click)="iniciarSprint(sprint)">▶ Iniciar sprint</button>
           } @else {
