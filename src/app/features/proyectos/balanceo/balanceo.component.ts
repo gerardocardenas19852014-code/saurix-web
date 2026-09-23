@@ -61,6 +61,13 @@ export class BalanceoComponent implements OnInit {
   protected readonly limiteAlerta = signal<number>(2);
 
   protected readonly usuariosExpandidos = signal<Set<number>>(new Set());
+
+  /** Tickets marcados con el checkbox "Comparar" (ver toggleComparar) — pensado
+   *  para armar a mano un grupo de 2-3 tickets de personas distintas y verlos
+   *  lado a lado (folio, encargado, horas) antes de decidir una reasignación,
+   *  pedido explícito del usuario ("quiero ver algo como esto para la toma de
+   *  decisión", mostrando un boceto con tickets en columnas). */
+  protected readonly ticketsComparar = signal<Set<number>>(new Set());
   /** Columna por la que se ordena la tabla ('total' o el id de una prioridad) —
    *  permite, p.ej., ver de un vistazo quién tiene más tickets de "Alta" para
    *  decidir a quién reasignar (pedido explícito del usuario). */
@@ -203,6 +210,20 @@ export class BalanceoComponent implements OnInit {
     () => this.filas().filter((f) => f.usuarioId !== 0 && this.tieneAlgunaAlerta(f)).length,
   );
 
+  /** Tickets seleccionados para comparar, en el orden en que se fueron marcando
+   *  (puede incluir tickets de distintas personas). */
+  protected readonly ticketsEnComparacion = computed<Ticket[]>(() => {
+    const ids = this.ticketsComparar();
+    if (ids.size === 0) return [];
+    const todos = this.tickets();
+    const resultado: Ticket[] = [];
+    for (const id of ids) {
+      const ticket = todos.find((t) => t.id === id);
+      if (ticket) resultado.push(ticket);
+    }
+    return resultado;
+  });
+
   protected conteoPrioridad(fila: FilaBalanceo, prioridadId: number): number {
     return fila.porPrioridad.get(prioridadId) ?? 0;
   }
@@ -235,6 +256,47 @@ export class BalanceoComponent implements OnInit {
    *  particular, para la lista desplegable de su fila. */
   protected ticketsDe(usuarioId: number): Ticket[] {
     return this.ticketsFiltrados().filter((t) => (Number(t.asignadoUsuarioId) || 0) === usuarioId);
+  }
+
+  protected estaEnComparacion(ticketId: number): boolean {
+    return this.ticketsComparar().has(ticketId);
+  }
+
+  protected toggleComparar(ticketId: number): void {
+    this.ticketsComparar.update((set) => {
+      const nuevo = new Set(set);
+      if (nuevo.has(ticketId)) {
+        nuevo.delete(ticketId);
+      } else {
+        nuevo.add(ticketId);
+      }
+      return nuevo;
+    });
+  }
+
+  protected quitarDeComparacion(ticketId: number): void {
+    this.ticketsComparar.update((set) => {
+      const nuevo = new Set(set);
+      nuevo.delete(ticketId);
+      return nuevo;
+    });
+  }
+
+  protected limpiarComparacion(): void {
+    this.ticketsComparar.set(new Set());
+  }
+
+  protected nombreUsuarioAsignado(id: number | null): string {
+    if (!id) return 'Sin asignar';
+    const usuario = this.usuarios().find((u) => Number(u.id) === Number(id));
+    return usuario ? nombreCompletoUsuario(usuario) : '—';
+  }
+
+  /** Formatea minutos como horas (mismo criterio que Reportes de horas: 1 decimal). */
+  protected horasTexto(minutos: number | null): string {
+    if (!minutos) return '—';
+    const horas = Math.round((minutos / 60) * 10) / 10;
+    return `${horas} h`;
   }
 
   protected nombreProyecto(id: number): string {

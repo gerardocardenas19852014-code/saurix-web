@@ -75,6 +75,94 @@
     }
   </div>
 
+  @if (ticketsEnComparacion().length > 0) {
+    <div class="comparacion-panel">
+      <div class="comparacion-header">
+        <strong>Comparando {{ ticketsEnComparacion().length }} ticket(s)</strong>
+        <button type="button" class="tab-more-item" style="width:auto; padding:3px 10px;" (click)="limpiarComparacion()">
+          Limpiar comparación
+        </button>
+      </div>
+      <div class="comparacion-scroll">
+        <table class="comparacion-tabla">
+          <tbody>
+            <tr>
+              <th>Ticket</th>
+              @for (t of ticketsEnComparacion(); track t.id) {
+                <td>
+                  <button
+                    type="button"
+                    class="comparacion-quitar"
+                    (click)="quitarDeComparacion(t.id)"
+                    title="Quitar de la comparación"
+                    aria-label="Quitar de la comparación"
+                  >×</button>
+                  <a [routerLink]="['/proyectos/tablero']" [queryParams]="{ ticket: t.id }" style="text-decoration:none;">
+                    #{{ t.numeroTicket }}
+                  </a>
+                </td>
+              }
+            </tr>
+            <tr>
+              <th>Título</th>
+              @for (t of ticketsEnComparacion(); track t.id) {
+                <td class="comparacion-texto-truncar" [title]="t.titulo">{{ t.titulo }}</td>
+              }
+            </tr>
+            <tr>
+              <th>Proyecto</th>
+              @for (t of ticketsEnComparacion(); track t.id) {
+                <td>{{ nombreProyecto(t.proyectoId) }}</td>
+              }
+            </tr>
+            <tr>
+              <th>Prioridad</th>
+              @for (t of ticketsEnComparacion(); track t.id) {
+                <td>
+                  <span
+                    class="kanban-tag"
+                    [style.color]="textoPrioridad(t.ticketPrioridadId)"
+                    [style.background]="fondoPrioridad(t.ticketPrioridadId)"
+                  >{{ nombrePrioridad(t.ticketPrioridadId) }}</span>
+                </td>
+              }
+            </tr>
+            <tr>
+              <th>Horas est.</th>
+              @for (t of ticketsEnComparacion(); track t.id) {
+                <td>{{ horasTexto(t.tiempoEstimadoMin) }}</td>
+              }
+            </tr>
+            <tr>
+              <th>Encargado</th>
+              @for (t of ticketsEnComparacion(); track t.id) {
+                <td>{{ nombreUsuarioAsignado(t.asignadoUsuarioId) }}</td>
+              }
+            </tr>
+            <tr>
+              <th>Reasignar a</th>
+              @for (t of ticketsEnComparacion(); track t.id) {
+                <td>
+                  <select
+                    class="toolbar-select"
+                    [value]="t.asignadoUsuarioId ?? 0"
+                    (change)="reasignar(t, $any($event.target).value)"
+                    aria-label="Reasignar a"
+                  >
+                    <option [value]="0">Sin asignar</option>
+                    @for (u of opcionesUsuarioPara(t); track u.id) {
+                      <option [value]="u.id">{{ u.nombre }}</option>
+                    }
+                  </select>
+                </td>
+              }
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+
   @if (filas().length === 0) {
     <p class="empty">No hay usuarios activos ni tickets pendientes que coincidan con estos filtros.</p>
   } @else {
@@ -198,6 +286,14 @@
                                   <option [value]="u.id">{{ u.nombre }}</option>
                                 }
                               </select>
+                              <label class="comparacion-check" title="Agregar a la comparación">
+                                <input
+                                  type="checkbox"
+                                  [checked]="estaEnComparacion(ticket.id)"
+                                  (change)="toggleComparar(ticket.id)"
+                                />
+                                Comparar
+                              </label>
                             </div>
                           </div>
                         </li>

@@ -43,3 +43,88 @@
 .th-ordenable:focus-visible {
   background: var(--technical-soft);
 }
+
+// Panel de comparación (checkbox "Comparar" en cada ticket de la lista desplegable
+// de una persona → se acumula aquí, incluso entre distintas personas) — tabla
+// traspuesta: una fila por atributo (Ticket/Título/Proyecto/Prioridad/Horas/
+// Encargado/Reasignar), una columna por ticket elegido. Pedido explícito del
+// usuario mostrando un boceto con tickets puestos en columnas para comparar.
+.comparacion-panel {
+  margin: 0 0 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper-raised);
+  overflow: hidden;
+}
+
+.comparacion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--technical-soft);
+}
+
+.comparacion-scroll {
+  overflow-x: auto;
+}
+
+.comparacion-tabla {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.comparacion-tabla th,
+.comparacion-tabla td {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.comparacion-tabla th {
+  color: var(--ink-soft);
+  font-weight: 600;
+  position: sticky;
+  left: 0;
+  background: var(--paper-raised);
+}
+
+.comparacion-tabla tr:last-child th,
+.comparacion-tabla tr:last-child td {
+  border-bottom: none;
+}
+
+.comparacion-tabla td {
+  min-width: 160px;
+}
+
+.comparacion-texto-truncar {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comparacion-quitar {
+  border: none;
+  background: transparent;
+  color: var(--danger);
+  font-weight: 700;
+  cursor: pointer;
+  margin-right: 6px;
+  padding: 0 4px;
+}
+
+.comparacion-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  cursor: pointer;
+}
