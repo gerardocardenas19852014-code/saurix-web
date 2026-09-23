@@ -18,11 +18,12 @@
 
 @if (modalAbierto()) {
   <div class="modal-overlay show" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
-    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+    <form class="modal-box" style="max-width: 980px;" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
       <h3>{{ enEdicion() ? 'Editar fijo' : 'Nuevo fijo' }}</h3>
 
-      <div class="edit-form" style="margin-bottom:18px;">
-        <label>Descripción<input type="text" formControlName="descripcion" /></label>
+      <div class="edit-form form-grid-3col" style="margin-bottom:18px;">
+        <label class="full-span">Descripción<input type="text" formControlName="descripcion" /></label>
+
         <label>Tipo
           <select formControlName="tipo" (change)="onTipoChange()">
             @for (t of tiposMovimiento(); track t.id) { <option [value]="t.clave">{{ t.etiqueta }}</option> }
@@ -40,6 +41,7 @@
             @for (c of categoriasFiltradas(); track c.id) { <option [ngValue]="c.id">{{ c.nombre }}</option> }
           </select>
         </label>
+
         <label>Monto<input type="number" step="0.01" formControlName="monto" /></label>
         <label>Frecuencia
           <select formControlName="frecuencia">
