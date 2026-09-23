@@ -5,6 +5,10 @@ import { DataClientService } from '../../core/services/data-client.service';
 import { Ticket } from '../../features/proyectos/kanban/ticket.model';
 import { TicketPrioridad, TicketPrioridadNotificar } from '../../features/proyectos/ticket-prioridades/ticket-prioridad.model';
 import { TableroColumna } from '../../features/proyectos/tableros/tablero-columna.model';
+import { AvisoTarjetaCiclo } from '../../features/presupuesto/shared/aviso-tarjeta.model';
+import { CuentaPresupuesto } from '../../features/catalogos/cuenta-presupuesto/cuenta-presupuesto.model';
+import { MovimientoPresupuesto } from '../../features/presupuesto/movimientos/movimiento.model';
+import { formatMoneda, infoTarjeta } from '../../features/presupuesto/shared/wallet.util';
 
 const ENTIDAD = 'Notificacion';
 
@@ -192,6 +196,65 @@ export class NotificacionesService {
       }
     } catch (error) {
       console.warn('No se pudo revisar el SLA de los tickets:', error);
+    }
+  }
+
+  /**
+   * Alertas de tarjeta de crédito: uso ≥90% del límite, y recordatorio 3 días
+   * antes (o el mismo día) de la fecha de pago cuando hay deuda pendiente —
+   * mismo patrón que revisarSlaTickets (llamado periódicamente desde
+   * ShellComponent), pero con su propio dedupe por ciclo (AvisoTarjetaCiclo, ver
+   * ese modelo) porque CuentaPresupuesto es un catálogo compartido entre
+   * usuarios y no puede guardar ahí una bandera "ya avisado" por usuario.
+   */
+  async revisarAlertasTarjetas(): Promise<void> {
+    const usuarioId = this.auth.usuarioActual()?.id;
+    if (!usuarioId) return;
+    try {
+      const [cuentas, movimientos, avisos] = await Promise.all([
+        firstValueFrom(this.data.list<CuentaPresupuesto>('CuentaPresupuesto')),
+        firstValueFrom(this.data.list<MovimientoPresupuesto>('MovimientoPresupuesto', { creadoPorUsuarioId: usuarioId })),
+        firstValueFrom(this.data.list<AvisoTarjetaCiclo>('AvisoTarjetaCiclo', { usuarioId })),
+      ]);
+
+      const hoy = new Date();
+      const hoySinHora = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+      const cicloActual = `${hoy.getFullYear()}-${hoy.getMonth() + 1}`;
+      const yaAvisado = (cuentaId: number, tipoAviso: 'uso' | 'pago', ciclo: string): boolean =>
+        avisos.some((a) => Number(a.cuentaPresupuestoId) === cuentaId && a.tipoAviso === tipoAviso && a.ciclo === ciclo);
+      const registrarAviso = (cuentaId: number, tipoAviso: 'uso' | 'pago', ciclo: string): void => {
+        this.data.alta<AvisoTarjetaCiclo>('AvisoTarjetaCiclo', { cuentaPresupuestoId: cuentaId, usuarioId, tipoAviso, ciclo }).subscribe({
+          error: (error) => console.warn('No se pudo registrar el aviso de tarjeta:', error),
+        });
+      };
+
+      for (const cuenta of cuentas) {
+        if (cuenta.tipo !== 'Tarjeta') continue;
+        const cuentaId = Number(cuenta.id);
+        const saldo = movimientos
+          .filter((m) => Number(m.cuentaPresupuestoId) === cuentaId)
+          .reduce((s, m) => s + (m.tipo === 'Ingreso' ? m.monto : -m.monto), 0);
+        const info = infoTarjeta(cuenta, saldo, hoy);
+
+        if (info.pctUso >= 90 && !yaAvisado(cuentaId, 'uso', cicloActual)) {
+          this.notificar(usuarioId, `💳 "${cuenta.nombre}" ya usó el ${info.pctUso.toFixed(0)}% de su límite de crédito.`, '/presupuesto/movimientos');
+          registrarAviso(cuentaId, 'uso', cicloActual);
+        }
+
+        if (info.deuda > 0 && info.proximaFechaPago) {
+          const diasRestantes = Math.round((info.proximaFechaPago.getTime() - hoySinHora.getTime()) / 86400000);
+          if (diasRestantes >= 0 && diasRestantes <= 3) {
+            const cicloPago = `${info.proximaFechaPago.getFullYear()}-${info.proximaFechaPago.getMonth() + 1}`;
+            if (!yaAvisado(cuentaId, 'pago', cicloPago)) {
+              const cuando = diasRestantes === 0 ? 'hoy' : diasRestantes === 1 ? 'mañana' : `en ${diasRestantes} días`;
+              this.notificar(usuarioId, `📅 El pago de "${cuenta.nombre}" (${formatMoneda(info.deuda)}) vence ${cuando}.`, '/presupuesto/movimientos');
+              registrarAviso(cuentaId, 'pago', cicloPago);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('No se pudo revisar las alertas de tarjetas:', error);
     }
   }
 }

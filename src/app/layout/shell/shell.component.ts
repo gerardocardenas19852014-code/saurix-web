@@ -49,11 +49,18 @@ export class ShellComponent implements OnDestroy {
     // localStorage de este navegador.
     void this.configuracionApariencia.cargarParaUsuarioActual();
     void this.notificacionesService.cargarParaUsuarioActual();
-    void this.notificacionesService.revisarSlaTickets();
+    this.revisarNotificacionesPeriodicas();
     this.intervaloRevisionSla = setInterval(
-      () => void this.notificacionesService.revisarSlaTickets(),
+      () => this.revisarNotificacionesPeriodicas(),
       ShellComponent.INTERVALO_REVISION_SLA_MS,
     );
+  }
+
+  /** SLA de tickets + alertas de tarjeta (uso ≥90%, recordatorio de pago) — mismo
+   *  intervalo, así ninguna pantalla en particular necesita estar abierta. */
+  private revisarNotificacionesPeriodicas(): void {
+    void this.notificacionesService.revisarSlaTickets();
+    void this.notificacionesService.revisarAlertasTarjetas();
   }
 
   ngOnDestroy(): void {

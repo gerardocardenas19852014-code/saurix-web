@@ -6,6 +6,7 @@ import { DataClientService } from '../../../core/services/data-client.service';
 import { AdjuntosPanelComponent } from '../../../shared/components/adjuntos-panel/adjuntos-panel.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../../shared/services/toast.service';
+import { PagoTarjetaService } from '../shared/pago-tarjeta.service';
 import { CategoriaPresupuesto } from '../../catalogos/categoria-presupuesto/categoria-presupuesto.model';
 import { CuentaPresupuesto } from '../../catalogos/cuenta-presupuesto/cuenta-presupuesto.model';
 import { colorCategoria, formatMoneda, iconoTipoCuenta } from '../shared/wallet.util';
@@ -44,6 +45,7 @@ export class MovimientosComponent implements OnInit {
   protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
+  private readonly pagoTarjeta = inject(PagoTarjetaService);
 
   protected readonly formatMoneda = formatMoneda;
   protected readonly colorCategoria = colorCategoria;
@@ -136,6 +138,27 @@ export class MovimientosComponent implements OnInit {
       ),
     );
     this.cargar();
+    this.abrirSolicitudPagoTarjetaSiExiste();
+  }
+
+  /** Si venimos del botón "Pagar tarjeta" del Dashboard, abre ya el modal de
+   *  transferencia con la tarjeta destino y el monto de la deuda prellenados
+   *  (el usuario solo elige de qué cuenta sale el pago). */
+  private abrirSolicitudPagoTarjetaSiExiste(): void {
+    const solicitud = this.pagoTarjeta.consumir();
+    if (!solicitud) return;
+    this.movimientoEnEdicion.set(null);
+    this.form.reset({
+      id: 0,
+      fecha: new Date().toISOString().slice(0, 10),
+      tipo: 'Transferencia',
+      cuentaPresupuestoId: 0,
+      cuentaDestinoId: solicitud.cuentaId,
+      categoriaPresupuestoId: 0,
+      monto: solicitud.monto,
+      descripcion: solicitud.descripcion,
+    });
+    this.modalAbierto.set(true);
   }
 
   cargar(): void {

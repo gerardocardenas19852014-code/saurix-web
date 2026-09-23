@@ -5,6 +5,10 @@
  * de categoría se deriva de forma determinista de su id, ciclando sobre
  * la paleta de acento ya definida en styles.scss.
  */
+import type { CuentaPresupuesto } from '../../catalogos/cuenta-presupuesto/cuenta-presupuesto.model';
+import type { CategoriaPresupuesto } from '../../catalogos/categoria-presupuesto/categoria-presupuesto.model';
+import type { MovimientoPresupuesto } from '../movimientos/movimiento.model';
+
 const PALETA_CATEGORIAS = [
   'var(--client)',
   'var(--danger)',
@@ -40,4 +44,100 @@ export function nivelUso(pctReal: number): 'ok' | 'warn' | 'over' {
   if (pctReal >= 100) return 'over';
   if (pctReal >= 70) return 'warn';
   return 'ok';
+}
+
+// ── Tarjetas de crédito: deuda/disponible/% de uso/próxima fecha de pago ──
+
+export interface InfoTarjeta {
+  deuda: number;
+  /** null si la cuenta no tiene límite de crédito capturado. */
+  disponible: number | null;
+  /** 0-100, topado en 100 aunque la deuda supere el límite. */
+  pctUso: number;
+  proximaFechaPago: Date | null;
+}
+
+/** Próxima fecha (hoy o después) en que cae un "día del mes" dado, clampado al
+ *  último día de cada mes — mismo cálculo que usa Calendario para fijos/tarjetas. */
+export function proximaFechaMensual(diaDelMes: number, hoy: Date = new Date()): Date {
+  const ultimoDiaEsteMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+  let candidata = new Date(hoy.getFullYear(), hoy.getMonth(), Math.min(diaDelMes, ultimoDiaEsteMes));
+  candidata.setHours(0, 0, 0, 0);
+  const hoySinHora = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  if (candidata < hoySinHora) {
+    const ultimoDiaSiguiente = new Date(hoy.getFullYear(), hoy.getMonth() + 2, 0).getDate();
+    candidata = new Date(hoy.getFullYear(), hoy.getMonth() + 1, Math.min(diaDelMes, ultimoDiaSiguiente));
+  }
+  return candidata;
+}
+
+/** Info de una cuenta tipo Tarjeta a partir de su saldo ya calculado (ingresos -
+ *  gastos de MIS movimientos sobre esa cuenta compartida — el mismo criterio que
+ *  usan Movimientos/Calendario/Dashboard). Un saldo negativo es deuda. */
+export function infoTarjeta(cuenta: CuentaPresupuesto, saldo: number, hoy: Date = new Date()): InfoTarjeta {
+  const deuda = Math.max(-saldo, 0);
+  const disponible = cuenta.limiteCredito != null ? Math.max(cuenta.limiteCredito - deuda, 0) : null;
+  const pctUso = cuenta.limiteCredito ? Math.min((deuda / cuenta.limiteCredito) * 100, 100) : 0;
+  const proximaFechaPago = cuenta.diaPago ? proximaFechaMensual(cuenta.diaPago, hoy) : null;
+  return { deuda, disponible, pctUso, proximaFechaPago };
+}
+
+// ── Gastos inusuales: mes actual vs. promedio de los 3 meses anteriores ──
+
+export interface GastoInusual {
+  categoriaId: number | null;
+  nombreCategoria: string;
+  montoMes: number;
+  promedio: number;
+  /** montoMes / promedio, p.ej. 1.8 = 80% arriba del promedio. */
+  veces: number;
+}
+
+/** Categorías cuyo gasto del mes en curso es ≥1.5x el promedio de gasto de esa
+ *  misma categoría en los 3 meses completos anteriores (mismo umbral del prototipo). */
+export function gastosInusuales(
+  movimientos: MovimientoPresupuesto[],
+  categorias: CategoriaPresupuesto[],
+  hoy: Date = new Date(),
+): GastoInusual[] {
+  const esGasto = (m: MovimientoPresupuesto) => m.tipo === 'Gasto' && !m.transferenciaId;
+  const totalPorCategoriaEnRango = (inicio: Date, fin: Date): Map<number | null, number> => {
+    const mapa = new Map<number | null, number>();
+    for (const m of movimientos.filter(esGasto)) {
+      const f = new Date(m.fecha);
+      if (f < inicio || f > fin) continue;
+      const id = m.categoriaPresupuestoId ? Number(m.categoriaPresupuestoId) : null;
+      mapa.set(id, (mapa.get(id) ?? 0) + m.monto);
+    }
+    return mapa;
+  };
+
+  const inicioMesActual = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  const finMesActual = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59);
+  const porCategoriaMes = totalPorCategoriaEnRango(inicioMesActual, finMesActual);
+
+  const promedios = new Map<number | null, number>();
+  for (let i = 1; i <= 3; i++) {
+    const base = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    const inicio = new Date(base.getFullYear(), base.getMonth(), 1);
+    const fin = new Date(base.getFullYear(), base.getMonth() + 1, 0, 23, 59, 59);
+    for (const [id, monto] of totalPorCategoriaEnRango(inicio, fin)) {
+      promedios.set(id, (promedios.get(id) ?? 0) + monto / 3);
+    }
+  }
+
+  const resultado: GastoInusual[] = [];
+  for (const [id, montoMes] of porCategoriaMes) {
+    const promedio = promedios.get(id) ?? 0;
+    if (promedio > 0 && montoMes >= promedio * 1.5) {
+      resultado.push({
+        categoriaId: id,
+        nombreCategoria: id ? (categorias.find((c) => Number(c.id) === id)?.nombre ?? '—') : 'Sin categoría',
+        montoMes,
+        promedio,
+        veces: montoMes / promedio,
+      });
+    }
+  }
+  return resultado.sort((a, b) => b.veces - a.veces);
 }
