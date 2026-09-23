@@ -47,8 +47,11 @@
               </tr>
             }
             @case ('grupo') {
-              <tr class="proy-fila-grupo">
-                <td [attr.colspan]="quincenasVisibles().length + 2">{{ renglon.nombre }}</td>
+              <tr class="proy-fila-grupo" (click)="toggleGrupo(renglon.clave)">
+                <td [attr.colspan]="quincenasVisibles().length + 2">
+                  <span class="proy-grupo-flecha">{{ estaColapsado(renglon.clave) ? '▸' : '▾' }}</span>
+                  {{ renglon.nombre }}
+                </td>
               </tr>
             }
             @default {

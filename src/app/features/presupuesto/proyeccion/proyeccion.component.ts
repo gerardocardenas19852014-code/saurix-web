@@ -35,6 +35,10 @@ interface RenglonProyeccion {
   /** false solo para Saldo inicial/Saldo final proyectado: son un saldo en
    *  un punto del tiempo, sumarlos entre quincenas no tiene sentido. */
   sumable: boolean;
+  /** Solo en las hojas/detalles que cuelgan de un renglón 'grupo': la clave
+   *  de ese grupo (misma que su `clave` de toggle), para poder ocultarlas
+   *  cuando el usuario lo colapsa. null en todo lo demás (siempre visible). */
+  grupoId: string | null;
 }
 
 interface RaizFila {
@@ -346,10 +350,10 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
   /** Renglón(es) de una categoría hoja: el renglón normal (editable, como
    *  antes) y, si junta más de una cuenta, un sub-renglón informativo por
    *  cuenta debajo — así se ve de dónde sale sin duplicar el total. */
-  private filasHoja(clave: string, nombre: string): RenglonProyeccion[] {
+  private filasHoja(clave: string, nombre: string, grupoId: string | null = null): RenglonProyeccion[] {
     const quincenas = this.quincenas();
     const celdas = quincenas.map((q) => this.celda(clave, q.clave));
-    const filas: RenglonProyeccion[] = [{ id: `hoja:${clave}`, tipo: 'hoja', clave, nombre, celdas, sumable: true }];
+    const filas: RenglonProyeccion[] = [{ id: `hoja:${clave}`, tipo: 'hoja', clave, nombre, celdas, sumable: true, grupoId }];
 
     for (const cuenta of this.cuentasDeCategoria(clave)) {
       const claveCuenta = `${clave}::cta:${cuenta.id}`;
@@ -358,7 +362,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
         manual: false,
         editable: false,
       }));
-      filas.push({ id: `detalle:${claveCuenta}`, tipo: 'detalle', clave: null, nombre: cuenta.nombre, celdas: celdasCuenta, sumable: true });
+      filas.push({ id: `detalle:${claveCuenta}`, tipo: 'detalle', clave: null, nombre: cuenta.nombre, celdas: celdasCuenta, sumable: true, grupoId });
     }
 
     return filas;
@@ -380,7 +384,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
   private construirSeccion(idSeccion: string, titulo: string, raices: RaizFila[]): RenglonProyeccion[] {
     const quincenas = this.quincenas();
     const renglones: RenglonProyeccion[] = [
-      { id: `sec:${idSeccion}`, tipo: 'seccion-titulo', clave: null, nombre: titulo, celdas: [], sumable: false },
+      { id: `sec:${idSeccion}`, tipo: 'seccion-titulo', clave: null, nombre: titulo, celdas: [], sumable: false, grupoId: null },
     ];
     const totalSeccion = quincenas.map(() => 0);
 
@@ -391,10 +395,13 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
         renglones.push(...filas);
         continue;
       }
-      renglones.push({ id: `grupo:${raiz.clave}`, tipo: 'grupo', clave: null, nombre: raiz.nombre, celdas: [], sumable: false });
+      // clave del renglón 'grupo' = la clave de la propia categoría raíz —
+      // se reutiliza como llave de colapsar/expandir (toggleGrupo), ya que
+      // un renglón 'grupo' nunca tiene celdas editables que la necesiten.
+      renglones.push({ id: `grupo:${raiz.clave}`, tipo: 'grupo', clave: raiz.clave, nombre: raiz.nombre, celdas: [], sumable: false, grupoId: null });
       const subtotal = quincenas.map(() => 0);
       for (const hijo of raiz.hijos) {
-        const filas = this.filasHoja(hijo.clave, hijo.nombre);
+        const filas = this.filasHoja(hijo.clave, hijo.nombre, raiz.clave);
         filas[0].celdas.forEach((c, i) => (subtotal[i] += c.valor));
         renglones.push(...filas);
       }
@@ -406,6 +413,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
         nombre: `Subtotal ${raiz.nombre}`,
         celdas: subtotal.map((valor) => ({ valor, manual: false, editable: false })),
         sumable: true,
+        grupoId: null,
       });
     }
 
@@ -416,6 +424,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       nombre: `TOTAL ${titulo}`,
       celdas: totalSeccion.map((valor) => ({ valor, manual: false, editable: false })),
       sumable: true,
+      grupoId: null,
     });
     return renglones;
   }
@@ -465,10 +474,11 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
         nombre: 'Saldo inicial',
         celdas: saldoInicial,
         sumable: false,
+        grupoId: null,
       },
-      { id: 'resumen:totalIngreso', tipo: 'resumen', clave: null, nombre: 'Total ingresos', celdas: totalIngreso, sumable: true },
-      { id: 'resumen:totalGasto', tipo: 'resumen', clave: null, nombre: 'Total gastos', celdas: totalGasto, sumable: true },
-      { id: 'resumen:ahorro', tipo: 'resumen', clave: null, nombre: 'Ahorro', celdas: totalAhorro, sumable: true },
+      { id: 'resumen:totalIngreso', tipo: 'resumen', clave: null, nombre: 'Total ingresos', celdas: totalIngreso, sumable: true, grupoId: null },
+      { id: 'resumen:totalGasto', tipo: 'resumen', clave: null, nombre: 'Total gastos', celdas: totalGasto, sumable: true, grupoId: null },
+      { id: 'resumen:ahorro', tipo: 'resumen', clave: null, nombre: 'Ahorro', celdas: totalAhorro, sumable: true, grupoId: null },
       {
         id: 'resumen:saldoFinal',
         tipo: 'resumen',
@@ -476,17 +486,40 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
         nombre: 'Saldo final proyectado',
         celdas: saldoFinal,
         sumable: false,
+        grupoId: null,
       },
     ];
   });
 
-  /** Todos los renglones de la tabla, en el orden en que se pintan. */
-  protected readonly filasTabla = computed<RenglonProyeccion[]>(() => [
-    ...this.resumen(),
-    ...this.renglonesIngreso(),
-    ...this.renglonesGasto(),
-    ...this.renglonesAhorro(),
-  ]);
+  // ---------------------------------------------------------------------
+  // Colapsar/expandir grupos (categorías con subcategorías) para lectura.
+  // ---------------------------------------------------------------------
+
+  protected readonly gruposColapsados = signal<Set<string>>(new Set());
+
+  protected estaColapsado(clave: string | null): boolean {
+    return !!clave && this.gruposColapsados().has(clave);
+  }
+
+  protected toggleGrupo(clave: string | null): void {
+    if (!clave) return;
+    this.gruposColapsados.update((actual) => {
+      const nuevo = new Set(actual);
+      if (nuevo.has(clave)) nuevo.delete(clave);
+      else nuevo.add(clave);
+      return nuevo;
+    });
+  }
+
+  /** Todos los renglones de la tabla, en el orden en que se pintan — sin las
+   *  hojas/detalles de los grupos que el usuario colapsó (el título del
+   *  grupo y su Subtotal se quedan siempre visibles). */
+  protected readonly filasTabla = computed<RenglonProyeccion[]>(() => {
+    const todas = [...this.resumen(), ...this.renglonesIngreso(), ...this.renglonesGasto(), ...this.renglonesAhorro()];
+    const colapsados = this.gruposColapsados();
+    if (colapsados.size === 0) return todas;
+    return todas.filter((r) => !r.grupoId || !colapsados.has(r.grupoId));
+  });
 
   // ---------------------------------------------------------------------
   // Edición manual de una celda.

@@ -61,6 +61,18 @@
   font-weight: 700;
   padding: 6px 10px;
   color: var(--ink-soft);
+  cursor: pointer;
+  user-select: none;
+}
+
+.proy-fila-grupo:hover td {
+  background: var(--technical);
+  color: white;
+}
+
+.proy-grupo-flecha {
+  display: inline-block;
+  width: 14px;
 }
 
 .proy-etiqueta {
