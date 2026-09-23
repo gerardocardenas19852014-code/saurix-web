@@ -125,16 +125,3 @@
   <a routerLink="movimientos" class="workspace-card-enter" style="display:inline-block; margin-bottom:28px;">Ver todos los movimientos →</a>
 }
 
-<h2 class="settings-card-title" style="margin:0 0 12px;">Accesos</h2>
-<div class="catalog-list">
-  @for (enlace of enlaces; track enlace.ruta) {
-    <a class="catalog-list-item" [routerLink]="enlace.ruta">
-      <span class="catalog-list-icon catalog-list-icon-{{ enlace.color }}">{{ enlace.icono }}</span>
-      <div class="catalog-list-body">
-        <h3>{{ enlace.titulo }}</h3>
-        <p>{{ enlace.descripcion }}</p>
-      </div>
-      <span class="workspace-card-enter catalog-list-enter">Entrar →</span>
-    </a>
-  }
-</div>

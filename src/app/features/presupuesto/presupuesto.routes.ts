@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { PresupuestoLandingComponent } from './landing/presupuesto-landing.component';
+import { PresupuestoInicioComponent } from './inicio/presupuesto-inicio.component';
 import { MovimientosComponent } from './movimientos/movimientos.component';
 import { RecurrentesComponent } from './recurrentes/recurrentes.component';
 import { DeudasComponent } from './deudas/deudas.component';
@@ -9,7 +10,8 @@ import { ReportesComponent } from './reportes/reportes.component';
 import { CalendarioComponent } from './calendario/calendario.component';
 
 export const PRESUPUESTO_ROUTES: Routes = [
-  { path: '', component: PresupuestoLandingComponent },
+  { path: '', component: PresupuestoInicioComponent },
+  { path: 'dashboard', component: PresupuestoLandingComponent },
   { path: 'movimientos', component: MovimientosComponent },
   { path: 'recurrentes', component: RecurrentesComponent },
   { path: 'deudas', component: DeudasComponent },

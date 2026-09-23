@@ -1,0 +1,25 @@
+<div class="page-header">
+  <h1>Presupuesto Personal</h1>
+</div>
+
+@for (grupo of grupos; track grupo.titulo) {
+  <div class="catalog-group">
+    <h2 class="catalog-group-title">
+      {{ grupo.titulo }}
+      <span class="catalog-group-count">{{ grupo.enlaces.length }}</span>
+    </h2>
+
+    <div class="tiles-grid tiles-grid-landing">
+      @for (enlace of grupo.enlaces; track enlace.ruta) {
+        <a
+          class="module-tile module-tile-{{ enlace.color }}"
+          [routerLink]="enlace.ruta"
+          [title]="enlace.descripcion"
+        >
+          <div class="module-tile-icon">{{ enlace.icono }}</div>
+          <div class="module-tile-label">{{ enlace.titulo }}</div>
+        </a>
+      }
+    </div>
+  </div>
+}

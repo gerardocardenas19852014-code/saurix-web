@@ -18,68 +18,6 @@ import {
   nivelUso,
 } from '../shared/wallet.util';
 
-type ColorIcono = 'siif' | 'personal' | 'generic';
-
-interface EnlacePresupuesto {
-  ruta: string;
-  icono: string;
-  color: ColorIcono;
-  titulo: string;
-  descripcion: string;
-}
-
-const ENLACES: EnlacePresupuesto[] = [
-  {
-    ruta: 'movimientos',
-    icono: '💸',
-    color: 'personal',
-    titulo: 'Movimientos',
-    descripcion: 'Registro de ingresos, gastos y transferencias entre cuentas.',
-  },
-  {
-    ruta: 'recurrentes',
-    icono: '🔁',
-    color: 'personal',
-    titulo: 'Fijos y Proyección',
-    descripcion: 'Ingresos y gastos recurrentes: renta, nómina, suscripciones, etc.',
-  },
-  {
-    ruta: 'deudas',
-    icono: '🏦',
-    color: 'personal',
-    titulo: 'Deudas',
-    descripcion: 'Préstamos personales, de auto, etc. — con historial real de abonos.',
-  },
-  {
-    ruta: 'metas',
-    icono: '🏆',
-    color: 'personal',
-    titulo: 'Metas de ahorro',
-    descripcion: 'Objetivos de ahorro con seguimiento de tus aportes.',
-  },
-  {
-    ruta: 'limites',
-    icono: '🎯',
-    color: 'personal',
-    titulo: 'Límites de gasto',
-    descripcion: 'Tope mensual de gasto por categoría o general.',
-  },
-  {
-    ruta: 'reportes',
-    icono: '📊',
-    color: 'generic',
-    titulo: 'Reportes',
-    descripcion: 'Ingresos vs. gastos, gasto por categoría y patrimonio neto histórico.',
-  },
-  {
-    ruta: 'calendario',
-    icono: '📅',
-    color: 'generic',
-    titulo: 'Calendario de pagos',
-    descripcion: 'Próximos fijos y próximo pago de cada tarjeta, a 60 días.',
-  },
-];
-
 interface CuentaConInfo {
   cuenta: CuentaPresupuesto;
   saldo: number;
@@ -128,7 +66,6 @@ export class PresupuestoLandingComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly pagoTarjeta = inject(PagoTarjetaService);
 
-  protected readonly enlaces = ENLACES;
   protected readonly formatMoneda = formatMoneda;
   protected readonly colorCategoria = colorCategoria;
   protected readonly iconoTipoCuenta = iconoTipoCuenta;

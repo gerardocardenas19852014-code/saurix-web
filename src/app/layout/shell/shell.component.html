@@ -59,7 +59,8 @@
     @if (moduloActivo() === 'presupuesto') {
       <span class="sidebar-label">Presupuesto Personal</span>
       <nav class="sidebar-nav" aria-label="Menú de presupuesto personal">
-        <a routerLink="/presupuesto" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">📊 Dashboard</a>
+        <a routerLink="/presupuesto" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
+        <a routerLink="/presupuesto/dashboard" routerLinkActive="active">📊 Dashboard</a>
 
         <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('presupuesto', 'Movimientos')">
           <span>{{ grupoAbierto('presupuesto', 'Movimientos') ? '▾' : '▸' }} Movimientos</span>
