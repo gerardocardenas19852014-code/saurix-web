@@ -11,6 +11,7 @@ import {
   GastoInusual,
   InfoTarjeta,
   colorCategoria,
+  fechaLocalDeTexto,
   formatMoneda,
   gastosInusuales,
   iconoTipoCuenta,
@@ -82,7 +83,7 @@ export class PresupuestoLandingComponent implements OnInit {
 
   private enElMesActual(fecha: string): boolean {
     const hoy = new Date();
-    const f = new Date(fecha);
+    const f = fechaLocalDeTexto(fecha);
     return f.getFullYear() === hoy.getFullYear() && f.getMonth() === hoy.getMonth();
   }
 

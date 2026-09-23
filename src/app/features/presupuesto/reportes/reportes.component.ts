@@ -5,7 +5,7 @@ import { DataClientService } from '../../../core/services/data-client.service';
 import { CategoriaPresupuesto } from '../../catalogos/categoria-presupuesto/categoria-presupuesto.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
 import { MovimientoRecurrentePresupuesto } from '../recurrentes/recurrente.model';
-import { colorCategoria, formatMoneda } from '../shared/wallet.util';
+import { colorCategoria, fechaLocalDeTexto, formatMoneda } from '../shared/wallet.util';
 
 type PeriodoId = 'mes-actual' | 'mes-anterior' | 'anio-actual' | 'anio-anterior';
 
@@ -112,7 +112,7 @@ export class ReportesComponent implements OnInit {
   protected readonly etiquetaPeriodo = computed(() => this.rangosDe(this.periodo()).etiqueta);
 
   private enRango(fecha: string, rango: RangoFecha): boolean {
-    const f = new Date(fecha);
+    const f = fechaLocalDeTexto(fecha);
     return f >= rango.inicio && f <= rango.fin;
   }
 
@@ -220,7 +220,7 @@ export class ReportesComponent implements OnInit {
     for (let i = 11; i >= 0; i--) {
       const finMes = new Date(hoy.getFullYear(), hoy.getMonth() - i + 1, 0, 23, 59, 59);
       const valor = movimientos
-        .filter((m) => new Date(m.fecha) <= finMes)
+        .filter((m) => fechaLocalDeTexto(m.fecha) <= finMes)
         .reduce((s, m) => s + (m.tipo === 'Ingreso' ? m.monto : -m.monto), 0);
       puntos.push({ etiqueta: finMes.toLocaleDateString('es-MX', { month: 'short' }), valor });
     }

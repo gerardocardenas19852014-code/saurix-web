@@ -12,6 +12,7 @@ import { CuentaPresupuesto } from '../../catalogos/cuenta-presupuesto/cuenta-pre
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
 import { ValorLista } from '../../catalogos/valor-lista/valor-lista.model';
 import { MovimientoRecurrentePresupuesto } from './recurrente.model';
+import { fechaLocalDeTexto, textoFechaDeLocal } from '../shared/wallet.util';
 
 /**
  * "Fijos y Proyección": gastos/ingresos recurrentes (renta, nómina,
@@ -167,7 +168,7 @@ export class RecurrentesComponent implements OnInit {
   }
 
   private cicloDeFecha(fecha: string, frecuencia: string): string {
-    const f = new Date(fecha);
+    const f = fechaLocalDeTexto(fecha);
     return frecuencia === 'Anual' ? `${f.getFullYear()}` : `${f.getFullYear()}-${f.getMonth() + 1}`;
   }
 
@@ -312,13 +313,13 @@ export class RecurrentesComponent implements OnInit {
       const mesAncla = this.mesAncla(fila);
       const anio = hoy.getFullYear() + pasos;
       const ultimoDia = new Date(anio, mesAncla + 1, 0).getDate();
-      const fecha = new Date(anio, mesAncla, Math.min(fila.diaDelMes, ultimoDia));
-      return { fecha: fecha.toISOString().slice(0, 10), ciclo: `${anio}` };
+      const dia = Math.min(fila.diaDelMes, ultimoDia);
+      return { fecha: textoFechaDeLocal(anio, mesAncla, dia), ciclo: `${anio}` };
     }
     const base = new Date(hoy.getFullYear(), hoy.getMonth() + pasos, 1);
     const ultimoDia = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
-    const fecha = new Date(base.getFullYear(), base.getMonth(), Math.min(fila.diaDelMes, ultimoDia));
-    return { fecha: fecha.toISOString().slice(0, 10), ciclo: `${base.getFullYear()}-${base.getMonth() + 1}` };
+    const dia = Math.min(fila.diaDelMes, ultimoDia);
+    return { fecha: textoFechaDeLocal(base.getFullYear(), base.getMonth(), dia), ciclo: `${base.getFullYear()}-${base.getMonth() + 1}` };
   }
 
   /** "Generar futuros": crea de una vez los MovimientoPresupuesto de los

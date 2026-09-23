@@ -7,7 +7,7 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
 import { ToastService } from '../../../shared/services/toast.service';
 import { CategoriaPresupuesto } from '../../catalogos/categoria-presupuesto/categoria-presupuesto.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
-import { formatMoneda, nivelUso } from '../shared/wallet.util';
+import { fechaLocalDeTexto, formatMoneda, nivelUso } from '../shared/wallet.util';
 import { LimitePresupuesto } from './limite.model';
 
 /** Límites de gasto mensual: por categoría, o general (todas) si categoriaPresupuestoId es NULL. */
@@ -67,7 +67,7 @@ export class LimitesComponent implements OnInit {
       .filter((m) => !m.proyectado)
       .filter((m) => m.tipo === 'Gasto' && !m.transferenciaId)
       .filter((m) => {
-        const f = new Date(m.fecha);
+        const f = fechaLocalDeTexto(m.fecha);
         return f.getFullYear() === hoy.getFullYear() && f.getMonth() === hoy.getMonth();
       })
       .filter((m) => (categoriaId ? Number(m.categoriaPresupuestoId) === Number(categoriaId) : true))

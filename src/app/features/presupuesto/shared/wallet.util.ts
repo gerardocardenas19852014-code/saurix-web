@@ -18,6 +18,24 @@ const PALETA_CATEGORIAS = [
   'var(--technical)',
 ];
 
+/** Parsea un texto "YYYY-MM-DD" (el formato que guardan los <input type="date">)
+ *  como fecha LOCAL a medianoche, en vez de `new Date(texto)` — que lo
+ *  interpreta como UTC: en una zona horaria detrás de UTC (México) eso puede
+ *  recorrer la fecha un día para atrás y cruzarla a un mes o año distinto
+ *  (p. ej. "2026-10-01" termina cayendo en septiembre). Úsese en cualquier
+ *  comparación por año/mes/rango sobre el campo `fecha` de un movimiento. */
+export function fechaLocalDeTexto(fecha: string): Date {
+  const [anio, mes, dia] = fecha.split('-').map(Number);
+  return new Date(anio, mes - 1, dia);
+}
+
+/** Arma un texto "YYYY-MM-DD" a partir de año/mes(0-indexado)/día LOCALES,
+ *  sin pasar por `Date.toISOString()` — que convierte a UTC y, según la
+ *  zona horaria, puede recorrer la fecha a un día (y por tanto mes) distinto. */
+export function textoFechaDeLocal(anio: number, mes0: number, dia: number): string {
+  return `${anio}-${String(mes0 + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+}
+
 export function colorCategoria(id: number | null | undefined): string {
   if (!id) return 'var(--technical)';
   return PALETA_CATEGORIAS[id % PALETA_CATEGORIAS.length];
@@ -104,7 +122,7 @@ export function gastosInusuales(
   const totalPorCategoriaEnRango = (inicio: Date, fin: Date): Map<number | null, number> => {
     const mapa = new Map<number | null, number>();
     for (const m of movimientos.filter(esGasto)) {
-      const f = new Date(m.fecha);
+      const f = fechaLocalDeTexto(m.fecha);
       if (f < inicio || f > fin) continue;
       const id = m.categoriaPresupuestoId ? Number(m.categoriaPresupuestoId) : null;
       mapa.set(id, (mapa.get(id) ?? 0) + m.monto);
