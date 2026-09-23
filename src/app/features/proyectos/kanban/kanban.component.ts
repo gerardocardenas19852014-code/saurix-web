@@ -25,6 +25,7 @@ import {
 import { TicketTipo } from '../ticket-tipos/ticket-tipo.model';
 import { TicketPrioridad } from '../ticket-prioridades/ticket-prioridad.model';
 import { TicketModulo } from '../ticket-modulos/ticket-modulo.model';
+import { Sprint, nombreSprintCorto } from '../sprints/sprint.model';
 import {
   Ticket,
   TicketActividad,
@@ -104,6 +105,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly tipos = signal<TicketTipo[]>([]);
   protected readonly prioridades = signal<TicketPrioridad[]>([]);
   protected readonly modulos = signal<TicketModulo[]>([]);
+  protected readonly sprints = signal<Sprint[]>([]);
   protected readonly usuarios = signal<UsuarioOpcion[]>([]);
 
   /** 'tablero' (Kanban) o 'lista' (tabla) — recuerda la preferencia del usuario (Panel de Control › Apariencia). */
@@ -418,6 +420,16 @@ export class KanbanComponent implements OnInit, OnDestroy {
       etiqueta: 'Módulo',
       formatear: (fila) => (fila.ticketModuloId ? `${this.iconoModulo(fila.ticketModuloId)} ${this.nombreModulo(fila.ticketModuloId)}`.trim() : 'Sin módulo'),
     },
+    {
+      campo: 'sprintId',
+      etiqueta: 'Sprint',
+      // Nombre corto (p.ej. solo "10.74.0") para que el renglón no se estire con
+      // nombres largos de sprint — el nombre completo queda disponible al pasar
+      // el mouse (columna.titulo, ver data-table.component.html).
+      formatear: (fila) => nombreSprintCorto(this.nombreSprint(fila)),
+      titulo: (fila) => this.nombreSprint(fila),
+      claseValor: (fila) => (fila.sprintId ? 'grid-badge-success' : 'grid-badge-neutral'),
+    },
     { campo: 'ticketPrioridadId', etiqueta: 'Prioridad', formatear: (fila) => this.nombrePrioridad(fila.ticketPrioridadId) },
     {
       campo: 'tableroColumnaId',
@@ -558,6 +570,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.data.list<TicketTipo>('TicketTipo').subscribe((tipos) => this.tipos.set(tipos));
     this.data.list<TicketPrioridad>('TicketPrioridad').subscribe((prioridades) => this.prioridades.set(prioridades));
     this.data.list<TicketModulo>('TicketModulo').subscribe((modulos) => this.modulos.set(modulos));
+    this.data.list<Sprint>('Sprint').subscribe((sprints) => this.sprints.set(sprints));
     // 'Usuario' no trae un campo nombreCompleto propio (ver Usuario.model.ts) — hay que
     // armarlo con nombreCompletoUsuario(), si no los combos de Asignado a / Reportado por
     // quedan con opciones en blanco.
@@ -589,6 +602,16 @@ export class KanbanComponent implements OnInit, OnDestroy {
   iconoModulo(id: number | null): string {
     if (!id) return '';
     return this.modulos().find((m) => Number(m.id) === Number(id))?.icono ?? '';
+  }
+
+  /** Nombre del sprint de un ticket, o 'Backlog' si no tiene ninguno asignado — a
+   *  pedido del usuario, para poder ver desde el propio Kanban/Lista y el detalle
+   *  del ticket si ya quedó metido en un sprint, sin tener que ir al Backlog. La
+   *  asignación en sí (moverlo a un sprint u otro) se sigue haciendo solo desde
+   *  ahí — aquí es de solo lectura. */
+  nombreSprint(ticket: Ticket): string {
+    if (!ticket.sprintId) return 'Backlog';
+    return this.sprints().find((s) => Number(s.id) === Number(ticket.sprintId))?.nombre ?? 'Backlog';
   }
 
   nombrePrioridad(id: number): string {

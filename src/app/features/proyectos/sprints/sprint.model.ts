@@ -29,3 +29,16 @@ export interface Sprint {
    *  fechaInicio hasta que alguien los reordene por primera vez. */
   orden?: number | null;
 }
+
+/** Versión corta del nombre de un sprint, para columnas angostas de grid (Kanban/Lista,
+ *  Mi Dashboard) donde el nombre completo hace que el renglón se estire de más — el
+ *  Backlog (donde sí hay espacio) sigue mostrando sprint.nombre tal cual. La mayoría de
+ *  los sprints terminan en un número de versión (p.ej. "...Obligaciones 10.74.0"), que en
+ *  la práctica es la parte que distingue un sprint de otro con el mismo "Paquete de
+ *  Liberación de..."; si se encuentra ese patrón se usa solo eso, si no se recorta el
+ *  nombre tal cual (p.ej. "RQS SEFIN", que ya es corto de por sí). */
+export function nombreSprintCorto(nombre: string): string {
+  const version = nombre.match(/\d+(?:\.\d+)+\s*$/);
+  if (version) return version[0].trim();
+  return nombre.length > 22 ? `${nombre.slice(0, 21)}…` : nombre;
+}

@@ -12,6 +12,11 @@ export interface ColumnaTabla<T> {
    * (Activo, Vigencia, etc.) — ver .grid-badge en styles.scss.
    */
   claseValor?: (fila: T) => string;
+  /** Opcional: texto para el atributo title/tooltip de la celda — útil cuando
+   *  formatear() devuelve una versión recortada del valor real (p.ej. el nombre
+   *  corto de un sprint) y se quiere poder ver el valor completo al pasar el
+   *  mouse, sin ocupar espacio extra en el renglón. */
+  titulo?: (fila: T) => string;
 }
 
 /**

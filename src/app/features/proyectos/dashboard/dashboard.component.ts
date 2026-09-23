@@ -8,6 +8,7 @@ import { Ticket, TicketEtiqueta, TicketSeguidor, UsuarioOpcion } from '../kanban
 import { TicketPrioridad } from '../ticket-prioridades/ticket-prioridad.model';
 import { TicketModulo } from '../ticket-modulos/ticket-modulo.model';
 import { ProyectoOpcion, TableroColumna } from '../tableros/tablero-columna.model';
+import { Sprint, nombreSprintCorto } from '../sprints/sprint.model';
 
 type ClaseSla = 'sla-ok' | 'sla-warning' | 'sla-expired';
 
@@ -17,6 +18,7 @@ type CampoOrdenPendientes =
   | 'titulo'
   | 'proyecto'
   | 'modulo'
+  | 'sprint'
   | 'asignado'
   | 'estado'
   | 'prioridad'
@@ -32,6 +34,11 @@ interface TicketResumen {
   moduloNombre: string;
   prioridadNombre: string;
   prioridadColor: string;
+  /** Nombre del sprint al que pertenece el ticket, o 'Backlog' si no tiene
+   *  ninguno asignado — a pedido del usuario, para saber de un vistazo si
+   *  algo de lo que trae entre manos ya quedó metido en un sprint o sigue
+   *  suelto en el Backlog, sin tener que ir a esa pantalla a buscarlo. */
+  sprintNombre: string;
   /** Solo se muestra en la tabla cuando se está viendo "Todos" (ver ID_TODOS) —
    *  si no, es redundante: ya se sabe de quién son todos los tickets listados. */
   asignadoNombre: string;
@@ -74,6 +81,8 @@ export class ProyectosDashboardComponent implements OnInit {
   protected readonly usuarios = signal<UsuarioOpcion[]>([]);
   protected readonly modulos = signal<TicketModulo[]>([]);
   protected readonly seguidos = signal<TicketSeguidor[]>([]);
+  protected readonly sprints = signal<Sprint[]>([]);
+  protected readonly nombreSprintCorto = nombreSprintCorto;
   /** Todas las etiquetas de todos los tickets (no solo las de "Todos" filtrado) —
    *  para poder buscar por etiqueta, igual que en Kanban/Lista de tickets. */
   protected readonly etiquetasPorTicket = signal<Map<number, TicketEtiqueta[]>>(new Map());
@@ -148,6 +157,7 @@ export class ProyectosDashboardComponent implements OnInit {
     this.data.list<TableroColumna>('TableroColumna').subscribe((c) => this.columnas.set(c));
     this.data.list<TicketPrioridad>('TicketPrioridad').subscribe((p) => this.prioridades.set(p));
     this.data.list<TicketModulo>('TicketModulo').subscribe((m) => this.modulos.set(m));
+    this.data.list<Sprint>('Sprint').subscribe((s) => this.sprints.set(s));
     // 'Usuario' no trae un campo nombreCompleto propio — hay que armarlo con
     // nombreCompletoUsuario(), si no el selector "Viendo tareas de" queda en blanco.
     this.data
@@ -270,6 +280,9 @@ export class ProyectosDashboardComponent implements OnInit {
     const columna = this.columnas().find((c) => Number(c.id) === Number(ticket.tableroColumnaId));
     const prioridad = this.prioridades().find((p) => Number(p.id) === Number(ticket.ticketPrioridadId));
     const modulo = this.modulos().find((m) => Number(m.id) === Number(ticket.ticketModuloId));
+    const sprint = ticket.sprintId
+      ? this.sprints().find((s) => Number(s.id) === Number(ticket.sprintId))
+      : undefined;
     const sla = this.slaDe(ticket);
     return {
       ticket,
@@ -283,6 +296,7 @@ export class ProyectosDashboardComponent implements OnInit {
       clase: sla.clase,
       texto: sla.texto,
       critica: prioridad?.critica === true,
+      sprintNombre: sprint?.nombre ?? 'Backlog',
     };
   }
 
@@ -346,6 +360,8 @@ export class ProyectosDashboardComponent implements OnInit {
         return `${r.proyectoClave} ${r.proyectoNombre}`;
       case 'modulo':
         return r.moduloNombre ?? '';
+      case 'sprint':
+        return r.sprintNombre ?? '';
       case 'asignado':
         return r.asignadoNombre ?? '';
       case 'estado':

@@ -138,6 +138,7 @@
             <th><button type="button" class="grid-sort-button" aria-label="Ordenar por Título" (click)="ordenarPendientesPor('titulo')">Título <span aria-hidden="true">{{ indicadorOrdenPendientes('titulo') }}</span></button></th>
             <th><button type="button" class="grid-sort-button" aria-label="Ordenar por Proyecto" (click)="ordenarPendientesPor('proyecto')">Proyecto <span aria-hidden="true">{{ indicadorOrdenPendientes('proyecto') }}</span></button></th>
             <th><button type="button" class="grid-sort-button" aria-label="Ordenar por Módulo" (click)="ordenarPendientesPor('modulo')">Módulo <span aria-hidden="true">{{ indicadorOrdenPendientes('modulo') }}</span></button></th>
+            <th><button type="button" class="grid-sort-button" aria-label="Ordenar por Sprint" (click)="ordenarPendientesPor('sprint')">Sprint <span aria-hidden="true">{{ indicadorOrdenPendientes('sprint') }}</span></button></th>
             @if (usuarioViendoId() === ID_TODOS || modoAsignacion() === 'reportado') {
               <th><button type="button" class="grid-sort-button" aria-label="Ordenar por Asignado a" (click)="ordenarPendientesPor('asignado')">Asignado a <span aria-hidden="true">{{ indicadorOrdenPendientes('asignado') }}</span></button></th>
             }
@@ -155,6 +156,9 @@
               <td data-label="Título">{{ r.ticket.titulo }}</td>
               <td data-label="Proyecto">{{ r.proyectoClave }} — {{ r.proyectoNombre }}</td>
               <td data-label="Módulo">{{ r.moduloNombre }}</td>
+              <td data-label="Sprint">
+                <span class="grid-badge" [class.grid-badge-neutral]="r.sprintNombre === 'Backlog'" [title]="r.sprintNombre">{{ nombreSprintCorto(r.sprintNombre) }}</span>
+              </td>
               @if (usuarioViendoId() === ID_TODOS || modoAsignacion() === 'reportado') {
                 <td data-label="Asignado a">{{ r.asignadoNombre }}</td>
               }
@@ -201,6 +205,7 @@
             <th>Título</th>
             <th>Proyecto</th>
             <th>Módulo</th>
+            <th>Sprint</th>
             @if (usuarioViendoId() === ID_TODOS || modoAsignacion() === 'reportado') {
               <th>Asignado a</th>
             }
@@ -218,6 +223,9 @@
               <td data-label="Título">{{ r.ticket.titulo }}</td>
               <td data-label="Proyecto">{{ r.proyectoClave }} — {{ r.proyectoNombre }}</td>
               <td data-label="Módulo">{{ r.moduloNombre }}</td>
+              <td data-label="Sprint">
+                <span class="grid-badge" [class.grid-badge-neutral]="r.sprintNombre === 'Backlog'" [title]="r.sprintNombre">{{ nombreSprintCorto(r.sprintNombre) }}</span>
+              </td>
               @if (usuarioViendoId() === ID_TODOS || modoAsignacion() === 'reportado') {
                 <td data-label="Asignado a">{{ r.asignadoNombre }}</td>
               }
@@ -292,7 +300,7 @@
               <span [class]="'sla-badge ' + r.clase" style="margin:0;">{{ r.texto }}</span>
             }
           </div>
-          <p class="actividad-item-texto">{{ r.ticket.titulo }} · {{ r.proyectoClave }} · {{ r.columnaNombre }}</p>
+          <p class="actividad-item-texto" [title]="r.sprintNombre">{{ r.ticket.titulo }} · {{ r.proyectoClave }} · {{ r.columnaNombre }} · {{ nombreSprintCorto(r.sprintNombre) }}</p>
         </li>
       }
     </ul>

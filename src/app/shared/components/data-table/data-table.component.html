@@ -25,7 +25,7 @@
           @for (columna of columnas(); track columna.campo) {
             <td [attr.data-label]="columna.etiqueta">
               @if (columna.claseValor) {
-                <span class="grid-badge {{ columna.claseValor(fila) }}">{{ valorCelda(fila, columna) }}</span>
+                <span class="grid-badge {{ columna.claseValor(fila) }}" [title]="columna.titulo ? columna.titulo(fila) : ''">{{ valorCelda(fila, columna) }}</span>
               } @else {
                 {{ valorCelda(fila, columna) }}
               }
