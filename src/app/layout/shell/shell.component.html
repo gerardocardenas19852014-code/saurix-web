@@ -16,16 +16,32 @@
     @if (moduloActivo() === 'catalogos') {
       <span class="sidebar-label">Catálogos</span>
       <nav class="sidebar-nav" aria-label="Menú de catálogos">
-        <a routerLink="/catalogos" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
-        <a routerLink="/catalogos/categorias-presupuesto" routerLinkActive="active">🏷️ Categorías de presupuesto</a>
-        <a routerLink="/catalogos/cuentas-presupuesto" routerLinkActive="active">🏦 Cuentas de presupuesto</a>
-        <a routerLink="/catalogos/tipo-cuenta-presupuesto" routerLinkActive="active">💳 Tipo de cuenta</a>
-        <a routerLink="/catalogos/tipo-movimiento-presupuesto" routerLinkActive="active">↔️ Tipo de movimiento</a>
-        <a routerLink="/catalogos/frecuencia-fijos-presupuesto" routerLinkActive="active">🔁 Frecuencia de fijos</a>
-        <a routerLink="/catalogos/tipos-ticket" routerLinkActive="active">🏳️ Tipos de Ticket</a>
-        <a routerLink="/catalogos/prioridades" routerLinkActive="active">🚦 Prioridades</a>
-        <a routerLink="/catalogos/modulos" routerLinkActive="active">🧭 Módulos</a>
-        <a routerLink="/catalogos/proveedor-conexion" routerLinkActive="active">🔌 Proveedor de conexión</a>
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('catalogos', 'Presupuesto Personal')">
+          <span>{{ grupoAbierto('catalogos', 'Presupuesto Personal') ? '▾' : '▸' }} Presupuesto Personal</span>
+        </button>
+        @if (grupoAbierto('catalogos', 'Presupuesto Personal')) {
+          <a routerLink="/catalogos/categorias-presupuesto" routerLinkActive="active">🏷️ Categorías de presupuesto</a>
+          <a routerLink="/catalogos/cuentas-presupuesto" routerLinkActive="active">🏦 Cuentas de presupuesto</a>
+          <a routerLink="/catalogos/tipo-cuenta-presupuesto" routerLinkActive="active">💳 Tipo de cuenta</a>
+          <a routerLink="/catalogos/tipo-movimiento-presupuesto" routerLinkActive="active">↔️ Tipo de movimiento</a>
+          <a routerLink="/catalogos/frecuencia-fijos-presupuesto" routerLinkActive="active">🔁 Frecuencia de fijos</a>
+        }
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('catalogos', 'Gestión de Proyectos')">
+          <span>{{ grupoAbierto('catalogos', 'Gestión de Proyectos') ? '▾' : '▸' }} Gestión de Proyectos</span>
+        </button>
+        @if (grupoAbierto('catalogos', 'Gestión de Proyectos')) {
+          <a routerLink="/catalogos/tipos-ticket" routerLinkActive="active">🏳️ Tipos de Ticket</a>
+          <a routerLink="/catalogos/prioridades" routerLinkActive="active">🚦 Prioridades</a>
+          <a routerLink="/catalogos/modulos" routerLinkActive="active">🧭 Módulos</a>
+        }
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('catalogos', 'Panel de Control')">
+          <span>{{ grupoAbierto('catalogos', 'Panel de Control') ? '▾' : '▸' }} Panel de Control</span>
+        </button>
+        @if (grupoAbierto('catalogos', 'Panel de Control')) {
+          <a routerLink="/catalogos/proveedor-conexion" routerLinkActive="active">🔌 Proveedor de conexión</a>
+        }
       </nav>
     }
 
@@ -44,13 +60,31 @@
       <span class="sidebar-label">Presupuesto Personal</span>
       <nav class="sidebar-nav" aria-label="Menú de presupuesto personal">
         <a routerLink="/presupuesto" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
-        <a routerLink="/presupuesto/movimientos" routerLinkActive="active">💸 Movimientos</a>
-        <a routerLink="/presupuesto/recurrentes" routerLinkActive="active">🔁 Fijos y Proyección</a>
-        <a routerLink="/presupuesto/deudas" routerLinkActive="active">🏦 Deudas</a>
-        <a routerLink="/presupuesto/metas" routerLinkActive="active">🏆 Metas de ahorro</a>
-        <a routerLink="/presupuesto/limites" routerLinkActive="active">🎯 Límites de gasto</a>
-        <a routerLink="/presupuesto/reportes" routerLinkActive="active">📊 Reportes</a>
-        <a routerLink="/presupuesto/calendario" routerLinkActive="active">📅 Calendario de pagos</a>
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('presupuesto', 'Movimientos')">
+          <span>{{ grupoAbierto('presupuesto', 'Movimientos') ? '▾' : '▸' }} Movimientos</span>
+        </button>
+        @if (grupoAbierto('presupuesto', 'Movimientos')) {
+          <a routerLink="/presupuesto/movimientos" routerLinkActive="active">💸 Movimientos</a>
+          <a routerLink="/presupuesto/recurrentes" routerLinkActive="active">🔁 Fijos y Proyección</a>
+          <a routerLink="/presupuesto/deudas" routerLinkActive="active">🏦 Deudas</a>
+        }
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('presupuesto', 'Metas y límites')">
+          <span>{{ grupoAbierto('presupuesto', 'Metas y límites') ? '▾' : '▸' }} Metas y límites</span>
+        </button>
+        @if (grupoAbierto('presupuesto', 'Metas y límites')) {
+          <a routerLink="/presupuesto/metas" routerLinkActive="active">🏆 Metas de ahorro</a>
+          <a routerLink="/presupuesto/limites" routerLinkActive="active">🎯 Límites de gasto</a>
+        }
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('presupuesto', 'Reportes')">
+          <span>{{ grupoAbierto('presupuesto', 'Reportes') ? '▾' : '▸' }} Reportes</span>
+        </button>
+        @if (grupoAbierto('presupuesto', 'Reportes')) {
+          <a routerLink="/presupuesto/reportes" routerLinkActive="active">📊 Reportes</a>
+          <a routerLink="/presupuesto/calendario" routerLinkActive="active">📅 Calendario de pagos</a>
+        }
       </nav>
     }
 
@@ -59,26 +93,26 @@
       <nav class="sidebar-nav" aria-label="Menú de gestión de proyectos">
         <a routerLink="/proyectos" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
 
-        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupoProyectos('Procesos')">
-          <span>{{ grupoProyectosAbierto('Procesos') ? '▾' : '▸' }} Procesos</span>
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('proyectos', 'Procesos')">
+          <span>{{ grupoAbierto('proyectos', 'Procesos') ? '▾' : '▸' }} Procesos</span>
         </button>
-        @if (grupoProyectosAbierto('Procesos')) {
+        @if (grupoAbierto('proyectos', 'Procesos')) {
           <a routerLink="/proyectos/tablero" routerLinkActive="active">🗂️ Ticket</a>
           <a routerLink="/proyectos/backlog" routerLinkActive="active">📋 Backlog</a>
         }
 
-        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupoProyectos('Configuracion')">
-          <span>{{ grupoProyectosAbierto('Configuracion') ? '▾' : '▸' }} Configuración</span>
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('proyectos', 'Configuracion')">
+          <span>{{ grupoAbierto('proyectos', 'Configuracion') ? '▾' : '▸' }} Configuración</span>
         </button>
-        @if (grupoProyectosAbierto('Configuracion')) {
+        @if (grupoAbierto('proyectos', 'Configuracion')) {
           <a routerLink="/proyectos/gestor-estados" routerLinkActive="active">🧭 Gestor de Estados</a>
           <a routerLink="/proyectos/proyectos" routerLinkActive="active">📁 Proyectos</a>
         }
 
-        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupoProyectos('Reportes')">
-          <span>{{ grupoProyectosAbierto('Reportes') ? '▾' : '▸' }} Reportes</span>
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('proyectos', 'Reportes')">
+          <span>{{ grupoAbierto('proyectos', 'Reportes') ? '▾' : '▸' }} Reportes</span>
         </button>
-        @if (grupoProyectosAbierto('Reportes')) {
+        @if (grupoAbierto('proyectos', 'Reportes')) {
           <a routerLink="/proyectos/dashboard" routerLinkActive="active">📊 Mi Dashboard</a>
           <a routerLink="/proyectos/reportes-horas" routerLinkActive="active">⏱️ Reportes de horas</a>
           <a routerLink="/proyectos/gantt" routerLinkActive="active">📅 Gantt</a>

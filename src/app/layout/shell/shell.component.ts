@@ -100,26 +100,40 @@ export class ShellComponent implements OnDestroy {
     ShellComponent.RUTAS_ANCHO_COMPLETO.some((ruta) => this.urlActual().startsWith(ruta)),
   );
 
-  /** El menú de "Gestión de Proyectos" ya tiene 9 enlaces — se agrupan como en su página
-   *  "Inicio" (ver proyectos-landing.component.ts: grupos "Procesos", "Configuración" y
-   *  "Reportes", mismo orden) y cada grupo se puede colapsar. Por defecto empiezan
-   *  CERRADOS (pedido explícito del usuario); no se persiste entre sesiones (se reinicia
-   *  al recargar, igual que sprintsColapsados en Backlog). */
-  protected readonly gruposProyectosColapsados = signal<Set<string>>(
-    new Set(['Procesos', 'Configuracion', 'Reportes']),
+  /** Menús laterales con muchos enlaces (Gestión de Proyectos, Catálogos,
+   *  Presupuesto Personal) agrupan sus enlaces en secciones colapsables,
+   *  igual que "Inicio" de Gestión de Proyectos ya lo hacía (grupos
+   *  "Procesos", "Configuración" y "Reportes"). La clave es `modulo:titulo`
+   *  para que un mismo nombre de grupo en dos módulos (p.ej. "Reportes" en
+   *  Proyectos y en Presupuesto) no comparta estado. Por defecto empiezan
+   *  CERRADOS (pedido explícito del usuario); no se persiste entre sesiones
+   *  (se reinicia al recargar, igual que sprintsColapsados en Backlog). */
+  protected readonly gruposColapsados = signal<Set<string>>(
+    new Set([
+      'proyectos:Procesos',
+      'proyectos:Configuracion',
+      'proyectos:Reportes',
+      'catalogos:Presupuesto Personal',
+      'catalogos:Gestión de Proyectos',
+      'catalogos:Panel de Control',
+      'presupuesto:Movimientos',
+      'presupuesto:Metas y límites',
+      'presupuesto:Reportes',
+    ]),
   );
 
-  grupoProyectosAbierto(titulo: string): boolean {
-    return !this.gruposProyectosColapsados().has(titulo);
+  grupoAbierto(modulo: string, titulo: string): boolean {
+    return !this.gruposColapsados().has(`${modulo}:${titulo}`);
   }
 
-  toggleGrupoProyectos(titulo: string): void {
-    this.gruposProyectosColapsados.update((set) => {
+  toggleGrupo(modulo: string, titulo: string): void {
+    this.gruposColapsados.update((set) => {
       const nuevo = new Set(set);
-      if (nuevo.has(titulo)) {
-        nuevo.delete(titulo);
+      const clave = `${modulo}:${titulo}`;
+      if (nuevo.has(clave)) {
+        nuevo.delete(clave);
       } else {
-        nuevo.add(titulo);
+        nuevo.add(clave);
       }
       return nuevo;
     });

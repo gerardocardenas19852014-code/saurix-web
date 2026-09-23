@@ -1,11 +1,10 @@
 import { Routes } from '@angular/router';
 
 export const CATALOGOS_ROUTES: Routes = [
-  {
-    path: '',
-    loadComponent: () =>
-      import('./landing/catalogos-landing.component').then((m) => m.CatalogosLandingComponent),
-  },
+  // Sin landing/Inicio propio: el menú lateral ya lista cada catálogo
+  // agrupado (ver shell.component.html), así que entrar a /catalogos a
+  // secas manda directo al primero.
+  { path: '', redirectTo: 'categorias-presupuesto', pathMatch: 'full' },
 
   // Los catálogos de WikiDocs (Tipo de sistema, Categoría, Secciones) se
   // movieron por completo a features/wikidocs (jerarquía real
@@ -13,12 +12,6 @@ export const CATALOGOS_ROUTES: Routes = [
   // en su propio módulo, no aquí.
 
   // Catálogos de Presupuesto Personal (compartidos entre todos los usuarios).
-  {
-    path: 'listas-valores',
-    loadComponent: () =>
-      import('./valor-lista/valor-lista-list.component').then((m) => m.ValorListaListComponent),
-  },
-
   {
     path: 'tipo-cuenta-presupuesto',
     loadComponent: () =>

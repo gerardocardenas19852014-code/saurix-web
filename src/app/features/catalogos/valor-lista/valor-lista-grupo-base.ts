@@ -14,10 +14,13 @@ const ENTIDAD = 'ValorLista';
  * Logica compartida por las pantallas dedicadas de cada grupo de "Listas de
  * valores" (Tipo de cuenta, Tipo de movimiento, Frecuencia de fijos,
  * Proveedor de conexion): misma entidad ValorLista de siempre (sin cambios
- * de datos), pero cada grupo ahora es su propio componente/ruta/menu — sin
- * combo para elegir el grupo ni pantalla compartida — a pedido explicito,
- * en vez de la pantalla generica anterior (ValorListaListComponent, que se
- * conserva solo para grupos nuevos que todavia no tengan pantalla propia).
+ * de datos), pero cada grupo es su propio componente/ruta/menu — sin combo
+ * para elegir el grupo ni pantalla generica compartida (esa pantalla,
+ * ValorListaListComponent, se elimino del todo a pedido explicito).
+ *
+ * Si algun dia se necesita un grupo nuevo, se crea otro componente igual
+ * de chico que estos (grupo/titulo/clavesProtegidas/moduloBitacora + su
+ * ruta), no hace falta revivir el combo generico.
  *
  * Cada subclase concreta solo declara `grupo`/`tituloGrupo`/`clavesProtegidas`/
  * `moduloBitacora` y comparte esta logica + la misma plantilla
