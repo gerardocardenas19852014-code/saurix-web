@@ -165,7 +165,12 @@
               (dragend)="onDragEnd()"
             >
               <div class="kanban-card-top">
-                <span class="kanban-card-id">#{{ ticket.numeroTicket }}</span>
+                <span class="kanban-card-id">
+                  #{{ ticket.numeroTicket }}
+                  @if (ticket.folioInterno) {
+                    <span [title]="'Folio interno: ' + ticket.folioInterno"> · {{ ticket.folioInterno }}</span>
+                  }
+                </span>
                 <span
                   class="kanban-card-priority"
                   [style.background]="colorPrioridad(ticket.ticketPrioridadId)"
