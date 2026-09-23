@@ -85,6 +85,18 @@
   color: var(--ink-soft);
 }
 
+.proy-fila-detalle .proy-etiqueta {
+  padding-left: 40px;
+  color: var(--ink-soft);
+  font-style: italic;
+  font-size: 12px;
+}
+
+.proy-fila-detalle .proy-celda {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
 .proy-celda {
   padding: 5px 10px;
   text-align: right;

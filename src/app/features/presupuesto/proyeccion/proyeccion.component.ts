@@ -28,7 +28,7 @@ interface Celda {
  *  subcategorías, solo etiqueta), hoja (renglón editable) o subtotal/total. */
 interface RenglonProyeccion {
   id: string;
-  tipo: 'resumen' | 'seccion-titulo' | 'grupo' | 'hoja' | 'subtotal' | 'total';
+  tipo: 'resumen' | 'seccion-titulo' | 'grupo' | 'hoja' | 'detalle' | 'subtotal' | 'total';
   clave: string | null;
   nombre: string;
   celdas: Celda[];
@@ -249,9 +249,13 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
 
   /** Mapa clave → (quincenaClave → monto), calculado una sola vez a partir
    *  de movimientos + fijos extrapolados (sin contar dos veces un ciclo que
-   *  ya tiene su movimiento real/proyectado). */
+   *  ya tiene su movimiento real/proyectado). También arma, por cada clave
+   *  de categoría (ing:X / gas:X), el desglose por cuenta (clave::cta:Y) y
+   *  qué cuentas la componen — para poder mostrar "de qué cuentas sale"
+   *  cuando una categoría junta movimientos de más de una cuenta. */
   private readonly valoresAuto = computed(() => {
     const mapa = new Map<string, Map<string, number>>();
+    const cuentasPorClave = new Map<string, Set<number>>();
     const sumar = (clave: string, quincenaClave: string, monto: number) => {
       let porQuincena = mapa.get(clave);
       if (!porQuincena) {
@@ -259,6 +263,24 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
         mapa.set(clave, porQuincena);
       }
       porQuincena.set(quincenaClave, (porQuincena.get(quincenaClave) ?? 0) + monto);
+    };
+    const sumarPorCategoria = (
+      prefijo: 'ing' | 'gas',
+      categoriaId: number,
+      cuentaId: number | null | undefined,
+      quincenaClave: string,
+      monto: number,
+    ) => {
+      const clave = `${prefijo}:${categoriaId}`;
+      sumar(clave, quincenaClave, monto);
+      const cuenta = Number(cuentaId ?? 0);
+      sumar(`${clave}::cta:${cuenta}`, quincenaClave, monto);
+      let cuentasClave = cuentasPorClave.get(clave);
+      if (!cuentasClave) {
+        cuentasClave = new Set<number>();
+        cuentasPorClave.set(clave, cuentasClave);
+      }
+      cuentasClave.add(cuenta);
     };
 
     const quincenasVentana = new Set(this.quincenas().map((q) => q.clave));
@@ -269,8 +291,8 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       const quincenaClave = this.quincenaDeFecha(m.fecha);
       if (!quincenasVentana.has(quincenaClave)) continue;
       if (!m.transferenciaId && m.categoriaPresupuestoId) {
-        if (m.tipo === 'Ingreso') sumar(`ing:${m.categoriaPresupuestoId}`, quincenaClave, m.monto);
-        else if (m.tipo === 'Gasto') sumar(`gas:${m.categoriaPresupuestoId}`, quincenaClave, m.monto);
+        if (m.tipo === 'Ingreso') sumarPorCategoria('ing', m.categoriaPresupuestoId, m.cuentaPresupuestoId, quincenaClave, m.monto);
+        else if (m.tipo === 'Gasto') sumarPorCategoria('gas', m.categoriaPresupuestoId, m.cuentaPresupuestoId, quincenaClave, m.monto);
       }
       if (cuentasAhorroIds.has(Number(m.cuentaPresupuestoId))) {
         sumar(`aho:${m.cuentaPresupuestoId}`, quincenaClave, m.tipo === 'Ingreso' ? m.monto : -m.monto);
@@ -284,8 +306,8 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
         if (cubiertoPorMovimiento.has(`${fila.id}:${q.clave}`)) continue;
         if (!this.fijoFiraEnQuincena(fila, q)) continue;
         if (fila.categoriaPresupuestoId) {
-          if (fila.tipo === 'Ingreso') sumar(`ing:${fila.categoriaPresupuestoId}`, q.clave, fila.monto);
-          else if (fila.tipo === 'Gasto') sumar(`gas:${fila.categoriaPresupuestoId}`, q.clave, fila.monto);
+          if (fila.tipo === 'Ingreso') sumarPorCategoria('ing', fila.categoriaPresupuestoId, fila.cuentaPresupuestoId, q.clave, fila.monto);
+          else if (fila.tipo === 'Gasto') sumarPorCategoria('gas', fila.categoriaPresupuestoId, fila.cuentaPresupuestoId, q.clave, fila.monto);
         }
         if (cuentasAhorroIds.has(Number(fila.cuentaPresupuestoId))) {
           sumar(`aho:${fila.cuentaPresupuestoId}`, q.clave, fila.tipo === 'Ingreso' ? fila.monto : -fila.monto);
@@ -293,7 +315,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       }
     }
 
-    return mapa;
+    return { mapa, cuentasPorClave };
   });
 
   protected readonly ajustesPorClave = computed(() => {
@@ -305,7 +327,41 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
   private celda(clave: string, quincenaClave: string, editable = true): Celda {
     const ajuste = this.ajustesPorClave().get(`${clave}|${quincenaClave}`);
     if (ajuste !== undefined) return { valor: ajuste, manual: true, editable };
-    return { valor: this.valoresAuto().get(clave)?.get(quincenaClave) ?? 0, manual: false, editable };
+    return { valor: this.valoresAuto().mapa.get(clave)?.get(quincenaClave) ?? 0, manual: false, editable };
+  }
+
+  /** Cuentas (≥2) que componen una categoría de Ingreso/Gasto — para
+   *  desglosarla en sub-renglones de solo lectura, uno por cuenta. Si solo
+   *  usa una cuenta (o ninguna), regresa vacío y la categoría se muestra
+   *  como un solo renglón, igual que antes. */
+  private cuentasDeCategoria(clave: string): { id: number; nombre: string }[] {
+    const ids = this.valoresAuto().cuentasPorClave.get(clave);
+    if (!ids || ids.size < 2) return [];
+    const nombresPorId = new Map(this.cuentas().map((c) => [Number(c.id), c.nombre]));
+    return [...ids]
+      .map((id) => ({ id, nombre: id === 0 ? 'Sin cuenta' : (nombresPorId.get(id) ?? `Cuenta #${id}`) }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es-MX'));
+  }
+
+  /** Renglón(es) de una categoría hoja: el renglón normal (editable, como
+   *  antes) y, si junta más de una cuenta, un sub-renglón informativo por
+   *  cuenta debajo — así se ve de dónde sale sin duplicar el total. */
+  private filasHoja(clave: string, nombre: string): RenglonProyeccion[] {
+    const quincenas = this.quincenas();
+    const celdas = quincenas.map((q) => this.celda(clave, q.clave));
+    const filas: RenglonProyeccion[] = [{ id: `hoja:${clave}`, tipo: 'hoja', clave, nombre, celdas, sumable: true }];
+
+    for (const cuenta of this.cuentasDeCategoria(clave)) {
+      const claveCuenta = `${clave}::cta:${cuenta.id}`;
+      const celdasCuenta = quincenas.map((q) => ({
+        valor: this.valoresAuto().mapa.get(claveCuenta)?.get(q.clave) ?? 0,
+        manual: false,
+        editable: false,
+      }));
+      filas.push({ id: `detalle:${claveCuenta}`, tipo: 'detalle', clave: null, nombre: cuenta.nombre, celdas: celdasCuenta, sumable: true });
+    }
+
+    return filas;
   }
 
   /** Saldo real (hoy) de todas las cuentas, sin proyectar nada — punto de
@@ -330,17 +386,17 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
 
     for (const raiz of raices) {
       if (raiz.hijos.length === 0) {
-        const celdas = quincenas.map((q) => this.celda(raiz.clave, q.clave));
-        celdas.forEach((c, i) => (totalSeccion[i] += c.valor));
-        renglones.push({ id: `hoja:${raiz.clave}`, tipo: 'hoja', clave: raiz.clave, nombre: raiz.nombre, celdas, sumable: true });
+        const filas = this.filasHoja(raiz.clave, raiz.nombre);
+        filas[0].celdas.forEach((c, i) => (totalSeccion[i] += c.valor));
+        renglones.push(...filas);
         continue;
       }
       renglones.push({ id: `grupo:${raiz.clave}`, tipo: 'grupo', clave: null, nombre: raiz.nombre, celdas: [], sumable: false });
       const subtotal = quincenas.map(() => 0);
       for (const hijo of raiz.hijos) {
-        const celdas = quincenas.map((q) => this.celda(hijo.clave, q.clave));
-        celdas.forEach((c, i) => (subtotal[i] += c.valor));
-        renglones.push({ id: `hoja:${hijo.clave}`, tipo: 'hoja', clave: hijo.clave, nombre: hijo.nombre, celdas, sumable: true });
+        const filas = this.filasHoja(hijo.clave, hijo.nombre);
+        filas[0].celdas.forEach((c, i) => (subtotal[i] += c.valor));
+        renglones.push(...filas);
       }
       subtotal.forEach((v, i) => (totalSeccion[i] += v));
       renglones.push({
