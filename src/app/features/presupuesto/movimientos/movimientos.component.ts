@@ -92,6 +92,12 @@ export class MovimientosComponent implements OnInit {
       !!this.filtroTexto() || this.filtroCuentaId() !== 0 || this.filtroCategoriaId() !== 0 || this.filtroTipo() !== '',
   );
 
+  /** Movimientos "reales" — excluye los proyectados (generados por
+   *  adelantado con "Generar futuros" en Fijos y Proyección, aún sin
+   *  confirmar): saldo, gráfica y demás cálculos de dinero solo deben
+   *  contar lo que ya ocurrió, no una proyección a futuro. */
+  protected readonly movimientosReales = computed(() => this.movimientos().filter((m) => !m.proyectado));
+
   protected readonly movimientosFiltrados = computed(() => {
     const texto = this.filtroTexto().trim().toLowerCase();
     const cuentaId = this.filtroCuentaId();
@@ -114,7 +120,7 @@ export class MovimientosComponent implements OnInit {
       const anio = fecha.getFullYear();
       const mes = fecha.getMonth();
       const etiqueta = fecha.toLocaleDateString('es-MX', { month: 'short' });
-      const delMes = this.movimientos().filter((m) => {
+      const delMes = this.movimientosReales().filter((m) => {
         const f = new Date(m.fecha);
         return f.getFullYear() === anio && f.getMonth() === mes && !m.transferenciaId;
       });
@@ -150,6 +156,10 @@ export class MovimientosComponent implements OnInit {
     categoriaPresupuestoId: [0],
     monto: [0, [Validators.required, Validators.min(0.01)]],
     descripcion: ['', Validators.required],
+    /** Editable a mano (además del atajo "✅ Confirmar" y de "Generar
+     *  futuros"/"↻ Registrar ciclo" en Fijos y Proyección): permite marcar o
+     *  desmarcar cualquier movimiento como proyección a futuro. */
+    proyectado: [false],
   });
 
   get esTransferencia(): boolean {
@@ -249,9 +259,10 @@ export class MovimientosComponent implements OnInit {
     return this.categorias().find((c) => Number(c.id) === Number(id))?.nombre ?? '—';
   }
 
-  /** Saldo actual de una cuenta = suma de sus ingresos menos sus gastos (no hay saldo inicial en el catálogo). */
+  /** Saldo actual de una cuenta = suma de sus ingresos menos sus gastos (no hay saldo inicial en el catálogo).
+   *  Solo cuenta movimientos reales — uno proyectado a futuro aún no pasó. */
   saldoCuenta(cuentaId: number): number {
-    return this.movimientos()
+    return this.movimientosReales()
       .filter((m) => Number(m.cuentaPresupuestoId) === Number(cuentaId))
       .reduce((s, m) => s + (m.tipo === 'Ingreso' ? m.monto : -m.monto), 0);
   }
@@ -267,6 +278,7 @@ export class MovimientosComponent implements OnInit {
       categoriaPresupuestoId: 0,
       monto: 0,
       descripcion: '',
+      proyectado: false,
     });
     this.modalAbierto.set(true);
   }
@@ -282,6 +294,7 @@ export class MovimientosComponent implements OnInit {
       categoriaPresupuestoId: movimiento.categoriaPresupuestoId ? Number(movimiento.categoriaPresupuestoId) : 0,
       monto: movimiento.monto,
       descripcion: movimiento.descripcion,
+      proyectado: movimiento.proyectado ?? false,
     });
     this.modalAbierto.set(true);
   }
@@ -344,6 +357,12 @@ export class MovimientosComponent implements OnInit {
       categoriaPresupuestoId: resto.categoriaPresupuestoId ? Number(resto.categoriaPresupuestoId) : null,
       creadoPorUsuarioId,
       origenRecurrenteId: this.movimientoEnEdicion()?.origenRecurrenteId ?? null,
+      // put() reemplaza el registro completo: transferenciaId no lo controla
+      // el formulario, así que hay que conservarlo explícitamente al editar
+      // para no perderlo (nunca se crea uno aquí; solo el flujo de
+      // transferencia de arriba genera un transferenciaId). "proyectado" sí
+      // viene de resto — el checkbox del formulario decide su valor.
+      transferenciaId: this.movimientoEnEdicion()?.transferenciaId ?? null,
     };
     const peticion = esEdicion
       ? this.data.modificacion<MovimientoPresupuesto>('MovimientoPresupuesto', payload)
@@ -355,6 +374,21 @@ export class MovimientosComponent implements OnInit {
         this.movimientoEnEdicion.set(resultado);
         this.cargar();
         if (!esEdicion) this.modalAbierto.set(false);
+      },
+    });
+  }
+
+  /** Confirma un movimiento proyectado (generado por adelantado con "Generar
+   *  futuros" en Fijos y Proyección) directamente desde su modal de edición,
+   *  sin tener que ir a Fijos y Proyección ni esperar al botón "Guardar". */
+  confirmarProyectado(): void {
+    const movimiento = this.movimientoEnEdicion();
+    if (!movimiento) return;
+    this.data.modificacion<MovimientoPresupuesto>('MovimientoPresupuesto', { ...movimiento, proyectado: false }).subscribe({
+      next: (resultado) => {
+        this.toast.exito('Movimiento confirmado.');
+        this.movimientoEnEdicion.set(resultado);
+        this.cargar();
       },
     });
   }

@@ -75,6 +75,11 @@ export class PresupuestoLandingComponent implements OnInit {
   protected readonly movimientos = signal<MovimientoPresupuesto[]>([]);
   protected readonly categorias = signal<CategoriaPresupuesto[]>([]);
 
+  /** Excluye los proyectados (generados por adelantado con "Generar futuros"
+   *  en Fijos y Proyección, aún sin confirmar) — el Dashboard solo debe
+   *  reflejar dinero que ya entró o salió de verdad, no una proyección. */
+  protected readonly movimientosReales = computed(() => this.movimientos().filter((m) => !m.proyectado));
+
   private enElMesActual(fecha: string): boolean {
     const hoy = new Date();
     const f = new Date(fecha);
@@ -82,23 +87,23 @@ export class PresupuestoLandingComponent implements OnInit {
   }
 
   protected readonly saldoTotal = computed(() =>
-    this.movimientos().reduce((s, m) => s + (m.tipo === 'Ingreso' ? m.monto : -m.monto), 0),
+    this.movimientosReales().reduce((s, m) => s + (m.tipo === 'Ingreso' ? m.monto : -m.monto), 0),
   );
 
   protected readonly ingresosDelMes = computed(() =>
-    this.movimientos()
+    this.movimientosReales()
       .filter((m) => m.tipo === 'Ingreso' && !m.transferenciaId && this.enElMesActual(m.fecha))
       .reduce((s, m) => s + m.monto, 0),
   );
 
   protected readonly gastosDelMes = computed(() =>
-    this.movimientos()
+    this.movimientosReales()
       .filter((m) => m.tipo === 'Gasto' && !m.transferenciaId && this.enElMesActual(m.fecha))
       .reduce((s, m) => s + m.monto, 0),
   );
 
   private saldoDeCuenta(cuentaId: number): number {
-    return this.movimientos()
+    return this.movimientosReales()
       .filter((m) => Number(m.cuentaPresupuestoId) === Number(cuentaId))
       .reduce((s, m) => s + (m.tipo === 'Ingreso' ? m.monto : -m.monto), 0);
   }
@@ -138,7 +143,7 @@ export class PresupuestoLandingComponent implements OnInit {
   protected readonly hayVariasTarjetas = computed(() => this.cuentasConInfo().filter((c) => c.esTarjeta).length > 1);
 
   protected readonly topCategorias = computed<CategoriaMonto[]>(() => {
-    const gastos = this.movimientos().filter((m) => m.tipo === 'Gasto' && !m.transferenciaId && this.enElMesActual(m.fecha));
+    const gastos = this.movimientosReales().filter((m) => m.tipo === 'Gasto' && !m.transferenciaId && this.enElMesActual(m.fecha));
     const porCategoria = new Map<number | null, number>();
     for (const m of gastos) {
       const id = m.categoriaPresupuestoId ? Number(m.categoriaPresupuestoId) : null;
@@ -158,7 +163,7 @@ export class PresupuestoLandingComponent implements OnInit {
   protected readonly maxTopCategoria = computed(() => Math.max(1, ...this.topCategorias().map((c) => c.monto)));
 
   protected readonly movimientosRecientes = computed<MovimientoReciente[]>(() =>
-    [...this.movimientos()]
+    [...this.movimientosReales()]
       .sort((a, b) => (a.fecha < b.fecha ? 1 : -1))
       .slice(0, 6)
       .map((movimiento) => ({
@@ -170,7 +175,7 @@ export class PresupuestoLandingComponent implements OnInit {
       })),
   );
 
-  protected readonly inusuales = computed<GastoInusual[]>(() => gastosInusuales(this.movimientos(), this.categorias()));
+  protected readonly inusuales = computed<GastoInusual[]>(() => gastosInusuales(this.movimientosReales(), this.categorias()));
 
   ngOnInit(): void {
     this.data.list<CuentaPresupuesto>('CuentaPresupuesto').subscribe((c) => this.cuentas.set(c));

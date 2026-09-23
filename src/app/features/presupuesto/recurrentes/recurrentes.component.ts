@@ -171,24 +171,57 @@ export class RecurrentesComponent implements OnInit {
     return frecuencia === 'Anual' ? `${f.getFullYear()}` : `${f.getFullYear()}-${f.getMonth() + 1}`;
   }
 
+  /** Solo cuenta como "registrado" un movimiento REAL de este ciclo — uno
+   *  proyectado (generado por adelantado con "Generar futuros" y aún sin
+   *  confirmar) no cuenta, porque todavía no ocurrió. */
   protected estaRegistradoEsteCiclo(fila: MovimientoRecurrentePresupuesto): boolean {
     const ciclo = this.cicloActual(fila);
     return this.movimientosOrigen().some(
-      (m) => Number(m.origenRecurrenteId) === Number(fila.id) && this.cicloDeFecha(m.fecha, fila.frecuencia) === ciclo,
+      (m) =>
+        Number(m.origenRecurrenteId) === Number(fila.id) && !m.proyectado && this.cicloDeFecha(m.fecha, fila.frecuencia) === ciclo,
     );
   }
 
-  protected estadoCiclo(fila: MovimientoRecurrentePresupuesto): 'registrado' | 'pendiente' | 'proximo' {
+  /** El movimiento proyectado (si existe) de un ciclo dado de este fijo — para
+   *  "confirmarlo" en vez de duplicarlo cuando ese ciclo por fin ocurre. */
+  private movimientoProyectadoDelCiclo(fila: MovimientoRecurrentePresupuesto, ciclo: string): MovimientoPresupuesto | undefined {
+    return this.movimientosOrigen().find(
+      (m) => Number(m.origenRecurrenteId) === Number(fila.id) && !!m.proyectado && this.cicloDeFecha(m.fecha, fila.frecuencia) === ciclo,
+    );
+  }
+
+  protected tieneProyectadoEsteCiclo(fila: MovimientoRecurrentePresupuesto): boolean {
+    return !!this.movimientoProyectadoDelCiclo(fila, this.cicloActual(fila));
+  }
+
+  protected estadoCiclo(fila: MovimientoRecurrentePresupuesto): 'registrado' | 'proyectado' | 'pendiente' | 'proximo' {
     if (this.estaRegistradoEsteCiclo(fila)) return 'registrado';
+    if (this.tieneProyectadoEsteCiclo(fila)) return 'proyectado';
     const hoy = new Date();
     if (fila.frecuencia === 'Anual' && hoy.getMonth() !== this.mesAncla(fila)) return 'proximo';
     return hoy.getDate() >= fila.diaDelMes ? 'pendiente' : 'proximo';
+  }
+
+  /** Texto largo para el aviso "Ciclo actual" dentro del modal de edición. */
+  protected etiquetaCicloActual(fila: MovimientoRecurrentePresupuesto): string {
+    switch (this.estadoCiclo(fila)) {
+      case 'registrado':
+        return '✓ ya registrado';
+      case 'proyectado':
+        return '🔮 generado como proyección — aún no confirmado';
+      case 'pendiente':
+        return '⚠ pendiente de registrar';
+      default:
+        return '· próximo';
+    }
   }
 
   private etiquetaEstadoCiclo(fila: MovimientoRecurrentePresupuesto): string {
     switch (this.estadoCiclo(fila)) {
       case 'registrado':
         return '✓ Registrado';
+      case 'proyectado':
+        return '🔮 Proyectado';
       case 'pendiente':
         return '⚠ Pendiente';
       default:
@@ -200,6 +233,8 @@ export class RecurrentesComponent implements OnInit {
     switch (this.estadoCiclo(fila)) {
       case 'registrado':
         return 'grid-badge-success';
+      case 'proyectado':
+        return 'grid-badge-neutral';
       case 'pendiente':
         return 'grid-badge-warning';
       default:
@@ -222,12 +257,28 @@ export class RecurrentesComponent implements OnInit {
     }
   }
 
-  /** Genera el MovimientoPresupuesto de este ciclo a partir del fijo (botón "Registrar este ciclo"). */
+  /** Genera el MovimientoPresupuesto de este ciclo a partir del fijo (botón "Registrar este ciclo").
+   *  Si el ciclo ya tiene un movimiento PROYECTADO (generado por adelantado con
+   *  "Generar futuros"), lo confirma (proyectado: false) en vez de crear uno
+   *  nuevo — así no se duplica el que ya se había adelantado. */
   registrarCiclo(fila: MovimientoRecurrentePresupuesto): void {
     if (this.estaRegistradoEsteCiclo(fila)) {
       this.toast.info('Este ciclo ya fue registrado.');
       return;
     }
+
+    const ciclo = this.cicloActual(fila);
+    const proyectado = this.movimientoProyectadoDelCiclo(fila, ciclo);
+    if (proyectado) {
+      this.data.modificacion<MovimientoPresupuesto>('MovimientoPresupuesto', { ...proyectado, proyectado: false }).subscribe({
+        next: () => {
+          this.toast.exito('Movimiento confirmado para este ciclo.');
+          this.cargar();
+        },
+      });
+      return;
+    }
+
     const hoy = new Date();
     const ultimoDiaMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
     const fecha = new Date(hoy.getFullYear(), hoy.getMonth(), Math.min(fila.diaDelMes, ultimoDiaMes)).toISOString().slice(0, 10);
@@ -240,6 +291,7 @@ export class RecurrentesComponent implements OnInit {
       descripcion: fila.descripcion,
       transferenciaId: null,
       origenRecurrenteId: fila.id,
+      proyectado: false,
       creadoPorUsuarioId: this.usuarioActualId,
     };
     this.data.alta<MovimientoPresupuesto>('MovimientoPresupuesto', payload).subscribe({
@@ -322,6 +374,10 @@ export class RecurrentesComponent implements OnInit {
       descripcion: fila.descripcion,
       transferenciaId: null,
       origenRecurrenteId: fila.id,
+      // Es una proyección a futuro, no un movimiento real todavía: no debe
+      // contar en saldo/ingresos/gastos/reportes hasta que se confirme
+      // (con "↻ Registrar ciclo" cuando ese ciclo sí llegue, o editándolo).
+      proyectado: true,
       creadoPorUsuarioId: this.usuarioActualId,
     };
     this.data.alta<MovimientoPresupuesto>('MovimientoPresupuesto', payload).subscribe({

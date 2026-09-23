@@ -59,10 +59,12 @@ export class LimitesComponent implements OnInit {
     return this.categorias().find((c) => Number(c.id) === Number(id))?.nombre ?? '—';
   }
 
-  /** Gasto acumulado en el mes en curso para una categoría (o el total, si id es null = límite general). */
+  /** Gasto acumulado en el mes en curso para una categoría (o el total, si id es null = límite general).
+   *  Excluye movimientos proyectados a futuro (aún sin confirmar): no cuentan como gasto real todavía. */
   gastoDelMes(categoriaId: number | null): number {
     const hoy = new Date();
     return this.movimientos()
+      .filter((m) => !m.proyectado)
       .filter((m) => m.tipo === 'Gasto' && !m.transferenciaId)
       .filter((m) => {
         const f = new Date(m.fecha);

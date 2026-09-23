@@ -58,6 +58,11 @@ export class ReportesComponent implements OnInit {
   protected readonly formatMoneda = formatMoneda;
 
   protected readonly movimientos = signal<MovimientoPresupuesto[]>([]);
+
+  /** Excluye los proyectados a futuro (generados por adelantado con "Generar
+   *  futuros" en Fijos y Proyección, aún sin confirmar): estos reportes deben
+   *  reflejar solo lo que ya ocurrió de verdad. */
+  protected readonly movimientosReales = computed(() => this.movimientos().filter((m) => !m.proyectado));
   protected readonly categorias = signal<CategoriaPresupuesto[]>([]);
   protected readonly recurrentes = signal<MovimientoRecurrentePresupuesto[]>([]);
   protected readonly cargando = signal(false);
@@ -112,7 +117,7 @@ export class ReportesComponent implements OnInit {
   }
 
   private totales(rango: RangoFecha): { ingreso: number; gasto: number } {
-    const reales = this.movimientos().filter((m) => !m.transferenciaId && this.enRango(m.fecha, rango));
+    const reales = this.movimientosReales().filter((m) => !m.transferenciaId && this.enRango(m.fecha, rango));
     return {
       ingreso: reales.filter((m) => m.tipo === 'Ingreso').reduce((s, m) => s + m.monto, 0),
       gasto: reales.filter((m) => m.tipo === 'Gasto').reduce((s, m) => s + m.monto, 0),
@@ -148,7 +153,7 @@ export class ReportesComponent implements OnInit {
   /** Gasto por categoría del periodo seleccionado, de mayor a menor. */
   protected readonly gastoPorCategoria = computed<GastoCategoria[]>(() => {
     const rango = this.rangosDe(this.periodo()).actual;
-    const gastos = this.movimientos().filter((m) => m.tipo === 'Gasto' && !m.transferenciaId && this.enRango(m.fecha, rango));
+    const gastos = this.movimientosReales().filter((m) => m.tipo === 'Gasto' && !m.transferenciaId && this.enRango(m.fecha, rango));
     const total = gastos.reduce((s, m) => s + m.monto, 0);
     const porCategoria = new Map<number | null, number>();
     for (const m of gastos) {
@@ -173,7 +178,7 @@ export class ReportesComponent implements OnInit {
   /** Ingresos por categoría del periodo seleccionado, de mayor a menor (misma lógica que gasto por categoría). */
   protected readonly ingresoPorCategoria = computed<GastoCategoria[]>(() => {
     const rango = this.rangosDe(this.periodo()).actual;
-    const ingresos = this.movimientos().filter((m) => m.tipo === 'Ingreso' && !m.transferenciaId && this.enRango(m.fecha, rango));
+    const ingresos = this.movimientosReales().filter((m) => m.tipo === 'Ingreso' && !m.transferenciaId && this.enRango(m.fecha, rango));
     const total = ingresos.reduce((s, m) => s + m.monto, 0);
     const porCategoria = new Map<number | null, number>();
     for (const m of ingresos) {
@@ -210,7 +215,7 @@ export class ReportesComponent implements OnInit {
   /** Patrimonio neto histórico: saldo acumulado de todos los movimientos hasta el fin de cada uno de los últimos 12 meses. */
   protected readonly patrimonioHistorico = computed<PuntoPatrimonio[]>(() => {
     const hoy = new Date();
-    const movimientos = this.movimientos();
+    const movimientos = this.movimientosReales();
     const puntos: { etiqueta: string; valor: number }[] = [];
     for (let i = 11; i >= 0; i--) {
       const finMes = new Date(hoy.getFullYear(), hoy.getMonth() - i + 1, 0, 23, 59, 59);
@@ -292,7 +297,7 @@ export class ReportesComponent implements OnInit {
     }
 
     const real = new Map<string, number>();
-    for (const m of this.movimientos().filter((m) => !m.transferenciaId && this.enRango(m.fecha, rango))) {
+    for (const m of this.movimientosReales().filter((m) => !m.transferenciaId && this.enRango(m.fecha, rango))) {
       const id = m.categoriaPresupuestoId ? Number(m.categoriaPresupuestoId) : null;
       const k = clave(id, m.tipo);
       real.set(k, (real.get(k) ?? 0) + m.monto);

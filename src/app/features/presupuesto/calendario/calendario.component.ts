@@ -67,9 +67,12 @@ export class CalendarioComponent implements OnInit {
     });
   }
 
+  /** Excluye movimientos proyectados a futuro: la deuda de tarjeta que se
+   *  muestra aquí debe ser la real, no una que incluya cargos que todavía no
+   *  se han confirmado. */
   private saldoCuenta(cuentaId: number): number {
     return this.movimientos()
-      .filter((m) => Number(m.cuentaPresupuestoId) === Number(cuentaId))
+      .filter((m) => Number(m.cuentaPresupuestoId) === Number(cuentaId) && !m.proyectado)
       .reduce((s, m) => s + (m.tipo === 'Ingreso' ? m.monto : -m.monto), 0);
   }
 

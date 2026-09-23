@@ -15,6 +15,10 @@ export interface MovimientoPresupuesto {
   transferenciaId: string | null;
   /** Si este movimiento se generó desde "Registrar este ciclo" de un fijo, aquí queda la referencia (trazabilidad). */
   origenRecurrenteId: number | null;
+  /** true = generado por adelantado con "Generar futuros" (proyección a meses/años que aún no llegan):
+   *  no cuenta en saldo/ingresos/gastos/reportes hasta que se confirma (se pone en false), ya sea
+   *  editándolo o con "↻ Registrar ciclo" sobre el mismo ciclo una vez que sí ocurrió. */
+  proyectado?: boolean;
   creadoPorUsuarioId: number;
   activo: boolean;
   fechaCreacion?: string;

@@ -132,6 +132,9 @@
           @if (movimiento.transferenciaId) {
             <span class="tag" title="Transferencia entre cuentas">🔄 transferencia</span>
           }
+          @if (movimiento.proyectado) {
+            <span class="tag" title="Generado por adelantado con Generar futuros — aún no confirmado">🔮 proyectado</span>
+          }
           <span class="hint" style="margin:0;">
             {{ nombreCuenta(movimiento.cuentaPresupuestoId) }}
             @if (!movimiento.transferenciaId) {
@@ -221,9 +224,21 @@
           Descripción
           <input type="text" formControlName="descripcion" />
         </label>
+
+        <label class="full-span checkbox-inline" title="Aún no ha pasado esta fecha: no cuenta en saldo, ingresos/gastos ni reportes hasta que lo confirmes.">
+          <input type="checkbox" formControlName="proyectado" />
+          🔮 Es una proyección a futuro (aún sin confirmar)
+        </label>
       </div>
 
       @if (movimientoEnEdicion(); as movimiento) {
+        @if (movimiento.proyectado) {
+          <div class="wallet-alert-block" style="margin:-8px 0 18px;">
+            <strong>🔮 Este movimiento es una proyección a futuro</strong>
+            <p style="margin:6px 0 10px;">Se generó por adelantado con "Generar futuros" y todavía no cuenta en tu saldo, ingresos/gastos ni reportes. Confírmalo cuando esta fecha ya haya pasado.</p>
+            <button type="button" class="btn-primary small" (click)="confirmarProyectado()">✅ Confirmar movimiento</button>
+          </div>
+        }
         <app-adjuntos-panel entidad="MovimientoPresupuestoAdjunto" campoPadre="movimientoPresupuestoId" [padreId]="movimiento.id" />
       }
 
