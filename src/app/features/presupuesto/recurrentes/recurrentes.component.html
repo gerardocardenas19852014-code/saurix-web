@@ -65,14 +65,27 @@
             <label style="display:flex; flex-direction:column; gap:6px; font-size:13px;">
               Desde
               @if (fijo.frecuencia === 'Anual') {
-                <input
-                  type="number"
-                  min="2000"
-                  max="2100"
-                  [value]="anioInicioGenerar()"
-                  (input)="anioInicioGenerar.set(+$any($event.target).value)"
-                  style="width:100px;"
-                />
+                @if (aniosPresupuesto().length > 0) {
+                  <select
+                    [value]="anioInicioGenerar()"
+                    (change)="anioInicioGenerar.set(+$any($event.target).value)"
+                    style="width:110px;"
+                  >
+                    @for (anio of aniosPresupuesto(); track anio) {
+                      <option [value]="anio">{{ anio }}</option>
+                    }
+                  </select>
+                } @else {
+                  <input
+                    type="number"
+                    min="2000"
+                    max="2100"
+                    [value]="anioInicioGenerar()"
+                    (input)="anioInicioGenerar.set(+$any($event.target).value)"
+                    style="width:100px;"
+                    title="Sin años registrados todavía en Catálogos → Presupuesto por año"
+                  />
+                }
               } @else {
                 <input
                   type="month"

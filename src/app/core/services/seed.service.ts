@@ -24,6 +24,10 @@ const VALORES_LISTA_INICIALES: { grupo: string; clave: string; etiqueta: string;
   { grupo: 'ConfiguracionConexionProveedor', clave: 'SqlServer', etiqueta: 'SQL Server', orden: 1 },
   { grupo: 'ConfiguracionConexionProveedor', clave: 'PostgreSql', etiqueta: 'PostgreSQL', orden: 2 },
   { grupo: 'ConfiguracionConexionProveedor', clave: 'MySql', etiqueta: 'MySQL', orden: 3 },
+  { grupo: 'PresupuestoAnualEstatus', clave: 'Creacion', etiqueta: 'Creación', orden: 1 },
+  { grupo: 'PresupuestoAnualEstatus', clave: 'Proyeccion', etiqueta: 'Proyección', orden: 2 },
+  { grupo: 'PresupuestoAnualEstatus', clave: 'Autorizado', etiqueta: 'Autorizado', orden: 3 },
+  { grupo: 'PresupuestoAnualEstatus', clave: 'Ejecutado', etiqueta: 'Ejecutado', orden: 4 },
 ];
 
 const DATOS_ROOT = {
@@ -118,10 +122,18 @@ export class SeedService {
     await this.sembrarValoresLista();
   }
 
+  /** Siembra por GRUPO (no todo o nada): un grupo que ya tiene aunque sea un
+   *  valor se deja intacto (no pisa lo que el usuario ya haya editado ahí),
+   *  pero un grupo nuevo que se agregue después a VALORES_LISTA_INICIALES
+   *  (como PresupuestoAnualEstatus) sí se siembra aunque la instalación ya
+   *  tenga meses de uso y otros grupos con datos — antes esto solo corría
+   *  si ValorLista estaba 100% vacía, así que un grupo agregado después
+   *  nunca llegaba a arrancar solo en una instalación ya existente. */
   private async sembrarValoresLista(): Promise<void> {
-    const existentes = await firstValueFrom(this.data.list<{ id: number }>('ValorLista'));
-    if (existentes.length > 0) return;
+    const existentes = await firstValueFrom(this.data.list<{ id: number; grupo: string }>('ValorLista'));
+    const gruposConDatos = new Set(existentes.map((v) => v.grupo));
     for (const valor of VALORES_LISTA_INICIALES) {
+      if (gruposConDatos.has(valor.grupo)) continue;
       await firstValueFrom(this.data.alta('ValorLista', valor));
     }
   }

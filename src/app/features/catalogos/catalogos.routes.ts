@@ -51,6 +51,18 @@ export const CATALOGOS_ROUTES: Routes = [
     loadComponent: () =>
       import('./cuenta-presupuesto/cuenta-presupuesto-list.component').then((m) => m.CuentaPresupuestoListComponent),
   },
+  {
+    path: 'presupuesto-anual',
+    loadComponent: () =>
+      import('./presupuesto-anual/presupuesto-anual-list.component').then((m) => m.PresupuestoAnualListComponent),
+  },
+  {
+    path: 'estatus-presupuesto-anual',
+    loadComponent: () =>
+      import('./presupuesto-anual-estatus/presupuesto-anual-estatus.component').then(
+        (m) => m.PresupuestoAnualEstatusComponent,
+      ),
+  },
 
   // Catálogos de Gestión de Proyectos (los administra el mismo Catálogos
   // general; el modelo de datos de cada uno sigue viviendo en su módulo de

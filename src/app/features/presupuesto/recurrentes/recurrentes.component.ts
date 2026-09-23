@@ -12,6 +12,7 @@ import { CuentaPresupuesto } from '../../catalogos/cuenta-presupuesto/cuenta-pre
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
 import { ValorLista } from '../../catalogos/valor-lista/valor-lista.model';
 import { MovimientoRecurrentePresupuesto } from './recurrente.model';
+import { PresupuestoAnual } from '../../catalogos/presupuesto-anual/presupuesto-anual.model';
 import { fechaLocalDeTexto, textoFechaDeLocal } from '../shared/wallet.util';
 
 /**
@@ -42,7 +43,16 @@ export class RecurrentesComponent implements OnInit {
   protected readonly categorias = signal<CategoriaPresupuesto[]>([]);
   protected readonly tiposMovimiento = signal<ValorLista[]>([]);
   protected readonly frecuencias = signal<ValorLista[]>([]);
+  protected readonly presupuestosAnuales = signal<PresupuestoAnual[]>([]);
   protected readonly cargando = signal(false);
+
+  /** Años dados de alta en Catálogos → "Presupuesto por año" — el campo
+   *  "Desde" de un fijo Anual elige entre estos en vez de escribir el año
+   *  libremente. Si todavía no hay ninguno registrado, se cae de vuelta a
+   *  un campo numérico libre (ver recurrentes.component.html). */
+  protected readonly aniosPresupuesto = computed(() =>
+    [...this.presupuestosAnuales()].map((p) => p.anio).sort((a, b) => a - b),
+  );
 
   /** Cuántos ciclos futuros generar de una vez con "Generar futuros"
    *  (meses si la frecuencia no es Anual; años si lo es). */
@@ -125,6 +135,7 @@ export class RecurrentesComponent implements OnInit {
         v.filter((x) => x.grupo === 'MovimientoRecurrenteFrecuencia').sort((a, b) => a.orden - b.orden),
       ),
     );
+    this.data.list<PresupuestoAnual>('PresupuestoAnual').subscribe((p) => this.presupuestosAnuales.set(p));
     this.cargar();
   }
 
@@ -361,7 +372,17 @@ export class RecurrentesComponent implements OnInit {
   private resetearDesdeGenerar(): void {
     const hoy = new Date();
     this.mesInicioGenerar.set(`${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`);
-    this.anioInicioGenerar.set(hoy.getFullYear());
+    // Si "Presupuesto por año" ya tiene años registrados y el actual no es
+    // uno de ellos, el <select> de "Desde" (ver html) no tendría dónde
+    // caer — se ajusta al más cercano disponible (el primero igual o
+    // posterior a hoy, o el último si todos quedaron en el pasado).
+    const anios = this.aniosPresupuesto();
+    if (anios.length === 0) {
+      this.anioInicioGenerar.set(hoy.getFullYear());
+      return;
+    }
+    const siguiente = anios.find((a) => a >= hoy.getFullYear());
+    this.anioInicioGenerar.set(siguiente ?? anios[anios.length - 1]);
   }
 
   /** Texto para el modal: a qué meses/años (y de cuál a cuál) aplicará

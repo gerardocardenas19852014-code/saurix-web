@@ -1,0 +1,93 @@
+<div class="page-header">
+  <div>
+    <span class="eyebrow">§ Catálogos</span>
+    <h1>Presupuesto por año</h1>
+  </div>
+</div>
+
+<p class="hint" style="margin-top:-6px;">
+  Control del año de presupuesto por etapas. Cuando el Estatus es Autorizado o Ejecutado,
+  la pantalla de Proyección de ese año deja de poder editarse a mano.
+</p>
+
+<div class="grid-toolbar">
+  <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo</button>
+
+  <div class="toolbar-group">
+    <button
+      type="button"
+      class="btn-secondary small toolbar-icon-button"
+      title="Exportar CSV"
+      aria-label="Exportar presupuesto por año a CSV"
+      (click)="exportarCsvArchivo()"
+    >
+      ⇩
+    </button>
+    <app-bitacora modulo="Catálogos / Presupuesto por año" />
+  </div>
+
+  <div class="grid-filter">
+    <input
+      type="search"
+      placeholder="Buscar por año o descripción…"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value)"
+    />
+  </div>
+</div>
+
+<app-data-table
+  [columnas]="columnas"
+  [filas]="registros()"
+  [cargando]="cargando()"
+  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+  (editar)="editar($event)"
+  (eliminar)="pedirEliminar($event)"
+/>
+
+@if (modalAbierto()) {
+  <div class="modal-overlay modal show d-block" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
+    <form class="modal-box modal-dialog modal-content" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3 class="modal-title mb-3">{{ registroEnEdicion() ? 'Editar presupuesto anual' : 'Nuevo presupuesto anual' }}</h3>
+
+      <div class="edit-form form-grid-3col">
+        <label class="floating-field">
+          <span>Año <b>*</b></span>
+          <input type="number" class="form-control pill-control" formControlName="anio" (change)="onAnioChange()" placeholder=" " aria-label="Año" />
+        </label>
+
+        <label class="floating-field">
+          <span>Fecha alta <b>*</b></span>
+          <input type="date" class="form-control pill-control" formControlName="fechaAlta" placeholder=" " aria-label="Fecha alta" />
+        </label>
+
+        <label class="floating-field">
+          <span>Estatus <b>*</b></span>
+          <select class="form-control pill-control" formControlName="estatusClave" aria-label="Estatus">
+            @for (e of estatus(); track e.id) {
+              <option [value]="e.clave">{{ e.etiqueta }}</option>
+            }
+          </select>
+        </label>
+
+        <label class="floating-field full-span">
+          <span>Descripción <b>*</b></span>
+          <textarea class="form-control pill-control" formControlName="descripcion" rows="3" placeholder=" " aria-label="Descripción"></textarea>
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">Cancelar</button>
+        <button type="submit" class="btn-primary btn btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="registroAEliminar() !== null"
+  titulo="Eliminar"
+  [mensaje]="'¿Eliminar el presupuesto del año ' + (registroAEliminar()?.anio ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="registroAEliminar.set(null)"
+/>

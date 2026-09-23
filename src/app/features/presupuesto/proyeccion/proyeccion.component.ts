@@ -8,6 +8,7 @@ import { CuentaPresupuesto } from '../../catalogos/cuenta-presupuesto/cuenta-pre
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
 import { MovimientoRecurrentePresupuesto } from '../recurrentes/recurrente.model';
 import { formatMoneda } from '../shared/wallet.util';
+import { PresupuestoAnual } from '../../catalogos/presupuesto-anual/presupuesto-anual.model';
 import { ProyeccionAjuste } from './proyeccion-ajuste.model';
 
 /** Una quincena (1-15 / 16-fin de mes) de la ventana de proyección. */
@@ -81,6 +82,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
   protected readonly movimientos = signal<MovimientoPresupuesto[]>([]);
   protected readonly recurrentes = signal<MovimientoRecurrentePresupuesto[]>([]);
   protected readonly ajustes = signal<ProyeccionAjuste[]>([]);
+  protected readonly presupuestosAnuales = signal<PresupuestoAnual[]>([]);
 
   protected readonly editando = signal<{ clave: string; quincenaClave: string } | null>(null);
   protected readonly valorEditando = signal('');
@@ -112,12 +114,14 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
         creadoPorUsuarioId: this.usuarioActualId,
       }),
       ajustes: this.data.list<ProyeccionAjuste>('ProyeccionAjuste', { creadoPorUsuarioId: this.usuarioActualId }),
+      presupuestosAnuales: this.data.list<PresupuestoAnual>('PresupuestoAnual'),
     }).subscribe({
-      next: ({ categorias, cuentas, movimientos, recurrentes, ajustes }) => {
+      next: ({ categorias, cuentas, movimientos, recurrentes, ajustes, presupuestosAnuales }) => {
         this.categorias.set(categorias);
         this.cuentas.set(cuentas);
         this.movimientos.set(movimientos);
         this.recurrentes.set(recurrentes);
+        this.presupuestosAnuales.set(presupuestosAnuales);
         this.ajustes.set(ajustes);
         this.cargando.set(false);
       },
@@ -328,10 +332,25 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
     return mapa;
   });
 
+  /** Años cuyo "Presupuesto por año" (Catálogos) ya está Autorizado o
+   *  Ejecutado — sus celdas en esta pantalla dejan de poder editarse a
+   *  mano (ver quincenaBloqueada/celda). Un año sin registro en ese
+   *  catálogo se trata como libre (no bloqueado). */
+  private readonly aniosBloqueados = computed(() => {
+    const claves = new Set(['Autorizado', 'Ejecutado']);
+    return new Set(this.presupuestosAnuales().filter((p) => claves.has(p.estatusClave)).map((p) => Number(p.anio)));
+  });
+
+  protected quincenaBloqueada(quincenaClave: string): boolean {
+    const anio = Number(quincenaClave.split('-')[0]);
+    return this.aniosBloqueados().has(anio);
+  }
+
   private celda(clave: string, quincenaClave: string, editable = true): Celda {
+    const editableFinal = editable && !this.quincenaBloqueada(quincenaClave);
     const ajuste = this.ajustesPorClave().get(`${clave}|${quincenaClave}`);
-    if (ajuste !== undefined) return { valor: ajuste, manual: true, editable };
-    return { valor: this.valoresAuto().mapa.get(clave)?.get(quincenaClave) ?? 0, manual: false, editable };
+    if (ajuste !== undefined) return { valor: ajuste, manual: true, editable: editableFinal };
+    return { valor: this.valoresAuto().mapa.get(clave)?.get(quincenaClave) ?? 0, manual: false, editable: editableFinal };
   }
 
   /** Cuentas (≥2) que componen una categoría de Ingreso/Gasto — para
@@ -532,6 +551,10 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
 
   protected iniciarEdicion(clave: string | null, quincenaClave: string, valorActual: number): void {
     if (!clave) return;
+    if (this.quincenaBloqueada(quincenaClave)) {
+      this.toast.advertencia('Este año ya está Autorizado o Ejecutado — la Proyección no se puede editar a mano.');
+      return;
+    }
     this.editando.set({ clave, quincenaClave });
     this.valorEditando.set(valorActual === 0 ? '' : String(Math.round(valorActual * 100) / 100));
   }
