@@ -5,6 +5,18 @@
   para escribir un valor a mano — déjala vacía para que vuelva a calcularse sola.
 </p>
 
+<div class="board-filters">
+  <label class="board-filter-field">
+    Año
+    <select [value]="filtroAnio()" (change)="filtroAnio.set($any($event.target).value === 'todos' ? 'todos' : +$any($event.target).value)">
+      <option value="todos">Todos</option>
+      @for (anio of aniosDisponibles(); track anio) {
+        <option [value]="anio">{{ anio }}</option>
+      }
+    </select>
+  </label>
+</div>
+
 @if (cargando()) {
   <p class="empty">Cargando…</p>
 } @else {
@@ -16,12 +28,14 @@
           @for (banda of bandasMes(); track $index) {
             <th [attr.colspan]="banda.colspan" class="proy-banda-mes">{{ banda.etiqueta }}</th>
           }
+          <th class="proy-col-total-header"></th>
         </tr>
         <tr>
           <th class="proy-esquina">Quincena</th>
-          @for (q of quincenas(); track q.clave) {
-            <th class="proy-col-quincena">{{ q.mitad }}</th>
+          @for (item of quincenasVisibles(); track item.indice) {
+            <th class="proy-col-quincena">{{ item.q.mitad }}</th>
           }
+          <th class="proy-col-total-header">Total</th>
         </tr>
       </thead>
       <tbody>
@@ -29,12 +43,12 @@
           @switch (renglon.tipo) {
             @case ('seccion-titulo') {
               <tr class="proy-fila-seccion">
-                <td [attr.colspan]="quincenas().length + 1">{{ renglon.nombre }}</td>
+                <td [attr.colspan]="quincenasVisibles().length + 2">{{ renglon.nombre }}</td>
               </tr>
             }
             @case ('grupo') {
               <tr class="proy-fila-grupo">
-                <td [attr.colspan]="quincenas().length + 1">{{ renglon.nombre }}</td>
+                <td [attr.colspan]="quincenasVisibles().length + 2">{{ renglon.nombre }}</td>
               </tr>
             }
             @default {
@@ -45,8 +59,9 @@
                 [class.proy-fila-total]="renglon.tipo === 'total'"
               >
                 <td class="proy-etiqueta">{{ renglon.nombre }}</td>
-                @for (celda of renglon.celdas; track $index) {
-                  @if (estaEditando(renglon.clave, quincenas()[$index].clave)) {
+                @for (item of quincenasVisibles(); track item.indice) {
+                  @let celda = renglon.celdas[item.indice];
+                  @if (estaEditando(renglon.clave, item.q.clave)) {
                     <td class="proy-celda proy-celda-edit">
                       <input
                         type="number"
@@ -66,11 +81,16 @@
                       [class.proy-celda-manual]="celda.manual"
                       [class.proy-celda-negativa]="celda.valor < 0"
                       [title]="celda.manual ? 'Valor escrito a mano — déjala vacía al editar para volver al cálculo automático.' : ''"
-                      (click)="celda.editable && iniciarEdicion(renglon.clave, quincenas()[$index].clave, celda.valor)"
+                      (click)="celda.editable && iniciarEdicion(renglon.clave, item.q.clave, celda.valor)"
                     >
                       {{ formatMoneda(celda.valor) }}
                     </td>
                   }
+                }
+                @if (renglon.sumable) {
+                  <td class="proy-celda proy-celda-total">{{ formatMoneda(totalFila(renglon.celdas)) }}</td>
+                } @else {
+                  <td class="proy-celda proy-celda-total proy-celda-vacia">—</td>
                 }
               </tr>
             }

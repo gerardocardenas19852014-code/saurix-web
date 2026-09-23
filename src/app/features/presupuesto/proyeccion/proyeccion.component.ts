@@ -32,6 +32,9 @@ interface RenglonProyeccion {
   clave: string | null;
   nombre: string;
   celdas: Celda[];
+  /** false solo para Saldo inicial/Saldo final proyectado: son un saldo en
+   *  un punto del tiempo, sumarlos entre quincenas no tiene sentido. */
+  sumable: boolean;
 }
 
 interface RaizFila {
@@ -145,11 +148,31 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
     return resultado;
   });
 
+  /** "todos" = las 24 quincenas de la ventana; un año = solo sus quincenas
+   *  dentro de esa ventana (la ventana sigue siendo la misma de 24 hacia
+   *  adelante desde hoy — un año puede verse incompleto si cae en la punta). */
+  protected readonly filtroAnio = signal<'todos' | number>('todos');
+
+  protected readonly aniosDisponibles = computed<number[]>(() => {
+    const anios = new Set(this.quincenas().map((q) => q.anio));
+    return [...anios].sort((a, b) => a - b);
+  });
+
+  /** Quincenas a pintar como columnas, ya filtradas por año — cada una trae
+   *  el índice que le corresponde dentro de `quincenas()`/`celdas`, porque el
+   *  cálculo (saldo en cadena, etc.) siempre corre sobre las 24 completas. */
+  protected readonly quincenasVisibles = computed<{ q: Quincena; indice: number }[]>(() => {
+    const anio = this.filtroAnio();
+    return this.quincenas()
+      .map((q, indice) => ({ q, indice }))
+      .filter(({ q }) => anio === 'todos' || q.anio === anio);
+  });
+
   /** Encabezado superior: una banda por mes, con el colspan de cuántas
-   *  quincenas de ese mes caen dentro de la ventana mostrada. */
+   *  quincenas VISIBLES de ese mes hay. */
   protected readonly bandasMes = computed<{ etiqueta: string; colspan: number }[]>(() => {
     const bandas: { etiqueta: string; colspan: number }[] = [];
-    for (const q of this.quincenas()) {
+    for (const { q } of this.quincenasVisibles()) {
       const texto = new Date(q.anio, q.mes, 1).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
       const etiqueta = texto.charAt(0).toUpperCase() + texto.slice(1);
       const anterior = bandas[bandas.length - 1];
@@ -158,6 +181,12 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
     }
     return bandas;
   });
+
+  /** Suma de un renglón a lo largo de las quincenas actualmente visibles
+   *  (respeta el filtro de año) — la columna "Total" de la tabla. */
+  protected totalFila(celdas: Celda[]): number {
+    return this.quincenasVisibles().reduce((s, { indice }) => s + (celdas[indice]?.valor ?? 0), 0);
+  }
 
   // ---------------------------------------------------------------------
   // Categorías/cuentas que arman los renglones de cada sección.
@@ -295,7 +324,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
   private construirSeccion(idSeccion: string, titulo: string, raices: RaizFila[]): RenglonProyeccion[] {
     const quincenas = this.quincenas();
     const renglones: RenglonProyeccion[] = [
-      { id: `sec:${idSeccion}`, tipo: 'seccion-titulo', clave: null, nombre: titulo, celdas: [] },
+      { id: `sec:${idSeccion}`, tipo: 'seccion-titulo', clave: null, nombre: titulo, celdas: [], sumable: false },
     ];
     const totalSeccion = quincenas.map(() => 0);
 
@@ -303,15 +332,15 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       if (raiz.hijos.length === 0) {
         const celdas = quincenas.map((q) => this.celda(raiz.clave, q.clave));
         celdas.forEach((c, i) => (totalSeccion[i] += c.valor));
-        renglones.push({ id: `hoja:${raiz.clave}`, tipo: 'hoja', clave: raiz.clave, nombre: raiz.nombre, celdas });
+        renglones.push({ id: `hoja:${raiz.clave}`, tipo: 'hoja', clave: raiz.clave, nombre: raiz.nombre, celdas, sumable: true });
         continue;
       }
-      renglones.push({ id: `grupo:${raiz.clave}`, tipo: 'grupo', clave: null, nombre: raiz.nombre, celdas: [] });
+      renglones.push({ id: `grupo:${raiz.clave}`, tipo: 'grupo', clave: null, nombre: raiz.nombre, celdas: [], sumable: false });
       const subtotal = quincenas.map(() => 0);
       for (const hijo of raiz.hijos) {
         const celdas = quincenas.map((q) => this.celda(hijo.clave, q.clave));
         celdas.forEach((c, i) => (subtotal[i] += c.valor));
-        renglones.push({ id: `hoja:${hijo.clave}`, tipo: 'hoja', clave: hijo.clave, nombre: hijo.nombre, celdas });
+        renglones.push({ id: `hoja:${hijo.clave}`, tipo: 'hoja', clave: hijo.clave, nombre: hijo.nombre, celdas, sumable: true });
       }
       subtotal.forEach((v, i) => (totalSeccion[i] += v));
       renglones.push({
@@ -320,6 +349,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
         clave: null,
         nombre: `Subtotal ${raiz.nombre}`,
         celdas: subtotal.map((valor) => ({ valor, manual: false, editable: false })),
+        sumable: true,
       });
     }
 
@@ -329,6 +359,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       clave: null,
       nombre: `TOTAL ${titulo}`,
       celdas: totalSeccion.map((valor) => ({ valor, manual: false, editable: false })),
+      sumable: true,
     });
     return renglones;
   }
@@ -371,12 +402,26 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
     }
 
     return [
-      { id: 'resumen:saldoInicial', tipo: 'resumen', clave: 'saldoInicial', nombre: 'Saldo inicial', celdas: saldoInicial },
-      { id: 'resumen:totalIngreso', tipo: 'resumen', clave: null, nombre: 'Total ingresos', celdas: totalIngreso },
-      { id: 'resumen:totalGasto', tipo: 'resumen', clave: null, nombre: 'Total gastos', celdas: totalGasto },
-      { id: 'resumen:neto', tipo: 'resumen', clave: null, nombre: 'Ingreso neto', celdas: neto },
-      { id: 'resumen:ahorro', tipo: 'resumen', clave: null, nombre: 'Ahorro', celdas: totalAhorro },
-      { id: 'resumen:saldoFinal', tipo: 'resumen', clave: null, nombre: 'Saldo final proyectado', celdas: saldoFinal },
+      {
+        id: 'resumen:saldoInicial',
+        tipo: 'resumen',
+        clave: 'saldoInicial',
+        nombre: 'Saldo inicial',
+        celdas: saldoInicial,
+        sumable: false,
+      },
+      { id: 'resumen:totalIngreso', tipo: 'resumen', clave: null, nombre: 'Total ingresos', celdas: totalIngreso, sumable: true },
+      { id: 'resumen:totalGasto', tipo: 'resumen', clave: null, nombre: 'Total gastos', celdas: totalGasto, sumable: true },
+      { id: 'resumen:neto', tipo: 'resumen', clave: null, nombre: 'Ingreso neto', celdas: neto, sumable: true },
+      { id: 'resumen:ahorro', tipo: 'resumen', clave: null, nombre: 'Ahorro', celdas: totalAhorro, sumable: true },
+      {
+        id: 'resumen:saldoFinal',
+        tipo: 'resumen',
+        clave: null,
+        nombre: 'Saldo final proyectado',
+        celdas: saldoFinal,
+        sumable: false,
+      },
     ];
   });
 

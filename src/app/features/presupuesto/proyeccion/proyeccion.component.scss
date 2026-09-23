@@ -132,3 +132,35 @@
   background: var(--paper-raised);
   color: var(--text-strong);
 }
+
+.proy-col-total-header {
+  position: sticky;
+  right: 0;
+  z-index: 5;
+  text-align: center;
+  padding: 6px 10px;
+  border-left: 2px solid var(--line);
+  min-width: 110px;
+}
+
+.proy-celda-total {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  background: var(--paper);
+  border-left: 2px solid var(--line);
+  font-weight: 700;
+}
+
+.proy-fila-resumen .proy-celda-total,
+.proy-fila-total .proy-celda-total,
+.proy-fila-subtotal .proy-celda-total {
+  background: var(--paper-raised);
+}
+
+.proy-celda-vacia {
+  color: var(--ink-soft);
+  font-weight: 400;
+  text-align: center;
+}
+
