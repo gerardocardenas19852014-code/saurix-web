@@ -569,6 +569,12 @@ html[data-theme='dark'] .edit-form input[type=date], html[data-theme='ocean'] .e
 @media (max-width: 1000px) { .form-grid-4col { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 640px) { .form-grid-4col { grid-template-columns: 1fr; } }
 
+/* Complemento de .full-span (grid-column: 1 / -1): para un campo que debe
+   ocupar la mitad de una fila de 4 (o 2 de una de 3), en vez de la fila
+   completa — p.ej. Nombre/Tipo en Cuentas de presupuesto, uno junto al otro
+   pero mas anchos que los campos numericos de abajo. */
+.half-span { grid-column: span 2; }
+
 .form-grid-5col { display: grid !important; grid-template-columns: repeat(5, 1fr); gap: 16px 20px; max-width: 1200px; }
 .form-grid-5col > h2, .form-grid-5col > p, .form-grid-5col > .form-actions, .form-grid-5col > .full-span { grid-column: 1 / -1; }
 @media (max-width: 1100px) { .form-grid-5col { grid-template-columns: repeat(3, 1fr); } }

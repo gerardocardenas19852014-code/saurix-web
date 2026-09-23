@@ -42,16 +42,16 @@
 
 @if (modalAbierto()) {
   <div class="modal-overlay modal show d-block" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
-    <form class="modal-box modal-dialog modal-content" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+    <form class="modal-box modal-dialog modal-content" style="max-width: 1120px;" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
       <h3 class="modal-title mb-3">{{ registroEnEdicion() ? 'Editar cuenta' : 'Nueva cuenta' }}</h3>
 
-      <div class="edit-form">
-        <label class="floating-field">
+      <div class="edit-form form-grid-4col">
+        <label class="floating-field half-span">
           <span>Nombre <b>*</b></span>
           <input type="text" class="form-control pill-control" formControlName="nombre" placeholder=" " aria-label="Nombre" />
         </label>
 
-        <label class="floating-field">
+        <label class="floating-field half-span">
           <span>Tipo <b>*</b></span>
           <select class="form-control pill-control" formControlName="tipo" aria-label="Tipo">
             @for (t of tipos(); track t.id) {
