@@ -125,10 +125,72 @@
     } @else if (sprintsDelProyecto().length === 0) {
       <p class="empty">Este proyecto todavía no tiene sprints.</p>
     } @else {
+
+    <h2 style="margin: 16px 0 4px;">Todos los sprints</h2>
+    <p class="hint" style="margin: 0 0 12px;">
+      Vistazo rápido de todos los sprints del proyecto y su avance — útil para decidir cuáles
+      llevar al reporte de nivel directivo. Haz clic en una fila para ver su detalle abajo.
+    </p>
+    <div class="grid-table-scroll" style="margin: 0 0 24px;">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th>Sprint</th>
+            <th>Estatus</th>
+            <th>Fechas</th>
+            <th>Objetivo</th>
+            <th>Tickets</th>
+            <th>Horas</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of resumenSprints(); track r.sprint.id) {
+            <tr
+              class="dashboard-row"
+              role="button"
+              tabindex="0"
+              [attr.aria-label]="'Ver detalle de ' + r.sprint.nombre"
+              (click)="cambiarSprintSeleccionado(r.sprint.id + '')"
+              (keydown.enter)="cambiarSprintSeleccionado(r.sprint.id + '')"
+              (keydown.space)="$event.preventDefault(); cambiarSprintSeleccionado(r.sprint.id + '')"
+            >
+              <td data-label="Sprint">{{ r.sprint.nombre }}</td>
+              <td data-label="Estatus">
+                <span
+                  class="grid-badge"
+                  [class.grid-badge-success]="r.sprint.estado === 'cerrado'"
+                  [class.grid-badge-neutral]="r.sprint.estado !== 'cerrado'"
+                >
+                  {{ r.sprint.estado }}
+                </span>
+              </td>
+              <td data-label="Fechas">
+                @if (r.sprint.fechaInicio || r.sprint.fechaFin) {
+                  {{ r.sprint.fechaInicio || '—' }} → {{ r.sprint.fechaFin || '—' }}
+                } @else {
+                  <span class="hint" style="margin:0;">Sin fechas</span>
+                }
+              </td>
+              <td data-label="Objetivo">
+                @if (r.sprint.objetivo) {
+                  <span [title]="r.sprint.objetivo">{{ r.sprint.objetivo }}</span>
+                } @else {
+                  <span class="hint" style="margin:0;">—</span>
+                }
+              </td>
+              <td data-label="Tickets">{{ r.resueltos }}/{{ r.totalTickets }} ({{ r.porcentajeTickets }}%)</td>
+              <td data-label="Horas">{{ r.horasResueltas }}/{{ r.horasTotales }} ({{ r.porcentajeHoras }}%)</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <h2 style="margin: 24px 0 4px;">Detalle del sprint elegido</h2>
     @if (sprintReporte(); as reporte) {
-      <div class="panel" style="margin-top: 16px;">
+      <div class="panel" style="margin-top: 8px;">
         <div class="panel-head">
-          <h2 style="margin:0;">{{ reporte.sprint.nombre }}</h2>
+          <h3 style="margin:0;">{{ reporte.sprint.nombre }}</h3>
           <span class="grid-badge" [class.grid-badge-success]="reporte.sprint.estado === 'cerrado'" [class.grid-badge-neutral]="reporte.sprint.estado !== 'cerrado'">
             {{ reporte.sprint.estado }}
           </span>

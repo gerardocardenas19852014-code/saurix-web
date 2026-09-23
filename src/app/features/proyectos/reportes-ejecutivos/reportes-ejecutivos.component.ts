@@ -300,12 +300,10 @@ export class ReportesEjecutivosComponent implements OnInit {
       .sort((a, b) => (b.fechaInicio ?? '').localeCompare(a.fechaInicio ?? ''));
   });
 
-  protected readonly sprintReporte = computed(() => {
-    const disponibles = this.sprintsDelProyecto();
-    const id = this.sprintSeleccionadoId() || disponibles[0]?.id || 0;
-    const sprint = disponibles.find((s) => Number(s.id) === Number(id));
-    if (!sprint) return null;
-
+  /** Mismo cálculo que antes tenía sprintReporte() en línea, ahora factorizado para
+   *  poder aplicarlo a UN sprint (sprintReporte, drill-down de abajo) o a TODOS los
+   *  del proyecto a la vez (resumenSprints, la tabla de arriba). */
+  private resumenDeSprint(sprint: Sprint) {
     const ticketsSprint = this.tickets().filter((t) => t.activo !== false && Number(t.sprintId) === Number(sprint.id));
     const resueltos = ticketsSprint.filter((t) => this.estaResuelto(t));
     const horasTotales = ticketsSprint.reduce((s, t) => s + this.horasDeTicket(t), 0);
@@ -321,7 +319,21 @@ export class ReportesEjecutivosComponent implements OnInit {
       porcentajeTickets: ticketsSprint.length ? Math.round((resueltos.length / ticketsSprint.length) * 100) : 0,
       porcentajeHoras: horasTotales ? Math.round((horasResueltas / horasTotales) * 100) : 0,
     };
+  }
+
+  protected readonly sprintReporte = computed(() => {
+    const disponibles = this.sprintsDelProyecto();
+    const id = this.sprintSeleccionadoId() || disponibles[0]?.id || 0;
+    const sprint = disponibles.find((s) => Number(s.id) === Number(id));
+    if (!sprint) return null;
+    return this.resumenDeSprint(sprint);
   });
+
+  /** Tabla con TODOS los sprints del proyecto (no solo el elegido en el selector) —
+   *  para poder ver de un vistazo cuáles hay y su avance antes de decidir cuáles
+   *  reportar a nivel directivo, sin tener que ir eligiéndolos uno por uno. Mismo
+   *  orden que sprintsDelProyecto (más reciente primero). */
+  protected readonly resumenSprints = computed(() => this.sprintsDelProyecto().map((s) => this.resumenDeSprint(s)));
 
   // ---------------------------------------------------------------------
   // 4. Velocidad — trabajo completado por sprint cerrado (últimos 8).
