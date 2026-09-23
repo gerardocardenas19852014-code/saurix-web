@@ -9,15 +9,15 @@
       <span class="catalog-group-count">{{ grupo.enlaces.length }}</span>
     </h2>
 
-    <div class="catalog-list">
+    <div class="tiles-grid tiles-grid-landing">
       @for (enlace of grupo.enlaces; track enlace.ruta) {
-        <a class="catalog-list-item" [routerLink]="enlace.ruta">
-          <span class="catalog-list-icon catalog-list-icon-{{ enlace.color }}">{{ enlace.icono }}</span>
-          <div class="catalog-list-body">
-            <h3>{{ enlace.titulo }}</h3>
-            <p>{{ enlace.descripcion }}</p>
-          </div>
-          <span class="workspace-card-enter catalog-list-enter">Entrar →</span>
+        <a
+          class="module-tile module-tile-{{ enlace.color }}"
+          [routerLink]="enlace.ruta"
+          [title]="enlace.descripcion"
+        >
+          <div class="module-tile-icon">{{ enlace.icono }}</div>
+          <div class="module-tile-label">{{ enlace.titulo }}</div>
         </a>
       }
     </div>

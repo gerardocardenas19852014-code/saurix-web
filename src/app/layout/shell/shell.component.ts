@@ -93,10 +93,13 @@ export class ShellComponent implements OnDestroy {
   );
 
   /** El menú de "Gestión de Proyectos" ya tiene 9 enlaces — se agrupan como en su página
-   *  "Inicio" (ver proyectos-landing.component.ts: grupos "Proyectos" y "Reportes", mismo
-   *  orden) y cada grupo se puede colapsar. Por defecto todos empiezan expandidos; no se
-   *  persiste entre sesiones (se reinicia al recargar, igual que sprintsColapsados en Backlog). */
-  protected readonly gruposProyectosColapsados = signal<Set<string>>(new Set());
+   *  "Inicio" (ver proyectos-landing.component.ts: grupos "Procesos", "Configuración" y
+   *  "Reportes", mismo orden) y cada grupo se puede colapsar. Por defecto empiezan
+   *  CERRADOS (pedido explícito del usuario); no se persiste entre sesiones (se reinicia
+   *  al recargar, igual que sprintsColapsados en Backlog). */
+  protected readonly gruposProyectosColapsados = signal<Set<string>>(
+    new Set(['Procesos', 'Configuracion', 'Reportes']),
+  );
 
   grupoProyectosAbierto(titulo: string): boolean {
     return !this.gruposProyectosColapsados().has(titulo);

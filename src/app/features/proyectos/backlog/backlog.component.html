@@ -163,19 +163,19 @@
               @for (ticket of ticketsVisibles(ticketsDeSprintFiltrados(sprint.id), 'sprint-' + sprint.id); track ticket.id) {
                 <li class="actividad-item">
                   <div class="actividad-item-head">
-                    <a
-                      [routerLink]="['/proyectos/tablero']"
-                      [queryParams]="{ ticket: ticket.id }"
-                      class="actividad-item-texto actividad-item-texto-truncar"
-                      style="text-decoration:none;"
-                      [title]="ticket.titulo"
-                    >
+                    <span class="actividad-item-texto actividad-item-texto-truncar" [title]="ticket.titulo">
                       #{{ ticket.numeroTicket }}
                       @if (ticket.folioInterno) {
                         <span class="hint" style="margin:0;">({{ ticket.folioInterno }})</span>
                       }
                       — {{ ticket.titulo }}
-                    </a>
+                    </span>
+                    <a
+                      [routerLink]="['/proyectos/tablero']"
+                      [queryParams]="{ ticket: ticket.id }"
+                      class="tab-more-item boton-abrir-ticket"
+                      title="Abrir este ticket en el Tablero"
+                    >↗ Abrir</a>
                     <div class="actividad-item-meta">
                       <span class="grid-badge" [class.grid-badge-success]="estaResuelto(ticket)" [class.grid-badge-neutral]="!estaResuelto(ticket)" title="Estado en el Tablero">
                         {{ nombreColumna(ticket.tableroColumnaId) }}
@@ -205,19 +205,27 @@
               @for (ticket of ticketsVisibles(ticketsDeSprintFiltrados(sprint.id), 'sprint-' + sprint.id); track ticket.id) {
                 <div class="kanban-card">
                   <div class="kanban-card-top">
-                    <span class="kanban-card-id">
-                      #{{ ticket.numeroTicket }}
-                      @if (ticket.folioInterno) { ({{ ticket.folioInterno }}) }
-                    </span>
+                    <div style="display:flex; align-items:center; gap:6px; min-width:0;">
+                      <span class="kanban-card-id">
+                        #{{ ticket.numeroTicket }}
+                        @if (ticket.folioInterno) { ({{ ticket.folioInterno }}) }
+                      </span>
+                      <a
+                        [routerLink]="['/proyectos/tablero']"
+                        [queryParams]="{ ticket: ticket.id }"
+                        class="tab-more-item boton-abrir-ticket"
+                        title="Abrir este ticket en el Tablero"
+                      >↗ Abrir</a>
+                    </div>
                     <span
                       class="kanban-card-priority"
                       [style.background]="colorPrioridad(ticket.ticketPrioridadId)"
                       [title]="'Prioridad: ' + nombrePrioridad(ticket.ticketPrioridadId)"
                     ></span>
                   </div>
-                  <a [routerLink]="['/proyectos/tablero']" [queryParams]="{ ticket: ticket.id }" class="kanban-card-title" style="display:block; text-decoration:none;">
+                  <p class="kanban-card-title" style="cursor:default;" [title]="ticket.titulo">
                     {{ ticket.titulo }}
-                  </a>
+                  </p>
                   <div class="kanban-card-tags">
                     <span class="grid-badge" [class.grid-badge-success]="estaResuelto(ticket)" [class.grid-badge-neutral]="!estaResuelto(ticket)" title="Estado en el Tablero">
                       {{ nombreColumna(ticket.tableroColumnaId) }}
@@ -302,19 +310,19 @@
                 @for (ticket of ticketsVisibles(ticketsDeSprintFiltrados(sprint.id), 'sprint-cerrado-' + sprint.id); track ticket.id) {
                   <li class="actividad-item">
                     <div class="actividad-item-head">
-                      <a
-                        [routerLink]="['/proyectos/tablero']"
-                        [queryParams]="{ ticket: ticket.id }"
-                        class="actividad-item-texto actividad-item-texto-truncar"
-                        style="text-decoration:none;"
-                        [title]="ticket.titulo"
-                      >
+                      <span class="actividad-item-texto actividad-item-texto-truncar" [title]="ticket.titulo">
                         #{{ ticket.numeroTicket }}
                         @if (ticket.folioInterno) {
                           <span class="hint" style="margin:0;">({{ ticket.folioInterno }})</span>
                         }
                         — {{ ticket.titulo }}
-                      </a>
+                      </span>
+                      <a
+                        [routerLink]="['/proyectos/tablero']"
+                        [queryParams]="{ ticket: ticket.id }"
+                        class="tab-more-item boton-abrir-ticket"
+                        title="Abrir este ticket en el Tablero"
+                      >↗ Abrir</a>
                       <div class="actividad-item-meta">
                         <span class="grid-badge" [class.grid-badge-success]="estaResuelto(ticket)" [class.grid-badge-neutral]="!estaResuelto(ticket)" title="Estado en el Tablero">
                           {{ nombreColumna(ticket.tableroColumnaId) }}
@@ -397,19 +405,19 @@
                 @for (ticket of ticketsVisibles(grupo.tickets, grupo.clave); track ticket.id) {
                   <li class="actividad-item">
                     <div class="actividad-item-head">
-                      <a
-                        [routerLink]="['/proyectos/tablero']"
-                        [queryParams]="{ ticket: ticket.id }"
-                        class="actividad-item-texto actividad-item-texto-truncar"
-                        style="text-decoration:none;"
-                        [title]="ticket.titulo"
-                      >
+                      <span class="actividad-item-texto actividad-item-texto-truncar" [title]="ticket.titulo">
                         #{{ ticket.numeroTicket }}
                         @if (ticket.folioInterno) {
                           <span class="hint" style="margin:0;">({{ ticket.folioInterno }})</span>
                         }
                         — {{ ticket.titulo }}
-                      </a>
+                      </span>
+                      <a
+                        [routerLink]="['/proyectos/tablero']"
+                        [queryParams]="{ ticket: ticket.id }"
+                        class="tab-more-item boton-abrir-ticket"
+                        title="Abrir este ticket en el Tablero"
+                      >↗ Abrir</a>
                       <div class="actividad-item-meta">
                         <span class="grid-badge" [class.grid-badge-success]="estaResuelto(ticket)" [class.grid-badge-neutral]="!estaResuelto(ticket)" title="Estado en el Tablero">
                           {{ nombreColumna(ticket.tableroColumnaId) }}
@@ -441,19 +449,27 @@
                 @for (ticket of ticketsVisibles(grupo.tickets, grupo.clave); track ticket.id) {
                   <div class="kanban-card">
                     <div class="kanban-card-top">
-                      <span class="kanban-card-id">
-                        #{{ ticket.numeroTicket }}
-                        @if (ticket.folioInterno) { ({{ ticket.folioInterno }}) }
-                      </span>
+                      <div style="display:flex; align-items:center; gap:6px; min-width:0;">
+                        <span class="kanban-card-id">
+                          #{{ ticket.numeroTicket }}
+                          @if (ticket.folioInterno) { ({{ ticket.folioInterno }}) }
+                        </span>
+                        <a
+                          [routerLink]="['/proyectos/tablero']"
+                          [queryParams]="{ ticket: ticket.id }"
+                          class="tab-more-item boton-abrir-ticket"
+                          title="Abrir este ticket en el Tablero"
+                        >↗ Abrir</a>
+                      </div>
                       <span
                         class="kanban-card-priority"
                         [style.background]="colorPrioridad(ticket.ticketPrioridadId)"
                         [title]="'Prioridad: ' + nombrePrioridad(ticket.ticketPrioridadId)"
                       ></span>
                     </div>
-                    <a [routerLink]="['/proyectos/tablero']" [queryParams]="{ ticket: ticket.id }" class="kanban-card-title" style="display:block; text-decoration:none;">
+                    <p class="kanban-card-title" style="cursor:default;" [title]="ticket.titulo">
                       {{ ticket.titulo }}
-                    </a>
+                    </p>
                     <div class="kanban-card-tags">
                       <span class="grid-badge" [class.grid-badge-success]="estaResuelto(ticket)" [class.grid-badge-neutral]="!estaResuelto(ticket)" title="Estado en el Tablero">
                         {{ nombreColumna(ticket.tableroColumnaId) }}

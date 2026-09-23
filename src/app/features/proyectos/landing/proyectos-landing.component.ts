@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-type ColorIcono = 'siif' | 'personal' | 'generic';
+/** Mismo criterio de color que el selector de módulos (modulos.component.ts):
+ *  una de las clases .module-tile-* definidas en styles.scss. */
+type ColorIcono = 'indigo' | 'slate' | 'teal';
 
 interface EnlaceModulo {
   ruta: string;
@@ -21,41 +23,50 @@ interface GrupoModulo {
 // Motivos de Solución) se administran desde Catálogos — mismo dato, una
 // sola pantalla de administración, para no duplicar mantenimiento. El
 // Gestor de Estados (columnas del tablero) sí vive aquí, en Proyectos.
+//
+// Agrupación y orden pedidos explícitamente por el usuario (mismo agrupado que
+// el menú lateral, ver shell.component.html): "Procesos" (el día a día con
+// tickets), "Configuración" (catálogos/ajustes del propio módulo) y "Reportes".
 const GRUPOS: GrupoModulo[] = [
   {
-    titulo: 'Proyectos',
+    titulo: 'Procesos',
     enlaces: [
       {
         ruta: 'tablero',
         icono: '🗂️',
-        color: 'siif',
+        color: 'indigo',
         titulo: 'Ticket',
         descripcion: 'Vista de tickets por estado, organizados en columnas.',
-        grupo: 'Proyectos',
-      },
-      {
-        ruta: 'proyectos',
-        icono: '📁',
-        color: 'siif',
-        titulo: 'Proyectos',
-        descripcion: 'Alta y edición de los proyectos que tienen su propio tablero Kanban.',
-        grupo: 'Proyectos',
+        grupo: 'Procesos',
       },
       {
         ruta: 'backlog',
         icono: '📋',
-        color: 'siif',
+        color: 'indigo',
         titulo: 'Backlog',
         descripcion: 'Tickets sin sprint asignado y planeación de sprints por proyecto.',
-        grupo: 'Proyectos',
+        grupo: 'Procesos',
       },
+    ],
+  },
+  {
+    titulo: 'Configuración',
+    enlaces: [
       {
         ruta: 'gestor-estados',
         icono: '🧭',
-        color: 'siif',
+        color: 'slate',
         titulo: 'Gestor de Estados',
         descripcion: 'Columnas del tablero Kanban de cada proyecto, con permisos y campos configurables por columna.',
-        grupo: 'Proyectos',
+        grupo: 'Configuración',
+      },
+      {
+        ruta: 'proyectos',
+        icono: '📁',
+        color: 'slate',
+        titulo: 'Proyectos',
+        descripcion: 'Alta y edición de los proyectos que tienen su propio tablero Kanban.',
+        grupo: 'Configuración',
       },
     ],
   },
@@ -65,7 +76,7 @@ const GRUPOS: GrupoModulo[] = [
       {
         ruta: 'dashboard',
         icono: '📊',
-        color: 'personal',
+        color: 'teal',
         titulo: 'Mi Dashboard',
         descripcion: 'Tus tickets asignados, avisos de vigencia (SLA) y horas registradas.',
         grupo: 'Reportes',
@@ -73,15 +84,15 @@ const GRUPOS: GrupoModulo[] = [
       {
         ruta: 'reportes-horas',
         icono: '⏱️',
-        color: 'personal',
-        titulo: 'Reportes de horas',
+        color: 'teal',
+        titulo: 'Reporte de Horas',
         descripcion: 'Horas registradas por usuario, por proyecto y por ticket.',
         grupo: 'Reportes',
       },
       {
         ruta: 'gantt',
         icono: '📅',
-        color: 'personal',
+        color: 'teal',
         titulo: 'Gantt',
         descripcion: 'Línea de tiempo de los tickets de un proyecto.',
         grupo: 'Reportes',
@@ -89,7 +100,7 @@ const GRUPOS: GrupoModulo[] = [
       {
         ruta: 'resumen-ejecutivo',
         icono: '📈',
-        color: 'personal',
+        color: 'teal',
         titulo: 'Resumen ejecutivo',
         descripcion: 'Salud de cada proyecto, estimado vs. horas reales, carga del equipo y cuellos de botella.',
         grupo: 'Reportes',
@@ -97,7 +108,7 @@ const GRUPOS: GrupoModulo[] = [
       {
         ruta: 'balanceo',
         icono: '⚖️',
-        color: 'personal',
+        color: 'teal',
         titulo: 'Balanceo',
         descripcion: 'Carga de trabajo pendiente por persona y prioridad, para decidir a quién asignar y reasignar tickets entre proyectos.',
         grupo: 'Reportes',

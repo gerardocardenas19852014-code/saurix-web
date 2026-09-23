@@ -55,14 +55,20 @@
       <nav class="sidebar-nav" aria-label="Menú de gestión de proyectos">
         <a routerLink="/proyectos" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
 
-        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupoProyectos('Proyectos')">
-          <span>{{ grupoProyectosAbierto('Proyectos') ? '▾' : '▸' }} Proyectos</span>
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupoProyectos('Procesos')">
+          <span>{{ grupoProyectosAbierto('Procesos') ? '▾' : '▸' }} Procesos</span>
         </button>
-        @if (grupoProyectosAbierto('Proyectos')) {
+        @if (grupoProyectosAbierto('Procesos')) {
           <a routerLink="/proyectos/tablero" routerLinkActive="active">🗂️ Ticket</a>
-          <a routerLink="/proyectos/proyectos" routerLinkActive="active">📁 Proyectos</a>
           <a routerLink="/proyectos/backlog" routerLinkActive="active">📋 Backlog</a>
+        }
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupoProyectos('Configuracion')">
+          <span>{{ grupoProyectosAbierto('Configuracion') ? '▾' : '▸' }} Configuración</span>
+        </button>
+        @if (grupoProyectosAbierto('Configuracion')) {
           <a routerLink="/proyectos/gestor-estados" routerLinkActive="active">🧭 Gestor de Estados</a>
+          <a routerLink="/proyectos/proyectos" routerLinkActive="active">📁 Proyectos</a>
         }
 
         <button type="button" class="sidebar-group-toggle" (click)="toggleGrupoProyectos('Reportes')">

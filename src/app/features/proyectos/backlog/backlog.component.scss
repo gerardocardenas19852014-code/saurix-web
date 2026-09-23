@@ -90,3 +90,15 @@
   flex-shrink: 0;
   margin-left: auto;
 }
+
+// Abrir el ticket ya no es toda la fila/tarjeta clickeable (molestaba para
+// seleccionar texto o usar los controles de al lado) — ahora es un botón
+// explícito, pedido por el usuario ("que no me permita abrir la ventana de
+// ticket, mejor que sea por un botón").
+.boton-abrir-ticket {
+  flex-shrink: 0;
+  width: auto;
+  padding: 2px 10px;
+  text-decoration: none;
+  white-space: nowrap;
+}
