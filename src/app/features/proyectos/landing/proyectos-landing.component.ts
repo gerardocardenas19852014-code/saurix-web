@@ -94,6 +94,14 @@ const GRUPOS: GrupoModulo[] = [
         descripcion: 'Salud de cada proyecto, estimado vs. horas reales, carga del equipo y cuellos de botella.',
         grupo: 'Reportes',
       },
+      {
+        ruta: 'balanceo',
+        icono: '⚖️',
+        color: 'personal',
+        titulo: 'Balanceo',
+        descripcion: 'Carga de trabajo pendiente por persona y prioridad, para decidir a quién asignar y reasignar tickets entre proyectos.',
+        grupo: 'Reportes',
+      },
     ],
   },
 ];

@@ -1,0 +1,31 @@
+// El sistema visual global (page-header, board-filters, grid-table, grid-badge,
+// dashboard-stats, actividades-list, kanban-tag/kanban-card-assignee, toolbar-select,
+// etc.) vive en src/styles.scss — lo único propio de esta pantalla es el layout del
+// título+meta de cada ticket dentro de la fila expandida de una persona, y un ancho
+// fijo para su <select> "Asignar a" (mismo motivo que en Backlog: un usuario con
+// nombre largo entre las opciones no debe agrandar ni dejar en blanco la píldora).
+
+.actividad-item-head {
+  flex-wrap: nowrap;
+}
+
+.actividad-item-texto-truncar {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actividad-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.actividad-item-meta .toolbar-select {
+  width: 150px;
+  min-width: 150px;
+}

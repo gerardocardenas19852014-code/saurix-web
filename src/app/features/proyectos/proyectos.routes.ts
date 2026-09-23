@@ -39,4 +39,8 @@ export const PROYECTOS_ROUTES: Routes = [
     path: 'gestor-estados',
     loadComponent: () => import('./gestor-estados/tableros.component').then((m) => m.TablerosComponent),
   },
+  {
+    path: 'balanceo',
+    loadComponent: () => import('./balanceo/balanceo.component').then((m) => m.BalanceoComponent),
+  },
 ];

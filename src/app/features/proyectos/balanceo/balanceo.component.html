@@ -1,0 +1,192 @@
+<div class="page-header">
+  <h1>Balanceo</h1>
+</div>
+
+<p class="hint" style="margin:0 0 20px;">
+  Carga de trabajo pendiente por persona, desglosada por prioridad — para decidir a quién sí
+  se le puede asignar un ticket nuevo y a quién no, y para mover gente entre proyectos
+  reasignando sus tickets directo desde aquí.
+</p>
+
+<div class="board-filters">
+  <label class="board-filter-field">
+    Proyecto
+    <select [value]="filtroProyectoId()" (change)="cambiarFiltroProyecto($any($event.target).value)">
+      <option [value]="0">Todos</option>
+      @for (p of proyectos(); track p.id) {
+        <option [value]="p.id">{{ p.clave }} — {{ p.nombre }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="board-filter-field">
+    Tipo
+    <select [value]="filtroTipoId()" (change)="cambiarFiltroTipo($any($event.target).value)">
+      <option [value]="0">Todos</option>
+      @for (t of tipos(); track t.id) {
+        <option [value]="t.id">{{ t.nombre }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="board-filter-field">
+    Prioridad
+    <select [value]="filtroPrioridadId()" (change)="cambiarFiltroPrioridad($any($event.target).value)">
+      <option [value]="0">Todas</option>
+      @for (p of prioridadesOrdenadas(); track p.id) {
+        <option [value]="p.id">{{ p.critica ? '🚨 ' : '' }}{{ p.nombre }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="board-filter-field">
+    Límite de alerta
+    <input
+      type="number"
+      min="1"
+      class="form-control"
+      style="width: 90px;"
+      [value]="limiteAlerta()"
+      (change)="cambiarLimiteAlerta($any($event.target).value)"
+      title="A partir de cuántos tickets de una misma prioridad se resalta en rojo"
+    />
+  </label>
+</div>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else {
+  <div class="dashboard-stats" style="margin: 20px 0 24px;">
+    <div class="dashboard-stat-card">
+      <div class="num">{{ totalPendientes() }}</div>
+      <div class="label">Tickets pendientes (con estos filtros)</div>
+    </div>
+    @if (totalSinAsignar() > 0) {
+      <div class="dashboard-stat-card dashboard-stat-danger">
+        <div class="num">{{ totalSinAsignar() }}</div>
+        <div class="label">Sin asignar</div>
+      </div>
+    }
+    @if (personasEnAlerta() > 0) {
+      <div class="dashboard-stat-card dashboard-stat-critica">
+        <div class="num">{{ personasEnAlerta() }}</div>
+        <div class="label">🚨 Personas en alerta</div>
+      </div>
+    }
+  </div>
+
+  @if (filas().length === 0) {
+    <p class="empty">No hay usuarios activos ni tickets pendientes que coincidan con estos filtros.</p>
+  } @else {
+    <div class="grid-table-scroll">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Persona</th>
+            <th>Total pendientes</th>
+            @for (p of prioridadesOrdenadas(); track p.id) {
+              <th [style.color]="p.codigoHex" [title]="p.critica ? 'Prioridad crítica' : p.nombre">
+                {{ p.critica ? '🚨 ' : '' }}{{ p.nombre }}
+              </th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (fila of filas(); track fila.usuarioId) {
+            <tr>
+              <td data-label="">
+                <button
+                  type="button"
+                  class="tab-more-item"
+                  style="width:auto; padding:2px 6px;"
+                  (click)="toggleUsuario(fila.usuarioId)"
+                  [attr.aria-label]="usuarioAbierto(fila.usuarioId) ? 'Colapsar' : 'Expandir'"
+                >
+                  <span aria-hidden="true">{{ usuarioAbierto(fila.usuarioId) ? '▾' : '▸' }}</span>
+                </button>
+              </td>
+              <td data-label="Persona">
+                <span
+                  class="kanban-card-assignee"
+                  style="display:inline-flex; vertical-align:middle; margin-right:8px;"
+                  [style.background]="fila.color"
+                >
+                  {{ iniciales(fila.nombre) }}
+                </span>
+                {{ fila.nombre }}
+              </td>
+              <td data-label="Total pendientes">{{ fila.total }}</td>
+              @for (p of prioridadesOrdenadas(); track p.id) {
+                <td [attr.data-label]="p.nombre">
+                  @if (superaLimite(fila, p.id)) {
+                    <span class="grid-badge grid-badge-danger">{{ conteoPrioridad(fila, p.id) }}</span>
+                  } @else if (conteoPrioridad(fila, p.id) > 0) {
+                    {{ conteoPrioridad(fila, p.id) }}
+                  } @else {
+                    <span class="hint" style="margin:0;">—</span>
+                  }
+                </td>
+              }
+            </tr>
+            @if (usuarioAbierto(fila.usuarioId)) {
+              <tr>
+                <td [attr.colspan]="3 + prioridadesOrdenadas().length" style="background: var(--paper);">
+                  @if (ticketsDe(fila.usuarioId).length === 0) {
+                    <p class="hint" style="margin:6px 0;">Sin tickets pendientes con estos filtros.</p>
+                  } @else {
+                    <ul class="actividades-list" style="margin:6px 0;">
+                      @for (ticket of ticketsDe(fila.usuarioId); track ticket.id) {
+                        <li class="actividad-item">
+                          <div class="actividad-item-head">
+                            <a
+                              [routerLink]="['/proyectos/tablero']"
+                              [queryParams]="{ ticket: ticket.id }"
+                              class="actividad-item-texto actividad-item-texto-truncar"
+                              style="text-decoration:none;"
+                              [title]="ticket.titulo"
+                            >
+                              #{{ ticket.numeroTicket }}
+                              @if (ticket.folioInterno) {
+                                <span class="hint" style="margin:0;">({{ ticket.folioInterno }})</span>
+                              }
+                              — {{ ticket.titulo }}
+                            </a>
+                            <div class="actividad-item-meta">
+                              <span class="hint" style="margin:0;">{{ nombreProyecto(ticket.proyectoId) }}</span>
+                              <span class="kanban-tag kanban-tag-tipo" [title]="'Tipo: ' + nombreTipo(ticket.ticketTipoId)">
+                                {{ iconoTipo(ticket.ticketTipoId) }} {{ nombreTipo(ticket.ticketTipoId) }}
+                              </span>
+                              <span
+                                class="kanban-tag"
+                                [style.color]="colorPrioridad(ticket.ticketPrioridadId)"
+                                [title]="'Prioridad: ' + nombrePrioridad(ticket.ticketPrioridadId)"
+                              >
+                                {{ nombrePrioridad(ticket.ticketPrioridadId) }}
+                              </span>
+                              <select
+                                class="toolbar-select"
+                                [value]="ticket.asignadoUsuarioId ?? 0"
+                                (change)="reasignar(ticket, $any($event.target).value)"
+                                aria-label="Asignar a"
+                              >
+                                <option [value]="0">Sin asignar</option>
+                                @for (u of opcionesUsuarioPara(ticket); track u.id) {
+                                  <option [value]="u.id">{{ u.nombre }}</option>
+                                }
+                              </select>
+                            </div>
+                          </div>
+                        </li>
+                      }
+                    </ul>
+                  }
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}
