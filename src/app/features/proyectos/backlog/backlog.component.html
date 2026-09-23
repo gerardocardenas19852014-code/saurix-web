@@ -143,10 +143,10 @@
         <div class="page-actions">
           @if (sprint.estado === 'planeado') {
             <button type="button" class="btn-secondary small" (click)="iniciarSprint(sprint)">▶ Iniciar sprint</button>
-            <button type="button" class="btn-danger small" (click)="eliminarSprint(sprint)">Eliminar</button>
           } @else {
             <button type="button" class="btn-secondary small" (click)="completarSprint(sprint)">✓ Completar sprint</button>
           }
+          <button type="button" class="btn-danger small" (click)="pedirEliminarSprint(sprint)">Eliminar</button>
         </div>
       </div>
 
@@ -190,8 +190,8 @@
                       <span class="hint" style="margin:0;">{{ nombreUsuarioAsignado(ticket.asignadoUsuarioId) }}</span>
                       <select class="toolbar-select" [value]="ticket.sprintId ?? 0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
                         <option [value]="0">Backlog</option>
-                        @for (s of sprintsDestino(); track s.id) {
-                          <option [value]="s.id">{{ s.nombre }}</option>
+                        @for (s of opcionesSprintPara(ticket); track s.id) {
+                          <option [value]="s.id">{{ s.nombre }}{{ s.estado === 'cerrado' ? ' (cerrado)' : '' }}</option>
                         }
                       </select>
                     </div>
@@ -244,8 +244,8 @@
                     }
                     <select class="toolbar-select" [value]="ticket.sprintId ?? 0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
                       <option [value]="0">Backlog</option>
-                      @for (s of sprintsDestino(); track s.id) {
-                        <option [value]="s.id">{{ s.nombre }}</option>
+                      @for (s of opcionesSprintPara(ticket); track s.id) {
+                        <option [value]="s.id">{{ s.nombre }}{{ s.estado === 'cerrado' ? ' (cerrado)' : '' }}</option>
                       }
                     </select>
                   </div>
@@ -268,19 +268,77 @@
       <div class="panel-head">
         <h2>Sprints completados</h2>
       </div>
-      <ul class="actividades-list">
-        @for (sprint of sprintsCerrados(); track sprint.id) {
-          <li class="actividad-item">
-            <div class="actividad-item-head">
-              <span class="actividad-item-texto">
-                {{ sprint.nombre }}
-                <span class="grid-badge grid-badge-muted">Cerrado</span>
-                — {{ ticketsDeSprintFiltrados(sprint.id).length }} ticket(s)
-              </span>
+      @for (sprint of sprintsCerrados(); track sprint.id) {
+        <div style="margin-top: 10px;">
+          <div class="actividad-item-head" style="padding: 4px 0;">
+            <button
+              type="button"
+              class="tab-more-item"
+              style="width:auto; padding:2px 6px;"
+              (click)="toggleSprint(sprint.id)"
+              [attr.aria-label]="sprintAbierto(sprint.id) ? 'Colapsar sprint' : 'Expandir sprint'"
+            >
+              <span aria-hidden="true">{{ sprintAbierto(sprint.id) ? '▾' : '▸' }}</span>
+            </button>
+            <span class="actividad-item-texto">
+              {{ sprint.nombre }}
+              <span class="grid-badge grid-badge-muted">Cerrado</span>
+              — {{ ticketsDeSprintFiltrados(sprint.id).length }} ticket(s)
+            </span>
+            <div class="actividad-item-meta">
+              <button type="button" class="btn-secondary small" (click)="reabrirSprint(sprint)" title="Reabrir este sprint, por ejemplo si se completó por error">
+                ↺ Reabrir sprint
+              </button>
+              <button type="button" class="btn-danger small" (click)="pedirEliminarSprint(sprint)">Eliminar</button>
             </div>
-          </li>
-        }
-      </ul>
+          </div>
+
+          @if (sprintAbierto(sprint.id)) {
+            @if (ticketsDeSprintFiltrados(sprint.id).length === 0) {
+              <p class="empty">Ningún ticket de este sprint coincide con los filtros activos.</p>
+            } @else {
+              <ul class="actividades-list compacta">
+                @for (ticket of ticketsVisibles(ticketsDeSprintFiltrados(sprint.id), 'sprint-cerrado-' + sprint.id); track ticket.id) {
+                  <li class="actividad-item">
+                    <div class="actividad-item-head">
+                      <a
+                        [routerLink]="['/proyectos/tablero']"
+                        [queryParams]="{ ticket: ticket.id }"
+                        class="actividad-item-texto actividad-item-texto-truncar"
+                        style="text-decoration:none;"
+                        [title]="ticket.titulo"
+                      >
+                        #{{ ticket.numeroTicket }}
+                        @if (ticket.folioInterno) {
+                          <span class="hint" style="margin:0;">({{ ticket.folioInterno }})</span>
+                        }
+                        — {{ ticket.titulo }}
+                      </a>
+                      <div class="actividad-item-meta">
+                        <span class="grid-badge" [class.grid-badge-success]="estaResuelto(ticket)" [class.grid-badge-neutral]="!estaResuelto(ticket)" title="Estado en el Tablero">
+                          {{ nombreColumna(ticket.tableroColumnaId) }}
+                        </span>
+                        <span class="hint" style="margin:0;">{{ nombreUsuarioAsignado(ticket.asignadoUsuarioId) }}</span>
+                        <select class="toolbar-select" [value]="ticket.sprintId ?? 0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
+                          <option [value]="0">Backlog</option>
+                          @for (s of opcionesSprintPara(ticket); track s.id) {
+                            <option [value]="s.id">{{ s.nombre }}{{ s.estado === 'cerrado' ? ' (cerrado)' : '' }}</option>
+                          }
+                        </select>
+                      </div>
+                    </div>
+                  </li>
+                }
+              </ul>
+              @if (ticketsDeSprintFiltrados(sprint.id).length > cantidadVisible('sprint-cerrado-' + sprint.id)) {
+                <button type="button" class="btn-secondary small" style="margin-top:8px;" (click)="verMas('sprint-cerrado-' + sprint.id)">
+                  Ver más ({{ ticketsDeSprintFiltrados(sprint.id).length - cantidadVisible('sprint-cerrado-' + sprint.id) }} restantes)
+                </button>
+              }
+            }
+          }
+        </div>
+      }
     </div>
   }
   }
@@ -445,3 +503,11 @@
 
   }
 }
+
+<app-confirm-dialog
+  [visible]="sprintAEliminar() !== null"
+  titulo="Eliminar sprint"
+  [mensaje]="'¿Eliminar el sprint \'' + (sprintAEliminar()?.nombre ?? '') + '\'? Sus tickets regresarán al Backlog.' + (sprintAEliminar()?.estado === 'cerrado' ? ' Se pierde el registro de que se cerraron en esta iteración.' : '')"
+  (confirmar)="confirmarEliminarSprint()"
+  (cancelar)="sprintAEliminar.set(null)"
+/>

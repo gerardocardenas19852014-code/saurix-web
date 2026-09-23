@@ -7,10 +7,14 @@ export type EstadoSprint = 'planeado' | 'activo' | 'cerrado';
  *
  * Solo puede haber un sprint 'activo' por proyecto a la vez (ver
  * iniciarSprint en backlog.component.ts, misma regla que Jira/Scrum real).
- * 'cerrado' es el equivalente de "completado": no se reabre. Al completar
- * un sprint, los tickets que no se resolvieron regresan solos al Backlog
- * (sprintId = null); los resueltos se quedan con el sprint como registro
- * histórico de qué se cerró en esa iteración.
+ * 'cerrado' es el equivalente de "completado". Al completar un sprint, los
+ * tickets que no se resolvieron regresan solos al Backlog (sprintId = null);
+ * los resueltos se quedan con el sprint como registro histórico de qué se
+ * cerró en esa iteración. Un sprint cerrado por error se puede reabrir (ver
+ * reabrirSprint en backlog.component.ts, vuelve a 'activo') — los tickets
+ * liberados al cerrarlo no vuelven solos. También se puede eliminar un
+ * sprint en cualquier estado (ver eliminarSprint/confirmarEliminarSprint):
+ * sus tickets siempre regresan primero al Backlog.
  */
 export interface Sprint {
   id: number;

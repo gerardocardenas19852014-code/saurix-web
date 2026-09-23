@@ -20,8 +20,16 @@
 .actividades-list.compacta .actividad-item-meta {
   gap: 6px;
 }
+/* Ancho FIJO (no solo min-width) a propósito: el nombre de un sprint puede ser
+ * mucho más largo que "Backlog" (p.ej. "Paquete de Liberación de..."), y un
+ * <select> nativo sin ancho fijo se redimensiona según el texto de sus
+ * <option> — con un sprint de nombre largo entre las opciones, el navegador
+ * agrandaba la píldora (y a veces la dejaba viéndose en blanco) aunque el
+ * ticket tuviera seleccionado "Backlog". Con ancho fijo siempre se ve del
+ * mismo tamaño que sus vecinas, truncando el texto si no cabe. */
 .actividades-list.compacta .toolbar-select {
   height: 28px;
+  width: 108px;
   min-width: 108px;
   padding: 0 22px 0 10px;
   font-size: 11.5px;
@@ -48,6 +56,13 @@
 .tarjetas-grid .kanban-card-foot {
   flex-wrap: wrap;
   gap: 8px;
+}
+/* Mismo motivo que .actividades-list.compacta .toolbar-select de arriba: ancho
+ * fijo para que un sprint de nombre largo entre las opciones no agrande (ni
+ * deje en blanco) la píldora "Mover a" de la tarjeta. */
+.tarjetas-grid .kanban-card-foot .toolbar-select {
+  width: 132px;
+  min-width: 132px;
 }
 
 /* Vista "Lista": antes el título del ticket (largo) y el grupo de

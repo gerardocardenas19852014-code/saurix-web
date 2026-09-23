@@ -12,6 +12,7 @@ import { TicketTipo } from '../ticket-tipos/ticket-tipo.model';
 import { TicketModulo } from '../ticket-modulos/ticket-modulo.model';
 import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
 import { Sprint } from '../sprints/sprint.model';
+import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 
 /**
  * Backlog + Sprints (Gestión de Proyectos) — patrón Scrum de Jira, ausente
@@ -29,7 +30,7 @@ import { Sprint } from '../sprints/sprint.model';
 @Component({
   selector: 'app-backlog',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, ConfirmDialogComponent],
   templateUrl: './backlog.component.html',
   styleUrl: './backlog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -446,6 +447,28 @@ export class BacklogComponent implements OnInit {
     });
   }
 
+  /** Deshace un "Completar sprint" hecho por error — lo regresa a 'activo' (mismo límite de
+   *  "un solo sprint activo a la vez" que iniciarSprint). Los tickets NO resueltos que se
+   *  liberaron solos al Backlog al cerrarlo (ver completarSprint) no vuelven automáticamente:
+   *  no queda registro de cuáles eran, así que si hace falta se reasignan a mano con "Mover a". */
+  reabrirSprint(sprint: Sprint): void {
+    const activo = this.sprintsActivos()[0];
+    if (activo && Number(activo.id) !== Number(sprint.id)) {
+      this.toast.advertencia(
+        `Ya hay un sprint activo ("${activo.nombre}"). Complétalo antes de reabrir "${sprint.nombre}".`,
+      );
+      return;
+    }
+    this.data.modificacion<Sprint>('Sprint', { ...sprint, estado: 'activo' }).subscribe({
+      next: () => {
+        this.toast.exito(
+          `Sprint "${sprint.nombre}" reabierto. Los tickets que se liberaron al Backlog al cerrarlo no vuelven solos — muévelos de nuevo si hace falta.`,
+        );
+        this.cargarSprintsYTickets();
+      },
+    });
+  }
+
   /** Al completar, los tickets NO resueltos regresan al Backlog (igual que
    *  "Complete sprint" en Jira); los ya resueltos se quedan con el sprint como
    *  registro histórico de qué se cerró en esta iteración. */
@@ -471,13 +494,21 @@ export class BacklogComponent implements OnInit {
     });
   }
 
-  /** Solo se puede eliminar un sprint que todavía no se ha iniciado — uno activo
-   *  o cerrado se completa, no se borra (para no perder el registro histórico). */
-  eliminarSprint(sprint: Sprint): void {
-    if (sprint.estado !== 'planeado') {
-      this.toast.advertencia('Solo se puede eliminar un sprint que todavía no se ha iniciado.');
-      return;
-    }
+  /** Se puede eliminar un sprint en cualquier estado (planeado, activo o cerrado) — sus
+   *  tickets siempre regresan primero al Backlog (sprintId = null), nunca se borran junto
+   *  con el sprint. Pide confirmación (ver sprintAEliminar/confirmarEliminarSprint) porque
+   *  borrar un sprint cerrado sí pierde el registro histórico de qué se cerró en esa
+   *  iteración — a diferencia de completarSprint(), que lo conserva a propósito. */
+  protected readonly sprintAEliminar = signal<Sprint | null>(null);
+
+  pedirEliminarSprint(sprint: Sprint): void {
+    this.sprintAEliminar.set(sprint);
+  }
+
+  confirmarEliminarSprint(): void {
+    const sprint = this.sprintAEliminar();
+    if (!sprint) return;
+
     const ticketsDelSprint = this.ticketsDeSprint(sprint.id);
     const liberar$: Observable<unknown> = ticketsDelSprint.length
       ? forkJoin(ticketsDelSprint.map((t) => this.data.modificacion<Ticket>('Ticket', { ...t, sprintId: null })))
@@ -487,7 +518,12 @@ export class BacklogComponent implements OnInit {
       next: () => {
         this.data.baja('Sprint', sprint.id).subscribe({
           next: () => {
-            this.toast.exito('Sprint eliminado.');
+            this.toast.exito(
+              ticketsDelSprint.length
+                ? `Sprint eliminado. ${ticketsDelSprint.length} ticket(s) regresaron al Backlog.`
+                : 'Sprint eliminado.',
+            );
+            this.sprintAEliminar.set(null);
             this.cargarSprintsYTickets();
           },
         });
@@ -501,5 +537,19 @@ export class BacklogComponent implements OnInit {
     this.data.modificacion<Ticket>('Ticket', { ...ticket, sprintId }).subscribe({
       next: () => this.cargarSprintsYTickets(),
     });
+  }
+
+  /** Opciones del <select> "Mover a" para UN ticket en particular: los sprints abiertos
+   *  (sprintsDestino, destino válido) más, si el ticket ya está en un sprint CERRADO, ese
+   *  mismo sprint agregado al final — así el <select> siempre tiene una opción que calza
+   *  con su valor actual. Sin esto, un ticket que quedó en un sprint cerrado (ver
+   *  completarSprint) mostraría el navegador seleccionando "Backlog" por defecto (al no
+   *  existir su <option>), aunque el ticket siga asignado a ese sprint cerrado. */
+  opcionesSprintPara(ticket: Ticket): Sprint[] {
+    const destino = this.sprintsDestino();
+    if (!ticket.sprintId) return destino;
+    if (destino.some((s) => Number(s.id) === Number(ticket.sprintId))) return destino;
+    const propio = this.sprints().find((s) => Number(s.id) === Number(ticket.sprintId));
+    return propio ? [...destino, propio] : destino;
   }
 }
