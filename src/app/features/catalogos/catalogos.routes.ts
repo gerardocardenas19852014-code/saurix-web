@@ -20,6 +20,33 @@ export const CATALOGOS_ROUTES: Routes = [
   },
 
   {
+    path: 'tipo-cuenta-presupuesto',
+    loadComponent: () =>
+      import('./tipo-cuenta-presupuesto/tipo-cuenta-presupuesto.component').then(
+        (m) => m.TipoCuentaPresupuestoComponent,
+      ),
+  },
+  {
+    path: 'tipo-movimiento-presupuesto',
+    loadComponent: () =>
+      import('./tipo-movimiento-presupuesto/tipo-movimiento-presupuesto.component').then(
+        (m) => m.TipoMovimientoPresupuestoComponent,
+      ),
+  },
+  {
+    path: 'frecuencia-fijos-presupuesto',
+    loadComponent: () =>
+      import('./frecuencia-fijos-presupuesto/frecuencia-fijos-presupuesto.component').then(
+        (m) => m.FrecuenciaFijosPresupuestoComponent,
+      ),
+  },
+  {
+    path: 'proveedor-conexion',
+    loadComponent: () =>
+      import('./proveedor-conexion/proveedor-conexion.component').then((m) => m.ProveedorConexionComponent),
+  },
+
+  {
     path: 'categorias-presupuesto',
     loadComponent: () =>
       import('./categoria-presupuesto/categoria-presupuesto-list.component').then(

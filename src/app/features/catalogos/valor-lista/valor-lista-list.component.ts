@@ -13,27 +13,29 @@ import { ValorLista } from './valor-lista.model';
 const MODULO_BITACORA = 'Catálogos / Listas de valores';
 const ENTIDAD = 'ValorLista';
 
+/** Grupos que ya tienen su propia pantalla dedicada (ver
+ *  ValorListaGrupoBase y catalogos.routes.ts) — a pedido explícito, dejaron
+ *  de administrarse desde aquí para no tener dos caminos hacia los mismos
+ *  datos; se excluyen del selector aunque ya existan filas con esa clave. */
+const GRUPOS_CON_PANTALLA_PROPIA = new Set([
+  'CuentaPresupuestoTipo',
+  'MovimientoPresupuestoTipo',
+  'MovimientoRecurrenteFrecuencia',
+  'ConfiguracionConexionProveedor',
+]);
+
 /** Nombres amigables para los grupos que ya usa el propio sistema (aparecen
  *  primero y con etiqueta bonita); cualquier grupo nuevo que el usuario cree
  *  aparece igual, mostrando su clave tal cual — sobre demanda, sin tocar
  *  código para agregar un grupo nuevo. */
-// Claves que otras pantallas del sistema usan tal cual en su lógica
-// (no solo como texto de combo): Límites de gasto, Reportes y Calendario
-// de pagos comparan directo contra 'Ingreso'/'Gasto', y el cálculo de
-// ciclo de Fijos compara directo contra 'Mensual'/'Anual'. Borrar o
-// renombrar la CLAVE de estos valores rompería esas pantallas en
-// silencio, así que aquí solo se deja cambiar la Etiqueta.
-const CLAVES_PROTEGIDAS: Record<string, string[]> = {
-  MovimientoPresupuestoTipo: ['Ingreso', 'Gasto'],
-  MovimientoRecurrenteFrecuencia: ['Mensual', 'Anual'],
-};
+// Claves que otras pantallas del sistema usan tal cual en su lógica (no
+// solo como texto de combo). Borrar o renombrar la CLAVE de estos valores
+// rompería esas pantallas en silencio, así que aquí solo se deja cambiar
+// la Etiqueta. (Los grupos con pantalla propia declaran esto en su propio
+// componente — ver clavesProtegidas en TipoCuentaPresupuestoComponent, etc.)
+const CLAVES_PROTEGIDAS: Record<string, string[]> = {};
 
-const ETIQUETAS_GRUPO: Record<string, string> = {
-  CuentaPresupuestoTipo: 'Tipo de cuenta · Presupuesto Personal',
-  MovimientoPresupuestoTipo: 'Tipo de movimiento · Presupuesto Personal',
-  MovimientoRecurrenteFrecuencia: 'Frecuencia de fijos · Presupuesto Personal',
-  ConfiguracionConexionProveedor: 'Proveedor de conexión · Panel de Control',
-};
+const ETIQUETAS_GRUPO: Record<string, string> = {};
 
 /**
  * "Listas de valores": catálogo genérico para todos los combos de
@@ -74,7 +76,11 @@ export class ValorListaListComponent implements OnInit {
   private grupoAnteriorAlCrear = '';
 
   protected readonly gruposDisponibles = computed(() => {
-    const claves = new Set(this.registrosTodos().map((r) => r.grupo));
+    const claves = new Set(
+      this.registrosTodos()
+        .map((r) => r.grupo)
+        .filter((grupo) => !GRUPOS_CON_PANTALLA_PROPIA.has(grupo)),
+    );
     // Los grupos conocidos por el sistema aparecen siempre, aunque todavía
     // no tengan ningún valor cargado (por si el sembrado inicial no corrió).
     for (const clave of Object.keys(ETIQUETAS_GRUPO)) claves.add(clave);

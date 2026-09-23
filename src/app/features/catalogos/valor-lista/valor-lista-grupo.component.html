@@ -1,46 +1,13 @@
 <div class="page-header">
   <div>
     <span class="eyebrow">§ Catálogos</span>
-    <h1>Listas de valores</h1>
+    <h1>{{ tituloGrupo }}</h1>
   </div>
 </div>
 
-<p class="hint" style="margin:-8px 0 18px;">
-  Aquí se administran los combos de tipo/estado nuevos que todavía no tienen su propia
-  pantalla. Tipo de cuenta, Tipo de movimiento, Frecuencia de fijos y Proveedor de conexión
-  ya se administran cada uno desde su propio catálogo.
-</p>
-
 <div class="grid-toolbar">
-  <label class="floating-field" style="min-width:280px;">
-    <span>Grupo</span>
-    <select
-      class="form-control pill-control"
-      [value]="grupoSeleccionado()"
-      (change)="cambiarGrupo($any($event.target).value)"
-    >
-      @for (grupo of gruposDisponibles(); track grupo) {
-        <option [value]="grupo">{{ etiquetaGrupo(grupo) }}</option>
-      }
-    </select>
-  </label>
-
-  <label class="floating-field" style="min-width:220px;">
-    <span>Crear grupo nuevo…</span>
-    <input
-      type="text"
-      class="form-control pill-control"
-      placeholder="ej. TicketPrioridadColor"
-      [value]="grupoNuevoTexto()"
-      (input)="grupoNuevoTexto.set($any($event.target).value)"
-    />
-  </label>
-  <button type="button" class="btn-secondary small" (click)="crearGrupoNuevo()">+ Crear grupo</button>
-</div>
-
-<div class="grid-toolbar">
-  <button type="button" class="toolbar-btn" (click)="nuevo()" [disabled]="!grupoSeleccionado()">+ Nuevo valor</button>
-  <app-bitacora modulo="Catálogos / Listas de valores" />
+  <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo valor</button>
+  <app-bitacora [modulo]="moduloBitacora" />
 </div>
 
 <app-data-table
@@ -56,7 +23,6 @@
   <div class="modal-overlay modal show d-block" (click)="cerrarModal()">
     <form class="modal-box modal-dialog modal-content" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
       <h3 class="modal-title mb-3">{{ registroEnEdicion() ? 'Editar valor' : 'Nuevo valor' }}</h3>
-      <p class="hint" style="margin:-8px 0 14px;">Grupo: <strong>{{ etiquetaGrupo(grupoSeleccionado()) }}</strong></p>
       @if (claveBloqueada()) {
         <p class="hint" style="margin:-8px 0 14px;">
           🔒 Este valor lo usan otras pantallas del sistema — solo puedes cambiar cómo se muestra (Etiqueta), no la clave interna.

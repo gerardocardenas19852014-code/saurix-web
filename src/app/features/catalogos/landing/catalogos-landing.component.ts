@@ -16,6 +16,7 @@ const GRUPO_ICONOS: Record<string, string> = {
   General: '🧩',
   'Presupuesto Personal': '💰',
   'Gestión de Proyectos': '📋',
+  'Panel de Control': '⚙️',
 };
 
 // Los catálogos de WikiDocs (Tipo de sistema, Categoría, Secciones) viven
@@ -28,6 +29,38 @@ const CATALOGOS: EnlaceCatalogo[] = [
     titulo: 'Listas de valores',
     descripcion: 'Combos de tipo/estado usados por otras pantallas (tipo de cuenta, tipo de movimiento, frecuencia, proveedor de conexión, etc.), 100% configurables.',
     grupo: 'General',
+  },
+  {
+    ruta: 'tipo-cuenta-presupuesto',
+    icono: '💳',
+    color: 'personal',
+    titulo: 'Tipo de cuenta',
+    descripcion: 'Efectivo, banco, tarjeta, ahorro — las opciones que ofrece el campo Tipo de una cuenta.',
+    grupo: 'Presupuesto Personal',
+  },
+  {
+    ruta: 'tipo-movimiento-presupuesto',
+    icono: '↔️',
+    color: 'personal',
+    titulo: 'Tipo de movimiento',
+    descripcion: 'Ingreso, Gasto — las opciones que ofrece el campo Tipo de un movimiento.',
+    grupo: 'Presupuesto Personal',
+  },
+  {
+    ruta: 'frecuencia-fijos-presupuesto',
+    icono: '🔁',
+    color: 'personal',
+    titulo: 'Frecuencia de fijos',
+    descripcion: 'Mensual, Anual — las opciones que ofrece la Frecuencia de un fijo (Fijos y Proyección).',
+    grupo: 'Presupuesto Personal',
+  },
+  {
+    ruta: 'proveedor-conexion',
+    icono: '🔌',
+    color: 'generic',
+    titulo: 'Proveedor de conexión',
+    descripcion: 'Opciones del campo Proveedor en Conexiones (Panel de Control).',
+    grupo: 'Panel de Control',
   },
   {
     ruta: 'categorias-presupuesto',
