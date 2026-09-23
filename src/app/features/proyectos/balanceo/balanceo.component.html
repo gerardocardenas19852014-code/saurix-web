@@ -138,7 +138,11 @@
               @for (p of prioridadesOrdenadas(); track p.id) {
                 <td [attr.data-label]="p.nombre">
                   @if (superaLimite(fila, p.id)) {
-                    <span class="grid-badge grid-badge-danger">{{ conteoPrioridad(fila, p.id) }}</span>
+                    <span
+                      class="grid-badge"
+                      [style.color]="textoPrioridad(p.id)"
+                      [style.background]="fondoPrioridad(p.id)"
+                    >{{ conteoPrioridad(fila, p.id) }}</span>
                   } @else if (conteoPrioridad(fila, p.id) > 0) {
                     {{ conteoPrioridad(fila, p.id) }}
                   } @else {
