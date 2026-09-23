@@ -539,11 +539,23 @@ export class BacklogComponent implements OnInit {
     });
   }
 
+  /** Antes esta llamada no tenía manejo de error: si data.modificacion() fallaba
+   *  (p.ej. un problema de IndexedDB), el <select> se quedaba en el valor recién
+   *  elegido por el navegador pero el ticket JAMÁS se movía — sin ningún aviso,
+   *  se veía igual que "no deja mandarlo". Ahora siempre hay una confirmación
+   *  visible (éxito o error), para que un fallo real deje de ser silencioso. */
   moverTicketASprint(ticket: Ticket, sprintIdTexto: string): void {
     const sprintId = Number(sprintIdTexto) || null;
     if (Number(ticket.sprintId ?? 0) === Number(sprintId ?? 0)) return;
+    const destino = sprintId
+      ? (this.sprints().find((s) => Number(s.id) === sprintId)?.nombre ?? 'el sprint')
+      : 'Backlog';
     this.data.modificacion<Ticket>('Ticket', { ...ticket, sprintId }).subscribe({
-      next: () => this.cargarSprintsYTickets(),
+      next: () => {
+        this.cargarSprintsYTickets();
+        this.toast.exito(`Ticket movido a ${destino}.`);
+      },
+      error: () => this.toast.error('No se pudo mover el ticket. Intenta de nuevo.'),
     });
   }
 
