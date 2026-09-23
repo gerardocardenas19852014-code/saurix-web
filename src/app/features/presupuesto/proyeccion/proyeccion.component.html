@@ -1,0 +1,82 @@
+<h2>Proyección</h2>
+<p class="hint" style="margin-top:-6px;">
+  Flujo de efectivo a futuro por quincena (1-15 / 16-fin de mes). Cada celda se calcula sola a partir de tus
+  Fijos y Proyección y tus Movimientos; haz clic en cualquier celda de un renglón con nombre de categoría/cuenta
+  para escribir un valor a mano — déjala vacía para que vuelva a calcularse sola.
+</p>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else {
+  <div class="proy-scroll">
+    <table class="proy-tabla">
+      <thead>
+        <tr>
+          <th class="proy-esquina"></th>
+          @for (banda of bandasMes(); track $index) {
+            <th [attr.colspan]="banda.colspan" class="proy-banda-mes">{{ banda.etiqueta }}</th>
+          }
+        </tr>
+        <tr>
+          <th class="proy-esquina">Quincena</th>
+          @for (q of quincenas(); track q.clave) {
+            <th class="proy-col-quincena">{{ q.mitad }}</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (renglon of filasTabla(); track renglon.id) {
+          @switch (renglon.tipo) {
+            @case ('seccion-titulo') {
+              <tr class="proy-fila-seccion">
+                <td [attr.colspan]="quincenas().length + 1">{{ renglon.nombre }}</td>
+              </tr>
+            }
+            @case ('grupo') {
+              <tr class="proy-fila-grupo">
+                <td [attr.colspan]="quincenas().length + 1">{{ renglon.nombre }}</td>
+              </tr>
+            }
+            @default {
+              <tr
+                [class.proy-fila-resumen]="renglon.tipo === 'resumen'"
+                [class.proy-fila-hoja]="renglon.tipo === 'hoja'"
+                [class.proy-fila-subtotal]="renglon.tipo === 'subtotal'"
+                [class.proy-fila-total]="renglon.tipo === 'total'"
+              >
+                <td class="proy-etiqueta">{{ renglon.nombre }}</td>
+                @for (celda of renglon.celdas; track $index) {
+                  @if (estaEditando(renglon.clave, quincenas()[$index].clave)) {
+                    <td class="proy-celda proy-celda-edit">
+                      <input
+                        type="number"
+                        step="0.01"
+                        class="proy-input"
+                        [value]="valorEditando()"
+                        (input)="valorEditando.set($any($event.target).value)"
+                        (blur)="confirmarEdicion()"
+                        (keydown.enter)="confirmarEdicion()"
+                        (keydown.escape)="cancelarEdicion()"
+                      />
+                    </td>
+                  } @else {
+                    <td
+                      class="proy-celda"
+                      [class.proy-celda-editable]="celda.editable"
+                      [class.proy-celda-manual]="celda.manual"
+                      [class.proy-celda-negativa]="celda.valor < 0"
+                      [title]="celda.manual ? 'Valor escrito a mano — déjala vacía al editar para volver al cálculo automático.' : ''"
+                      (click)="celda.editable && iniciarEdicion(renglon.clave, quincenas()[$index].clave, celda.valor)"
+                    >
+                      {{ formatMoneda(celda.valor) }}
+                    </td>
+                  }
+                }
+              </tr>
+            }
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+}

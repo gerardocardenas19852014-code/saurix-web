@@ -73,6 +73,13 @@ const GRUPOS: GrupoModulo[] = [
     titulo: 'Reportes',
     enlaces: [
       {
+        ruta: 'proyeccion',
+        icono: '📈',
+        color: 'teal',
+        titulo: 'Proyección',
+        descripcion: 'Flujo de efectivo a futuro por quincena, editable a mano.',
+      },
+      {
         ruta: 'reportes',
         icono: '📊',
         color: 'teal',

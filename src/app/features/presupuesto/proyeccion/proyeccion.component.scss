@@ -1,0 +1,134 @@
+.proy-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  max-height: calc(100vh - 260px);
+  overflow-y: auto;
+}
+
+.proy-tabla {
+  border-collapse: collapse;
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+  min-width: 100%;
+}
+
+.proy-esquina,
+.proy-banda-mes,
+.proy-col-quincena {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--paper-raised);
+  border-bottom: 1px solid var(--line);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.proy-esquina {
+  left: 0;
+  z-index: 4;
+  min-width: 190px;
+  text-align: left;
+  padding: 6px 10px;
+}
+
+.proy-banda-mes {
+  text-align: center;
+  padding: 6px 10px;
+  color: var(--ink-soft);
+  border-left: 1px solid var(--line);
+}
+
+.proy-col-quincena {
+  text-align: center;
+  padding: 6px 10px;
+  min-width: 92px;
+  border-left: 1px solid var(--line);
+  top: 29px;
+}
+
+.proy-fila-seccion td {
+  background: var(--technical);
+  color: white;
+  font-weight: 700;
+  padding: 7px 10px;
+  letter-spacing: 0.04em;
+}
+
+.proy-fila-grupo td {
+  background: var(--paper-raised);
+  font-weight: 700;
+  padding: 6px 10px;
+  color: var(--ink-soft);
+}
+
+.proy-etiqueta {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--paper);
+  padding: 5px 10px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+}
+
+.proy-fila-resumen .proy-etiqueta,
+.proy-fila-total .proy-etiqueta,
+.proy-fila-subtotal .proy-etiqueta {
+  background: var(--paper-raised);
+  font-weight: 700;
+}
+
+.proy-fila-hoja .proy-etiqueta {
+  padding-left: 24px;
+  color: var(--ink-soft);
+}
+
+.proy-celda {
+  padding: 5px 10px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  color: var(--text-strong);
+}
+
+.proy-fila-resumen .proy-celda,
+.proy-fila-total .proy-celda,
+.proy-fila-subtotal .proy-celda {
+  background: var(--paper-raised);
+  font-weight: 700;
+}
+
+.proy-celda-negativa {
+  color: var(--danger);
+}
+
+.proy-celda-editable {
+  cursor: pointer;
+}
+.proy-celda-editable:hover {
+  outline: 1px solid var(--client);
+  outline-offset: -1px;
+}
+
+.proy-celda-manual {
+  box-shadow: inset 3px 0 0 var(--amber);
+}
+
+.proy-celda-edit {
+  padding: 2px 4px;
+}
+
+.proy-input {
+  width: 84px;
+  padding: 4px 6px;
+  border: 1px solid var(--client);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  text-align: right;
+  background: var(--paper-raised);
+  color: var(--text-strong);
+}

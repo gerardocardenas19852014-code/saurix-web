@@ -8,6 +8,7 @@ import { MetasComponent } from './metas/metas.component';
 import { LimitesComponent } from './limites/limites.component';
 import { ReportesComponent } from './reportes/reportes.component';
 import { CalendarioComponent } from './calendario/calendario.component';
+import { ProyeccionComponent } from './proyeccion/proyeccion.component';
 
 export const PRESUPUESTO_ROUTES: Routes = [
   { path: '', component: PresupuestoInicioComponent },
@@ -19,4 +20,5 @@ export const PRESUPUESTO_ROUTES: Routes = [
   { path: 'limites', component: LimitesComponent },
   { path: 'reportes', component: ReportesComponent },
   { path: 'calendario', component: CalendarioComponent },
+  { path: 'proyeccion', component: ProyeccionComponent },
 ];
