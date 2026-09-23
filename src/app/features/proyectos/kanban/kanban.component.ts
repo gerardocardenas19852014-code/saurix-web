@@ -19,6 +19,7 @@ import {
   TableroColumna,
   TICKET_CAMPOS_CONFIGURABLES,
   parsearConfiguracionCampos,
+  puedeMoverA,
   reglaCampo,
 } from '../tableros/tablero-columna.model';
 import { TicketTipo } from '../ticket-tipos/ticket-tipo.model';
@@ -52,11 +53,16 @@ type TabDetalle =
 type ClaseSla = 'sla-ok' | 'sla-warning' | 'sla-expired';
 
 /**
- * Tablero Kanban por proyecto. El único lugar desde donde se cambia de estado
- * es la barra de estado del detalle del ticket ("Aceptar"/"◀ Regresar"), que
- * exige haber registrado antes una actividad en la columna actual — ver
- * `mover()`. Ambos botones terminan llamando a `moverTicketAColumna`, el único
- * punto que persiste el cambio de columna.
+ * Tablero Kanban por proyecto. El estado se cambia desde dos lugares: la barra
+ * de estado del detalle del ticket ("Aceptar"/"◀ Regresar" — ver `mover()`,
+ * movimiento lineal ±1 en el orden de columnas) o arrastrando la tarjeta a otra
+ * columna del tablero (ver `onDrop()`/`soltarTicket()`, movimiento libre a
+ * cualquier columna permitida). Ambos exigen haber registrado antes una
+ * actividad en la columna actual, y ambos terminan llamando a
+ * `moverTicketAColumna`, el único punto que persiste el cambio de columna. Qué
+ * columnas destino están permitidas desde una columna de origen lo decide
+ * `puedeMoverA()` (configurable por columna en Gestor de Estados → "🔀 Flujo";
+ * sin configurar, se puede mover a cualquiera).
  */
 @Component({
   selector: 'app-kanban',
@@ -134,6 +140,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly ticketActivo = signal<Ticket | null>(null);
   protected readonly ticketAEliminar = signal<Ticket | null>(null);
   protected readonly tabActiva = signal<TabDetalle>('detalles');
+
+  /** Ticket que se está arrastrando en el tablero (drag & drop nativo HTML5, sin librería). */
+  protected readonly ticketArrastrando = signal<Ticket | null>(null);
 
   /** Pestañas del detalle agrupadas bajo el botón "Más ▾" — las 5 que menos se
    *  consultan día a día, para no saturar la fila principal con las 10 juntas
@@ -1011,6 +1020,63 @@ export class KanbanComponent implements OnInit, OnDestroy {
     }
 
     this.moverTicketAColumna(ticket, columnas[indiceDestino].id);
+  }
+
+  // ---------------- Arrastrar y soltar (mover tickets entre columnas del tablero) ----------------
+
+  onDragStart(ticket: Ticket): void {
+    this.ticketArrastrando.set(ticket);
+  }
+
+  onDragEnd(): void {
+    this.ticketArrastrando.set(null);
+  }
+
+  /** Necesario para que el navegador permita soltar sobre la columna (por defecto lo bloquea). */
+  onDragOver(evento: DragEvent): void {
+    if (!this.ticketArrastrando()) return;
+    evento.preventDefault();
+  }
+
+  /** Resalta como destino válido solo las columnas a las que el ticket arrastrado sí puede
+   *  moverse — misma lógica de permisos (`puedeMoverA`) que aplica `soltarTicket()` al soltar. */
+  esDestinoValido(columna: TableroColumna): boolean {
+    const ticket = this.ticketArrastrando();
+    if (!ticket) return false;
+    const origen = this.columnasTablero().find((c) => Number(c.id) === Number(ticket.tableroColumnaId));
+    if (!origen) return false;
+    return puedeMoverA(origen, Number(columna.id));
+  }
+
+  /** Suelta el ticket arrastrado sobre `columnaDestino` — respeta la misma restricción de
+   *  flujo configurada en Gestor de Estados (`puedeMoverA`) y la misma regla de "actividad
+   *  obligatoria antes de cambiar de estado" que `mover()`, para que arrastrar no sea un atajo
+   *  que se salte esa validación. */
+  onDrop(evento: DragEvent, columnaDestino: TableroColumna): void {
+    evento.preventDefault();
+    const ticket = this.ticketArrastrando();
+    this.ticketArrastrando.set(null);
+    if (!ticket) return;
+
+    const origen = this.columnasTablero().find((c) => Number(c.id) === Number(ticket.tableroColumnaId));
+    if (!origen || Number(origen.id) === Number(columnaDestino.id)) return;
+
+    if (!puedeMoverA(origen, Number(columnaDestino.id))) {
+      this.toast.advertencia(`No se puede mover de "${origen.nombre}" a "${columnaDestino.nombre}".`);
+      return;
+    }
+
+    if (
+      this.ticketActivo()?.id === ticket.id &&
+      this.tabsPermitidas().actividades &&
+      !this.tieneActividadDesdeUltimoCambio(ticket)
+    ) {
+      this.tabActiva.set('actividades');
+      this.toast.advertencia('Antes de cambiar de estado es obligatorio registrar una actividad describiendo qué se hizo.');
+      return;
+    }
+
+    this.moverTicketAColumna(ticket, Number(columnaDestino.id));
   }
 
   /** true si ya se registró al menos una Actividad después del último cambio de columna

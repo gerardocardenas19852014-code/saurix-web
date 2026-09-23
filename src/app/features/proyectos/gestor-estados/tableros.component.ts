@@ -12,6 +12,7 @@ import {
   TICKET_CAMPOS_CONFIGURABLES,
   TableroColumna,
   parsearConfiguracionCampos,
+  parsearTransicionesPermitidas,
   reglaCampo,
 } from '../tableros/tablero-columna.model';
 
@@ -65,6 +66,11 @@ export class TablerosComponent implements OnInit {
   protected readonly camposConfigurables = TICKET_CAMPOS_CONFIGURABLES;
   protected readonly columnaCamposEnEdicion = signal<TableroColumna | null>(null);
   protected readonly configuracionCamposEdit = signal<ConfiguracionCamposTicket>({});
+
+  /** "🔀 Flujo" — restringe, por columna, a qué otras columnas se puede mover un ticket
+   *  (arrastrándolo en el Tablero). `null` = sin restricción (se puede mover a cualquiera). */
+  protected readonly columnaFlujoEnEdicion = signal<TableroColumna | null>(null);
+  protected readonly transicionesEdit = signal<Set<number> | null>(null);
 
   protected readonly form = this.fb.nonNullable.group({
     id: [0],
@@ -154,6 +160,7 @@ export class TablerosComponent implements OnInit {
       ...valor,
       proyectoId: this.proyectoSeleccionadoId(),
       configuracionCamposJson: existente?.configuracionCamposJson ?? null,
+      transicionesPermitidasJson: existente?.transicionesPermitidasJson ?? null,
     };
 
     const esEdicion = existente !== null;
@@ -265,6 +272,60 @@ export class TablerosComponent implements OnInit {
       next: () => {
         this.toast.exito('Configuración de campos guardada.');
         this.cerrarCampos();
+        this.cargar();
+      },
+    });
+  }
+
+  // ---------------- "🔀 Flujo" (TransicionesPermitidasJson por columna) ----------------
+
+  /** Las demás columnas del mismo proyecto — candidatas a ser destino permitido desde `columna`. */
+  otrasColumnas(columna: TableroColumna): TableroColumna[] {
+    return this.columnasTablero().filter((c) => c.id !== columna.id);
+  }
+
+  abrirFlujo(columna: TableroColumna): void {
+    this.columnaFlujoEnEdicion.set(columna);
+    const permitidas = parsearTransicionesPermitidas(columna.transicionesPermitidasJson);
+    this.transicionesEdit.set(permitidas === null ? null : new Set(permitidas));
+  }
+
+  cerrarFlujo(): void {
+    this.columnaFlujoEnEdicion.set(null);
+  }
+
+  cancelarFlujo(): void {
+    this.toast.info('Cambios descartados.');
+    this.cerrarFlujo();
+  }
+
+  /** Activa/desactiva la restricción: sin restricción (null) ↔ un set (vacío al activarla). */
+  activarRestriccion(activar: boolean): void {
+    this.transicionesEdit.set(activar ? new Set<number>() : null);
+  }
+
+  toggleTransicion(columnaId: number, marcado: boolean): void {
+    this.transicionesEdit.update((set) => {
+      const nuevo = new Set(set ?? []);
+      if (marcado) {
+        nuevo.add(columnaId);
+      } else {
+        nuevo.delete(columnaId);
+      }
+      return nuevo;
+    });
+  }
+
+  guardarFlujo(): void {
+    const columna = this.columnaFlujoEnEdicion();
+    if (!columna) return;
+
+    const set = this.transicionesEdit();
+    const transicionesPermitidasJson = set === null ? null : JSON.stringify(Array.from(set));
+    this.data.modificacion<TableroColumna>('TableroColumna', { ...columna, transicionesPermitidasJson }).subscribe({
+      next: () => {
+        this.toast.exito('Flujo de columna guardado.');
+        this.cerrarFlujo();
         this.cargar();
       },
     });

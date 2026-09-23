@@ -13,6 +13,16 @@ export interface TableroColumna {
    * Se edita desde Gestión de Proyectos → Gestor de Estados → "⚙ Campos".
    */
   configuracionCamposJson: string | null;
+  /**
+   * IDs de columnas destino a las que se puede mover un ticket DESDE esta
+   * columna arrastrándolo en el Tablero — null (el valor por defecto, y lo
+   * que tienen todas las columnas creadas antes de este campo) significa
+   * "sin restricción configurada": se puede mover a cualquier otra columna.
+   * Un array (aunque esté vacío) SÍ es una restricción real: [] significa
+   * "no se puede mover a ninguna otra desde aquí". Se edita en Gestor de
+   * Estados → "🔀 Flujo" — ver parsearTransicionesPermitidas/puedeMoverA.
+   */
+  transicionesPermitidasJson: string | null;
   activo: boolean;
 }
 
@@ -81,4 +91,28 @@ export function parsearConfiguracionCampos(json: string | null | undefined): Con
 
 export function reglaCampo(config: ConfiguracionCamposTicket, campo: CampoTicketConfigurable): ReglaCampoTicket {
   return config[campo] ?? REGLA_POR_DEFECTO;
+}
+
+/** Parseo defensivo, mismo criterio que parsearConfiguracionCampos: JSON
+ *  inválido o ausente (columna creada antes de este campo, o que nunca
+ *  configuró su flujo) se trata como "sin restricción" (null). */
+export function parsearTransicionesPermitidas(json: string | null | undefined): number[] | null {
+  if (!json) return null;
+  try {
+    const valor = JSON.parse(json);
+    return Array.isArray(valor) ? valor.map(Number) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** true si un ticket puede moverse (arrastrándolo en el Tablero) de
+ *  `columnaOrigen` a la columna con id `columnaDestinoId`. Sin restricción
+ *  configurada (transicionesPermitidasJson null) se puede mover a
+ *  cualquier otra columna — nunca a sí misma. */
+export function puedeMoverA(columnaOrigen: TableroColumna, columnaDestinoId: number): boolean {
+  if (Number(columnaOrigen.id) === Number(columnaDestinoId)) return false;
+  const permitidas = parsearTransicionesPermitidas(columnaOrigen.transicionesPermitidasJson);
+  if (permitidas === null) return true;
+  return permitidas.includes(Number(columnaDestinoId));
 }

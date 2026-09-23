@@ -43,6 +43,9 @@
           <button type="button" class="btn-secondary small" (click)="abrirCampos(columna)" title="Configurar campos del ticket en esta columna" aria-label="Configurar campos del ticket en esta columna">
             ⚙ Campos
           </button>
+          <button type="button" class="btn-secondary small" (click)="abrirFlujo(columna)" title="Configurar a qué columnas se puede mover un ticket desde aquí" aria-label="Configurar flujo de esta columna">
+            🔀 Flujo
+          </button>
           <button type="button" class="btn-secondary small" (click)="editar(columna)">Editar</button>
           <button
             type="button"
@@ -145,6 +148,47 @@
       <div class="modal-actions">
         <button type="button" class="btn-secondary" (click)="cancelarCampos()">Cancelar</button>
         <button type="button" class="btn-primary" (click)="guardarCampos()">Guardar</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (columnaFlujoEnEdicion(); as columna) {
+  <div class="modal-overlay show" (click)="cancelarFlujo()">
+    <div class="modal-box" style="max-width: 520px;" (click)="$event.stopPropagation()">
+      <h3>Flujo — {{ columna.nombre }}</h3>
+      <p class="hint" style="margin: 0 0 16px;">
+        Por defecto, un ticket en esta columna se puede mover a cualquier otra. Actívalo para
+        limitar a solo las columnas que marques (por ejemplo, para no permitir saltarse pasos).
+      </p>
+
+      <label class="checkbox-inline" style="margin-bottom: 14px;">
+        <input
+          type="checkbox"
+          [checked]="transicionesEdit() !== null"
+          (change)="activarRestriccion($any($event.target).checked)"
+        />
+        Restringir a columnas específicas
+      </label>
+
+      @if (transicionesEdit(); as permitidas) {
+        <div class="edit-form" style="margin-bottom: 4px;">
+          @for (otra of otrasColumnas(columna); track otra.id) {
+            <label class="checkbox-inline">
+              <input
+                type="checkbox"
+                [checked]="permitidas.has(otra.id)"
+                (change)="toggleTransicion(otra.id, $any($event.target).checked)"
+              />
+              {{ otra.nombre }}
+            </label>
+          }
+        </div>
+      }
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="cancelarFlujo()">Cancelar</button>
+        <button type="button" class="btn-primary" (click)="guardarFlujo()">Guardar</button>
       </div>
     </div>
   </div>
