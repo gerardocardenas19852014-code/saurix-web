@@ -43,6 +43,11 @@ export class RecurrentesComponent implements OnInit {
   protected readonly frecuencias = signal<ValorLista[]>([]);
   protected readonly cargando = signal(false);
 
+  /** Cuántos ciclos futuros generar de una vez con "Generar futuros"
+   *  (meses si la frecuencia no es Anual; años si lo es). */
+  protected readonly nCiclosAGenerar = signal(6);
+  protected readonly generandoFuturos = signal(false);
+
   protected readonly modalAbierto = signal(false);
   protected readonly enEdicion = signal<MovimientoRecurrentePresupuesto | null>(null);
   protected readonly aEliminar = signal<MovimientoRecurrentePresupuesto | null>(null);
@@ -240,6 +245,90 @@ export class RecurrentesComponent implements OnInit {
     this.data.alta<MovimientoPresupuesto>('MovimientoPresupuesto', payload).subscribe({
       next: () => {
         this.toast.exito('Movimiento registrado para este ciclo.');
+        this.cargar();
+      },
+    });
+  }
+
+  /** Fecha (clampada al último día de ese mes/año) del ciclo que cae N pasos
+   *  adelante de hoy: N meses adelante si no es Anual, N años adelante si lo
+   *  es (anclado al mes de creación del fijo) — mismo criterio que
+   *  proximaFechaMensual/proximaFechaAnual del Calendario, solo que aquí se
+   *  necesita la lista completa de ciclos futuros, no solo el próximo. */
+  private fechaDelCiclo(fila: MovimientoRecurrentePresupuesto, pasos: number, hoy: Date): { fecha: string; ciclo: string } {
+    if (fila.frecuencia === 'Anual') {
+      const mesAncla = this.mesAncla(fila);
+      const anio = hoy.getFullYear() + pasos;
+      const ultimoDia = new Date(anio, mesAncla + 1, 0).getDate();
+      const fecha = new Date(anio, mesAncla, Math.min(fila.diaDelMes, ultimoDia));
+      return { fecha: fecha.toISOString().slice(0, 10), ciclo: `${anio}` };
+    }
+    const base = new Date(hoy.getFullYear(), hoy.getMonth() + pasos, 1);
+    const ultimoDia = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+    const fecha = new Date(base.getFullYear(), base.getMonth(), Math.min(fila.diaDelMes, ultimoDia));
+    return { fecha: fecha.toISOString().slice(0, 10), ciclo: `${base.getFullYear()}-${base.getMonth() + 1}` };
+  }
+
+  /** "Generar futuros": crea de una vez los MovimientoPresupuesto de los
+   *  próximos N ciclos (empezando por el actual si aún no está registrado),
+   *  con la fecha de cada ciclo ya clampada al último día de su mes/año —
+   *  así un fijo con día 31, por ejemplo, no truena en febrero ni en ningún
+   *  mes de 30 días: simplemente cae en el último día disponible de ese mes.
+   *  Salta cualquier ciclo que ya tenga su movimiento (no duplica). */
+  generarFuturos(fila: MovimientoRecurrentePresupuesto): void {
+    const n = Math.max(1, Math.min(60, Math.trunc(this.nCiclosAGenerar()) || 1));
+    const hoy = new Date();
+
+    const ciclosYaRegistrados = new Set(
+      this.movimientosOrigen()
+        .filter((m) => Number(m.origenRecurrenteId) === Number(fila.id))
+        .map((m) => this.cicloDeFecha(m.fecha, fila.frecuencia)),
+    );
+
+    const pendientes: { fecha: string; ciclo: string }[] = [];
+    for (let pasos = 0; pasos < n; pasos++) {
+      const candidato = this.fechaDelCiclo(fila, pasos, hoy);
+      if (!ciclosYaRegistrados.has(candidato.ciclo)) pendientes.push(candidato);
+    }
+
+    if (pendientes.length === 0) {
+      this.toast.info('Esos ciclos ya estaban generados.');
+      return;
+    }
+
+    this.generandoFuturos.set(true);
+    this.generarSiguientePendiente(fila, pendientes, 0);
+  }
+
+  /** Alta secuencial de uno por uno — el DataClientService no tiene alta en
+   *  lote, así que se encadenan en vez de disparar N peticiones a la vez. */
+  private generarSiguientePendiente(
+    fila: MovimientoRecurrentePresupuesto,
+    pendientes: { fecha: string; ciclo: string }[],
+    indice: number,
+  ): void {
+    if (indice >= pendientes.length) {
+      this.generandoFuturos.set(false);
+      this.toast.exito(`${pendientes.length} movimiento(s) futuro(s) generado(s).`);
+      this.cargar();
+      return;
+    }
+    const payload = {
+      fecha: pendientes[indice].fecha,
+      tipo: fila.tipo,
+      cuentaPresupuestoId: Number(fila.cuentaPresupuestoId),
+      categoriaPresupuestoId: fila.categoriaPresupuestoId ? Number(fila.categoriaPresupuestoId) : null,
+      monto: fila.monto,
+      descripcion: fila.descripcion,
+      transferenciaId: null,
+      origenRecurrenteId: fila.id,
+      creadoPorUsuarioId: this.usuarioActualId,
+    };
+    this.data.alta<MovimientoPresupuesto>('MovimientoPresupuesto', payload).subscribe({
+      next: () => this.generarSiguientePendiente(fila, pendientes, indice + 1),
+      error: () => {
+        this.generandoFuturos.set(false);
+        this.toast.error(`Se generaron ${indice} de ${pendientes.length}; ocurrió un error y se detuvo.`);
         this.cargar();
       },
     });

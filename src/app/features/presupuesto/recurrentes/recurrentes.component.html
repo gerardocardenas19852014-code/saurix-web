@@ -55,6 +55,35 @@
         <p class="hint" style="margin:-8px 0 14px;">
           Ciclo actual: {{ estadoCiclo(fijo) === 'registrado' ? '✓ ya registrado' : estadoCiclo(fijo) === 'pendiente' ? '⚠ pendiente de registrar' : '· próximo' }}
         </p>
+
+        <div class="settings-card" style="margin:0 0 18px; padding:14px 16px;">
+          <p class="hint" style="margin:0 0 10px;">
+            Genera de una vez los movimientos de los próximos ciclos (salta los que ya estén registrados).
+            El día se ajusta solo al último día de cada {{ fijo.frecuencia === 'Anual' ? 'año' : 'mes' }} cuando no alcanza.
+          </p>
+          <div style="display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap;">
+            <label style="display:flex; flex-direction:column; gap:6px; font-size:13px;">
+              {{ fijo.frecuencia === 'Anual' ? 'Años' : 'Meses' }} a generar
+              <input
+                type="number"
+                min="1"
+                max="60"
+                [value]="nCiclosAGenerar()"
+                (input)="nCiclosAGenerar.set(+$any($event.target).value)"
+                style="width:90px;"
+              />
+            </label>
+            <button
+              type="button"
+              class="btn-secondary small"
+              [disabled]="generandoFuturos()"
+              (click)="generarFuturos(fijo)"
+            >
+              {{ generandoFuturos() ? 'Generando…' : '📅 Generar futuros' }}
+            </button>
+          </div>
+        </div>
+
         <app-adjuntos-panel entidad="MovimientoRecurrentePresupuestoAdjunto" campoPadre="movimientoRecurrentePresupuestoId" [padreId]="fijo.id" />
       }
 
