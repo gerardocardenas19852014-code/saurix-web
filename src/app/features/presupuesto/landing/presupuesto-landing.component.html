@@ -1,16 +1,113 @@
 <div class="page-header">
   <h1>Presupuesto</h1>
 </div>
-<p class="hint" style="margin-top:-12px;">
-  Las categorías y cuentas se administran desde Catálogos; aquí van tus movimientos personales.
-</p>
 
 <div class="dashboard-stats">
-  <div class="dashboard-stat-card"><div class="num">{{ formatMoneda(saldoTotal()) }}</div><div class="label">Saldo total</div></div>
-  <div class="dashboard-stat-card dashboard-stat-danger"><div class="num">{{ formatMoneda(gastosDelMes()) }}</div><div class="label">Gastos del mes</div></div>
-  <div class="dashboard-stat-card"><div class="num">{{ cuentas().length }}</div><div class="label">Cuentas</div></div>
+  <div class="dashboard-stat-card">
+    <div class="num">{{ formatMoneda(saldoTotal()) }}</div>
+    <div class="label">Saldo total</div>
+  </div>
+  <div class="dashboard-stat-card">
+    <div class="num">{{ formatMoneda(ingresosDelMes()) }}</div>
+    <div class="label">Ingresos del mes</div>
+  </div>
+  <div class="dashboard-stat-card dashboard-stat-danger">
+    <div class="num">{{ formatMoneda(gastosDelMes()) }}</div>
+    <div class="label">Gastos del mes</div>
+  </div>
+  @if (hayVariasTarjetas()) {
+    <div class="dashboard-stat-card dashboard-stat-danger">
+      <div class="num">{{ formatMoneda(deudaTotalTarjetas()) }}</div>
+      <div class="label">Deuda en tarjetas</div>
+    </div>
+  }
 </div>
 
+@if (inusuales().length > 0) {
+  <div class="wallet-alert-block">
+    <strong>⚠ Gasto inusual este mes</strong>
+    <ul>
+      @for (g of inusuales(); track g.categoriaId) {
+        <li>{{ g.nombreCategoria }}: {{ formatMoneda(g.montoMes) }} — {{ g.veces | number: '1.1-1' }}× tu promedio de {{ formatMoneda(g.promedio) }} (últimos 3 meses)</li>
+      }
+    </ul>
+  </div>
+}
+
+<h2 class="settings-card-title" style="margin:0 0 4px;">Cuentas</h2>
+<p class="hint" style="margin:0 0 12px;">Las categorías y cuentas se administran desde Catálogos.</p>
+<div class="wallet-accounts-grid" style="margin-bottom:28px;">
+  @for (c of cuentasConInfo(); track c.cuenta.id) {
+    <div class="wallet-account-card" style="cursor:default;">
+      <span class="wallet-account-icon">{{ iconoTipoCuenta(c.cuenta.tipo) }}</span>
+      <div class="wallet-account-name">{{ c.cuenta.nombre }}</div>
+      @if (c.esTarjeta && c.info) {
+        <div class="wallet-account-balance">{{ formatMoneda(c.info.deuda) }}</div>
+        <span class="hint" style="margin:0;">de deuda</span>
+        @if (c.cuenta.limiteCredito) {
+          <div class="wallet-limit-track" style="margin:10px 0 4px;">
+            <div
+              class="wallet-limit-fill"
+              [class.wallet-limit-fill-ok]="nivelUso(c.info.pctUso) === 'ok'"
+              [class.wallet-limit-fill-warn]="nivelUso(c.info.pctUso) === 'warn'"
+              [class.wallet-limit-fill-over]="nivelUso(c.info.pctUso) === 'over'"
+              [style.width.%]="c.info.pctUso"
+            ></div>
+          </div>
+          <span class="hint" style="margin:0;">{{ c.info.pctUso | number: '1.0-0' }}% usado · disponible {{ formatMoneda(c.info.disponible ?? 0) }}</span>
+        }
+        @if (c.cuenta.diaPago) {
+          <div class="hint" style="margin:6px 0 0;">Corte día {{ c.cuenta.diaCorte }} · paga día {{ c.cuenta.diaPago }}</div>
+        }
+        @if (c.info.deuda > 0) {
+          <div>
+            <button type="button" class="btn-primary small" style="margin-top:10px;" (click)="pagarTarjeta(c)">💳 Pagar tarjeta</button>
+          </div>
+        }
+      } @else {
+        <div class="wallet-account-balance">{{ formatMoneda(c.saldo) }}</div>
+      }
+    </div>
+  } @empty {
+    <div class="empty-state-block"><p>Aún no hay cuentas — créalas desde Catálogos.</p></div>
+  }
+</div>
+
+@if (topCategorias().length > 0) {
+  <h2 class="settings-card-title" style="margin:0 0 12px;">Top categorías del mes</h2>
+  <div style="margin-bottom:28px;">
+    @for (c of topCategorias(); track c.id) {
+      <div class="wallet-cat-bar-row">
+        <span class="wallet-cat-bar-name" [title]="c.nombre">{{ c.nombre }}</span>
+        <div class="wallet-cat-bar-track">
+          <div class="wallet-cat-bar-fill" [style.width.%]="(c.monto / maxTopCategoria()) * 100" [style.background]="c.color"></div>
+        </div>
+        <span class="wallet-cat-bar-amount">{{ formatMoneda(c.monto) }}</span>
+      </div>
+    }
+  </div>
+}
+
+@if (movimientosRecientes().length > 0) {
+  <h2 class="settings-card-title" style="margin:0 0 12px;">Movimientos recientes</h2>
+  <ul class="wallet-tx-list" style="margin-bottom:12px;">
+    @for (r of movimientosRecientes(); track r.movimiento.id) {
+      <li class="wallet-tx-item" style="cursor:default;">
+        <span class="wallet-tx-cat-dot" [style.background]="colorCategoria(r.movimiento.categoriaPresupuestoId)"></span>
+        <div class="wallet-tx-body">
+          <strong>{{ r.movimiento.descripcion || r.nombreCategoria }}</strong>
+          <span class="hint" style="margin:0;">{{ r.nombreCuenta }} · {{ r.nombreCategoria }} · {{ r.movimiento.fecha | date: 'dd/MM/yyyy' }}</span>
+        </div>
+        <span class="wallet-tx-amount" [class.wallet-tx-amount-in]="r.movimiento.tipo === 'Ingreso'" [class.wallet-tx-amount-out]="r.movimiento.tipo === 'Gasto'">
+          {{ r.movimiento.tipo === 'Ingreso' ? '+' : '-' }}{{ formatMoneda(r.movimiento.monto) }}
+        </span>
+      </li>
+    }
+  </ul>
+  <a routerLink="movimientos" class="workspace-card-enter" style="display:inline-block; margin-bottom:28px;">Ver todos los movimientos →</a>
+}
+
+<h2 class="settings-card-title" style="margin:0 0 12px;">Accesos</h2>
 <div class="catalog-list">
   @for (enlace of enlaces; track enlace.ruta) {
     <a class="catalog-list-item" [routerLink]="enlace.ruta">
