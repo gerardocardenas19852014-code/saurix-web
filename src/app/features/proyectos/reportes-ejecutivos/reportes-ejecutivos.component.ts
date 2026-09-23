@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
 import { DataClientService } from '../../../core/services/data-client.service';
+import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
+import { ColumnaCsv, exportarCsv } from '../../../shared/utils/csv.util';
 import { colorBadgeFondo, colorBadgeTexto } from '../kanban/avatar.util';
 import { Ticket, TicketHistorialEstado, UsuarioOpcion } from '../kanban/ticket.model';
 import { Sprint } from '../sprints/sprint.model';
@@ -72,7 +73,7 @@ const COLORES_SERIE = ['var(--indigo)', 'var(--amber)', 'var(--teal)', 'var(--da
 })
 export class ReportesEjecutivosComponent implements OnInit {
   private readonly data = inject(DataClientService);
-  private readonly router = inject(Router);
+  protected readonly preferenciasGrid = inject(PreferenciasGridService);
   private readonly MS_POR_DIA = 86400000;
 
   protected readonly cargando = signal(false);
@@ -158,11 +159,35 @@ export class ReportesEjecutivosComponent implements OnInit {
     return this.columnas().find((c) => Number(c.id) === Number(id))?.nombre ?? '—';
   }
 
-  /** Abre el ticket en el Tablero Kanban (mismo deep link ?ticket=id que usan
-   *  Balanceo/Backlog/Mi Dashboard) — para poder saltar de la lista del sprint
-   *  directo al detalle del ticket. */
-  protected abrirTicket(ticket: Ticket): void {
-    this.router.navigate(['/proyectos/tablero'], { queryParams: { ticket: ticket.id } });
+  /** Recorta la lista de tickets del sprint a lo que la preferencia "Registros
+   *  por página" (Panel de Control → Apariencia → Tablas y listados) diga mostrar
+   *  — mismo servicio/convención que ya usan Usuarios y el resto de los listados
+   *  del sistema (PreferenciasGridService). El CSV exporta siempre todos. */
+  protected ticketsVisibles(tickets: Ticket[]): Ticket[] {
+    return tickets.slice(0, this.preferenciasGrid.tamanoPagina());
+  }
+
+  protected exportarTicketsSprintCsv(sprint: Sprint, tickets: Ticket[]): void {
+    const filas = tickets.map((t) => ({
+      ...t,
+      estadoTexto: this.nombreColumna(t.tableroColumnaId),
+      prioridadTexto: this.nombrePrioridad(t.ticketPrioridadId),
+      asignadoTexto: this.nombreUsuario(t.asignadoUsuarioId),
+      horasTexto: this.horasDeTicket(t),
+    }));
+
+    const columnas: ColumnaCsv<(typeof filas)[number]>[] = [
+      { clave: 'numeroTicket', etiqueta: 'Folio' },
+      { clave: 'folioInterno', etiqueta: 'Folio interno' },
+      { clave: 'titulo', etiqueta: 'Título' },
+      { clave: 'estadoTexto', etiqueta: 'Estado' },
+      { clave: 'prioridadTexto', etiqueta: 'Prioridad' },
+      { clave: 'asignadoTexto', etiqueta: 'Asignado a' },
+      { clave: 'horasTexto', etiqueta: 'Horas est.' },
+    ];
+
+    const nombreArchivo = `sprint-${sprint.nombre}-tickets.csv`.replace(/[^a-z0-9.\-]+/gi, '-');
+    exportarCsv(nombreArchivo, columnas, filas);
   }
 
   protected cambiarPestana(p: Pestana): void {

@@ -239,15 +239,35 @@
           {{ reporte.horasResueltas }} de {{ reporte.horasTotales }} horas estimadas completadas.
         </p>
 
-        <h3 style="margin: 20px 0 8px;">Tickets del sprint</h3>
+        <div class="panel-head" style="margin: 20px 0 8px;">
+          <h3 style="margin:0;">Tickets del sprint</h3>
+          @if (reporte.tickets.length > 0) {
+            <button
+              type="button"
+              class="btn-secondary small toolbar-icon-button"
+              title="Exportar CSV"
+              aria-label="Exportar tickets del sprint a CSV"
+              (click)="exportarTicketsSprintCsv(reporte.sprint, reporte.tickets)"
+            >
+              ⬇️
+            </button>
+          }
+        </div>
         @if (reporte.tickets.length === 0) {
           <p class="empty">Este sprint todavía no tiene tickets.</p>
         } @else {
+          @if (reporte.tickets.length > preferenciasGrid.tamanoPagina()) {
+            <p class="hint" style="margin: 0 0 8px;">
+              Mostrando los primeros {{ preferenciasGrid.tamanoPagina() }} de {{ reporte.tickets.length }} —
+              cambia cuántos ver en Panel de Control → Apariencia → Tablas y listados. El CSV exporta todos.
+            </p>
+          }
           <div class="grid-table-scroll">
             <table class="grid-table">
               <thead>
                 <tr>
                   <th>Folio</th>
+                  <th>Folio interno</th>
                   <th>Título</th>
                   <th>Estado</th>
                   <th>Prioridad</th>
@@ -256,17 +276,10 @@
                 </tr>
               </thead>
               <tbody>
-                @for (t of reporte.tickets; track t.id) {
-                  <tr
-                    class="dashboard-row"
-                    role="button"
-                    tabindex="0"
-                    [attr.aria-label]="'Abrir ticket ' + t.numeroTicket"
-                    (click)="abrirTicket(t)"
-                    (keydown.enter)="abrirTicket(t)"
-                    (keydown.space)="$event.preventDefault(); abrirTicket(t)"
-                  >
+                @for (t of ticketsVisibles(reporte.tickets); track t.id) {
+                  <tr>
                     <td data-label="Folio">{{ t.numeroTicket }}</td>
+                    <td data-label="Folio interno">{{ t.folioInterno || '—' }}</td>
                     <td data-label="Título"><span [title]="t.titulo">{{ t.titulo }}</span></td>
                     <td data-label="Estado">
                       <span class="grid-badge" [class.grid-badge-success]="estaResuelto(t)" [class.grid-badge-neutral]="!estaResuelto(t)">
