@@ -63,6 +63,26 @@
           </p>
           <div style="display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap;">
             <label style="display:flex; flex-direction:column; gap:6px; font-size:13px;">
+              Desde
+              @if (fijo.frecuencia === 'Anual') {
+                <input
+                  type="number"
+                  min="2000"
+                  max="2100"
+                  [value]="anioInicioGenerar()"
+                  (input)="anioInicioGenerar.set(+$any($event.target).value)"
+                  style="width:100px;"
+                />
+              } @else {
+                <input
+                  type="month"
+                  [value]="mesInicioGenerar()"
+                  (input)="mesInicioGenerar.set($any($event.target).value)"
+                  style="width:150px;"
+                />
+              }
+            </label>
+            <label style="display:flex; flex-direction:column; gap:6px; font-size:13px;">
               {{ fijo.frecuencia === 'Anual' ? 'Años' : 'Meses' }} a generar
               <input
                 type="number"

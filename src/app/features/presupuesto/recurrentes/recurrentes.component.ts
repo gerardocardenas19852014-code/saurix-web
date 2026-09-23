@@ -47,6 +47,12 @@ export class RecurrentesComponent implements OnInit {
   /** Cuántos ciclos futuros generar de una vez con "Generar futuros"
    *  (meses si la frecuencia no es Anual; años si lo es). */
   protected readonly nCiclosAGenerar = signal(6);
+  /** Desde cuándo empieza a contar "Generar futuros" — por defecto el mes/año
+   *  actual, pero el usuario puede adelantarlo o atrasarlo (p.ej. un fijo que
+   *  arranca hasta dentro de unos meses, o retomar la generación desde donde
+   *  se quedó en vez de siempre desde hoy). */
+  protected readonly mesInicioGenerar = signal('');
+  protected readonly anioInicioGenerar = signal(new Date().getFullYear());
   protected readonly generandoFuturos = signal(false);
 
   protected readonly modalAbierto = signal(false);
@@ -333,18 +339,46 @@ export class RecurrentesComponent implements OnInit {
     return texto.charAt(0).toUpperCase() + texto.slice(1);
   }
 
+  /** Punto de partida para "Generar futuros" — el mes/año que el usuario
+   *  eligió en "Desde" (por defecto el actual, ver resetearDesdeGenerar). */
+  private baseGenerar(fila: MovimientoRecurrentePresupuesto): Date {
+    if (fila.frecuencia === 'Anual') {
+      const anio = this.anioInicioGenerar() || new Date().getFullYear();
+      return new Date(anio, this.mesAncla(fila), 1);
+    }
+    const texto = this.mesInicioGenerar();
+    if (!texto) return new Date();
+    const [anioTexto, mesTexto] = texto.split('-');
+    const anio = Number(anioTexto);
+    const mes = Number(mesTexto) - 1;
+    if (!Number.isFinite(anio) || !Number.isFinite(mes)) return new Date();
+    return new Date(anio, mes, 1);
+  }
+
+  /** Reinicia "Desde" al mes/año actual — se llama al abrir el modal (nuevo
+   *  o editar) para que cada fijo arranque mostrando "hoy" salvo que el
+   *  usuario lo cambie a mano. */
+  private resetearDesdeGenerar(): void {
+    const hoy = new Date();
+    this.mesInicioGenerar.set(`${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`);
+    this.anioInicioGenerar.set(hoy.getFullYear());
+  }
+
   /** Texto para el modal: a qué meses/años (y de cuál a cuál) aplicará
-   *  "Generar futuros" con el número de ciclos actualmente escrito —
-   *  así no hay que adivinar qué cubre un número a secas como "6". */
+   *  "Generar futuros" con el número de ciclos y el "Desde" actualmente
+   *  escritos — así no hay que adivinar qué cubre un número a secas como "6". */
   protected readonly rangoAGenerar = computed<string>(() => {
     const fila = this.enEdicion();
     if (!fila) return '';
+    // computed() debe leer las señales de "Desde" para recalcular cuando cambian
+    this.mesInicioGenerar();
+    this.anioInicioGenerar();
     const n = Math.max(1, Math.min(60, Math.trunc(this.nCiclosAGenerar()) || 1));
-    const hoy = new Date();
-    const primero = this.fechaDelCiclo(fila, 0, hoy);
+    const base = this.baseGenerar(fila);
+    const primero = this.fechaDelCiclo(fila, 0, base);
     const etiquetaPrimero = this.etiquetaCiclo(primero.ciclo, fila.frecuencia);
     if (n === 1) return fila.frecuencia === 'Anual' ? `año ${etiquetaPrimero}` : etiquetaPrimero;
-    const ultimo = this.fechaDelCiclo(fila, n - 1, hoy);
+    const ultimo = this.fechaDelCiclo(fila, n - 1, base);
     const etiquetaUltimo = this.etiquetaCiclo(ultimo.ciclo, fila.frecuencia);
     return fila.frecuencia === 'Anual' ? `años ${etiquetaPrimero} a ${etiquetaUltimo}` : `de ${etiquetaPrimero} a ${etiquetaUltimo}`;
   });
@@ -357,7 +391,7 @@ export class RecurrentesComponent implements OnInit {
    *  Salta cualquier ciclo que ya tenga su movimiento (no duplica). */
   generarFuturos(fila: MovimientoRecurrentePresupuesto): void {
     const n = Math.max(1, Math.min(60, Math.trunc(this.nCiclosAGenerar()) || 1));
-    const hoy = new Date();
+    const hoy = this.baseGenerar(fila);
 
     const ciclosYaRegistrados = new Set(
       this.movimientosOrigen()
@@ -421,11 +455,13 @@ export class RecurrentesComponent implements OnInit {
   nuevo(): void {
     this.enEdicion.set(null);
     this.form.reset({ id: 0, descripcion: '', tipo: 'Gasto', cuentaPresupuestoId: 0, categoriaPresupuestoId: 0, monto: 0, frecuencia: 'Mensual', diaDelMes: 1 });
+    this.resetearDesdeGenerar();
     this.modalAbierto.set(true);
   }
 
   editar(item: MovimientoRecurrentePresupuesto): void {
     this.enEdicion.set(item);
+    this.resetearDesdeGenerar();
     this.form.reset({
       id: item.id,
       descripcion: item.descripcion,
