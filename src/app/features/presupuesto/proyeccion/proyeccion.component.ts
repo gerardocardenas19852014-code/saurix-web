@@ -7,7 +7,7 @@ import { CategoriaPresupuesto } from '../../catalogos/categoria-presupuesto/cate
 import { CuentaPresupuesto } from '../../catalogos/cuenta-presupuesto/cuenta-presupuesto.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
 import { MovimientoRecurrentePresupuesto } from '../recurrentes/recurrente.model';
-import { formatMoneda } from '../shared/wallet.util';
+import { formatMoneda, textoFechaDeLocal } from '../shared/wallet.util';
 import { PresupuestoAnual } from '../../catalogos/presupuesto-anual/presupuesto-anual.model';
 import { ProyeccionAjuste } from './proyeccion-ajuste.model';
 
@@ -563,11 +563,26 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
     this.editando.set(null);
   }
 
+  /** Claves de categoría de Ingreso/Gasto (ej. "gas:12") — SOLO estas
+   *  editan/crean/borran el MovimientoPresupuesto real de esa quincena en
+   *  vez de un ProyeccionAjuste (ver confirmarEdicionMovimiento). Las demás
+   *  (Ahorro "aho:X", Saldo inicial, etc.) siguen usando el ajuste manual
+   *  de siempre — no hay forma segura de resolver "el" movimiento cuando
+   *  la celda es neta de varios movimientos con signos distintos. */
+  private static readonly RE_CATEGORIA = /^(ing|gas):(\d+)$/;
+
   protected confirmarEdicion(): void {
     const objetivo = this.editando();
     if (!objetivo) return;
     const texto = this.valorEditando().trim();
     this.editando.set(null);
+
+    const match = objetivo.clave.match(ProyeccionComponent.RE_CATEGORIA);
+    if (match) {
+      this.confirmarEdicionMovimiento(match[1] as 'ing' | 'gas', Number(match[2]), objetivo.quincenaClave, texto);
+      return;
+    }
+
     if (texto === '') {
       this.quitarAjuste(objetivo.clave, objetivo.quincenaClave);
       return;
@@ -600,6 +615,155 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       next: () => {
         this.ajustes.update((lista) => lista.filter((a) => a.id !== existente.id));
       },
+    });
+  }
+
+  /** El Fijo (si hay exactamente uno, sin movimiento propio todavía) que
+   *  explica el valor automático de esta celda — para poder ligarle un
+   *  MovimientoPresupuesto real cuando el usuario captura un monto ahí. */
+  private fijoParaCelda(categoriaId: number, prefijo: 'ing' | 'gas', q: Quincena): MovimientoRecurrentePresupuesto | undefined {
+    const tipo = prefijo === 'ing' ? 'Ingreso' : 'Gasto';
+    return this.recurrentes().find(
+      (f) =>
+        f.activo !== false &&
+        f.tipo === tipo &&
+        Number(f.categoriaPresupuestoId) === categoriaId &&
+        this.fijoFiraEnQuincena(f, q) &&
+        !this.movimientos().some(
+          (m) => m.origenRecurrenteId != null && Number(m.origenRecurrenteId) === Number(f.id) && this.quincenaDeFecha(m.fecha) === q.clave,
+        ),
+    );
+  }
+
+  /** Edita/crea/borra el MovimientoPresupuesto real de una celda de
+   *  categoría Ingreso/Gasto (en vez de un ProyeccionAjuste aparte):
+   *  - Si ya hay un movimiento real de esa categoría en esa quincena, se
+   *    edita (o se borra, si se deja vacía). Si hay más de uno, se toca
+   *    solo el más reciente y se avisa.
+   *  - Si no hay movimiento pero SÍ un Fijo que la explica (aún no
+   *    generado para esa quincena), se crea un movimiento ligado a ese
+   *    Fijo (origenRecurrenteId), marcado "proyectado" — igual que
+   *    "Generar futuros".
+   *  - Si no hay ni movimiento ni Fijo, se crea un movimiento suelto,
+   *    usando la única cuenta que históricamente haya usado esta
+   *    categoría; si no se puede identificar una sola cuenta, se guarda
+   *    como ajuste manual (comportamiento anterior) y se avisa. */
+  private confirmarEdicionMovimiento(prefijo: 'ing' | 'gas', categoriaId: number, quincenaClave: string, texto: string): void {
+    const clave = `${prefijo}:${categoriaId}`;
+    const q = this.quincenas().find((qq) => qq.clave === quincenaClave);
+    if (!q) return;
+
+    const tipo = prefijo === 'ing' ? 'Ingreso' : 'Gasto';
+    const existentes = this.movimientos()
+      .filter(
+        (m) =>
+          !m.transferenciaId &&
+          m.tipo === tipo &&
+          Number(m.categoriaPresupuestoId) === categoriaId &&
+          this.quincenaDeFecha(m.fecha) === quincenaClave,
+      )
+      .sort((a, b) => {
+        const claveA = a.fechaModificacion ?? a.fechaCreacion ?? '';
+        const claveB = b.fechaModificacion ?? b.fechaCreacion ?? '';
+        return claveB.localeCompare(claveA) || Number(b.id) - Number(a.id);
+      });
+
+    if (existentes.length > 1) {
+      this.toast.advertencia(
+        `Esta celda junta ${existentes.length} movimientos — se edita solo el más reciente ("${existentes[0].descripcion}"). Los demás se editan desde Movimientos.`,
+      );
+    }
+
+    if (texto === '') {
+      if (existentes.length > 0) {
+        const objetivo = existentes[0];
+        this.data.baja('MovimientoPresupuesto', objetivo.id).subscribe({
+          next: () => {
+            this.movimientos.update((lista) => lista.filter((m) => m.id !== objetivo.id));
+            this.toast.exito('Movimiento eliminado.');
+          },
+          error: () => this.toast.error('No se pudo eliminar el movimiento.'),
+        });
+        return;
+      }
+      // No hay movimiento real (puede que el valor visible fuera de un
+      // ajuste manual de antes de este cambio) — se limpia por si acaso.
+      this.quitarAjuste(clave, quincenaClave);
+      return;
+    }
+
+    const monto = Number(texto);
+    if (!Number.isFinite(monto)) {
+      this.toast.error('Ese valor no es un número válido.');
+      return;
+    }
+
+    if (existentes.length > 0) {
+      const objetivo = existentes[0];
+      this.data.modificacion<MovimientoPresupuesto>('MovimientoPresupuesto', { ...objetivo, monto }).subscribe({
+        next: (actualizado) => {
+          this.movimientos.update((lista) => lista.map((m) => (m.id === actualizado.id ? actualizado : m)));
+          this.toast.exito('Movimiento actualizado.');
+        },
+        error: () => this.toast.error('No se pudo actualizar el movimiento.'),
+      });
+      return;
+    }
+
+    const fijo = this.fijoParaCelda(categoriaId, prefijo, q);
+    if (fijo) {
+      const ultimoDia = new Date(q.anio, q.mes + 1, 0).getDate();
+      const dia = Math.min(fijo.diaDelMes, ultimoDia);
+      const payload = {
+        fecha: textoFechaDeLocal(q.anio, q.mes, dia),
+        tipo: fijo.tipo,
+        cuentaPresupuestoId: Number(fijo.cuentaPresupuestoId),
+        categoriaPresupuestoId: categoriaId,
+        monto,
+        descripcion: fijo.descripcion,
+        transferenciaId: null,
+        origenRecurrenteId: fijo.id,
+        proyectado: true,
+        creadoPorUsuarioId: this.usuarioActualId,
+      };
+      this.data.alta<MovimientoPresupuesto>('MovimientoPresupuesto', payload).subscribe({
+        next: (creado) => {
+          this.movimientos.update((lista) => [...lista, creado]);
+          this.toast.exito(`Movimiento creado y ligado al fijo "${fijo.descripcion}".`);
+        },
+        error: () => this.toast.error('No se pudo crear el movimiento.'),
+      });
+      return;
+    }
+
+    const cuentaIds = [...(this.valoresAuto().cuentasPorClave.get(clave) ?? [])].filter((id) => id !== 0);
+    if (cuentaIds.length !== 1) {
+      this.guardarAjuste(clave, quincenaClave, monto);
+      this.toast.advertencia(
+        'No se identificó una sola cuenta para esta categoría; se guardó como valor manual (no crea movimiento). Captúralo desde Movimientos para ligarlo a una cuenta.',
+      );
+      return;
+    }
+
+    const diaInicio = q.mitad === 1 ? 1 : 16;
+    const payload = {
+      fecha: textoFechaDeLocal(q.anio, q.mes, diaInicio),
+      tipo,
+      cuentaPresupuestoId: cuentaIds[0],
+      categoriaPresupuestoId: categoriaId,
+      monto,
+      descripcion: this.categorias().find((c) => Number(c.id) === categoriaId)?.nombre ?? '',
+      transferenciaId: null,
+      origenRecurrenteId: null,
+      proyectado: false,
+      creadoPorUsuarioId: this.usuarioActualId,
+    };
+    this.data.alta<MovimientoPresupuesto>('MovimientoPresupuesto', payload).subscribe({
+      next: (creado) => {
+        this.movimientos.update((lista) => [...lista, creado]);
+        this.toast.exito('Movimiento creado.');
+      },
+      error: () => this.toast.error('No se pudo crear el movimiento.'),
     });
   }
 }
