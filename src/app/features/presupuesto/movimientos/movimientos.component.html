@@ -5,34 +5,77 @@
   </div>
 </div>
 
-<h2 class="settings-card-title" style="margin:0 0 12px;">Cuentas</h2>
-<div class="wallet-accounts-grid" style="margin-bottom:28px;">
-  @for (cuenta of cuentas(); track cuenta.id) {
-    <div class="wallet-account-card">
-      <span class="wallet-account-icon">{{ iconoTipoCuenta(cuenta.tipo) }}</span>
-      <div class="wallet-account-name">{{ cuenta.nombre }}</div>
-      <div class="wallet-account-balance">{{ formatMoneda(saldoCuenta(cuenta.id)) }}</div>
-    </div>
-  } @empty {
-    <div class="empty-state-block"><p>Aún no hay cuentas — créalas desde Catálogos.</p></div>
-  }
+<div class="tab-bar" style="margin:0 0 18px;">
+  <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'movimientos'" (click)="seleccionarTab('movimientos')">
+    📋 Movimientos
+  </button>
+  <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'cuentas'" (click)="seleccionarTab('cuentas')">
+    💳 Cuentas
+  </button>
+  <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'grafica'" (click)="seleccionarTab('grafica')">
+    📊 Ingresos vs. gastos
+  </button>
 </div>
 
-@if (resumenMensual().length > 0) {
-  <h2 class="settings-card-title" style="margin:0 0 12px;">Ingresos vs. gastos (últimos 6 meses)</h2>
-  <div class="wallet-monthly-chart" style="margin-bottom:28px;">
-    @for (columna of resumenMensual(); track columna.etiqueta) {
-      <div class="wallet-monthly-col">
-        <div class="wallet-monthly-bars">
-          <div class="wallet-monthly-bar wallet-monthly-bar-in" [style.height.px]="(columna.ingreso / maxMensual()) * 140"></div>
-          <div class="wallet-monthly-bar wallet-monthly-bar-out" [style.height.px]="(columna.gasto / maxMensual()) * 140"></div>
-        </div>
-        <span class="wallet-monthly-label">{{ columna.etiqueta }}</span>
+@if (tabActiva() === 'cuentas') {
+  <div class="wallet-accounts-grid" style="margin-bottom:28px;">
+    @for (c of cuentasConInfo(); track c.cuenta.id) {
+      <div class="wallet-account-card" style="cursor:default;">
+        <span class="wallet-account-icon">{{ iconoTipoCuenta(c.cuenta.tipo) }}</span>
+        <div class="wallet-account-name">{{ c.cuenta.nombre }}</div>
+        @if (c.esTarjeta && c.info) {
+          <div class="wallet-account-balance">{{ formatMoneda(c.info.deuda) }}</div>
+          <span class="hint" style="margin:0;">de deuda</span>
+          @if (c.cuenta.limiteCredito) {
+            <div class="wallet-limit-track" style="margin:10px 0 4px;">
+              <div
+                class="wallet-limit-fill"
+                [class.wallet-limit-fill-ok]="nivelUso(c.info.pctUso) === 'ok'"
+                [class.wallet-limit-fill-warn]="nivelUso(c.info.pctUso) === 'warn'"
+                [class.wallet-limit-fill-over]="nivelUso(c.info.pctUso) === 'over'"
+                [style.width.%]="c.info.pctUso"
+              ></div>
+            </div>
+            <span class="hint" style="margin:0;">{{ c.info.pctUso | number: '1.0-0' }}% usado · disponible {{ formatMoneda(c.info.disponible ?? 0) }}</span>
+          }
+          @if (c.cuenta.diaPago) {
+            <div class="hint" style="margin:6px 0 0;">Corte día {{ c.cuenta.diaCorte }} · paga día {{ c.cuenta.diaPago }}</div>
+          }
+          @if (c.info.deuda > 0) {
+            <div>
+              <button type="button" class="btn-primary small" style="margin-top:10px;" (click)="pagarTarjeta(c)">💳 Pagar tarjeta</button>
+            </div>
+          }
+        } @else {
+          <div class="wallet-account-balance">{{ formatMoneda(c.saldo) }}</div>
+        }
       </div>
+    } @empty {
+      <div class="empty-state-block"><p>Aún no hay cuentas — créalas desde Catálogos.</p></div>
     }
   </div>
 }
 
+@if (tabActiva() === 'grafica') {
+  @if (resumenMensual().length > 0) {
+    <h2 class="settings-card-title" style="margin:0 0 12px;">Ingresos vs. gastos (últimos 6 meses)</h2>
+    <div class="wallet-monthly-chart" style="margin-bottom:28px;">
+      @for (columna of resumenMensual(); track columna.etiqueta) {
+        <div class="wallet-monthly-col">
+          <div class="wallet-monthly-bars">
+            <div class="wallet-monthly-bar wallet-monthly-bar-in" [style.height.px]="(columna.ingreso / maxMensual()) * 140"></div>
+            <div class="wallet-monthly-bar wallet-monthly-bar-out" [style.height.px]="(columna.gasto / maxMensual()) * 140"></div>
+          </div>
+          <span class="wallet-monthly-label">{{ columna.etiqueta }}</span>
+        </div>
+      }
+    </div>
+  } @else {
+    <div class="empty-state-block"><p>Aún no hay movimientos para graficar.</p></div>
+  }
+}
+
+@if (tabActiva() === 'movimientos') {
 <div class="board-filters">
   <label class="board-filter-field">
     Buscar
@@ -111,6 +154,7 @@
       </li>
     }
   </ul>
+}
 }
 
 @if (modalAbierto()) {

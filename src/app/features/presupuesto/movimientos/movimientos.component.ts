@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth.service';
 import { DataClientService } from '../../../core/services/data-client.service';
@@ -10,7 +10,7 @@ import { ToastService } from '../../../shared/services/toast.service';
 import { PagoTarjetaService } from '../shared/pago-tarjeta.service';
 import { CategoriaPresupuesto } from '../../catalogos/categoria-presupuesto/categoria-presupuesto.model';
 import { CuentaPresupuesto } from '../../catalogos/cuenta-presupuesto/cuenta-presupuesto.model';
-import { colorCategoria, formatMoneda, iconoTipoCuenta } from '../shared/wallet.util';
+import { InfoTarjeta, colorCategoria, formatMoneda, iconoTipoCuenta, infoTarjeta, nivelUso } from '../shared/wallet.util';
 import { ValorLista } from '../../catalogos/valor-lista/valor-lista.model';
 import { MovimientoPresupuesto } from './movimiento.model';
 
@@ -19,6 +19,15 @@ interface ColumnaMensual {
   ingreso: number;
   gasto: number;
 }
+
+interface CuentaConInfo {
+  cuenta: CuentaPresupuesto;
+  saldo: number;
+  esTarjeta: boolean;
+  info: InfoTarjeta | null;
+}
+
+type TabMovimientos = 'movimientos' | 'cuentas' | 'grafica';
 
 /**
  * Movimientos (ingresos/gastos). Una transferencia entre cuentas propias
@@ -36,7 +45,7 @@ interface ColumnaMensual {
 @Component({
   selector: 'app-movimientos',
   standalone: true,
-  imports: [ReactiveFormsModule, ConfirmDialogComponent, AdjuntosPanelComponent, DatePipe],
+  imports: [ReactiveFormsModule, ConfirmDialogComponent, AdjuntosPanelComponent, DatePipe, DecimalPipe],
   templateUrl: './movimientos.component.html',
   styleUrl: './movimientos.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -51,6 +60,17 @@ export class MovimientosComponent implements OnInit {
   protected readonly formatMoneda = formatMoneda;
   protected readonly colorCategoria = colorCategoria;
   protected readonly iconoTipoCuenta = iconoTipoCuenta;
+  protected readonly nivelUso = nivelUso;
+
+  /** Pestaña activa de la página — Movimientos (filtros + lista) es la
+   *  principal y por eso va primero/por defecto; Cuentas y la gráfica de
+   *  Ingresos vs. gastos quedan cada una en su propia pestaña en vez de
+   *  apiladas una tras otra. */
+  protected readonly tabActiva = signal<TabMovimientos>('movimientos');
+
+  seleccionarTab(tab: TabMovimientos): void {
+    this.tabActiva.set(tab);
+  }
 
   protected readonly movimientos = signal<MovimientoPresupuesto[]>([]);
   protected readonly cuentas = signal<CuentaPresupuesto[]>([]);
@@ -111,6 +131,16 @@ export class MovimientosComponent implements OnInit {
     Math.max(1, ...this.resumenMensual().flatMap((c) => [c.ingreso, c.gasto])),
   );
 
+  /** Mismo criterio que el Dashboard (presupuesto-landing): tarjetas con su
+   *  info de deuda/límite/atajo de pago, el resto solo con su saldo. */
+  protected readonly cuentasConInfo = computed<CuentaConInfo[]>(() =>
+    this.cuentas().map((cuenta) => {
+      const saldo = this.saldoCuenta(Number(cuenta.id));
+      const esTarjeta = cuenta.tipo === 'Tarjeta';
+      return { cuenta, saldo, esTarjeta, info: esTarjeta ? infoTarjeta(cuenta, saldo) : null };
+    }),
+  );
+
   protected readonly form = this.fb.nonNullable.group({
     id: [0],
     fecha: [new Date().toISOString().slice(0, 10), Validators.required],
@@ -160,6 +190,15 @@ export class MovimientosComponent implements OnInit {
       ),
     );
     this.cargar();
+    this.abrirSolicitudPagoTarjetaSiExiste();
+  }
+
+  /** Atajo "Pagar tarjeta" desde la propia pestaña Cuentas de esta página
+   *  (mismo atajo que ya existe en el Dashboard): dejamos la solicitud y la
+   *  consumimos en el acto, sin necesidad de navegar a ningún lado. */
+  pagarTarjeta(cuentaInfo: CuentaConInfo): void {
+    if (!cuentaInfo.info || cuentaInfo.info.deuda <= 0) return;
+    this.pagoTarjeta.solicitar(cuentaInfo.cuenta, cuentaInfo.info.deuda);
     this.abrirSolicitudPagoTarjetaSiExiste();
   }
 
