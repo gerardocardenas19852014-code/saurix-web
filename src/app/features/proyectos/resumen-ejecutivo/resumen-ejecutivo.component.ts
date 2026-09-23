@@ -354,6 +354,45 @@ export class ResumenEjecutivoComponent implements OnInit {
       }
     }
 
+    // Tramo inicial (de Ticket.fechaCreacion al primer TicketHistorialEstado, o hasta ahora
+    // si el ticket nunca se ha movido) — el bucle de arriba solo recorre TicketHistorialEstado
+    // y por eso nunca contaba el tiempo que un ticket pasa en su columna DE ARRANQUE antes de
+    // que alguien lo mueva por primera vez (p.ej. cuánto se queda "olvidado" en Backlog/Nuevo),
+    // justo el dato que este reporte de cuellos de botella debería mostrar (mismo tramo inicial
+    // que reconstruye segmentosDeTicket() en reportes-ejecutivos.component.ts).
+    for (const ticket of ticketsProyecto) {
+      if (!ticket.fechaCreacion) continue;
+      const ticketId = Number(ticket.id);
+      const entradas = porTicket.get(ticketId);
+      const primera = entradas?.length
+        ? [...entradas].sort((a, b) => (a.fechaCreacion ?? '').localeCompare(b.fechaCreacion ?? ''))[0]
+        : undefined;
+      const columnaInicial = primera
+        ? Number(primera.tableroColumnaAnteriorId ?? primera.tableroColumnaNuevaId)
+        : Number(ticket.tableroColumnaId);
+      const inicioMs = new Date(ticket.fechaCreacion).getTime();
+
+      let finMs: number | null;
+      if (primera?.fechaCreacion) {
+        // Tramo cerrado: se movió de la columna inicial a otra — dato exacto.
+        finMs = new Date(primera.fechaCreacion).getTime();
+      } else if (!ticketsResueltosIds.has(ticketId)) {
+        // Nunca se ha movido y sigue sin resolverse: sigue "corriendo" hasta ahora mismo.
+        finMs = ahora;
+      } else {
+        // Nunca se ha movido pero ya se resolvió: la columna inicial es también la final,
+        // no se cuenta (mismo criterio que arriba).
+        finMs = null;
+      }
+      if (finMs === null) continue;
+
+      const dias = Math.max(0, (finMs - inicioMs) / this.MS_POR_DIA);
+      const actual = acumPorColumna.get(columnaInicial) ?? { totalDias: 0, muestras: 0 };
+      actual.totalDias += dias;
+      actual.muestras++;
+      acumPorColumna.set(columnaInicial, actual);
+    }
+
     return columnasProyecto
       .map((c) => {
         const acum = acumPorColumna.get(Number(c.id));

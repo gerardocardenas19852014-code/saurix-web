@@ -1004,6 +1004,18 @@ export class KanbanComponent implements OnInit, OnDestroy {
     const indiceDestino = indiceActual + direccion;
     if (indiceActual === -1 || indiceDestino < 0 || indiceDestino >= columnas.length) return;
 
+    // Misma restricción de flujo configurada en Gestor de Estados ("🔀 Flujo") que ya
+    // aplica onDrop()/esDestinoValido() al arrastrar — antes SOLO se validaba aquí el
+    // límite del arreglo de columnas, así que "Aceptar"/"◀ Regresar" podían saltarse
+    // por completo una restricción de transicionesPermitidasJson que drag&drop sí
+    // respeta (bug encontrado en revisión general del módulo).
+    const origen = columnas[indiceActual];
+    const destino = columnas[indiceDestino];
+    if (!puedeMoverA(origen, Number(destino.id))) {
+      this.toast.advertencia(`No se puede mover de "${origen.nombre}" a "${destino.nombre}".`);
+      return;
+    }
+
     // Cambiar de estado (avanzar O retroceder) exige haber bitacoreado qué se hizo en la
     // columna actual — solo se puede verificar de forma confiable cuando el detalle de ESTE
     // ticket está abierto (actividades()/historial() traen datos de ese ticket en ese caso),
