@@ -107,13 +107,17 @@ export class CalendarioComponent implements OnInit {
     const eventos: EventoCalendario[] = [];
 
     for (const fijo of this.recurrentes()) {
-      const fecha = fijo.frecuencia === 'Mensual' ? this.proximaFechaMensual(fijo.diaDelMes, hoy) : this.proximaFechaAnual(fijo, hoy);
+      // Igual que en Fijos y Proyección (recurrentes.component.ts): 'Anual' es
+      // la única frecuencia con su propio cálculo (anclada al mes de
+      // creación); cualquier otra (Mensual, Quincenal, o una clave nueva del
+      // catálogo) usa la cadencia mensual clampada al último día de cada mes.
+      const fecha = fijo.frecuencia === 'Anual' ? this.proximaFechaAnual(fijo, hoy) : this.proximaFechaMensual(fijo.diaDelMes, hoy);
       if (fecha <= limite) {
         eventos.push({
           fecha,
           icono: fijo.tipo === 'Ingreso' ? '💰' : '🔁',
           titulo: fijo.descripcion,
-          detalle: fijo.frecuencia === 'Mensual' ? 'Fijo mensual' : 'Fijo anual',
+          detalle: fijo.frecuencia === 'Anual' ? 'Fijo anual' : `Fijo ${fijo.frecuencia.toLowerCase()}`,
           monto: fijo.monto,
           tipo: fijo.tipo,
         });

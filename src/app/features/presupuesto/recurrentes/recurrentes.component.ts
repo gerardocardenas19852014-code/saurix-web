@@ -148,14 +148,22 @@ export class RecurrentesComponent implements OnInit {
     return new Date(2000, this.mesAncla(fila), 1).toLocaleDateString('es-MX', { month: 'long' });
   }
 
+  /** 'Anual' es la única frecuencia con ciclo propio (una vez al año, anclada
+   *  al mes de creación) — cualquier otra frecuencia (Mensual, Quincenal, o
+   *  cualquier clave nueva que el usuario dé de alta en el catálogo "Frecuencia
+   *  de fijos") se trata con cadencia mensual: un ciclo por mes calendario,
+   *  registrable el día indicado (clampado al último día de cada mes en
+   *  registrarCiclo). Antes solo 'Mensual' entraba por esta rama y cualquier
+   *  frecuencia nueva caía silenciosamente en la rama Anual (un fijo Quincenal,
+   *  por ejemplo, terminaba contando una sola vez al año en vez de cada mes). */
   private cicloActual(fila: MovimientoRecurrentePresupuesto): string {
     const hoy = new Date();
-    return fila.frecuencia === 'Mensual' ? `${hoy.getFullYear()}-${hoy.getMonth() + 1}` : `${hoy.getFullYear()}`;
+    return fila.frecuencia === 'Anual' ? `${hoy.getFullYear()}` : `${hoy.getFullYear()}-${hoy.getMonth() + 1}`;
   }
 
   private cicloDeFecha(fecha: string, frecuencia: string): string {
     const f = new Date(fecha);
-    return frecuencia === 'Mensual' ? `${f.getFullYear()}-${f.getMonth() + 1}` : `${f.getFullYear()}`;
+    return frecuencia === 'Anual' ? `${f.getFullYear()}` : `${f.getFullYear()}-${f.getMonth() + 1}`;
   }
 
   protected estaRegistradoEsteCiclo(fila: MovimientoRecurrentePresupuesto): boolean {

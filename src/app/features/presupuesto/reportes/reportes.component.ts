@@ -275,12 +275,15 @@ export class ReportesComponent implements OnInit {
     const planeado = new Map<string, number>();
     for (const fijo of this.recurrentes()) {
       const id = fijo.categoriaPresupuestoId ? Number(fijo.categoriaPresupuestoId) : null;
+      // 'Anual' es la única frecuencia con su propio conteo; cualquier otra
+      // (Mensual, Quincenal, o una clave nueva del catálogo) cuenta una vez
+      // por cada mes del rango, igual que Fijos y Proyección/Calendario.
       let veces = 0;
-      if (fijo.frecuencia === 'Mensual') {
-        veces = mesesEnRango;
-      } else if (fijo.frecuencia === 'Anual') {
+      if (fijo.frecuencia === 'Anual') {
         const mesAncla = fijo.fechaCreacion ? new Date(fijo.fechaCreacion).getMonth() : 0;
         veces = mesesEnRango >= 12 || rango.inicio.getMonth() === mesAncla ? 1 : 0;
+      } else {
+        veces = mesesEnRango;
       }
       if (veces > 0) {
         const k = clave(id, fijo.tipo);

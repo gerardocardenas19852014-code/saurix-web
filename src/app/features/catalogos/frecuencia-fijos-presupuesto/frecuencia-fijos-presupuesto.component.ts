@@ -18,6 +18,12 @@ export class FrecuenciaFijosPresupuestoComponent extends ValorListaGrupoBase {
   protected readonly grupo = 'MovimientoRecurrenteFrecuencia';
   protected readonly tituloGrupo = 'Frecuencia de fijos · Presupuesto Personal';
   protected readonly moduloBitacora = 'Catálogos / Frecuencia de fijos (Presupuesto)';
-  /** El cálculo de ciclo de Fijos y Proyección/Calendario compara 'Mensual'/'Anual' tal cual. */
+  /** 'Anual' es la única clave especial para Fijos y Proyección/Calendario/
+   * Reportes (ciclo una vez al año, anclado al mes de creación del fijo);
+   * cualquier otra clave — 'Mensual' o una nueva que se agregue aquí, p.ej.
+   * 'Quincenal' — se trata con cadencia mensual (un ciclo por mes, el día
+   * indicado clampado al último día de cada mes: funciona igual en meses de
+   * 28, 30 o 31 días). Por eso solo 'Mensual'/'Anual' están protegidas: son
+   * las únicas que ese código compara por nombre exacto. */
   protected readonly clavesProtegidas = ['Mensual', 'Anual'];
 }
