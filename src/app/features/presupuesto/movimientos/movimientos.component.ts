@@ -111,9 +111,13 @@ export class MovimientosComponent implements OnInit {
   protected readonly filtroTipo = signal<string>('');
   /** "" = todos los meses; si no, "año-mes" (mes 0-indexado, ver claveMes()). */
   protected readonly filtroMes = signal<string>('');
+  /** "" = todos los años; si no, año como texto (p.ej. "2026"). */
+  protected readonly filtroAnio = signal<string>('');
   /** "" = sin límite; si no, fecha ISO "YYYY-MM-DD" (compara bien como texto). */
   protected readonly filtroFechaDesde = signal<string>('');
   protected readonly filtroFechaHasta = signal<string>('');
+  /** 'desc' = más reciente primero (por defecto), 'asc' = más antiguo primero. */
+  protected readonly ordenFecha = signal<'desc' | 'asc'>('desc');
 
   protected readonly hayFiltros = computed(
     () =>
@@ -122,6 +126,7 @@ export class MovimientosComponent implements OnInit {
       this.filtroCategoriaId() !== 0 ||
       this.filtroTipo() !== '' ||
       this.filtroMes() !== '' ||
+      this.filtroAnio() !== '' ||
       !!this.filtroFechaDesde() ||
       !!this.filtroFechaHasta(),
   );
@@ -147,12 +152,19 @@ export class MovimientosComponent implements OnInit {
       });
   });
 
+  /** Años con al menos un movimiento (de más reciente a más antiguo), para el combo "Año". */
+  protected readonly aniosDisponibles = computed<string[]>(() => {
+    const anios = new Set(this.movimientos().map((m) => String(new Date(m.fecha).getFullYear())));
+    return [...anios].sort((a, b) => Number(b) - Number(a));
+  });
+
   protected readonly movimientosFiltrados = computed(() => {
     const texto = this.filtroTexto().trim().toLowerCase();
     const cuentaId = this.filtroCuentaId();
     const categoriaId = this.filtroCategoriaId();
     const tipo = this.filtroTipo();
     const mes = this.filtroMes();
+    const anio = this.filtroAnio();
     const desde = this.filtroFechaDesde();
     const hasta = this.filtroFechaHasta();
     return [...this.movimientos()]
@@ -160,10 +172,14 @@ export class MovimientosComponent implements OnInit {
       .filter((m) => !categoriaId || m.categoriaPresupuestoId === categoriaId)
       .filter((m) => !tipo || m.tipo === tipo)
       .filter((m) => !mes || claveMes(m.fecha) === mes)
+      .filter((m) => !anio || String(new Date(m.fecha).getFullYear()) === anio)
       .filter((m) => !desde || m.fecha >= desde)
       .filter((m) => !hasta || m.fecha <= hasta)
       .filter((m) => !texto || m.descripcion.toLowerCase().includes(texto))
-      .sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+      .sort((a, b) => {
+        const signo = this.ordenFecha() === 'asc' ? 1 : -1;
+        return a.fecha < b.fecha ? signo : a.fecha > b.fecha ? -signo : 0;
+      });
   });
 
   /** La misma lista de movimientosFiltrados, pero agrupada por mes — para que
@@ -322,8 +338,10 @@ export class MovimientosComponent implements OnInit {
     this.filtroCategoriaId.set(0);
     this.filtroTipo.set('');
     this.filtroMes.set('');
+    this.filtroAnio.set('');
     this.filtroFechaDesde.set('');
     this.filtroFechaHasta.set('');
+    this.ordenFecha.set('desc');
   }
 
   nombreCuenta(id: number): string {

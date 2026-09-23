@@ -304,6 +304,16 @@ html[data-wide='grid'] .content { max-width: 1600px; }
   flex-direction: row; align-items: center; gap: 8px; flex: 0 0 auto; white-space: nowrap;
 }
 .board-filter-field.board-filter-checkbox input[type='checkbox'] { width: auto; }
+// Par "Desde"/"Hasta" del filtro de rango de fechas, juntos en una sola fila
+// dentro del mismo .board-filter-field (en vez de dos campos separados).
+.board-filter-daterange {
+  display: flex; align-items: center; gap: 6px;
+  input[type='date'] { flex: 0 1 180px; min-width: 0; }
+  span { color: var(--ink-soft); }
+}
+// Ocupa su propio renglón dentro de .board-filters (en vez de compartir fila
+// con los demás combos), sin estirarse a todo el ancho del contenedor.
+.board-filter-field-full { flex: 0 1 auto; }
 .kanban-board { display: flex; gap: 18px; overflow-x: auto; padding-bottom: 8px; align-items: flex-start; }
 .kanban-column {
   flex: 1 1 300px; min-width: 300px; max-width: 400px; background: var(--paper-raised);

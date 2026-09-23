@@ -118,16 +118,35 @@
     </select>
   </label>
   <label class="board-filter-field">
-    Desde
-    <input type="date" [value]="filtroFechaDesde()" (change)="filtroFechaDesde.set($any($event.target).value)" />
+    Año
+    <select [value]="filtroAnio()" (change)="filtroAnio.set($any($event.target).value)">
+      <option value="">Todos</option>
+      @for (anio of aniosDisponibles(); track anio) {
+        <option [value]="anio">{{ anio }}</option>
+      }
+    </select>
   </label>
   <label class="board-filter-field">
-    Hasta
-    <input type="date" [value]="filtroFechaHasta()" (change)="filtroFechaHasta.set($any($event.target).value)" />
+    Orden
+    <select [value]="ordenFecha()" (change)="ordenFecha.set($any($event.target).value)">
+      <option value="desc">Más reciente primero</option>
+      <option value="asc">Más antiguo primero</option>
+    </select>
   </label>
   @if (hayFiltros()) {
     <button type="button" class="btn-secondary small" (click)="limpiarFiltros()">✕ Limpiar filtros</button>
   }
+</div>
+
+<div class="board-filters">
+  <label class="board-filter-field board-filter-field-full">
+    Rango de fechas
+    <div class="board-filter-daterange">
+      <input type="date" [value]="filtroFechaDesde()" (change)="filtroFechaDesde.set($any($event.target).value)" />
+      <span>–</span>
+      <input type="date" [value]="filtroFechaHasta()" (change)="filtroFechaHasta.set($any($event.target).value)" />
+    </div>
+  </label>
 </div>
 
 @if (cargando()) {
