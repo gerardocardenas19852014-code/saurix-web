@@ -5,8 +5,14 @@
 // fijo para su <select> "Asignar a" (mismo motivo que en Backlog: un usuario con
 // nombre largo entre las opciones no debe agrandar ni dejar en blanco la píldora).
 
+// El título del ticket y sus "meta" (proyecto/tipo/prioridad/asignar/comparar) ya
+// NO comparten una sola fila con ancho repartido por flex-shrink (eso hacía que,
+// con títulos largos, el <a> ocupara todo el ancho y empujara el resto fuera de
+// vista) — ahora el título va en su propia fila (con el botón "Abrir" a su lado,
+// de ancho fijo) y el meta en la fila de abajo, con wrap permitido.
 .actividad-item-head {
   flex-wrap: nowrap;
+  align-items: flex-start;
 }
 
 .actividad-item-texto-truncar {
@@ -17,12 +23,20 @@
   white-space: nowrap;
 }
 
+.boton-abrir-ticket {
+  flex-shrink: 0;
+  width: auto;
+  padding: 2px 10px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
 .actividad-item-meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  flex-shrink: 0;
-  margin-left: auto;
+  margin-top: 6px;
 }
 
 .actividad-item-meta .toolbar-select {

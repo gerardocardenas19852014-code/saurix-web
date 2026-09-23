@@ -249,52 +249,54 @@
                       @for (ticket of ticketsDe(fila.usuarioId); track ticket.id) {
                         <li class="actividad-item">
                           <div class="actividad-item-head">
-                            <a
-                              [routerLink]="['/proyectos/tablero']"
-                              [queryParams]="{ ticket: ticket.id }"
-                              class="actividad-item-texto actividad-item-texto-truncar"
-                              style="text-decoration:none;"
-                              [title]="ticket.titulo"
-                            >
+                            <span class="actividad-item-texto actividad-item-texto-truncar" [title]="ticket.titulo">
                               #{{ ticket.numeroTicket }}
                               @if (ticket.folioInterno) {
                                 <span class="hint" style="margin:0;">({{ ticket.folioInterno }})</span>
                               }
                               — {{ ticket.titulo }}
+                            </span>
+                            <a
+                              [routerLink]="['/proyectos/tablero']"
+                              [queryParams]="{ ticket: ticket.id }"
+                              class="tab-more-item boton-abrir-ticket"
+                              title="Abrir este ticket en el Tablero"
+                            >
+                              ↗ Abrir
                             </a>
-                            <div class="actividad-item-meta">
-                              <span class="hint" style="margin:0;">{{ nombreProyecto(ticket.proyectoId) }}</span>
-                              <span class="kanban-tag kanban-tag-tipo" [title]="'Tipo: ' + nombreTipo(ticket.ticketTipoId)">
-                                {{ iconoTipo(ticket.ticketTipoId) }} {{ nombreTipo(ticket.ticketTipoId) }}
-                              </span>
-                              <span
-                                class="kanban-tag"
-                                [style.color]="textoPrioridad(ticket.ticketPrioridadId)"
-                                [style.background]="fondoPrioridad(ticket.ticketPrioridadId)"
-                                [title]="'Prioridad: ' + nombrePrioridad(ticket.ticketPrioridadId)"
-                              >
-                                {{ nombrePrioridad(ticket.ticketPrioridadId) }}
-                              </span>
-                              <select
-                                class="toolbar-select"
-                                [value]="ticket.asignadoUsuarioId ?? 0"
-                                (change)="reasignar(ticket, $any($event.target).value)"
-                                aria-label="Asignar a"
-                              >
-                                <option [value]="0">Sin asignar</option>
-                                @for (u of opcionesUsuarioPara(ticket); track u.id) {
-                                  <option [value]="u.id">{{ u.nombre }}</option>
-                                }
-                              </select>
-                              <label class="comparacion-check" title="Agregar a la comparación">
-                                <input
-                                  type="checkbox"
-                                  [checked]="estaEnComparacion(ticket.id)"
-                                  (change)="toggleComparar(ticket.id)"
-                                />
-                                Comparar
-                              </label>
-                            </div>
+                          </div>
+                          <div class="actividad-item-meta">
+                            <span class="hint" style="margin:0;">{{ nombreProyecto(ticket.proyectoId) }}</span>
+                            <span class="kanban-tag kanban-tag-tipo" [title]="'Tipo: ' + nombreTipo(ticket.ticketTipoId)">
+                              {{ iconoTipo(ticket.ticketTipoId) }} {{ nombreTipo(ticket.ticketTipoId) }}
+                            </span>
+                            <span
+                              class="kanban-tag"
+                              [style.color]="textoPrioridad(ticket.ticketPrioridadId)"
+                              [style.background]="fondoPrioridad(ticket.ticketPrioridadId)"
+                              [title]="'Prioridad: ' + nombrePrioridad(ticket.ticketPrioridadId)"
+                            >
+                              {{ nombrePrioridad(ticket.ticketPrioridadId) }}
+                            </span>
+                            <select
+                              class="toolbar-select"
+                              [value]="ticket.asignadoUsuarioId ?? 0"
+                              (change)="reasignar(ticket, $any($event.target).value)"
+                              aria-label="Asignar a"
+                            >
+                              <option [value]="0">Sin asignar</option>
+                              @for (u of opcionesUsuarioPara(ticket); track u.id) {
+                                <option [value]="u.id">{{ u.nombre }}</option>
+                              }
+                            </select>
+                            <label class="comparacion-check" title="Agregar a la comparación">
+                              <input
+                                type="checkbox"
+                                [checked]="estaEnComparacion(ticket.id)"
+                                (change)="toggleComparar(ticket.id)"
+                              />
+                              Comparar
+                            </label>
                           </div>
                         </li>
                       }
