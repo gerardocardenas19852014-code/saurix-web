@@ -38,9 +38,14 @@ function etiquetaMes(anio: number, mes: number): string {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
+/** Parsea "YYYY-MM-DD" directamente como texto (sin pasar por `new Date`):
+ *  los <input type="date"> siempre guardan fecha en ese formato sin hora, y
+ *  `new Date("YYYY-MM-DD")` la interpreta como UTC — en una zona horaria
+ *  detrás de UTC (México) eso la recorre un día para atrás y cae en el mes
+ *  incorrecto. Comparar el texto evita ese corrimiento. */
 function claveMes(fecha: string): string {
-  const f = new Date(fecha);
-  return `${f.getFullYear()}-${f.getMonth()}`;
+  const [anioTexto, mesTexto] = fecha.split('-');
+  return `${Number(anioTexto)}-${Number(mesTexto) - 1}`;
 }
 
 interface CuentaConInfo {
@@ -154,7 +159,7 @@ export class MovimientosComponent implements OnInit {
 
   /** Años con al menos un movimiento (de más reciente a más antiguo), para el combo "Año". */
   protected readonly aniosDisponibles = computed<string[]>(() => {
-    const anios = new Set(this.movimientos().map((m) => String(new Date(m.fecha).getFullYear())));
+    const anios = new Set(this.movimientos().map((m) => m.fecha.slice(0, 4)));
     return [...anios].sort((a, b) => Number(b) - Number(a));
   });
 
@@ -172,7 +177,7 @@ export class MovimientosComponent implements OnInit {
       .filter((m) => !categoriaId || m.categoriaPresupuestoId === categoriaId)
       .filter((m) => !tipo || m.tipo === tipo)
       .filter((m) => !mes || claveMes(m.fecha) === mes)
-      .filter((m) => !anio || String(new Date(m.fecha).getFullYear()) === anio)
+      .filter((m) => !anio || m.fecha.slice(0, 4) === anio)
       .filter((m) => !desde || m.fecha >= desde)
       .filter((m) => !hasta || m.fecha <= hasta)
       .filter((m) => !texto || m.descripcion.toLowerCase().includes(texto))
@@ -209,10 +214,8 @@ export class MovimientosComponent implements OnInit {
       const anio = fecha.getFullYear();
       const mes = fecha.getMonth();
       const etiqueta = fecha.toLocaleDateString('es-MX', { month: 'short' });
-      const delMes = this.movimientosReales().filter((m) => {
-        const f = new Date(m.fecha);
-        return f.getFullYear() === anio && f.getMonth() === mes && !m.transferenciaId;
-      });
+      const claveColumna = `${anio}-${mes}`;
+      const delMes = this.movimientosReales().filter((m) => claveMes(m.fecha) === claveColumna && !m.transferenciaId);
       columnas.push({
         etiqueta,
         ingreso: delMes.filter((m) => m.tipo === 'Ingreso').reduce((s, m) => s + m.monto, 0),
