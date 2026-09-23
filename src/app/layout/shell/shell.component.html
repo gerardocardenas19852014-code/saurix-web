@@ -54,14 +54,26 @@
       <span class="sidebar-label">Gestión de Proyectos</span>
       <nav class="sidebar-nav" aria-label="Menú de gestión de proyectos">
         <a routerLink="/proyectos" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
-        <a routerLink="/proyectos/dashboard" routerLinkActive="active">📊 Mi Dashboard</a>
-        <a routerLink="/proyectos/proyectos" routerLinkActive="active">📁 Proyectos</a>
-        <a routerLink="/proyectos/tablero" routerLinkActive="active">🗂️ Ticket</a>
-        <a routerLink="/proyectos/backlog" routerLinkActive="active">📋 Backlog</a>
-        <a routerLink="/proyectos/reportes-horas" routerLinkActive="active">⏱️ Reportes de horas</a>
-        <a routerLink="/proyectos/gantt" routerLinkActive="active">📅 Gantt</a>
-        <a routerLink="/proyectos/resumen-ejecutivo" routerLinkActive="active">📈 Resumen ejecutivo</a>
-        <a routerLink="/proyectos/gestor-estados" routerLinkActive="active">🧭 Gestor de Estados</a>
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupoProyectos('Proyectos')">
+          <span>{{ grupoProyectosAbierto('Proyectos') ? '▾' : '▸' }} Proyectos</span>
+        </button>
+        @if (grupoProyectosAbierto('Proyectos')) {
+          <a routerLink="/proyectos/tablero" routerLinkActive="active">🗂️ Ticket</a>
+          <a routerLink="/proyectos/proyectos" routerLinkActive="active">📁 Proyectos</a>
+          <a routerLink="/proyectos/backlog" routerLinkActive="active">📋 Backlog</a>
+          <a routerLink="/proyectos/gestor-estados" routerLinkActive="active">🧭 Gestor de Estados</a>
+        }
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupoProyectos('Reportes')">
+          <span>{{ grupoProyectosAbierto('Reportes') ? '▾' : '▸' }} Reportes</span>
+        </button>
+        @if (grupoProyectosAbierto('Reportes')) {
+          <a routerLink="/proyectos/dashboard" routerLinkActive="active">📊 Mi Dashboard</a>
+          <a routerLink="/proyectos/reportes-horas" routerLinkActive="active">⏱️ Reportes de horas</a>
+          <a routerLink="/proyectos/gantt" routerLinkActive="active">📅 Gantt</a>
+          <a routerLink="/proyectos/resumen-ejecutivo" routerLinkActive="active">📈 Resumen ejecutivo</a>
+        }
       </nav>
     }
 

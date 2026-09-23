@@ -42,6 +42,14 @@ const GRUPOS: GrupoModulo[] = [
         grupo: 'Proyectos',
       },
       {
+        ruta: 'backlog',
+        icono: '📋',
+        color: 'siif',
+        titulo: 'Backlog',
+        descripcion: 'Tickets sin sprint asignado y planeación de sprints por proyecto.',
+        grupo: 'Proyectos',
+      },
+      {
         ruta: 'gestor-estados',
         icono: '🧭',
         color: 'siif',
