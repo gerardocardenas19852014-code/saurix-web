@@ -354,15 +354,18 @@ export class TablerosComponent implements OnInit {
   protected readonly origenTransicion = signal<TableroColumna | null>(null);
   private arrastre: { columnaId: number; offsetX: number; offsetY: number } | null = null;
 
+  /** Tamaño mínimo del lienzo — generoso a propósito (la página ahora usa ancho completo,
+   *  ver RUTAS_ANCHO_COMPLETO en shell.component.ts) para que el área de trabajo se sienta
+   *  amplia desde el principio y no solo del tamaño justo de las cajas actuales. */
   protected readonly anchoLienzo = computed(() => {
-    let max = 760;
-    for (const pos of this.posiciones().values()) max = Math.max(max, pos.x + this.ANCHO_CAJA + 60);
+    let max = 1400;
+    for (const pos of this.posiciones().values()) max = Math.max(max, pos.x + this.ANCHO_CAJA + 80);
     return max;
   });
 
   protected readonly altoLienzo = computed(() => {
-    let max = 360;
-    for (const pos of this.posiciones().values()) max = Math.max(max, pos.y + this.ALTO_CAJA + 60);
+    let max = 640;
+    for (const pos of this.posiciones().values()) max = Math.max(max, pos.y + this.ALTO_CAJA + 80);
     return max;
   });
 
@@ -395,9 +398,9 @@ export class TablerosComponent implements OnInit {
     const mapa = new Map<number, PosicionDiagrama>();
     this.columnasTablero().forEach((columna, indice) => {
       const guardada = parsearPosicionDiagrama(columna.posicionDiagramaJson);
-      const fila = Math.floor(indice / 4);
-      const col = indice % 4;
-      mapa.set(columna.id, guardada ?? { x: 40 + col * (this.ANCHO_CAJA + 60), y: 40 + fila * (this.ALTO_CAJA + 80) });
+      const fila = Math.floor(indice / 5);
+      const col = indice % 5;
+      mapa.set(columna.id, guardada ?? { x: 50 + col * (this.ANCHO_CAJA + 90), y: 50 + fila * (this.ALTO_CAJA + 110) });
     });
     this.posiciones.set(mapa);
   }

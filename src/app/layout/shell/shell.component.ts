@@ -85,6 +85,7 @@ export class ShellComponent implements OnDestroy {
     '/proyectos/gantt',
     '/proyectos/resumen-ejecutivo',
     '/proyectos/backlog',
+    '/proyectos/gestor-estados',
   ];
   protected readonly contenidoAncho = computed(() =>
     ShellComponent.RUTAS_ANCHO_COMPLETO.some((ruta) => this.urlActual().startsWith(ruta)),
