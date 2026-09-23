@@ -1,0 +1,294 @@
+<div class="page-header">
+  <h1>Reportes ejecutivos</h1>
+</div>
+
+<p class="hint" style="margin:0 0 16px;">
+  Gráficas pensadas para nivel directivo: trabajo hecho y pendiente, avance de sprint,
+  velocidad del equipo, flujo acumulado y tiempo de ciclo — todo calculado a partir de
+  los datos que ya captura el día a día.
+</p>
+
+<div class="tab-bar">
+  <button type="button" class="tab-btn" [class.is-active]="pestana() === 'hecho'" (click)="cambiarPestana('hecho')">Trabajo hecho</button>
+  <button type="button" class="tab-btn" [class.is-active]="pestana() === 'pendiente'" (click)="cambiarPestana('pendiente')">Trabajo pendiente</button>
+  <button type="button" class="tab-btn" [class.is-active]="pestana() === 'sprint'" (click)="cambiarPestana('sprint')">Reporte de sprint</button>
+  <button type="button" class="tab-btn" [class.is-active]="pestana() === 'velocidad'" (click)="cambiarPestana('velocidad')">Velocidad</button>
+  <button type="button" class="tab-btn" [class.is-active]="pestana() === 'cfd'" (click)="cambiarPestana('cfd')">Flujo acumulado</button>
+  <button type="button" class="tab-btn" [class.is-active]="pestana() === 'control'" (click)="cambiarPestana('control')">Control</button>
+</div>
+
+<div class="board-filters" style="margin-top: 16px;">
+  <label class="board-filter-field">
+    Proyecto
+    <select [value]="proyectoId()" (change)="cambiarProyecto($any($event.target).value)">
+      @if (pestana() === 'hecho' || pestana() === 'pendiente' || pestana() === 'control') {
+        <option [value]="0">Todos</option>
+      }
+      @for (p of proyectos(); track p.id) {
+        <option [value]="p.id">{{ p.clave }} — {{ p.nombre }}</option>
+      }
+    </select>
+  </label>
+
+  @if (pestana() === 'hecho' || pestana() === 'pendiente' || pestana() === 'sprint' || pestana() === 'velocidad') {
+    <label class="board-filter-field">
+      Métrica
+      <select [value]="metrica()" (change)="cambiarMetrica($any($event.target).value)">
+        <option value="tickets">Número de tickets</option>
+        <option value="horas">Horas estimadas</option>
+      </select>
+    </label>
+  }
+
+  @if (pestana() === 'sprint' && sprintsDelProyecto().length > 0) {
+    <label class="board-filter-field">
+      Sprint
+      <select [value]="sprintSeleccionadoId() || sprintsDelProyecto()[0].id" (change)="cambiarSprintSeleccionado($any($event.target).value)">
+        @for (s of sprintsDelProyecto(); track s.id) {
+          <option [value]="s.id">{{ s.nombre }} ({{ s.estado }})</option>
+        }
+      </select>
+    </label>
+  }
+
+  @if (pestana() === 'cfd') {
+    <label class="board-filter-field">
+      Rango
+      <select [value]="diasCfd()" (change)="cambiarDiasCfd($any($event.target).value)">
+        <option [value]="14">Últimos 14 días</option>
+        <option [value]="30">Últimos 30 días</option>
+        <option [value]="60">Últimos 60 días</option>
+        <option [value]="90">Últimos 90 días</option>
+      </select>
+    </label>
+  }
+</div>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else {
+
+  <!-- 1. TRABAJO HECHO ------------------------------------------------- -->
+  @if (pestana() === 'hecho') {
+    <div class="dashboard-stats" style="margin: 20px 0;">
+      <div class="dashboard-stat-card">
+        <div class="num">{{ totalTrabajoHecho() }}</div>
+        <div class="label">{{ metrica() === 'horas' ? 'Horas estimadas resueltas (6 meses)' : 'Tickets resueltos (6 meses)' }}</div>
+      </div>
+    </div>
+    @if (totalTrabajoHecho() === 0) {
+      <p class="empty">Todavía no hay tickets resueltos con estos filtros.</p>
+    } @else {
+      <div class="report-bars">
+        @for (punto of trabajoHecho(); track punto.etiqueta) {
+          <div class="report-bar-row">
+            <span class="report-bar-label">{{ punto.etiqueta }}</span>
+            <div class="report-bar-track">
+              <div class="report-bar-fill" [style.width.%]="(punto.valor / maxTrabajoHecho()) * 100" style="background: var(--client);"></div>
+            </div>
+            <span class="report-bar-value">{{ punto.valor }}</span>
+          </div>
+        }
+      </div>
+    }
+  }
+
+  <!-- 2. TRABAJO PENDIENTE ---------------------------------------------- -->
+  @if (pestana() === 'pendiente') {
+    <div class="dashboard-stats" style="margin: 20px 0;">
+      <div class="dashboard-stat-card">
+        <div class="num">{{ totalTrabajoPendiente() }}</div>
+        <div class="label">{{ metrica() === 'horas' ? 'Horas estimadas pendientes' : 'Tickets pendientes' }}</div>
+      </div>
+    </div>
+    @if (trabajoPendiente().length === 0) {
+      <p class="empty">No hay tickets pendientes con estos filtros.</p>
+    } @else {
+      <div class="report-bars">
+        @for (punto of trabajoPendiente(); track punto.etiqueta) {
+          <div class="report-bar-row">
+            <span class="report-bar-label" [title]="punto.etiqueta">{{ punto.etiqueta }}</span>
+            <div class="report-bar-track">
+              <div class="report-bar-fill" [style.width.%]="(punto.valor / maxTrabajoPendiente()) * 100" style="background: var(--amber);"></div>
+            </div>
+            <span class="report-bar-value">{{ punto.valor }}</span>
+          </div>
+        }
+      </div>
+    }
+  }
+
+  <!-- 3. REPORTE DE SPRINT ------------------------------------------------ -->
+  @if (pestana() === 'sprint') {
+    @if (!proyectoId()) {
+      <p class="empty">Elige un proyecto para ver el reporte de sus sprints.</p>
+    } @else if (sprintsDelProyecto().length === 0) {
+      <p class="empty">Este proyecto todavía no tiene sprints.</p>
+    } @else {
+    @if (sprintReporte(); as reporte) {
+      <div class="panel" style="margin-top: 16px;">
+        <div class="panel-head">
+          <h2 style="margin:0;">{{ reporte.sprint.nombre }}</h2>
+          <span class="grid-badge" [class.grid-badge-success]="reporte.sprint.estado === 'cerrado'" [class.grid-badge-neutral]="reporte.sprint.estado !== 'cerrado'">
+            {{ reporte.sprint.estado }}
+          </span>
+        </div>
+        @if (reporte.sprint.objetivo) {
+          <p class="hint" style="margin: 0 0 12px;">{{ reporte.sprint.objetivo }}</p>
+        }
+        @if (reporte.sprint.fechaInicio || reporte.sprint.fechaFin) {
+          <p class="hint" style="margin: 0 0 16px;">
+            {{ reporte.sprint.fechaInicio || '—' }} → {{ reporte.sprint.fechaFin || '—' }}
+          </p>
+        }
+
+        <div class="dashboard-stats">
+          <div class="dashboard-stat-card">
+            <div class="num">{{ reporte.totalTickets }}</div>
+            <div class="label">Tickets en el sprint</div>
+          </div>
+          <div class="dashboard-stat-card dashboard-stat-critica">
+            <div class="num">{{ reporte.resueltos }}</div>
+            <div class="label">Resueltos ({{ reporte.porcentajeTickets }}%)</div>
+          </div>
+          <div class="dashboard-stat-card">
+            <div class="num">{{ reporte.pendientes }}</div>
+            <div class="label">Pendientes</div>
+          </div>
+        </div>
+
+        <div class="report-bars" style="margin-top: 20px;">
+          <div class="report-bar-row">
+            <span class="report-bar-label">Tickets completados</span>
+            <div class="report-bar-track">
+              <div class="report-bar-fill" [style.width.%]="reporte.porcentajeTickets" style="background: var(--client);"></div>
+            </div>
+            <span class="report-bar-value">{{ reporte.porcentajeTickets }}%</span>
+          </div>
+          <div class="report-bar-row">
+            <span class="report-bar-label">Horas completadas</span>
+            <div class="report-bar-track">
+              <div class="report-bar-fill" [style.width.%]="reporte.porcentajeHoras" style="background: var(--teal);"></div>
+            </div>
+            <span class="report-bar-value">{{ reporte.porcentajeHoras }}%</span>
+          </div>
+        </div>
+        <p class="hint" style="margin-top: 10px;">
+          {{ reporte.horasResueltas }} de {{ reporte.horasTotales }} horas estimadas completadas.
+        </p>
+      </div>
+    }
+    }
+  }
+
+  <!-- 4. VELOCIDAD ------------------------------------------------------- -->
+  @if (pestana() === 'velocidad') {
+    @if (!proyectoId()) {
+      <p class="empty">Elige un proyecto para ver su velocidad.</p>
+    } @else if (velocidad().length === 0) {
+      <p class="empty">Este proyecto todavía no tiene sprints cerrados.</p>
+    } @else {
+      <div class="dashboard-stats" style="margin: 20px 0;">
+        <div class="dashboard-stat-card">
+          <div class="num">{{ promedioVelocidad() }}</div>
+          <div class="label">Promedio por sprint ({{ metrica() === 'horas' ? 'horas' : 'tickets' }}, últimos {{ velocidad().length }})</div>
+        </div>
+      </div>
+      <div class="report-bars">
+        @for (punto of velocidad(); track punto.etiqueta) {
+          <div class="report-bar-row">
+            <span class="report-bar-label" [title]="punto.etiqueta">{{ punto.etiqueta }}</span>
+            <div class="report-bar-track">
+              <div class="report-bar-fill" [style.width.%]="(punto.valor / maxVelocidad()) * 100" style="background: var(--indigo);"></div>
+            </div>
+            <span class="report-bar-value">{{ punto.valor }}</span>
+          </div>
+        }
+      </div>
+    }
+  }
+
+  <!-- 5. DIAGRAMA DE FLUJO ACUMULADO (CFD) -------------------------------- -->
+  @if (pestana() === 'cfd') {
+    @if (!proyectoId()) {
+      <p class="empty">Elige un proyecto para ver su flujo acumulado.</p>
+    } @else if (cfd().series.length === 0) {
+      <p class="empty">Este proyecto todavía no tiene columnas configuradas.</p>
+    } @else if (cfdSinDatos()) {
+      <p class="empty">
+        Este proyecto todavía no tiene movimientos de columna registrados en este rango —
+        el diagrama se va llenando conforme se mueven tickets en el Tablero. Prueba con un
+        rango más amplio, o vuelve más adelante.
+      </p>
+    } @else {
+      <div class="cfd-lienzo">
+        <svg viewBox="0 0 720 320" preserveAspectRatio="none" class="cfd-svg">
+          @for (serie of cfd().series; track serie.nombre) {
+            <path [attr.d]="pathSerieCfd(serie.valores, 720, 320)" [attr.fill]="serie.color" />
+          }
+        </svg>
+        <div class="cfd-eje-x">
+          <span>{{ cfd().dias[0] }}</span>
+          <span>{{ cfd().dias[cfd().dias.length - 1] }}</span>
+        </div>
+      </div>
+      <div class="cfd-leyenda">
+        @for (serie of cfd().series; track serie.nombre) {
+          <span class="cfd-leyenda-item">
+            <span class="cfd-leyenda-punto" [style.background]="serie.color"></span>
+            {{ serie.nombre }}
+          </span>
+        }
+      </div>
+      <p class="hint" style="margin-top: 10px;">
+        Cada banda es el número de tickets que estaban en esa columna (o en una posterior) ese
+        día — entre más ancha una banda, más tiempo se quedan ahí los tickets: ahí está el cuello
+        de botella.
+      </p>
+    }
+  }
+
+  <!-- 6. GRÁFICA DE CONTROL ------------------------------------------------ -->
+  @if (pestana() === 'control') {
+    @if (control().length === 0) {
+      <p class="empty">Todavía no hay tickets resueltos con historial de movimientos para calcular tiempo de ciclo.</p>
+    } @else {
+      <div class="dashboard-stats" style="margin: 20px 0;">
+        <div class="dashboard-stat-card">
+          <div class="num">{{ controlPromedio() }}</div>
+          <div class="label">Promedio de días de ciclo</div>
+        </div>
+        <div class="dashboard-stat-card">
+          <div class="num">{{ controlP85() }}</div>
+          <div class="label">Percentil 85 (compromiso razonable de entrega)</div>
+        </div>
+      </div>
+      <div class="control-lienzo">
+        <svg viewBox="0 0 720 280" preserveAspectRatio="none" class="control-svg">
+          <line x1="0" [attr.y1]="280 - (controlPromedio() / controlMaximo()) * 280" x2="720" [attr.y2]="280 - (controlPromedio() / controlMaximo()) * 280" class="control-linea-promedio" />
+          <line x1="0" [attr.y1]="280 - (controlP85() / controlMaximo()) * 280" x2="720" [attr.y2]="280 - (controlP85() / controlMaximo()) * 280" class="control-linea-p85" />
+          @for (punto of control(); track punto.folio + punto.fecha; let i = $index) {
+            <circle
+              [attr.cx]="posicionControl(i, punto.dias, 720, 280).x"
+              [attr.cy]="posicionControl(i, punto.dias, 720, 280).y"
+              r="4"
+              class="control-punto"
+            >
+              <title>#{{ punto.folio }} — {{ punto.titulo }}: {{ punto.dias }} día(s), resuelto {{ punto.fecha }}</title>
+            </circle>
+          }
+        </svg>
+      </div>
+      <div class="cfd-leyenda">
+        <span class="cfd-leyenda-item"><span class="cfd-leyenda-linea control-linea-promedio"></span> Promedio ({{ controlPromedio() }} días)</span>
+        <span class="cfd-leyenda-item"><span class="cfd-leyenda-linea control-linea-p85"></span> Percentil 85 ({{ controlP85() }} días)</span>
+      </div>
+      <p class="hint" style="margin-top: 10px;">
+        Cada punto es un ticket resuelto, de izquierda (más antiguo) a derecha (más reciente).
+        Pasa el mouse sobre un punto para ver de cuál ticket se trata. Muchos puntos por
+        encima del percentil 85 son una señal de que los compromisos de entrega ya no son
+        realistas.
+      </p>
+    }
+  }
+}

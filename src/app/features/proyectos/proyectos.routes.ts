@@ -43,4 +43,9 @@ export const PROYECTOS_ROUTES: Routes = [
     path: 'balanceo',
     loadComponent: () => import('./balanceo/balanceo.component').then((m) => m.BalanceoComponent),
   },
+  {
+    path: 'reportes-ejecutivos',
+    loadComponent: () =>
+      import('./reportes-ejecutivos/reportes-ejecutivos.component').then((m) => m.ReportesEjecutivosComponent),
+  },
 ];

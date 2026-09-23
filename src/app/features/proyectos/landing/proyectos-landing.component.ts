@@ -113,6 +113,14 @@ const GRUPOS: GrupoModulo[] = [
         descripcion: 'Carga de trabajo pendiente por persona y prioridad, para decidir a quién asignar y reasignar tickets entre proyectos.',
         grupo: 'Reportes',
       },
+      {
+        ruta: 'reportes-ejecutivos',
+        icono: '📊',
+        color: 'teal',
+        titulo: 'Reportes ejecutivos',
+        descripcion: 'Trabajo hecho, trabajo pendiente, reporte de sprint, velocidad, flujo acumulado y gráfica de control — para nivel directivo.',
+        grupo: 'Reportes',
+      },
     ],
   },
 ];

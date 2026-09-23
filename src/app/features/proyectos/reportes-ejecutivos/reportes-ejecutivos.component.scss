@@ -1,0 +1,87 @@
+// El sistema visual global (page-header, tab-bar/tab-btn, board-filters,
+// dashboard-stats, report-bars, panel/panel-head, grid-badge, etc.) vive en
+// src/styles.scss. Lo único propio de esta pantalla es el lienzo SVG del
+// Diagrama de Flujo Acumulado y de la Gráfica de Control — no hay ningún otro
+// gráfico de este tipo (áreas apiladas / dispersión con líneas) en el resto de
+// la app, así que sus estilos no encajan en ninguna clase ya existente.
+
+.cfd-lienzo,
+.control-lienzo {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.cfd-svg,
+.control-svg {
+  width: 100%;
+  height: 320px;
+  display: block;
+}
+
+.control-svg {
+  height: 280px;
+}
+
+.cfd-eje-x {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  margin-top: 6px;
+}
+
+.cfd-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.cfd-leyenda-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.cfd-leyenda-punto {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cfd-leyenda-linea {
+  display: inline-block;
+  width: 16px;
+  height: 0;
+  border-top: 2px solid currentColor;
+}
+
+.control-punto {
+  fill: var(--indigo);
+  fill-opacity: 0.75;
+  cursor: default;
+}
+
+.control-punto:hover {
+  fill-opacity: 1;
+}
+
+.control-linea-promedio {
+  stroke: var(--teal);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  color: var(--teal);
+}
+
+.control-linea-p85 {
+  stroke: var(--danger);
+  stroke-width: 2;
+  stroke-dasharray: 2 3;
+  color: var(--danger);
+}
