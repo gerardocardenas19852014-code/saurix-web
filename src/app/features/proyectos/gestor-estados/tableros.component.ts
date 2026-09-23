@@ -13,7 +13,7 @@ import {
   TableroColumna,
   parsearConfiguracionCampos,
   reglaCampo,
-} from '../../proyectos/tableros/tablero-columna.model';
+} from '../tableros/tablero-columna.model';
 
 interface TicketOpcion {
   id: number;

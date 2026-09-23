@@ -18,9 +18,9 @@ interface GrupoModulo {
 }
 
 // Los catálogos propios de este módulo (Tipos de Ticket, Prioridades,
-// Motivos de Solución) y el Gestor de Estados de columnas se administran
-// ahora desde Catálogos y Panel de Control respectivamente — mismo dato,
-// una sola pantalla de administración, para no duplicar mantenimiento.
+// Motivos de Solución) se administran desde Catálogos — mismo dato, una
+// sola pantalla de administración, para no duplicar mantenimiento. El
+// Gestor de Estados (columnas del tablero) sí vive aquí, en Proyectos.
 const GRUPOS: GrupoModulo[] = [
   {
     titulo: 'Proyectos',
@@ -39,6 +39,14 @@ const GRUPOS: GrupoModulo[] = [
         color: 'siif',
         titulo: 'Proyectos',
         descripcion: 'Alta y edición de los proyectos que tienen su propio tablero Kanban.',
+        grupo: 'Proyectos',
+      },
+      {
+        ruta: 'gestor-estados',
+        icono: '🧭',
+        color: 'siif',
+        titulo: 'Gestor de Estados',
+        descripcion: 'Columnas del tablero Kanban de cada proyecto, con permisos y campos configurables por columna.',
         grupo: 'Proyectos',
       },
     ],

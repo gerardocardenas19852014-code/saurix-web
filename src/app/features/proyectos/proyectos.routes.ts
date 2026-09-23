@@ -35,4 +35,8 @@ export const PROYECTOS_ROUTES: Routes = [
     loadComponent: () =>
       import('./resumen-ejecutivo/resumen-ejecutivo.component').then((m) => m.ResumenEjecutivoComponent),
   },
+  {
+    path: 'gestor-estados',
+    loadComponent: () => import('./gestor-estados/tableros.component').then((m) => m.TablerosComponent),
+  },
 ];

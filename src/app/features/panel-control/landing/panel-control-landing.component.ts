@@ -17,11 +17,10 @@ interface GrupoConfig {
   enlaces: EnlaceConfig[];
 }
 
-// Panel de Control reúne la configuración general de la app (Apariencia,
-// Conexiones) junto con las pantallas de configuración propias de cada
-// módulo (p.ej. el Gestor de Estados de Gestión de Proyectos). Cada módulo
-// que necesite una pantalla de configuración similar agrega aquí su propio
-// grupo, para que siempre quede claro a qué módulo pertenece cada una.
+// Panel de Control reúne la configuración GENERAL de la app (Apariencia,
+// Conexiones, Respaldo). La configuración propia de cada módulo (p.ej. el
+// Gestor de Estados de Gestión de Proyectos) vive dentro de ese mismo
+// módulo — así siempre queda claro a qué módulo pertenece cada pantalla.
 const GRUPOS: GrupoConfig[] = [
   {
     titulo: 'General',
@@ -49,19 +48,6 @@ const GRUPOS: GrupoConfig[] = [
         titulo: 'Respaldo y restauración',
         descripcion: 'Descarga toda tu información o restáurala en otro dispositivo.',
         grupo: 'General',
-      },
-    ],
-  },
-  {
-    titulo: 'Gestión de Proyectos',
-    enlaces: [
-      {
-        ruta: 'gestion-proyectos/gestor-estados',
-        icono: '🧭',
-        color: 'siif',
-        titulo: 'Gestor de Estados',
-        descripcion: 'Columnas del tablero Kanban de cada proyecto, con permisos y campos configurables por columna.',
-        grupo: 'Gestión de Proyectos',
       },
     ],
   },

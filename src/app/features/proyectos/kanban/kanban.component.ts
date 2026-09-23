@@ -770,7 +770,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   });
 
   /** Aplica, sobre `this.form`, las reglas editable/obligatorio configuradas para
-   *  la columna actual (Panel de Control → Gestión de Proyectos → Gestor de Estados → "⚙ Campos").
+   *  la columna actual (Gestión de Proyectos → Gestor de Estados → "⚙ Campos").
    *  Se llama cada vez que se abre/actualiza el formulario (alta, detalle, tras
    *  mover el ticket de columna). */
   private aplicarConfiguracionCampos(): void {
@@ -792,7 +792,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   nuevoTicket(columnaId: number): void {
     if (!this.columnasTablero().length) {
       this.toast.advertencia(
-        'Este proyecto todavía no tiene columnas configuradas. Créalas primero en Panel de Control → Gestión de Proyectos → Gestor de Estados.',
+        'Este proyecto todavía no tiene columnas configuradas. Créalas primero en Gestor de Estados.',
       );
       return;
     }
