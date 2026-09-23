@@ -4,6 +4,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { CategoriaPresupuesto } from '../../catalogos/categoria-presupuesto/categoria-presupuesto.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
+import { MovimientoRecurrentePresupuesto } from '../recurrentes/recurrente.model';
 import { colorCategoria, formatMoneda } from '../shared/wallet.util';
 
 type PeriodoId = 'mes-actual' | 'mes-anterior' | 'anio-actual' | 'anio-anterior';
@@ -28,6 +29,14 @@ interface PuntoPatrimonio {
   y: number;
 }
 
+interface PlaneadoReal {
+  clave: string;
+  nombre: string;
+  tipo: 'Ingreso' | 'Gasto';
+  planeado: number;
+  real: number;
+}
+
 /**
  * Reportes: ingresos vs. gastos con comparación de periodo, gasto por
  * categoría (dona/barra) y patrimonio neto histórico. Todo se calcula en
@@ -50,6 +59,7 @@ export class ReportesComponent implements OnInit {
 
   protected readonly movimientos = signal<MovimientoPresupuesto[]>([]);
   protected readonly categorias = signal<CategoriaPresupuesto[]>([]);
+  protected readonly recurrentes = signal<MovimientoRecurrentePresupuesto[]>([]);
   protected readonly cargando = signal(false);
 
   protected readonly periodo = signal<PeriodoId>('mes-actual');
@@ -62,6 +72,9 @@ export class ReportesComponent implements OnInit {
   ngOnInit(): void {
     this.cargando.set(true);
     this.data.list<CategoriaPresupuesto>('CategoriaPresupuesto').subscribe((c) => this.categorias.set(c));
+    this.data
+      .list<MovimientoRecurrentePresupuesto>('MovimientoRecurrentePresupuesto', { creadoPorUsuarioId: this.usuarioActualId })
+      .subscribe((r) => this.recurrentes.set(r));
     this.data.list<MovimientoPresupuesto>('MovimientoPresupuesto', { creadoPorUsuarioId: this.usuarioActualId }).subscribe({
       next: (m) => {
         this.movimientos.set(m);
@@ -157,6 +170,29 @@ export class ReportesComponent implements OnInit {
 
   protected readonly maxCategoria = computed(() => Math.max(1, ...this.gastoPorCategoria().map((c) => c.monto)));
 
+  /** Ingresos por categoría del periodo seleccionado, de mayor a menor (misma lógica que gasto por categoría). */
+  protected readonly ingresoPorCategoria = computed<GastoCategoria[]>(() => {
+    const rango = this.rangosDe(this.periodo()).actual;
+    const ingresos = this.movimientos().filter((m) => m.tipo === 'Ingreso' && !m.transferenciaId && this.enRango(m.fecha, rango));
+    const total = ingresos.reduce((s, m) => s + m.monto, 0);
+    const porCategoria = new Map<number | null, number>();
+    for (const m of ingresos) {
+      const id = m.categoriaPresupuestoId ? Number(m.categoriaPresupuestoId) : null;
+      porCategoria.set(id, (porCategoria.get(id) ?? 0) + m.monto);
+    }
+    return [...porCategoria.entries()]
+      .map(([id, monto]) => ({
+        id,
+        nombre: id ? (this.categorias().find((c) => Number(c.id) === id)?.nombre ?? '—') : 'Sin categoría',
+        monto,
+        pct: total > 0 ? (monto / total) * 100 : 0,
+        color: colorCategoria(id),
+      }))
+      .sort((a, b) => b.monto - a.monto);
+  });
+
+  protected readonly maxIngresoCategoria = computed(() => Math.max(1, ...this.ingresoPorCategoria().map((c) => c.monto)));
+
   /** Gradiente cónico para la dona, construido a partir de los porcentajes acumulados. */
   protected readonly gradienteDona = computed(() => {
     const categorias = this.gastoPorCategoria();
@@ -213,4 +249,78 @@ export class ReportesComponent implements OnInit {
     const puntos = this.patrimonioHistorico();
     return puntos.length > 0 ? puntos[puntos.length - 1].valor : 0;
   });
+
+  /** Cuántos meses caben, completos, dentro de un rango (1 para mes-actual/anterior, 12 para año-actual/anterior). */
+  private mesesEnRango(rango: RangoFecha): number {
+    return (
+      (rango.fin.getFullYear() - rango.inicio.getFullYear()) * 12 + (rango.fin.getMonth() - rango.inicio.getMonth()) + 1
+    );
+  }
+
+  /**
+   * "Planeado vs. real": lo que los fijos (Fijos y Proyección) configurados hoy
+   * DEBERÍAN haber producido durante el periodo seleccionado (planeado) contra lo
+   * que realmente se registró en Movimientos en ese mismo periodo (real),
+   * agrupado por categoría + tipo. Un fijo Mensual cuenta una vez por cada mes
+   * del rango; uno Anual cuenta solo si el mes de su fechaCreacion cae dentro
+   * del rango (siempre una vez cuando el rango es un año completo).
+   */
+  protected readonly planeadoVsReal = computed<PlaneadoReal[]>(() => {
+    const rango = this.rangosDe(this.periodo()).actual;
+    const mesesEnRango = this.mesesEnRango(rango);
+    const nombreCategoria = (id: number | null) =>
+      id ? (this.categorias().find((c) => Number(c.id) === id)?.nombre ?? '—') : 'Sin categoría';
+    const clave = (id: number | null, tipo: string) => `${id ?? 'null'}|${tipo}`;
+
+    const planeado = new Map<string, number>();
+    for (const fijo of this.recurrentes()) {
+      const id = fijo.categoriaPresupuestoId ? Number(fijo.categoriaPresupuestoId) : null;
+      let veces = 0;
+      if (fijo.frecuencia === 'Mensual') {
+        veces = mesesEnRango;
+      } else if (fijo.frecuencia === 'Anual') {
+        const mesAncla = fijo.fechaCreacion ? new Date(fijo.fechaCreacion).getMonth() : 0;
+        veces = mesesEnRango >= 12 || rango.inicio.getMonth() === mesAncla ? 1 : 0;
+      }
+      if (veces > 0) {
+        const k = clave(id, fijo.tipo);
+        planeado.set(k, (planeado.get(k) ?? 0) + fijo.monto * veces);
+      }
+    }
+
+    const real = new Map<string, number>();
+    for (const m of this.movimientos().filter((m) => !m.transferenciaId && this.enRango(m.fecha, rango))) {
+      const id = m.categoriaPresupuestoId ? Number(m.categoriaPresupuestoId) : null;
+      const k = clave(id, m.tipo);
+      real.set(k, (real.get(k) ?? 0) + m.monto);
+    }
+
+    const claves = new Set([...planeado.keys(), ...real.keys()]);
+    const filas: PlaneadoReal[] = [];
+    for (const k of claves) {
+      const [idTexto, tipo] = k.split('|');
+      const id = idTexto === 'null' ? null : Number(idTexto);
+      filas.push({
+        clave: k,
+        nombre: nombreCategoria(id),
+        tipo: tipo as 'Ingreso' | 'Gasto',
+        planeado: planeado.get(k) ?? 0,
+        real: real.get(k) ?? 0,
+      });
+    }
+    return filas.sort((a, b) => a.tipo.localeCompare(b.tipo) || b.planeado - a.planeado);
+  });
+
+  /** 'over' cuando lo real perjudica (gastaste más de lo planeado, o ingresaste menos), 'ok' en caso contrario. */
+  protected estadoPlaneado(fila: PlaneadoReal): 'ok' | 'over' {
+    if (fila.tipo === 'Gasto') return fila.real > fila.planeado ? 'over' : 'ok';
+    return fila.real < fila.planeado ? 'over' : 'ok';
+  }
+
+  protected etiquetaPlaneado(fila: PlaneadoReal): string {
+    const diferencia = fila.real - fila.planeado;
+    if (diferencia === 0) return 'exacto';
+    const signo = diferencia > 0 ? '+' : '−';
+    return `${signo}${this.formatMoneda(Math.abs(diferencia))}`;
+  }
 }

@@ -73,6 +73,58 @@
     </div>
   }
 
+  <h2 class="settings-card-title" style="margin:0 0 12px;">Ingresos por categoría</h2>
+  @if (ingresoPorCategoria().length === 0) {
+    <div class="empty-state-block"><p>Sin ingresos registrados en este periodo.</p></div>
+  } @else {
+    <div style="margin-bottom:28px;">
+      @for (cat of ingresoPorCategoria(); track cat.id) {
+        <div class="wallet-cat-bar-row">
+          <span class="wallet-cat-bar-name" [title]="cat.nombre">{{ cat.nombre }}</span>
+          <div class="wallet-cat-bar-track">
+            <div class="wallet-cat-bar-fill" [style.width.%]="(cat.monto / maxIngresoCategoria()) * 100" [style.background]="cat.color"></div>
+          </div>
+          <span class="wallet-cat-bar-amount">{{ formatMoneda(cat.monto) }}</span>
+        </div>
+      }
+    </div>
+  }
+
+  <h2 class="settings-card-title" style="margin:0 0 4px;">Planeado vs. real — {{ etiquetaPeriodo() }}</h2>
+  <p class="hint" style="margin:0 0 12px;">Lo que tus fijos (Fijos y Proyección) deberían haber producido en el periodo, contra lo que realmente registraste.</p>
+  @if (planeadoVsReal().length === 0) {
+    <div class="empty-state-block"><p>No tienes fijos configurados todavía.</p></div>
+  } @else {
+    <div class="grid-table-scroll" style="margin-bottom:28px;">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th>Categoría</th>
+            <th>Tipo</th>
+            <th>Planeado</th>
+            <th>Real</th>
+            <th>Diferencia</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (fila of planeadoVsReal(); track fila.clave) {
+            <tr>
+              <td>{{ fila.nombre }}</td>
+              <td><span class="grid-badge" [class.grid-badge-success]="fila.tipo === 'Ingreso'" [class.grid-badge-danger]="fila.tipo === 'Gasto'">{{ fila.tipo }}</span></td>
+              <td>{{ formatMoneda(fila.planeado) }}</td>
+              <td>{{ formatMoneda(fila.real) }}</td>
+              <td>
+                <span class="grid-badge" [class.grid-badge-success]="estadoPlaneado(fila) === 'ok'" [class.grid-badge-warning]="estadoPlaneado(fila) === 'over'">
+                  {{ etiquetaPlaneado(fila) }}
+                </span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
   <h2 class="settings-card-title" style="margin:0 0 4px;">Patrimonio neto histórico</h2>
   <p class="hint" style="margin:0 0 12px;">Suma de todos tus ingresos menos gastos, acumulada mes a mes (últimos 12 meses) · actual: <strong>{{ formatMoneda(patrimonioActual()) }}</strong></p>
   <svg class="wallet-networth-chart" viewBox="0 0 640 200" preserveAspectRatio="none">
