@@ -87,6 +87,13 @@ interface CuentaConInfo {
   info: InfoTarjeta | null;
 }
 
+/** Orden preferido de las pestañas de Cuentas — coincide con los tipos
+ * protegidos del catálogo "Tipo de cuenta" (Efectivo/Banco/Tarjeta/Ahorro);
+ * cualquier tipo adicional que el usuario dé de alta ahí se agrega al final,
+ * alfabéticamente, sin tener que tocar este componente. */
+const ORDEN_TIPOS_CUENTA = ['Efectivo', 'Banco', 'Tarjeta', 'Ahorro'];
+const TAB_TODAS = 'Todas';
+
 interface CategoriaMonto {
   id: number | null;
   nombre: string;
@@ -166,6 +173,25 @@ export class PresupuestoLandingComponent implements OnInit {
       return { cuenta, saldo, esTarjeta, info: esTarjeta ? infoTarjeta(cuenta, saldo) : null };
     }),
   );
+
+  /** Pestaña de Cuentas seleccionada ('Todas' o un tipo, p.ej. 'Tarjeta'). */
+  protected readonly tabCuentaActiva = signal<string>(TAB_TODAS);
+
+  protected readonly tabsCuenta = computed<string[]>(() => {
+    const presentes = new Set(this.cuentasConInfo().map((c) => c.cuenta.tipo));
+    const conocidos = ORDEN_TIPOS_CUENTA.filter((t) => presentes.has(t));
+    const extras = [...presentes].filter((t) => !ORDEN_TIPOS_CUENTA.includes(t)).sort();
+    return [TAB_TODAS, ...conocidos, ...extras];
+  });
+
+  protected readonly cuentasFiltradas = computed<CuentaConInfo[]>(() => {
+    const tab = this.tabCuentaActiva();
+    return tab === TAB_TODAS ? this.cuentasConInfo() : this.cuentasConInfo().filter((c) => c.cuenta.tipo === tab);
+  });
+
+  seleccionarTabCuenta(tab: string): void {
+    this.tabCuentaActiva.set(tab);
+  }
 
   protected readonly deudaTotalTarjetas = computed(() =>
     this.cuentasConInfo().reduce((s, c) => s + (c.info?.deuda ?? 0), 0),

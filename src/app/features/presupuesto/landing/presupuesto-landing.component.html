@@ -36,8 +36,24 @@
 
 <h2 class="settings-card-title" style="margin:0 0 4px;">Cuentas</h2>
 <p class="hint" style="margin:0 0 12px;">Las categorías y cuentas se administran desde Catálogos.</p>
+
+@if (tabsCuenta().length > 2) {
+  <div class="tab-bar" style="margin:0 0 14px;">
+    @for (tab of tabsCuenta(); track tab) {
+      <button
+        type="button"
+        class="tab-btn"
+        [class.is-active]="tabCuentaActiva() === tab"
+        (click)="seleccionarTabCuenta(tab)"
+      >
+        {{ tab === 'Todas' ? '📋' : iconoTipoCuenta(tab) }} {{ tab }}
+      </button>
+    }
+  </div>
+}
+
 <div class="wallet-accounts-grid" style="margin-bottom:28px;">
-  @for (c of cuentasConInfo(); track c.cuenta.id) {
+  @for (c of cuentasFiltradas(); track c.cuenta.id) {
     <div class="wallet-account-card" style="cursor:default;">
       <span class="wallet-account-icon">{{ iconoTipoCuenta(c.cuenta.tipo) }}</span>
       <div class="wallet-account-name">{{ c.cuenta.nombre }}</div>
@@ -69,7 +85,9 @@
       }
     </div>
   } @empty {
-    <div class="empty-state-block"><p>Aún no hay cuentas — créalas desde Catálogos.</p></div>
+    <div class="empty-state-block">
+      <p>{{ tabCuentaActiva() === 'Todas' ? 'Aún no hay cuentas — créalas desde Catálogos.' : 'No hay cuentas de tipo ' + tabCuentaActiva() + '.' }}</p>
+    </div>
   }
 </div>
 
