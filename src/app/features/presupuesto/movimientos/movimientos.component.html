@@ -126,7 +126,7 @@
 
         <label>
           Tipo
-          <select formControlName="tipo">
+          <select formControlName="tipo" (change)="onTipoChange()">
             @for (t of tiposMovimiento(); track t.id) {
               <option [value]="t.clave">{{ t.etiqueta }}</option>
             }
@@ -161,7 +161,7 @@
             Categoría
             <select formControlName="categoriaPresupuestoId">
               <option [ngValue]="0">Sin categoría</option>
-              @for (categoria of categorias(); track categoria.id) {
+              @for (categoria of categoriasFiltradas(); track categoria.id) {
                 <option [ngValue]="categoria.id">{{ categoria.nombre }}</option>
               }
             </select>

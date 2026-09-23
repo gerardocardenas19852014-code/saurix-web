@@ -24,7 +24,7 @@
       <div class="edit-form" style="margin-bottom:18px;">
         <label>Descripción<input type="text" formControlName="descripcion" /></label>
         <label>Tipo
-          <select formControlName="tipo">
+          <select formControlName="tipo" (change)="onTipoChange()">
             @for (t of tiposMovimiento(); track t.id) { <option [value]="t.clave">{{ t.etiqueta }}</option> }
           </select>
         </label>
@@ -37,7 +37,7 @@
         <label>Categoría
           <select formControlName="categoriaPresupuestoId">
             <option [ngValue]="0">Sin categoría</option>
-            @for (c of categorias(); track c.id) { <option [ngValue]="c.id">{{ c.nombre }}</option> }
+            @for (c of categoriasFiltradas(); track c.id) { <option [ngValue]="c.id">{{ c.nombre }}</option> }
           </select>
         </label>
         <label>Monto<input type="number" step="0.01" formControlName="monto" /></label>

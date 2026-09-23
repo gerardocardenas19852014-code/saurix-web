@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth.service';
@@ -30,6 +30,9 @@ export class LimitesComponent implements OnInit {
   protected readonly limites = signal<LimitePresupuesto[]>([]);
   protected readonly categorias = signal<CategoriaPresupuesto[]>([]);
   protected readonly movimientos = signal<MovimientoPresupuesto[]>([]);
+
+  /** Un límite de gasto solo tiene sentido contra categorías de Gasto (o sin Tipo definido — catálogo previo a este campo). */
+  protected readonly categoriasGasto = computed(() => this.categorias().filter((c) => !c.tipo || c.tipo === 'Gasto'));
   protected readonly cargando = signal(false);
   protected readonly modalAbierto = signal(false);
   protected readonly enEdicion = signal<LimitePresupuesto | null>(null);

@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth.service';
@@ -123,6 +124,27 @@ export class MovimientosComponent implements OnInit {
 
   get esTransferencia(): boolean {
     return this.form.controls.tipo.value === 'Transferencia';
+  }
+
+  /** Tipo actual del formulario como signal (para filtrar Categoría reactivamente sin duplicar estado). */
+  private readonly tipoFormulario = toSignal(this.form.controls.tipo.valueChanges, {
+    initialValue: this.form.controls.tipo.value,
+  });
+
+  /** Solo categorías del mismo Tipo (o sin Tipo definido — catálogo previo a este campo). */
+  protected readonly categoriasFiltradas = computed(() => {
+    const tipo = this.tipoFormulario();
+    return this.categorias().filter((c) => !c.tipo || c.tipo === tipo);
+  });
+
+  /** Si al cambiar Tipo la categoría ya elegida deja de aplicar, se limpia (evita guardar una combinación inconsistente). */
+  onTipoChange(): void {
+    const tipo = this.form.controls.tipo.value;
+    const categoriaId = this.form.controls.categoriaPresupuestoId.value;
+    const categoria = this.categorias().find((c) => Number(c.id) === Number(categoriaId));
+    if (categoria?.tipo && categoria.tipo !== tipo) {
+      this.form.controls.categoriaPresupuestoId.setValue(0);
+    }
   }
 
   private get usuarioActualId(): number {

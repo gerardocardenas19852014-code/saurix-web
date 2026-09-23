@@ -53,7 +53,7 @@
 
         <label class="floating-field full-span">
           <span>Categoría padre (vacío = raíz)</span>
-          <select class="form-control pill-control" formControlName="categoriaPresupuestoPadreId" aria-label="Categoría padre">
+          <select class="form-control pill-control" formControlName="categoriaPresupuestoPadreId" (change)="onPadreChange()" aria-label="Categoría padre">
             <option [ngValue]="0">Ninguna (es una categoría raíz)</option>
             @for (raiz of raices(); track raiz.id) {
               @if (raiz.id !== registroEnEdicion()?.id) {
@@ -61,6 +61,18 @@
               }
             }
           </select>
+        </label>
+
+        <label class="floating-field full-span">
+          <span>Tipo <b>*</b></span>
+          <select class="form-control pill-control" formControlName="tipo" aria-label="Tipo">
+            @for (t of tiposMovimiento(); track t.id) {
+              <option [value]="t.clave">{{ t.etiqueta }}</option>
+            }
+          </select>
+          @if (tipoHeredado()) {
+            <span class="hint" style="margin:4px 0 0;">Heredado de su categoría padre.</span>
+          }
         </label>
       </div>
 

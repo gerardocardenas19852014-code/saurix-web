@@ -9,6 +9,7 @@ import { BitacoraService } from '../../../shared/services/bitacora.service';
 import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { ToastService } from '../../../shared/services/toast.service';
 import { exportarCsv } from '../../../shared/utils/csv.util';
+import { ValorLista } from '../valor-lista/valor-lista.model';
 import { CategoriaPresupuesto } from './categoria-presupuesto.model';
 
 const MODULO_BITACORA = 'Catálogos / Categorías de presupuesto';
@@ -38,6 +39,7 @@ export class CategoriaPresupuestoListComponent implements OnInit {
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
 
   protected readonly registrosTodos = signal<CategoriaPresupuesto[]>([]);
+  protected readonly tiposMovimiento = signal<ValorLista[]>([]);
   protected readonly cargando = signal(false);
   protected readonly busqueda = signal('');
 
@@ -57,6 +59,12 @@ export class CategoriaPresupuestoListComponent implements OnInit {
   protected readonly columnas: ColumnaTabla<CategoriaPresupuesto>[] = [
     { campo: 'nombre', etiqueta: 'Nombre', formatear: (r) => (r.categoriaPresupuestoPadreId ? `— ${r.nombre}` : r.nombre) },
     {
+      campo: 'tipo',
+      etiqueta: 'Tipo',
+      formatear: (r) => this.etiquetaTipo(r.tipo),
+      claseValor: (r) => (r.tipo === 'Ingreso' ? 'grid-badge-success' : r.tipo === 'Gasto' ? 'grid-badge-danger' : 'grid-badge-muted'),
+    },
+    {
       campo: 'categoriaPresupuestoPadreId',
       etiqueta: 'Categoría padre',
       formatear: (r) => this.nombrePadre(r.categoriaPresupuestoPadreId),
@@ -66,16 +74,50 @@ export class CategoriaPresupuestoListComponent implements OnInit {
   protected readonly form = this.fb.nonNullable.group({
     id: [0],
     nombre: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(60)]],
+    tipo: ['Gasto' as string, Validators.required],
     categoriaPresupuestoPadreId: [0],
   });
 
+  /** true mientras el Tipo lo hereda de la categoría padre elegida (el select se deshabilita) — ver onPadreChange(). */
+  protected readonly tipoHeredado = signal(false);
+
   ngOnInit(): void {
+    this.data.list<ValorLista>('ValorLista', { grupo: 'MovimientoPresupuestoTipo' }).subscribe((valores) =>
+      this.tiposMovimiento.set(
+        valores.filter((v) => v.grupo === 'MovimientoPresupuestoTipo').sort((a, b) => a.orden - b.orden),
+      ),
+    );
     this.cargar();
   }
 
   nombrePadre(id: number | null): string {
     if (!id) return '—';
     return this.registrosTodos().find((c) => Number(c.id) === Number(id))?.nombre ?? '—';
+  }
+
+  etiquetaTipo(tipo: string | null): string {
+    if (!tipo) return 'Sin definir';
+    return this.tiposMovimiento().find((t) => t.clave === tipo)?.etiqueta ?? tipo;
+  }
+
+  /** El Tipo de una subcategoría siempre es el de su padre — se dispara al elegir/quitar "Categoría padre" en el formulario. */
+  onPadreChange(): void {
+    const padreId = this.form.controls.categoriaPresupuestoPadreId.value;
+    if (!padreId) {
+      this.tipoHeredado.set(false);
+      this.form.controls.tipo.enable();
+      return;
+    }
+    const padre = this.raices().find((c) => Number(c.id) === Number(padreId));
+    if (padre?.tipo) {
+      this.form.controls.tipo.setValue(padre.tipo);
+      this.tipoHeredado.set(true);
+      this.form.controls.tipo.disable();
+    } else {
+      // El padre es de un catálogo previo al campo Tipo (todavía "Sin definir"): no hay de dónde heredar.
+      this.tipoHeredado.set(false);
+      this.form.controls.tipo.enable();
+    }
   }
 
   cargar(): void {
@@ -91,7 +133,9 @@ export class CategoriaPresupuestoListComponent implements OnInit {
 
   nuevo(): void {
     this.registroEnEdicion.set(null);
-    this.form.reset({ id: 0, nombre: '', categoriaPresupuestoPadreId: 0 });
+    this.tipoHeredado.set(false);
+    this.form.reset({ id: 0, nombre: '', tipo: 'Gasto', categoriaPresupuestoPadreId: 0 });
+    this.form.controls.tipo.enable();
     this.modalAbierto.set(true);
   }
 
@@ -100,8 +144,11 @@ export class CategoriaPresupuestoListComponent implements OnInit {
     this.form.reset({
       id: registro.id,
       nombre: registro.nombre,
+      tipo: registro.tipo ?? 'Gasto',
       categoriaPresupuestoPadreId: registro.categoriaPresupuestoPadreId ?? 0,
     });
+    this.form.controls.tipo.enable();
+    this.onPadreChange();
     this.modalAbierto.set(true);
   }
 
