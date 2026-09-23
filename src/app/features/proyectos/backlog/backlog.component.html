@@ -131,6 +131,7 @@
             <span class="grid-badge" [class.grid-badge-success]="sprint.estado === 'activo'" [class.grid-badge-neutral]="sprint.estado === 'planeado'">
               {{ sprint.estado === 'activo' ? 'Activo' : 'Planeado' }}
             </span>
+            <span class="hint" style="font-weight:400;">{{ ticketsDeSprintFiltrados(sprint.id).length }} ticket(s)</span>
           </h2>
           @if (sprint.objetivo) {
             <p class="hint" style="margin: 0 0 4px;">🎯 {{ sprint.objetivo }}</p>
