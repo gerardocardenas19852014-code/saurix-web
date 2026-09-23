@@ -260,13 +260,13 @@
             <table class="grid-table">
               <thead>
                 <tr>
-                  <th>Folio</th>
-                  <th>Folio interno</th>
-                  <th>Título</th>
-                  <th>Estado</th>
-                  <th>Prioridad</th>
-                  <th>Asignado a</th>
-                  <th>Horas est.</th>
+                  <th class="th-ordenable" role="button" tabindex="0" (click)="ordenarTicketsPor('folio')" (keydown.enter)="ordenarTicketsPor('folio')">Folio{{ indicadorOrdenTickets('folio') }}</th>
+                  <th class="th-ordenable" role="button" tabindex="0" (click)="ordenarTicketsPor('folioInterno')" (keydown.enter)="ordenarTicketsPor('folioInterno')">Folio interno{{ indicadorOrdenTickets('folioInterno') }}</th>
+                  <th class="th-ordenable" role="button" tabindex="0" (click)="ordenarTicketsPor('titulo')" (keydown.enter)="ordenarTicketsPor('titulo')">Título{{ indicadorOrdenTickets('titulo') }}</th>
+                  <th class="th-ordenable" role="button" tabindex="0" (click)="ordenarTicketsPor('estado')" (keydown.enter)="ordenarTicketsPor('estado')">Estado{{ indicadorOrdenTickets('estado') }}</th>
+                  <th class="th-ordenable" role="button" tabindex="0" (click)="ordenarTicketsPor('prioridad')" (keydown.enter)="ordenarTicketsPor('prioridad')">Prioridad{{ indicadorOrdenTickets('prioridad') }}</th>
+                  <th class="th-ordenable" role="button" tabindex="0" (click)="ordenarTicketsPor('asignado')" (keydown.enter)="ordenarTicketsPor('asignado')">Asignado a{{ indicadorOrdenTickets('asignado') }}</th>
+                  <th class="th-ordenable" role="button" tabindex="0" (click)="ordenarTicketsPor('horas')" (keydown.enter)="ordenarTicketsPor('horas')">Horas est.{{ indicadorOrdenTickets('horas') }}</th>
                 </tr>
               </thead>
               <tbody>

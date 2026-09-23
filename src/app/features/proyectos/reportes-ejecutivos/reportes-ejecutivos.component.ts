@@ -12,6 +12,7 @@ import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario
 type Pestana = 'hecho' | 'pendiente' | 'sprint' | 'velocidad' | 'cfd' | 'control';
 type Metrica = 'tickets' | 'horas';
 type OrdenSprint = 'nombre' | 'estado' | 'fecha' | 'tickets' | 'horas';
+type OrdenTicket = 'folio' | 'folioInterno' | 'titulo' | 'estado' | 'prioridad' | 'asignado' | 'horas';
 
 interface PuntoBarra {
   etiqueta: string;
@@ -165,6 +166,8 @@ export class ReportesEjecutivosComponent implements OnInit {
    *  Control → Apariencia → Tablas y listados / PreferenciasGridService). El CSV
    *  exporta siempre TODOS los tickets, sin importar la página en pantalla. */
   protected readonly paginaTicketsSprint = signal(1);
+  protected readonly ordenTicketsPor = signal<OrdenTicket | null>(null);
+  protected readonly ordenTicketsDireccion = signal<'asc' | 'desc'>('asc');
 
   protected totalPaginasTickets(totalTickets: number): number {
     return Math.max(1, Math.ceil(totalTickets / this.preferenciasGrid.tamanoPagina()));
@@ -179,12 +182,61 @@ export class ReportesEjecutivosComponent implements OnInit {
 
   protected ticketsVisibles(tickets: Ticket[]): Ticket[] {
     const tamano = this.preferenciasGrid.tamanoPagina();
+    const ordenados = this.ordenarTickets(tickets);
     const inicio = (this.paginaActualTickets(tickets.length) - 1) * tamano;
-    return tickets.slice(inicio, inicio + tamano);
+    return ordenados.slice(inicio, inicio + tamano);
   }
 
   protected irAPaginaTickets(pagina: number): void {
     this.paginaTicketsSprint.set(pagina);
+  }
+
+  /** Ordenar la tabla "Tickets del sprint" por cualquier columna (mismo patrón
+   *  th-ordenable que "Todos los sprints" y Balanceo) — reinicia a la página 1
+   *  para no quedar viendo una página que ya no corresponde al nuevo orden. */
+  protected ordenarTicketsPor(campo: OrdenTicket): void {
+    if (this.ordenTicketsPor() === campo) {
+      this.ordenTicketsDireccion.update((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      this.ordenTicketsPor.set(campo);
+      this.ordenTicketsDireccion.set('asc');
+    }
+    this.paginaTicketsSprint.set(1);
+  }
+
+  protected indicadorOrdenTickets(campo: OrdenTicket): string {
+    if (this.ordenTicketsPor() !== campo) return '';
+    return this.ordenTicketsDireccion() === 'desc' ? ' ▾' : ' ▴';
+  }
+
+  private ordenarTickets(tickets: Ticket[]): Ticket[] {
+    const campo = this.ordenTicketsPor();
+    if (!campo) return tickets;
+    const direccion = this.ordenTicketsDireccion() === 'desc' ? -1 : 1;
+    const valorDe = (t: Ticket): number | string => {
+      switch (campo) {
+        case 'folio':
+          return t.numeroTicket.toLowerCase();
+        case 'folioInterno':
+          return (t.folioInterno ?? '').toLowerCase();
+        case 'titulo':
+          return t.titulo.toLowerCase();
+        case 'estado':
+          return this.nombreColumna(t.tableroColumnaId).toLowerCase();
+        case 'prioridad':
+          return this.nombrePrioridad(t.ticketPrioridadId).toLowerCase();
+        case 'asignado':
+          return this.nombreUsuario(t.asignadoUsuarioId).toLowerCase();
+        case 'horas':
+          return this.horasDeTicket(t);
+      }
+    };
+    return [...tickets].sort((a, b) => {
+      const va = valorDe(a);
+      const vb = valorDe(b);
+      const cmp = typeof va === 'number' && typeof vb === 'number' ? va - vb : String(va).localeCompare(String(vb));
+      return direccion * cmp || a.numeroTicket.localeCompare(b.numeroTicket);
+    });
   }
 
   protected exportarTicketsSprintCsv(sprint: Sprint, tickets: Ticket[]): void {
@@ -222,11 +274,13 @@ export class ReportesEjecutivosComponent implements OnInit {
     this.proyectoId.set(Number(idTexto) || 0);
     this.sprintSeleccionadoId.set(0);
     this.paginaTicketsSprint.set(1);
+    this.ordenTicketsPor.set(null);
   }
 
   protected cambiarSprintSeleccionado(idTexto: string): void {
     this.sprintSeleccionadoId.set(Number(idTexto) || 0);
     this.paginaTicketsSprint.set(1);
+    this.ordenTicketsPor.set(null);
   }
 
   protected cambiarDiasCfd(diasTexto: string): void {
