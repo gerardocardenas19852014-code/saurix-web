@@ -17,6 +17,19 @@
   font-size: 12.5px;
   gap: 6px;
 }
+.actividades-list.compacta .actividad-item-meta {
+  gap: 6px;
+}
+.actividades-list.compacta .toolbar-select {
+  height: 28px;
+  min-width: 108px;
+  padding: 0 22px 0 10px;
+  font-size: 11.5px;
+}
+.actividades-list.compacta .grid-badge {
+  padding: 2px 8px;
+  font-size: 11px;
+}
 
 /* Vista "Tarjetas" (☰ Lista / ▦ Tarjetas, ver formatoTicket): reutiliza el
  * diseño .kanban-card del Tablero Kanban tal cual, solo se agrega la
@@ -35,4 +48,30 @@
 .tarjetas-grid .kanban-card-foot {
   flex-wrap: wrap;
   gap: 8px;
+}
+
+/* Vista "Lista": antes el título del ticket (largo) y el grupo de
+ * badges/"Mover a" competían por el mismo espacio en una fila con
+ * flex-wrap, y con un título largo terminaban encimados — visualmente
+ * atropellado y, peor, el clic en el punto exacto donde se encimaban podía
+ * caer sobre el link del título en vez del selector, abriendo el ticket sin
+ * querer. Ahora el título trunca con "…" (se ve completo en el title del
+ * navegador al pasar el mouse) y el grupo de la derecha queda en su propio
+ * bloque de ancho fijo, siempre a la derecha, sin volver a superponerse. */
+.actividad-item-head {
+  flex-wrap: nowrap;
+}
+.actividad-item-texto-truncar {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.actividad-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
 }

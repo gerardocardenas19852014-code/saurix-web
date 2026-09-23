@@ -162,12 +162,13 @@
             <ul class="actividades-list compacta">
               @for (ticket of ticketsVisibles(ticketsDeSprintFiltrados(sprint.id), 'sprint-' + sprint.id); track ticket.id) {
                 <li class="actividad-item">
-                  <div class="actividad-item-head" style="align-items:center; gap:10px; flex-wrap:wrap;">
+                  <div class="actividad-item-head">
                     <a
                       [routerLink]="['/proyectos/tablero']"
                       [queryParams]="{ ticket: ticket.id }"
-                      class="actividad-item-texto"
+                      class="actividad-item-texto actividad-item-texto-truncar"
                       style="text-decoration:none;"
+                      [title]="ticket.titulo"
                     >
                       #{{ ticket.numeroTicket }}
                       @if (ticket.folioInterno) {
@@ -175,20 +176,25 @@
                       }
                       — {{ ticket.titulo }}
                     </a>
-                    <span
-                      class="kanban-tag"
-                      [style.color]="colorPrioridad(ticket.ticketPrioridadId)"
-                      [title]="'Prioridad: ' + nombrePrioridad(ticket.ticketPrioridadId)"
-                    >
-                      {{ nombrePrioridad(ticket.ticketPrioridadId) }}
-                    </span>
-                    <span class="hint" style="margin:0;">{{ nombreUsuarioAsignado(ticket.asignadoUsuarioId) }}</span>
-                    <select class="toolbar-select" [value]="ticket.sprintId ?? 0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
-                      <option [value]="0">Backlog</option>
-                      @for (s of sprintsDestino(); track s.id) {
-                        <option [value]="s.id">{{ s.nombre }}</option>
-                      }
-                    </select>
+                    <div class="actividad-item-meta">
+                      <span class="grid-badge" [class.grid-badge-success]="estaResuelto(ticket)" [class.grid-badge-neutral]="!estaResuelto(ticket)" title="Estado en el Tablero">
+                        {{ nombreColumna(ticket.tableroColumnaId) }}
+                      </span>
+                      <span
+                        class="kanban-tag"
+                        [style.color]="colorPrioridad(ticket.ticketPrioridadId)"
+                        [title]="'Prioridad: ' + nombrePrioridad(ticket.ticketPrioridadId)"
+                      >
+                        {{ nombrePrioridad(ticket.ticketPrioridadId) }}
+                      </span>
+                      <span class="hint" style="margin:0;">{{ nombreUsuarioAsignado(ticket.asignadoUsuarioId) }}</span>
+                      <select class="toolbar-select" [value]="ticket.sprintId ?? 0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
+                        <option [value]="0">Backlog</option>
+                        @for (s of sprintsDestino(); track s.id) {
+                          <option [value]="s.id">{{ s.nombre }}</option>
+                        }
+                      </select>
+                    </div>
                   </div>
                 </li>
               }
@@ -331,12 +337,13 @@
               <ul class="actividades-list compacta">
                 @for (ticket of ticketsVisibles(grupo.tickets, grupo.clave); track ticket.id) {
                   <li class="actividad-item">
-                    <div class="actividad-item-head" style="align-items:center; gap:10px; flex-wrap:wrap;">
+                    <div class="actividad-item-head">
                       <a
                         [routerLink]="['/proyectos/tablero']"
                         [queryParams]="{ ticket: ticket.id }"
-                        class="actividad-item-texto"
+                        class="actividad-item-texto actividad-item-texto-truncar"
                         style="text-decoration:none;"
+                        [title]="ticket.titulo"
                       >
                         #{{ ticket.numeroTicket }}
                         @if (ticket.folioInterno) {
@@ -344,22 +351,27 @@
                         }
                         — {{ ticket.titulo }}
                       </a>
-                      <span
-                        class="kanban-tag"
-                        [style.color]="colorPrioridad(ticket.ticketPrioridadId)"
-                        [title]="'Prioridad: ' + nombrePrioridad(ticket.ticketPrioridadId)"
-                      >
-                        {{ nombrePrioridad(ticket.ticketPrioridadId) }}
-                      </span>
-                      <span class="hint" style="margin:0;">{{ nombreUsuarioAsignado(ticket.asignadoUsuarioId) }}</span>
-                      @if (sprintsDestino().length > 0) {
-                        <select class="toolbar-select" [value]="0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
-                          <option [value]="0">Mover a…</option>
-                          @for (s of sprintsDestino(); track s.id) {
-                            <option [value]="s.id">{{ s.nombre }}</option>
-                          }
-                        </select>
-                      }
+                      <div class="actividad-item-meta">
+                        <span class="grid-badge" [class.grid-badge-success]="estaResuelto(ticket)" [class.grid-badge-neutral]="!estaResuelto(ticket)" title="Estado en el Tablero">
+                          {{ nombreColumna(ticket.tableroColumnaId) }}
+                        </span>
+                        <span
+                          class="kanban-tag"
+                          [style.color]="colorPrioridad(ticket.ticketPrioridadId)"
+                          [title]="'Prioridad: ' + nombrePrioridad(ticket.ticketPrioridadId)"
+                        >
+                          {{ nombrePrioridad(ticket.ticketPrioridadId) }}
+                        </span>
+                        <span class="hint" style="margin:0;">{{ nombreUsuarioAsignado(ticket.asignadoUsuarioId) }}</span>
+                        @if (sprintsDestino().length > 0) {
+                          <select class="toolbar-select" [value]="0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
+                            <option [value]="0">Mover a…</option>
+                            @for (s of sprintsDestino(); track s.id) {
+                              <option [value]="s.id">{{ s.nombre }}</option>
+                            }
+                          </select>
+                        }
+                      </div>
                     </div>
                   </li>
                 }
