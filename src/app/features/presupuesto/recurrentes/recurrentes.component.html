@@ -82,6 +82,9 @@
               {{ generandoFuturos() ? 'Generando…' : '📅 Generar futuros' }}
             </button>
           </div>
+          <p class="hint" style="margin:8px 0 0;">
+            Se generará{{ nCiclosAGenerar() > 1 ? 'n' : '' }} {{ rangoAGenerar() }}.
+          </p>
         </div>
 
         <app-adjuntos-panel entidad="MovimientoRecurrentePresupuestoAdjunto" campoPadre="movimientoRecurrentePresupuestoId" [padreId]="fijo.id" />

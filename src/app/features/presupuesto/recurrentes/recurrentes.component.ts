@@ -322,6 +322,33 @@ export class RecurrentesComponent implements OnInit {
     return { fecha: textoFechaDeLocal(base.getFullYear(), base.getMonth(), dia), ciclo: `${base.getFullYear()}-${base.getMonth() + 1}` };
   }
 
+  /** Etiqueta legible de un ciclo — "Octubre de 2026" para fijos normales,
+   *  o el año a secas ("2027") para los Anuales (su ciclo ya es un año). */
+  private etiquetaCiclo(ciclo: string, frecuencia: string): string {
+    if (frecuencia === 'Anual') return ciclo;
+    const [anioTexto, mesTexto] = ciclo.split('-');
+    const anio = Number(anioTexto);
+    const mes = Number(mesTexto) - 1;
+    const texto = new Date(anio, mes, 1).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
+  }
+
+  /** Texto para el modal: a qué meses/años (y de cuál a cuál) aplicará
+   *  "Generar futuros" con el número de ciclos actualmente escrito —
+   *  así no hay que adivinar qué cubre un número a secas como "6". */
+  protected readonly rangoAGenerar = computed<string>(() => {
+    const fila = this.enEdicion();
+    if (!fila) return '';
+    const n = Math.max(1, Math.min(60, Math.trunc(this.nCiclosAGenerar()) || 1));
+    const hoy = new Date();
+    const primero = this.fechaDelCiclo(fila, 0, hoy);
+    const etiquetaPrimero = this.etiquetaCiclo(primero.ciclo, fila.frecuencia);
+    if (n === 1) return fila.frecuencia === 'Anual' ? `año ${etiquetaPrimero}` : etiquetaPrimero;
+    const ultimo = this.fechaDelCiclo(fila, n - 1, hoy);
+    const etiquetaUltimo = this.etiquetaCiclo(ultimo.ciclo, fila.frecuencia);
+    return fila.frecuencia === 'Anual' ? `años ${etiquetaPrimero} a ${etiquetaUltimo}` : `de ${etiquetaPrimero} a ${etiquetaUltimo}`;
+  });
+
   /** "Generar futuros": crea de una vez los MovimientoPresupuesto de los
    *  próximos N ciclos (empezando por el actual si aún no está registrado),
    *  con la fecha de cada ciclo ya clampada al último día de su mes/año —
