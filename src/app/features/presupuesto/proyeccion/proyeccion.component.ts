@@ -381,13 +381,13 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
     const totalAhorro = this.renglonesAhorro().find((r) => r.tipo === 'total')!.celdas;
 
     const saldoInicial: Celda[] = [];
-    const neto: Celda[] = [];
     const saldoFinal: Celda[] = [];
     let saldoPrevio = 0;
 
     for (let i = 0; i < quincenas.length; i++) {
+      // Ingreso neto ya no se muestra como renglón aparte, pero se sigue
+      // calculando: el saldo final proyectado depende de él.
       const netoValor = totalIngreso[i].valor - totalGasto[i].valor;
-      neto.push({ valor: netoValor, manual: false, editable: false });
 
       let inicial: Celda;
       if (i === 0) {
@@ -412,7 +412,6 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       },
       { id: 'resumen:totalIngreso', tipo: 'resumen', clave: null, nombre: 'Total ingresos', celdas: totalIngreso, sumable: true },
       { id: 'resumen:totalGasto', tipo: 'resumen', clave: null, nombre: 'Total gastos', celdas: totalGasto, sumable: true },
-      { id: 'resumen:neto', tipo: 'resumen', clave: null, nombre: 'Ingreso neto', celdas: neto, sumable: true },
       { id: 'resumen:ahorro', tipo: 'resumen', clave: null, nombre: 'Ahorro', celdas: totalAhorro, sumable: true },
       {
         id: 'resumen:saldoFinal',
