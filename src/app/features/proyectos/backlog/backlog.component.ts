@@ -572,4 +572,20 @@ export class BacklogComponent implements OnInit {
     const propio = this.sprints().find((s) => Number(s.id) === Number(ticket.sprintId));
     return propio ? [...destino, propio] : destino;
   }
+
+  /** true si `sprintId` (0 = Backlog) es el sprint actual del ticket — marca [selected]
+   *  en cada <option> del <select> "Mover a" de forma explícita. Antes solo se ponía
+   *  [value] en el propio <select>, confiando en que el navegador seleccionara la
+   *  <option> que coincidiera; pero esas <option> las genera un @for anidado, que en el
+   *  primer render puede terminar de crear sus elementos DESPUÉS de que Angular ya
+   *  aplicó [value] al <select> — como todavía no hay ninguna <option> con ese valor, el
+   *  navegador cae de vuelta a la primera ("Backlog") y ahí se queda (Angular no vuelve
+   *  a tocar [value] si ticket.sprintId no cambia). Resultado: el <select> se veía en
+   *  "Backlog" aunque el ticket sí tuviera sprint, y click en "Backlog" no hacía nada
+   *  porque para el navegador ese ya era el valor actual (no disparaba (change)).
+   *  [selected] en cada <option>, en cambio, se aplica junto con la propia <option> al
+   *  crearse, así que siempre queda bien marcada desde el primer render. */
+  protected esOpcionSeleccionada(ticket: Ticket, sprintId: number): boolean {
+    return Number(ticket.sprintId ?? 0) === Number(sprintId);
+  }
 }

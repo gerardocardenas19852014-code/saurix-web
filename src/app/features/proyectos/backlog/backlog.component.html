@@ -190,9 +190,9 @@
                       </span>
                       <span class="hint" style="margin:0;">{{ nombreUsuarioAsignado(ticket.asignadoUsuarioId) }}</span>
                       <select class="toolbar-select" [value]="ticket.sprintId ?? 0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
-                        <option [value]="0">Backlog</option>
+                        <option [value]="0" [selected]="esOpcionSeleccionada(ticket, 0)">Backlog</option>
                         @for (s of opcionesSprintPara(ticket); track s.id) {
-                          <option [value]="s.id">{{ s.nombre }}{{ s.estado === 'cerrado' ? ' (cerrado)' : '' }}</option>
+                          <option [value]="s.id" [selected]="esOpcionSeleccionada(ticket, s.id)">{{ s.nombre }}{{ s.estado === 'cerrado' ? ' (cerrado)' : '' }}</option>
                         }
                       </select>
                     </div>
@@ -252,9 +252,9 @@
                       <span class="kanban-card-assignee kanban-card-assignee-empty" title="Sin asignar">?</span>
                     }
                     <select class="toolbar-select" [value]="ticket.sprintId ?? 0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
-                      <option [value]="0">Backlog</option>
+                      <option [value]="0" [selected]="esOpcionSeleccionada(ticket, 0)">Backlog</option>
                       @for (s of opcionesSprintPara(ticket); track s.id) {
-                        <option [value]="s.id">{{ s.nombre }}{{ s.estado === 'cerrado' ? ' (cerrado)' : '' }}</option>
+                        <option [value]="s.id" [selected]="esOpcionSeleccionada(ticket, s.id)">{{ s.nombre }}{{ s.estado === 'cerrado' ? ' (cerrado)' : '' }}</option>
                       }
                     </select>
                   </div>
@@ -329,9 +329,9 @@
                         </span>
                         <span class="hint" style="margin:0;">{{ nombreUsuarioAsignado(ticket.asignadoUsuarioId) }}</span>
                         <select class="toolbar-select" [value]="ticket.sprintId ?? 0" (change)="moverTicketASprint(ticket, $any($event.target).value)" aria-label="Mover a">
-                          <option [value]="0">Backlog</option>
+                          <option [value]="0" [selected]="esOpcionSeleccionada(ticket, 0)">Backlog</option>
                           @for (s of opcionesSprintPara(ticket); track s.id) {
-                            <option [value]="s.id">{{ s.nombre }}{{ s.estado === 'cerrado' ? ' (cerrado)' : '' }}</option>
+                            <option [value]="s.id" [selected]="esOpcionSeleccionada(ticket, s.id)">{{ s.nombre }}{{ s.estado === 'cerrado' ? ' (cerrado)' : '' }}</option>
                           }
                         </select>
                       </div>
