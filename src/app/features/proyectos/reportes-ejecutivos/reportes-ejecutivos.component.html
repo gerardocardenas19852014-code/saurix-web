@@ -135,12 +135,12 @@
       <table class="grid-table">
         <thead>
           <tr>
-            <th>Sprint</th>
-            <th>Estatus</th>
-            <th>Fechas</th>
+            <th class="th-ordenable" role="button" tabindex="0" (click)="ordenarSprintsPor('nombre')" (keydown.enter)="ordenarSprintsPor('nombre')">Sprint{{ indicadorOrdenSprint('nombre') }}</th>
+            <th class="th-ordenable" role="button" tabindex="0" (click)="ordenarSprintsPor('estado')" (keydown.enter)="ordenarSprintsPor('estado')">Estatus{{ indicadorOrdenSprint('estado') }}</th>
+            <th class="th-ordenable" role="button" tabindex="0" (click)="ordenarSprintsPor('fecha')" (keydown.enter)="ordenarSprintsPor('fecha')">Fechas{{ indicadorOrdenSprint('fecha') }}</th>
             <th>Objetivo</th>
-            <th>Tickets</th>
-            <th>Horas</th>
+            <th class="th-ordenable" role="button" tabindex="0" (click)="ordenarSprintsPor('tickets')" (keydown.enter)="ordenarSprintsPor('tickets')">Tickets{{ indicadorOrdenSprint('tickets') }}</th>
+            <th class="th-ordenable" role="button" tabindex="0" (click)="ordenarSprintsPor('horas')" (keydown.enter)="ordenarSprintsPor('horas')">Horas{{ indicadorOrdenSprint('horas') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -238,6 +238,54 @@
         <p class="hint" style="margin-top: 10px;">
           {{ reporte.horasResueltas }} de {{ reporte.horasTotales }} horas estimadas completadas.
         </p>
+
+        <h3 style="margin: 20px 0 8px;">Tickets del sprint</h3>
+        @if (reporte.tickets.length === 0) {
+          <p class="empty">Este sprint todavía no tiene tickets.</p>
+        } @else {
+          <div class="grid-table-scroll">
+            <table class="grid-table">
+              <thead>
+                <tr>
+                  <th>Folio</th>
+                  <th>Título</th>
+                  <th>Estado</th>
+                  <th>Prioridad</th>
+                  <th>Asignado a</th>
+                  <th>Horas est.</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (t of reporte.tickets; track t.id) {
+                  <tr
+                    class="dashboard-row"
+                    role="button"
+                    tabindex="0"
+                    [attr.aria-label]="'Abrir ticket ' + t.numeroTicket"
+                    (click)="abrirTicket(t)"
+                    (keydown.enter)="abrirTicket(t)"
+                    (keydown.space)="$event.preventDefault(); abrirTicket(t)"
+                  >
+                    <td data-label="Folio">{{ t.numeroTicket }}</td>
+                    <td data-label="Título"><span [title]="t.titulo">{{ t.titulo }}</span></td>
+                    <td data-label="Estado">
+                      <span class="grid-badge" [class.grid-badge-success]="estaResuelto(t)" [class.grid-badge-neutral]="!estaResuelto(t)">
+                        {{ nombreColumna(t.tableroColumnaId) }}
+                      </span>
+                    </td>
+                    <td data-label="Prioridad">
+                      <span class="kanban-tag" [style.color]="textoPrioridad(t.ticketPrioridadId)" [style.background]="fondoPrioridad(t.ticketPrioridadId)">
+                        {{ nombrePrioridad(t.ticketPrioridadId) }}
+                      </span>
+                    </td>
+                    <td data-label="Asignado a">{{ nombreUsuario(t.asignadoUsuarioId) }}</td>
+                    <td data-label="Horas est.">{{ horasDeTicket(t) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
       </div>
     }
     }

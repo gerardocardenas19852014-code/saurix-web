@@ -1,11 +1,16 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { DataClientService } from '../../../core/services/data-client.service';
-import { Ticket, TicketHistorialEstado } from '../kanban/ticket.model';
+import { colorBadgeFondo, colorBadgeTexto } from '../kanban/avatar.util';
+import { Ticket, TicketHistorialEstado, UsuarioOpcion } from '../kanban/ticket.model';
 import { Sprint } from '../sprints/sprint.model';
 import { ProyectoOpcion, TableroColumna } from '../tableros/tablero-columna.model';
+import { TicketPrioridad } from '../ticket-prioridades/ticket-prioridad.model';
+import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
 
 type Pestana = 'hecho' | 'pendiente' | 'sprint' | 'velocidad' | 'cfd' | 'control';
 type Metrica = 'tickets' | 'horas';
+type OrdenSprint = 'nombre' | 'estado' | 'fecha' | 'tickets' | 'horas';
 
 interface PuntoBarra {
   etiqueta: string;
@@ -67,6 +72,7 @@ const COLORES_SERIE = ['var(--indigo)', 'var(--amber)', 'var(--teal)', 'var(--da
 })
 export class ReportesEjecutivosComponent implements OnInit {
   private readonly data = inject(DataClientService);
+  private readonly router = inject(Router);
   private readonly MS_POR_DIA = 86400000;
 
   protected readonly cargando = signal(false);
@@ -84,6 +90,14 @@ export class ReportesEjecutivosComponent implements OnInit {
   protected readonly tickets = signal<Ticket[]>([]);
   protected readonly sprints = signal<Sprint[]>([]);
   protected readonly historial = signal<TicketHistorialEstado[]>([]);
+  protected readonly prioridades = signal<TicketPrioridad[]>([]);
+  protected readonly usuarios = signal<UsuarioOpcion[]>([]);
+
+  /** Orden de la tabla "Todos los sprints" — por defecto el más reciente primero
+   *  (mismo orden que ya traía sprintsDelProyecto), pero cualquier columna se
+   *  puede usar para ordenar (mismo patrón th-ordenable que Balanceo). */
+  protected readonly ordenSprintPor = signal<OrdenSprint>('fecha');
+  protected readonly ordenSprintDireccion = signal<'desc' | 'asc'>('desc');
 
   ngOnInit(): void {
     this.cargando.set(true);
@@ -91,10 +105,64 @@ export class ReportesEjecutivosComponent implements OnInit {
     this.data.list<TableroColumna>('TableroColumna').subscribe((c) => this.columnas.set(c));
     this.data.list<Sprint>('Sprint').subscribe((s) => this.sprints.set(s));
     this.data.list<TicketHistorialEstado>('TicketHistorialEstado').subscribe((h) => this.historial.set(h));
+    this.data.list<TicketPrioridad>('TicketPrioridad').subscribe((p) => this.prioridades.set(p));
+    // 'Usuario' no trae un campo nombreCompleto propio — hay que armarlo con
+    // nombreCompletoUsuario(), igual que en Mi Dashboard/Resumen ejecutivo/Kanban.
+    this.data
+      .list<Usuario>('Usuario')
+      .subscribe((u) => this.usuarios.set(u.map((x) => ({ id: x.id, nombreCompleto: nombreCompletoUsuario(x) }))));
     this.data.list<Ticket>('Ticket').subscribe((t) => {
       this.tickets.set(t);
       this.cargando.set(false);
     });
+  }
+
+  protected ordenarSprintsPor(campo: OrdenSprint): void {
+    if (this.ordenSprintPor() === campo) {
+      this.ordenSprintDireccion.update((d) => (d === 'desc' ? 'asc' : 'desc'));
+    } else {
+      this.ordenSprintPor.set(campo);
+      // Nombre/Estatus se leen mejor de A-Z por defecto; Fecha/Tickets/Horas, de
+      // mayor a menor (lo más reciente o lo más avanzado primero).
+      this.ordenSprintDireccion.set(campo === 'nombre' || campo === 'estado' ? 'asc' : 'desc');
+    }
+  }
+
+  protected indicadorOrdenSprint(campo: OrdenSprint): string {
+    if (this.ordenSprintPor() !== campo) return '';
+    return this.ordenSprintDireccion() === 'desc' ? ' ▾' : ' ▴';
+  }
+
+  protected nombreUsuario(id: number | null): string {
+    if (!id) return 'Sin asignar';
+    return this.usuarios().find((u) => Number(u.id) === Number(id))?.nombreCompleto ?? '—';
+  }
+
+  protected nombrePrioridad(id: number): string {
+    return this.prioridades().find((p) => Number(p.id) === Number(id))?.nombre ?? '—';
+  }
+
+  private colorPrioridad(id: number): string | undefined {
+    return this.prioridades().find((p) => Number(p.id) === Number(id))?.codigoHex;
+  }
+
+  protected textoPrioridad(id: number): string {
+    return colorBadgeTexto(this.colorPrioridad(id));
+  }
+
+  protected fondoPrioridad(id: number): string {
+    return colorBadgeFondo(this.colorPrioridad(id));
+  }
+
+  protected nombreColumna(id: number): string {
+    return this.columnas().find((c) => Number(c.id) === Number(id))?.nombre ?? '—';
+  }
+
+  /** Abre el ticket en el Tablero Kanban (mismo deep link ?ticket=id que usan
+   *  Balanceo/Backlog/Mi Dashboard) — para poder saltar de la lista del sprint
+   *  directo al detalle del ticket. */
+  protected abrirTicket(ticket: Ticket): void {
+    this.router.navigate(['/proyectos/tablero'], { queryParams: { ticket: ticket.id } });
   }
 
   protected cambiarPestana(p: Pestana): void {
@@ -304,13 +372,18 @@ export class ReportesEjecutivosComponent implements OnInit {
    *  poder aplicarlo a UN sprint (sprintReporte, drill-down de abajo) o a TODOS los
    *  del proyecto a la vez (resumenSprints, la tabla de arriba). */
   private resumenDeSprint(sprint: Sprint) {
-    const ticketsSprint = this.tickets().filter((t) => t.activo !== false && Number(t.sprintId) === Number(sprint.id));
+    const ticketsSprint = this.tickets()
+      .filter((t) => t.activo !== false && Number(t.sprintId) === Number(sprint.id))
+      // Pendientes primero (lo que falta es lo que más le importa a quien revisa
+      // el sprint); dentro de cada grupo, por folio — orden estable y predecible.
+      .sort((a, b) => Number(this.estaResuelto(a)) - Number(this.estaResuelto(b)) || a.numeroTicket.localeCompare(b.numeroTicket));
     const resueltos = ticketsSprint.filter((t) => this.estaResuelto(t));
     const horasTotales = ticketsSprint.reduce((s, t) => s + this.horasDeTicket(t), 0);
     const horasResueltas = resueltos.reduce((s, t) => s + this.horasDeTicket(t), 0);
 
     return {
       sprint,
+      tickets: ticketsSprint,
       totalTickets: ticketsSprint.length,
       resueltos: resueltos.length,
       pendientes: ticketsSprint.length - resueltos.length,
@@ -331,9 +404,35 @@ export class ReportesEjecutivosComponent implements OnInit {
 
   /** Tabla con TODOS los sprints del proyecto (no solo el elegido en el selector) —
    *  para poder ver de un vistazo cuáles hay y su avance antes de decidir cuáles
-   *  reportar a nivel directivo, sin tener que ir eligiéndolos uno por uno. Mismo
-   *  orden que sprintsDelProyecto (más reciente primero). */
-  protected readonly resumenSprints = computed(() => this.sprintsDelProyecto().map((s) => this.resumenDeSprint(s)));
+   *  reportar a nivel directivo, sin tener que ir eligiéndolos uno por uno. Se puede
+   *  reordenar por cualquier columna (ordenarSprintsPor/ordenSprintPor). */
+  protected readonly resumenSprints = computed(() => {
+    const campo = this.ordenSprintPor();
+    const direccion = this.ordenSprintDireccion() === 'desc' ? -1 : 1;
+    const valorDe = (r: ReturnType<typeof this.resumenDeSprint>): number | string => {
+      switch (campo) {
+        case 'nombre':
+          return r.sprint.nombre.toLowerCase();
+        case 'estado':
+          return r.sprint.estado;
+        case 'tickets':
+          return r.porcentajeTickets;
+        case 'horas':
+          return r.porcentajeHoras;
+        case 'fecha':
+        default:
+          return r.sprint.fechaInicio ?? '';
+      }
+    };
+    return this.sprintsDelProyecto()
+      .map((s) => this.resumenDeSprint(s))
+      .sort((a, b) => {
+        const va = valorDe(a);
+        const vb = valorDe(b);
+        const cmp = typeof va === 'number' && typeof vb === 'number' ? va - vb : String(va).localeCompare(String(vb));
+        return direccion * cmp || a.sprint.nombre.localeCompare(b.sprint.nombre);
+      });
+  });
 
   // ---------------------------------------------------------------------
   // 4. Velocidad — trabajo completado por sprint cerrado (últimos 8).

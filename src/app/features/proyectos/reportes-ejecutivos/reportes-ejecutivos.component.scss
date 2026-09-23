@@ -85,3 +85,17 @@
   stroke-dasharray: 2 3;
   color: var(--danger);
 }
+
+// Encabezados de columna cliqueables (ordenar la tabla "Todos los sprints") —
+// mismo patrón que Balanceo, duplicado aquí porque el encapsulamiento de vistas
+// de Angular es por componente.
+.th-ordenable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.th-ordenable:hover,
+.th-ordenable:focus-visible {
+  background: var(--technical-soft);
+}
