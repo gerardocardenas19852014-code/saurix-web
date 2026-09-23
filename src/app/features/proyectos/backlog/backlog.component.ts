@@ -4,7 +4,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Observable, forkJoin, of } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ToastService } from '../../../shared/services/toast.service';
-import { colorAvatar, iniciales } from '../kanban/avatar.util';
+import { colorAvatar, colorBadgeFondo, colorBadgeTexto, iniciales } from '../kanban/avatar.util';
 import { Ticket } from '../kanban/ticket.model';
 import { ProyectoOpcion, TableroColumna } from '../tableros/tablero-columna.model';
 import { TicketPrioridad } from '../ticket-prioridades/ticket-prioridad.model';
@@ -391,6 +391,14 @@ export class BacklogComponent implements OnInit {
   }
   protected colorPrioridad(id: number): string {
     return this.prioridades().find((p) => Number(p.id) === Number(id))?.codigoHex ?? '#999';
+  }
+  /** Par fondo+texto normalizado (ver avatar.util.ts) para pintar la prioridad como
+   *  pill siempre legible, sin importar qué tan pálido u oscuro sea el color elegido. */
+  protected fondoPrioridad(id: number): string {
+    return colorBadgeFondo(this.colorPrioridad(id));
+  }
+  protected textoPrioridad(id: number): string {
+    return colorBadgeTexto(this.colorPrioridad(id));
   }
   protected nombreUsuarioAsignado(id: number | null): string {
     if (!id) return 'Sin asignar';

@@ -29,3 +29,17 @@
   width: 150px;
   min-width: 150px;
 }
+
+// Encabezados de columna cliqueables (ordenar la tabla por total o por prioridad) —
+// pedido explícito del usuario: "ver los tickets de forma más dinámica para la
+// toma de decisión".
+.th-ordenable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.th-ordenable:hover,
+.th-ordenable:focus-visible {
+  background: var(--technical-soft);
+}

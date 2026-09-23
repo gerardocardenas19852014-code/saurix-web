@@ -182,7 +182,8 @@
                       </span>
                       <span
                         class="kanban-tag"
-                        [style.color]="colorPrioridad(ticket.ticketPrioridadId)"
+                        [style.color]="textoPrioridad(ticket.ticketPrioridadId)"
+                        [style.background]="fondoPrioridad(ticket.ticketPrioridadId)"
                         [title]="'Prioridad: ' + nombrePrioridad(ticket.ticketPrioridadId)"
                       >
                         {{ nombrePrioridad(ticket.ticketPrioridadId) }}
@@ -415,7 +416,8 @@
                         </span>
                         <span
                           class="kanban-tag"
-                          [style.color]="colorPrioridad(ticket.ticketPrioridadId)"
+                          [style.color]="textoPrioridad(ticket.ticketPrioridadId)"
+                          [style.background]="fondoPrioridad(ticket.ticketPrioridadId)"
                           [title]="'Prioridad: ' + nombrePrioridad(ticket.ticketPrioridadId)"
                         >
                           {{ nombrePrioridad(ticket.ticketPrioridadId) }}

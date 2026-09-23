@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DataClientService } from '../../../core/services/data-client.service';
-import { colorAvatar, iniciales } from '../kanban/avatar.util';
+import { colorAvatar, colorBadgeFondo, colorBadgeTexto, iniciales } from '../kanban/avatar.util';
 import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
 import { Ticket } from '../kanban/ticket.model';
 import { TicketPrioridad } from '../ticket-prioridades/ticket-prioridad.model';
@@ -61,6 +61,11 @@ export class BalanceoComponent implements OnInit {
   protected readonly limiteAlerta = signal<number>(2);
 
   protected readonly usuariosExpandidos = signal<Set<number>>(new Set());
+  /** Columna por la que se ordena la tabla ('total' o el id de una prioridad) —
+   *  permite, p.ej., ver de un vistazo quién tiene más tickets de "Alta" para
+   *  decidir a quién reasignar (pedido explícito del usuario). */
+  protected readonly ordenPor = signal<number | 'total'>('total');
+  protected readonly ordenDireccion = signal<'desc' | 'asc'>('desc');
 
   ngOnInit(): void {
     this.cargando.set(true);
@@ -185,7 +190,11 @@ export class BalanceoComponent implements OnInit {
       });
     }
 
-    return filas.sort((a, b) => b.total - a.total);
+    const columna = this.ordenPor();
+    const direccion = this.ordenDireccion() === 'desc' ? -1 : 1;
+    const valorColumna = (fila: FilaBalanceo) =>
+      columna === 'total' ? fila.total : fila.porPrioridad.get(columna) ?? 0;
+    return filas.sort((a, b) => direccion * (valorColumna(a) - valorColumna(b)) || a.nombre.localeCompare(b.nombre));
   });
 
   protected readonly totalPendientes = computed(() => this.ticketsFiltrados().length);
@@ -246,6 +255,33 @@ export class BalanceoComponent implements OnInit {
 
   protected colorPrioridad(id: number): string {
     return this.prioridades().find((p) => Number(p.id) === Number(id))?.codigoHex ?? '#999';
+  }
+
+  /** Par fondo+texto normalizado (ver colorBadgeFondo/colorBadgeTexto en avatar.util.ts)
+   *  para pintar la prioridad como pill siempre legible, sin importar qué tan pálido u
+   *  oscuro sea el color que el usuario haya elegido para esa prioridad. */
+  protected fondoPrioridad(id: number): string {
+    return colorBadgeFondo(this.colorPrioridad(id));
+  }
+
+  protected textoPrioridad(id: number): string {
+    return colorBadgeTexto(this.colorPrioridad(id));
+  }
+
+  /** Clic en un encabezado de columna: ordena la tabla por esa columna
+   *  (alternando desc/asc si ya se estaba ordenando por ella). */
+  protected ordenarPorColumna(columna: number | 'total'): void {
+    if (this.ordenPor() === columna) {
+      this.ordenDireccion.update((d) => (d === 'desc' ? 'asc' : 'desc'));
+    } else {
+      this.ordenPor.set(columna);
+      this.ordenDireccion.set('desc');
+    }
+  }
+
+  protected indicadorOrden(columna: number | 'total'): string {
+    if (this.ordenPor() !== columna) return '';
+    return this.ordenDireccion() === 'desc' ? ' ▾' : ' ▴';
   }
 
   /** Opciones del <select> "Asignar a" para UN ticket en particular: los usuarios

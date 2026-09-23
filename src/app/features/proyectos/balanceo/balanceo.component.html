@@ -84,10 +84,28 @@
           <tr>
             <th></th>
             <th>Persona</th>
-            <th>Total pendientes</th>
+            <th
+              class="th-ordenable"
+              role="button"
+              tabindex="0"
+              title="Ordenar por total pendientes"
+              (click)="ordenarPorColumna('total')"
+              (keydown.enter)="ordenarPorColumna('total')"
+            >Total pendientes{{ indicadorOrden('total') }}</th>
             @for (p of prioridadesOrdenadas(); track p.id) {
-              <th [style.color]="p.codigoHex" [title]="p.critica ? 'Prioridad crítica' : p.nombre">
-                {{ p.critica ? '🚨 ' : '' }}{{ p.nombre }}
+              <th
+                class="th-ordenable"
+                role="button"
+                tabindex="0"
+                [title]="(p.critica ? 'Prioridad crítica — ' : '') + 'Ordenar por ' + p.nombre"
+                (click)="ordenarPorColumna(p.id)"
+                (keydown.enter)="ordenarPorColumna(p.id)"
+              >
+                <span
+                  class="kanban-tag"
+                  [style.color]="textoPrioridad(p.id)"
+                  [style.background]="fondoPrioridad(p.id)"
+                >{{ p.critica ? '🚨 ' : '' }}{{ p.nombre }}</span>{{ indicadorOrden(p.id) }}
               </th>
             }
           </tr>
@@ -159,7 +177,8 @@
                               </span>
                               <span
                                 class="kanban-tag"
-                                [style.color]="colorPrioridad(ticket.ticketPrioridadId)"
+                                [style.color]="textoPrioridad(ticket.ticketPrioridadId)"
+                                [style.background]="fondoPrioridad(ticket.ticketPrioridadId)"
                                 [title]="'Prioridad: ' + nombrePrioridad(ticket.ticketPrioridadId)"
                               >
                                 {{ nombrePrioridad(ticket.ticketPrioridadId) }}
