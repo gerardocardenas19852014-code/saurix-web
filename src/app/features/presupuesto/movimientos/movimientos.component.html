@@ -108,6 +108,23 @@
       }
     </select>
   </label>
+  <label class="board-filter-field">
+    Mes
+    <select [value]="filtroMes()" (change)="filtroMes.set($any($event.target).value)">
+      <option value="">Todos</option>
+      @for (opcion of mesesDisponibles(); track opcion.valor) {
+        <option [value]="opcion.valor">{{ opcion.etiqueta }}</option>
+      }
+    </select>
+  </label>
+  <label class="board-filter-field">
+    Desde
+    <input type="date" [value]="filtroFechaDesde()" (change)="filtroFechaDesde.set($any($event.target).value)" />
+  </label>
+  <label class="board-filter-field">
+    Hasta
+    <input type="date" [value]="filtroFechaHasta()" (change)="filtroFechaHasta.set($any($event.target).value)" />
+  </label>
   @if (hayFiltros()) {
     <button type="button" class="btn-secondary small" (click)="limpiarFiltros()">✕ Limpiar filtros</button>
   }
@@ -123,40 +140,48 @@
     }
   </div>
 } @else {
-  <ul class="wallet-tx-list">
-    @for (movimiento of movimientosFiltrados(); track movimiento.id) {
-      <li class="wallet-tx-item" (click)="editar(movimiento)">
-        <span class="wallet-tx-cat-dot" [style.background]="colorCategoria(movimiento.categoriaPresupuestoId)"></span>
-        <div class="wallet-tx-body">
-          <strong>{{ movimiento.descripcion || nombreCategoria(movimiento.categoriaPresupuestoId) }}</strong>
-          @if (movimiento.transferenciaId) {
-            <span class="tag" title="Transferencia entre cuentas">🔄 transferencia</span>
-          }
-          @if (movimiento.proyectado) {
-            <span class="tag" title="Generado por adelantado con Generar futuros — aún no confirmado">🔮 proyectado</span>
-          }
-          <span class="hint" style="margin:0;">
-            {{ nombreCuenta(movimiento.cuentaPresupuestoId) }}
-            @if (!movimiento.transferenciaId) {
-              · {{ nombreCategoria(movimiento.categoriaPresupuestoId) }}
-            }
-            · {{ movimiento.fecha | date: 'dd/MM/yyyy' }}
-          </span>
-        </div>
-        <span class="wallet-tx-amount" [class.wallet-tx-amount-in]="movimiento.tipo === 'Ingreso'" [class.wallet-tx-amount-out]="movimiento.tipo === 'Gasto'">
-          {{ movimiento.tipo === 'Ingreso' ? '+' : '-' }}{{ formatMoneda(movimiento.monto) }}
-        </span>
-        <button
-          type="button"
-          class="btn-danger small"
-          title="Eliminar"
-          (click)="$event.stopPropagation(); pedirEliminar(movimiento)"
-        >
-          Eliminar
-        </button>
-      </li>
-    }
-  </ul>
+  @for (grupo of movimientosAgrupados(); track grupo.clave) {
+    <div class="catalog-group">
+      <div class="catalog-group-title">
+        {{ grupo.etiqueta }}
+        <span class="catalog-group-count">{{ grupo.movimientos.length }}</span>
+      </div>
+      <ul class="wallet-tx-list">
+        @for (movimiento of grupo.movimientos; track movimiento.id) {
+          <li class="wallet-tx-item" (click)="editar(movimiento)">
+            <span class="wallet-tx-cat-dot" [style.background]="colorCategoria(movimiento.categoriaPresupuestoId)"></span>
+            <div class="wallet-tx-body">
+              <strong>{{ movimiento.descripcion || nombreCategoria(movimiento.categoriaPresupuestoId) }}</strong>
+              @if (movimiento.transferenciaId) {
+                <span class="tag" title="Transferencia entre cuentas">🔄 transferencia</span>
+              }
+              @if (movimiento.proyectado) {
+                <span class="tag" title="Generado por adelantado con Generar futuros — aún no confirmado">🔮 proyectado</span>
+              }
+              <span class="hint" style="margin:0;">
+                {{ nombreCuenta(movimiento.cuentaPresupuestoId) }}
+                @if (!movimiento.transferenciaId) {
+                  · {{ nombreCategoria(movimiento.categoriaPresupuestoId) }}
+                }
+                · {{ movimiento.fecha | date: 'dd/MM/yyyy' }}
+              </span>
+            </div>
+            <span class="wallet-tx-amount" [class.wallet-tx-amount-in]="movimiento.tipo === 'Ingreso'" [class.wallet-tx-amount-out]="movimiento.tipo === 'Gasto'">
+              {{ movimiento.tipo === 'Ingreso' ? '+' : '-' }}{{ formatMoneda(movimiento.monto) }}
+            </span>
+            <button
+              type="button"
+              class="btn-danger small"
+              title="Eliminar"
+              (click)="$event.stopPropagation(); pedirEliminar(movimiento)"
+            >
+              Eliminar
+            </button>
+          </li>
+        }
+      </ul>
+    </div>
+  }
 }
 }
 

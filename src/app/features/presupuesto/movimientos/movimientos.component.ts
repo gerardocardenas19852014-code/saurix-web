@@ -20,6 +20,29 @@ interface ColumnaMensual {
   gasto: number;
 }
 
+interface OpcionMes {
+  valor: string;
+  etiqueta: string;
+}
+
+interface GrupoMovimientos {
+  clave: string;
+  etiqueta: string;
+  movimientos: MovimientoPresupuesto[];
+}
+
+/** "2026-8" (año-mes, mes 0-indexado) → "Septiembre 2026" — mismo formato para
+ *  el combo "Mes" y para los encabezados de grupo de la lista. */
+function etiquetaMes(anio: number, mes: number): string {
+  const texto = new Date(anio, mes, 1).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+function claveMes(fecha: string): string {
+  const f = new Date(fecha);
+  return `${f.getFullYear()}-${f.getMonth()}`;
+}
+
 interface CuentaConInfo {
   cuenta: CuentaPresupuesto;
   saldo: number;
@@ -86,10 +109,21 @@ export class MovimientosComponent implements OnInit {
   protected readonly filtroCuentaId = signal(0);
   protected readonly filtroCategoriaId = signal(0);
   protected readonly filtroTipo = signal<string>('');
+  /** "" = todos los meses; si no, "año-mes" (mes 0-indexado, ver claveMes()). */
+  protected readonly filtroMes = signal<string>('');
+  /** "" = sin límite; si no, fecha ISO "YYYY-MM-DD" (compara bien como texto). */
+  protected readonly filtroFechaDesde = signal<string>('');
+  protected readonly filtroFechaHasta = signal<string>('');
 
   protected readonly hayFiltros = computed(
     () =>
-      !!this.filtroTexto() || this.filtroCuentaId() !== 0 || this.filtroCategoriaId() !== 0 || this.filtroTipo() !== '',
+      !!this.filtroTexto() ||
+      this.filtroCuentaId() !== 0 ||
+      this.filtroCategoriaId() !== 0 ||
+      this.filtroTipo() !== '' ||
+      this.filtroMes() !== '' ||
+      !!this.filtroFechaDesde() ||
+      !!this.filtroFechaHasta(),
   );
 
   /** Movimientos "reales" — excluye los proyectados (generados por
@@ -98,17 +132,56 @@ export class MovimientosComponent implements OnInit {
    *  contar lo que ya ocurrió, no una proyección a futuro. */
   protected readonly movimientosReales = computed(() => this.movimientos().filter((m) => !m.proyectado));
 
+  /** Meses con al menos un movimiento (de más reciente a más antiguo), para el combo "Mes". */
+  protected readonly mesesDisponibles = computed<OpcionMes[]>(() => {
+    const claves = new Set(this.movimientos().map((m) => claveMes(m.fecha)));
+    return [...claves]
+      .sort((a, b) => {
+        const [anioA, mesA] = a.split('-').map(Number);
+        const [anioB, mesB] = b.split('-').map(Number);
+        return anioB - anioA || mesB - mesA;
+      })
+      .map((valor) => {
+        const [anio, mes] = valor.split('-').map(Number);
+        return { valor, etiqueta: etiquetaMes(anio, mes) };
+      });
+  });
+
   protected readonly movimientosFiltrados = computed(() => {
     const texto = this.filtroTexto().trim().toLowerCase();
     const cuentaId = this.filtroCuentaId();
     const categoriaId = this.filtroCategoriaId();
     const tipo = this.filtroTipo();
+    const mes = this.filtroMes();
+    const desde = this.filtroFechaDesde();
+    const hasta = this.filtroFechaHasta();
     return [...this.movimientos()]
       .filter((m) => !cuentaId || m.cuentaPresupuestoId === cuentaId)
       .filter((m) => !categoriaId || m.categoriaPresupuestoId === categoriaId)
       .filter((m) => !tipo || m.tipo === tipo)
+      .filter((m) => !mes || claveMes(m.fecha) === mes)
+      .filter((m) => !desde || m.fecha >= desde)
+      .filter((m) => !hasta || m.fecha <= hasta)
       .filter((m) => !texto || m.descripcion.toLowerCase().includes(texto))
       .sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+  });
+
+  /** La misma lista de movimientosFiltrados, pero agrupada por mes — para que
+   *  la lista se pueda escanear fácilmente aunque crezca mucho. Como
+   *  movimientosFiltrados ya viene ordenado de más reciente a más antiguo, los
+   *  grupos salen en ese mismo orden sin necesidad de reordenarlos aparte. */
+  protected readonly movimientosAgrupados = computed<GrupoMovimientos[]>(() => {
+    const grupos = new Map<string, MovimientoPresupuesto[]>();
+    for (const m of this.movimientosFiltrados()) {
+      const clave = claveMes(m.fecha);
+      const lista = grupos.get(clave);
+      if (lista) lista.push(m);
+      else grupos.set(clave, [m]);
+    }
+    return [...grupos.entries()].map(([clave, movimientos]) => {
+      const [anio, mes] = clave.split('-').map(Number);
+      return { clave, etiqueta: etiquetaMes(anio, mes), movimientos };
+    });
   });
 
   /** Resumen de los últimos 6 meses (ingresos vs gastos) para la gráfica de barras. */
@@ -248,6 +321,9 @@ export class MovimientosComponent implements OnInit {
     this.filtroCuentaId.set(0);
     this.filtroCategoriaId.set(0);
     this.filtroTipo.set('');
+    this.filtroMes.set('');
+    this.filtroFechaDesde.set('');
+    this.filtroFechaHasta.set('');
   }
 
   nombreCuenta(id: number): string {
