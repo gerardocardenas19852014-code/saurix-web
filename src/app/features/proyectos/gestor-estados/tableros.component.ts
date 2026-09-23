@@ -7,11 +7,13 @@ import { ToastService } from '../../../shared/services/toast.service';
 import {
   CampoTicketConfigurable,
   ConfiguracionCamposTicket,
+  PosicionDiagrama,
   ProyectoOpcion,
   ReglaCampoTicket,
   TICKET_CAMPOS_CONFIGURABLES,
   TableroColumna,
   parsearConfiguracionCampos,
+  parsearPosicionDiagrama,
   parsearTransicionesPermitidas,
   reglaCampo,
 } from '../tableros/tablero-columna.model';
@@ -62,6 +64,9 @@ export class TablerosComponent implements OnInit {
   protected readonly columnaEnEdicion = signal<TableroColumna | null>(null);
   protected readonly columnaAEliminar = signal<TableroColumna | null>(null);
 
+  /** "☰ Lista" (la tabla de siempre) vs "🔀 Diagrama de flujo" (cajas + flechas, estilo Jira). */
+  protected readonly vistaGestor = signal<'lista' | 'diagrama'>('lista');
+
   /** "⚙ Campos" — configura, por columna, qué campos del ticket son editables/obligatorios en esa etapa. */
   protected readonly camposConfigurables = TICKET_CAMPOS_CONFIGURABLES;
   protected readonly columnaCamposEnEdicion = signal<TableroColumna | null>(null);
@@ -104,6 +109,10 @@ export class TablerosComponent implements OnInit {
     this.cargar();
   }
 
+  cambiarVistaGestor(vista: 'lista' | 'diagrama'): void {
+    this.vistaGestor.set(vista);
+  }
+
   cargar(): void {
     const proyectoId = this.proyectoSeleccionadoId();
     if (!proyectoId) return;
@@ -112,6 +121,7 @@ export class TablerosComponent implements OnInit {
     this.data.list<TableroColumna>('TableroColumna', { proyectoId }).subscribe({
       next: (columnas) => {
         this.columnasTablero.set(columnas.sort((a, b) => a.orden - b.orden));
+        this.sincronizarPosiciones();
         this.cargando.set(false);
       },
       error: () => this.cargando.set(false),
@@ -161,6 +171,7 @@ export class TablerosComponent implements OnInit {
       proyectoId: this.proyectoSeleccionadoId(),
       configuracionCamposJson: existente?.configuracionCamposJson ?? null,
       transicionesPermitidasJson: existente?.transicionesPermitidasJson ?? null,
+      posicionDiagramaJson: existente?.posicionDiagramaJson ?? null,
     };
 
     const esEdicion = existente !== null;
@@ -329,5 +340,207 @@ export class TablerosComponent implements OnInit {
         this.cargar();
       },
     });
+  }
+
+  // ---------------- "🔀 Diagrama de flujo" (cajas arrastrables + flechas, estilo Jira) ----------------
+
+  /** Tamaño fijo de cada caja del diagrama, usado tanto para dibujarlas como para calcular
+   *  dónde una flecha debe "salir"/"entrar" en el borde del rectángulo (ver puntoEnBorde). */
+  protected readonly ANCHO_CAJA = 168;
+  protected readonly ALTO_CAJA = 56;
+
+  protected readonly posiciones = signal<Map<number, PosicionDiagrama>>(new Map());
+  protected readonly modoAgregarTransicion = signal(false);
+  protected readonly origenTransicion = signal<TableroColumna | null>(null);
+  private arrastre: { columnaId: number; offsetX: number; offsetY: number } | null = null;
+
+  protected readonly anchoLienzo = computed(() => {
+    let max = 760;
+    for (const pos of this.posiciones().values()) max = Math.max(max, pos.x + this.ANCHO_CAJA + 60);
+    return max;
+  });
+
+  protected readonly altoLienzo = computed(() => {
+    let max = 360;
+    for (const pos of this.posiciones().values()) max = Math.max(max, pos.y + this.ALTO_CAJA + 60);
+    return max;
+  });
+
+  /** Una línea con flecha por cada transición permitida (columnas SIN restricción configurada
+   *  no dibujan flechas — mostrarlas todas contra todas ensuciaría el diagrama; se marcan con
+   *  el candado 🔓 en su caja en su lugar). */
+  protected readonly lineasTransicion = computed(() => {
+    const columnas = this.columnasTablero();
+    const posiciones = this.posiciones();
+    const lineas: { origenId: number; destinoId: number; path: string }[] = [];
+    for (const columna of columnas) {
+      const permitidas = parsearTransicionesPermitidas(columna.transicionesPermitidasJson);
+      if (permitidas === null) continue;
+      const origenPos = posiciones.get(columna.id);
+      if (!origenPos) continue;
+      for (const destinoId of permitidas) {
+        const destino = columnas.find((c) => Number(c.id) === Number(destinoId));
+        const destinoPos = destino ? posiciones.get(destino.id) : undefined;
+        if (!destino || !destinoPos) continue;
+        lineas.push({ origenId: columna.id, destinoId: destino.id, path: this.calcularPath(origenPos, destinoPos) });
+      }
+    }
+    return lineas;
+  });
+
+  /** Recalcula el mapa de posiciones: usa la guardada (posicionDiagramaJson) cuando existe, o
+   *  si no, una cuadrícula automática de 4 columnas — se llama cada vez que cargar() trae
+   *  columnas nuevas, para que una columna recién creada aparezca en un lugar razonable. */
+  private sincronizarPosiciones(): void {
+    const mapa = new Map<number, PosicionDiagrama>();
+    this.columnasTablero().forEach((columna, indice) => {
+      const guardada = parsearPosicionDiagrama(columna.posicionDiagramaJson);
+      const fila = Math.floor(indice / 4);
+      const col = indice % 4;
+      mapa.set(columna.id, guardada ?? { x: 40 + col * (this.ANCHO_CAJA + 60), y: 40 + fila * (this.ALTO_CAJA + 80) });
+    });
+    this.posiciones.set(mapa);
+  }
+
+  posicionDe(columnaId: number): PosicionDiagrama {
+    return this.posiciones().get(columnaId) ?? { x: 0, y: 0 };
+  }
+
+  esRestringida(columna: TableroColumna): boolean {
+    return parsearTransicionesPermitidas(columna.transicionesPermitidasJson) !== null;
+  }
+
+  toggleModoTransicion(): void {
+    this.modoAgregarTransicion.update((v) => !v);
+    this.origenTransicion.set(null);
+  }
+
+  /** Clic en una caja: fuera del modo "+ Agregar transición" no hace nada (arrastrar ya se
+   *  maneja en onCajaMouseDown/onDiagramaMouseMove). Dentro del modo, el primer clic marca el
+   *  origen y el segundo (en otra caja) crea la transición; clic de nuevo en la misma cancela. */
+  onCajaClick(columna: TableroColumna): void {
+    if (!this.modoAgregarTransicion()) return;
+    const origen = this.origenTransicion();
+    if (!origen) {
+      this.origenTransicion.set(columna);
+      return;
+    }
+    if (Number(origen.id) === Number(columna.id)) {
+      this.origenTransicion.set(null);
+      return;
+    }
+    this.agregarTransicion(origen, columna);
+    this.origenTransicion.set(null);
+  }
+
+  onCajaMouseDown(evento: MouseEvent, columna: TableroColumna): void {
+    if (this.modoAgregarTransicion()) return;
+    evento.preventDefault();
+    const pos = this.posicionDe(columna.id);
+    this.arrastre = { columnaId: columna.id, offsetX: evento.clientX - pos.x, offsetY: evento.clientY - pos.y };
+  }
+
+  onDiagramaMouseMove(evento: MouseEvent): void {
+    if (!this.arrastre) return;
+    const { columnaId, offsetX, offsetY } = this.arrastre;
+    const x = Math.max(0, evento.clientX - offsetX);
+    const y = Math.max(0, evento.clientY - offsetY);
+    this.posiciones.update((mapa) => {
+      const nuevo = new Map(mapa);
+      nuevo.set(columnaId, { x, y });
+      return nuevo;
+    });
+  }
+
+  /** Al soltar, persiste la posición final — mientras se arrastra solo se actualiza el signal
+   *  en memoria (onDiagramaMouseMove) para que se sienta fluido sin pegarle a la BD en cada pixel. */
+  onDiagramaMouseUp(): void {
+    if (!this.arrastre) return;
+    const columnaId = this.arrastre.columnaId;
+    this.arrastre = null;
+    const columna = this.columnasTablero().find((c) => c.id === columnaId);
+    const posicion = this.posiciones().get(columnaId);
+    if (!columna || !posicion) return;
+    const posicionDiagramaJson = JSON.stringify(posicion);
+    this.data.modificacion<TableroColumna>('TableroColumna', { ...columna, posicionDiagramaJson }).subscribe({
+      error: () => this.toast.error('No se pudo guardar la posición de la columna.'),
+    });
+  }
+
+  /** El candado 🔓/🔒 de la caja: activa/desactiva la restricción de flujo directo desde el
+   *  diagrama (mismo dato que el checklist "🔀 Flujo" — al activarla empieza sin transiciones
+   *  permitidas, igual que activarRestriccion() en ese modal). */
+  toggleRestriccionDiagrama(columna: TableroColumna): void {
+    const restringidaActual = this.esRestringida(columna);
+    const transicionesPermitidasJson = restringidaActual ? null : JSON.stringify([]);
+    this.data.modificacion<TableroColumna>('TableroColumna', { ...columna, transicionesPermitidasJson }).subscribe({
+      next: () => {
+        this.toast.exito(
+          restringidaActual
+            ? `"${columna.nombre}" ya se puede mover a cualquier columna.`
+            : `"${columna.nombre}" restringida — dibuja flechas para permitir transiciones.`,
+        );
+        this.cargar();
+      },
+      error: () => this.toast.error('No se pudo actualizar la restricción.'),
+    });
+  }
+
+  private agregarTransicion(origen: TableroColumna, destino: TableroColumna): void {
+    const actuales = parsearTransicionesPermitidas(origen.transicionesPermitidasJson);
+    if (actuales === null) {
+      this.toast.advertencia(
+        `"${origen.nombre}" no tiene restricciones — ya se puede mover a "${destino.nombre}". Actívale el candado 🔒 primero si quieres limitarla.`,
+      );
+      return;
+    }
+    if (actuales.includes(Number(destino.id))) return;
+    const transicionesPermitidasJson = JSON.stringify([...actuales, Number(destino.id)]);
+    this.data.modificacion<TableroColumna>('TableroColumna', { ...origen, transicionesPermitidasJson }).subscribe({
+      next: () => {
+        this.toast.exito(`Transición agregada: ${origen.nombre} → ${destino.nombre}.`);
+        this.cargar();
+      },
+      error: () => this.toast.error('No se pudo agregar la transición.'),
+    });
+  }
+
+  /** Clic en una flecha del diagrama para eliminarla. */
+  quitarTransicion(origenId: number, destinoId: number): void {
+    const origen = this.columnasTablero().find((c) => Number(c.id) === Number(origenId));
+    if (!origen) return;
+    const actuales = parsearTransicionesPermitidas(origen.transicionesPermitidasJson) ?? [];
+    const transicionesPermitidasJson = JSON.stringify(actuales.filter((id) => Number(id) !== Number(destinoId)));
+    this.data.modificacion<TableroColumna>('TableroColumna', { ...origen, transicionesPermitidasJson }).subscribe({
+      next: () => {
+        this.toast.info('Transición eliminada.');
+        this.cargar();
+      },
+      error: () => this.toast.error('No se pudo eliminar la transición.'),
+    });
+  }
+
+  private calcularPath(origen: PosicionDiagrama, destino: PosicionDiagrama): string {
+    const cx1 = origen.x + this.ANCHO_CAJA / 2;
+    const cy1 = origen.y + this.ALTO_CAJA / 2;
+    const cx2 = destino.x + this.ANCHO_CAJA / 2;
+    const cy2 = destino.y + this.ALTO_CAJA / 2;
+    const p1 = this.puntoEnBorde(cx1, cy1, cx2, cy2);
+    const p2 = this.puntoEnBorde(cx2, cy2, cx1, cy1);
+    return `M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`;
+  }
+
+  /** Punto donde la línea entre (cx,cy) y (haciaX,haciaY) sale del rectángulo de la caja
+   *  centrado en (cx,cy) — así la flecha nace y termina en el borde de la caja, no en su centro. */
+  private puntoEnBorde(cx: number, cy: number, haciaX: number, haciaY: number): PosicionDiagrama {
+    const dx = haciaX - cx;
+    const dy = haciaY - cy;
+    if (dx === 0 && dy === 0) return { x: cx, y: cy };
+    const hw = this.ANCHO_CAJA / 2;
+    const hh = this.ALTO_CAJA / 2;
+    const escalaX = dx !== 0 ? hw / Math.abs(dx) : Infinity;
+    const escalaY = dy !== 0 ? hh / Math.abs(dy) : Infinity;
+    const escala = Math.min(escalaX, escalaY);
+    return { x: cx + dx * escala, y: cy + dy * escala };
   }
 }

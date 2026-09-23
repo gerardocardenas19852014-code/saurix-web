@@ -23,6 +23,14 @@ export interface TableroColumna {
    * Estados → "🔀 Flujo" — ver parsearTransicionesPermitidas/puedeMoverA.
    */
   transicionesPermitidasJson: string | null;
+  /**
+   * Posición (x, y en píxeles) de la caja de esta columna en el diagrama de
+   * flujo visual de Gestor de Estados — null (columnas nunca movidas ahí, o
+   * creadas antes de este campo) usa una posición automática en cuadrícula
+   * calculada al vuelo. Se actualiza arrastrando la caja; ver PosicionDiagrama
+   * / parsearPosicionDiagrama más abajo.
+   */
+  posicionDiagramaJson: string | null;
   activo: boolean;
 }
 
@@ -115,4 +123,26 @@ export function puedeMoverA(columnaOrigen: TableroColumna, columnaDestinoId: num
   const permitidas = parsearTransicionesPermitidas(columnaOrigen.transicionesPermitidasJson);
   if (permitidas === null) return true;
   return permitidas.includes(Number(columnaDestinoId));
+}
+
+/** Posición (x, y) de una caja en el diagrama de flujo, en píxeles dentro del lienzo. */
+export interface PosicionDiagrama {
+  x: number;
+  y: number;
+}
+
+/** Parseo defensivo: JSON inválido, ausente, o con forma inesperada se trata
+ *  como "sin posición guardada" (null) — el diagrama entonces calcula una
+ *  posición automática para esa columna. */
+export function parsearPosicionDiagrama(json: string | null | undefined): PosicionDiagrama | null {
+  if (!json) return null;
+  try {
+    const valor = JSON.parse(json);
+    if (valor && typeof valor.x === 'number' && typeof valor.y === 'number') {
+      return { x: valor.x, y: valor.y };
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }

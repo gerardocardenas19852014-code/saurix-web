@@ -1,2 +1,109 @@
 // El sistema visual global (page-header, status-manager-list, modal-overlay,
-// edit-form, etc.) vive en src/styles.scss — este componente no necesita estilos propios.
+// edit-form, etc.) vive en src/styles.scss — este componente no necesita estilos propios,
+// salvo el diagrama de flujo "🔀 Diagrama de flujo" (cajas arrastrables + flechas SVG), que
+// es exclusivo de esta pantalla y no tiene equivalente en ningún otro módulo.
+
+.flujo-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.flujo-toolbar .btn-secondary.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.flujo-lienzo {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  overflow: auto;
+  max-width: 100%;
+  max-height: 70vh;
+}
+
+.flujo-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.flujo-linea {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.flujo-linea:hover {
+  stroke-width: 3;
+  stroke: var(--danger, #c0392b);
+}
+
+.flujo-flecha-punta {
+  fill: var(--accent);
+}
+
+.flujo-caja {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+  cursor: grab;
+  user-select: none;
+}
+
+.flujo-caja:active {
+  cursor: grabbing;
+}
+
+.flujo-caja.flujo-caja-modo-transicion {
+  cursor: pointer;
+}
+
+.flujo-caja.flujo-caja-seleccionada {
+  outline: 3px solid #fff;
+  outline-offset: -5px;
+}
+
+.flujo-caja-nombre {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flujo-caja-candado {
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, .18);
+  border: none;
+  border-radius: 6px;
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flujo-caja-candado:hover {
+  background: rgba(255, 255, 255, .32);
+}

@@ -24,48 +24,142 @@
   lista es el orden en que aparecen las columnas, de izquierda a derecha — usa ▲ ▼ para reordenarlos.
 </p>
 
-@if (cargando()) {
-  <p class="hint">Cargando…</p>
-} @else if (!columnasTablero().length) {
-  <div class="empty-state-block">
-    <p>Este proyecto todavía no tiene columnas configuradas.</p>
-  </div>
-} @else {
-  <ul class="status-manager-list">
-    @for (columna of columnasTablero(); track columna.id; let i = $index) {
-      <li class="status-manager-item">
-        <span class="status-manager-order">{{ i + 1 }}</span>
-        <span class="status-manager-name">{{ columna.nombre }}</span>
-        <span class="status-manager-count">{{ conteoPorColumna().get(columna.id) ?? 0 }} ticket{{ (conteoPorColumna().get(columna.id) ?? 0) === 1 ? '' : 's' }}</span>
-        <div class="status-manager-actions">
-          <button type="button" class="kanban-move-btn" (click)="moverOrden(columna, -1)" [disabled]="i === 0" title="Mover antes" aria-label="Mover columna antes">▲</button>
-          <button type="button" class="kanban-move-btn" (click)="moverOrden(columna, 1)" [disabled]="i === columnasTablero().length - 1" title="Mover después" aria-label="Mover columna después">▼</button>
-          <button type="button" class="btn-secondary small" (click)="abrirCampos(columna)" title="Configurar campos del ticket en esta columna" aria-label="Configurar campos del ticket en esta columna">
-            ⚙ Campos
-          </button>
-          <button type="button" class="btn-secondary small" (click)="abrirFlujo(columna)" title="Configurar a qué columnas se puede mover un ticket desde aquí" aria-label="Configurar flujo de esta columna">
-            🔀 Flujo
-          </button>
-          <button type="button" class="btn-secondary small" (click)="editar(columna)">Editar</button>
+<div class="tab-bar" style="margin-bottom: 16px;">
+  <button type="button" class="tab-btn" [class.is-active]="vistaGestor() === 'lista'" (click)="cambiarVistaGestor('lista')">
+    ☰ Lista
+  </button>
+  <button type="button" class="tab-btn" [class.is-active]="vistaGestor() === 'diagrama'" (click)="cambiarVistaGestor('diagrama')">
+    🔀 Diagrama de flujo
+  </button>
+</div>
+
+@if (vistaGestor() === 'lista') {
+  @if (cargando()) {
+    <p class="hint">Cargando…</p>
+  } @else if (!columnasTablero().length) {
+    <div class="empty-state-block">
+      <p>Este proyecto todavía no tiene columnas configuradas.</p>
+    </div>
+  } @else {
+    <ul class="status-manager-list">
+      @for (columna of columnasTablero(); track columna.id; let i = $index) {
+        <li class="status-manager-item">
+          <span class="status-manager-order">{{ i + 1 }}</span>
+          <span class="status-manager-name">{{ columna.nombre }}</span>
+          <span class="status-manager-count">{{ conteoPorColumna().get(columna.id) ?? 0 }} ticket{{ (conteoPorColumna().get(columna.id) ?? 0) === 1 ? '' : 's' }}</span>
+          <div class="status-manager-actions">
+            <button type="button" class="kanban-move-btn" (click)="moverOrden(columna, -1)" [disabled]="i === 0" title="Mover antes" aria-label="Mover columna antes">▲</button>
+            <button type="button" class="kanban-move-btn" (click)="moverOrden(columna, 1)" [disabled]="i === columnasTablero().length - 1" title="Mover después" aria-label="Mover columna después">▼</button>
+            <button type="button" class="btn-secondary small" (click)="abrirCampos(columna)" title="Configurar campos del ticket en esta columna" aria-label="Configurar campos del ticket en esta columna">
+              ⚙ Campos
+            </button>
+            <button type="button" class="btn-secondary small" (click)="abrirFlujo(columna)" title="Configurar a qué columnas se puede mover un ticket desde aquí" aria-label="Configurar flujo de esta columna">
+              🔀 Flujo
+            </button>
+            <button type="button" class="btn-secondary small" (click)="editar(columna)">Editar</button>
+            <button
+              type="button"
+              class="btn-danger small"
+              (click)="pedirEliminar(columna)"
+              [disabled]="columnasTablero().length <= 1 || (conteoPorColumna().get(columna.id) ?? 0) > 0"
+              [title]="
+                columnasTablero().length <= 1
+                  ? 'Debe quedar al menos un estado'
+                  : (conteoPorColumna().get(columna.id) ?? 0) > 0
+                    ? 'Mueve los tickets de esta columna antes de eliminarla'
+                    : ''
+              "
+            >
+              Eliminar
+            </button>
+          </div>
+        </li>
+      }
+    </ul>
+  }
+}
+
+@if (vistaGestor() === 'diagrama') {
+  @if (cargando()) {
+    <p class="hint">Cargando…</p>
+  } @else if (!columnasTablero().length) {
+    <div class="empty-state-block">
+      <p>Este proyecto todavía no tiene columnas configuradas.</p>
+    </div>
+  } @else {
+    <div class="flujo-toolbar">
+      <button type="button" class="btn-secondary small" (click)="nueva()">+ Agregar estado</button>
+      <button
+        type="button"
+        class="btn-secondary small"
+        [class.is-active]="modoAgregarTransicion()"
+        (click)="toggleModoTransicion()"
+      >
+        + Agregar transición
+      </button>
+      @if (modoAgregarTransicion()) {
+        <span class="hint">
+          {{ origenTransicion() ? 'Ahora da clic en la columna DESTINO…' : 'Da clic en la columna de ORIGEN…' }}
+        </span>
+      }
+    </div>
+
+    <p class="hint" style="margin: 8px 0 14px;">
+      Arrastra una caja para acomodarla. 🔓 = sin restricción (se puede mover a cualquiera); da
+      clic para restringirla (🔒) y luego usa "+ Agregar transición" para dibujar a qué columnas
+      sí puede moverse — clic en una flecha existente la elimina.
+    </p>
+
+    <div
+      class="flujo-lienzo"
+      [style.width.px]="anchoLienzo()"
+      [style.height.px]="altoLienzo()"
+      (document:mousemove)="onDiagramaMouseMove($event)"
+      (document:mouseup)="onDiagramaMouseUp()"
+    >
+      <svg class="flujo-svg" [attr.width]="anchoLienzo()" [attr.height]="altoLienzo()">
+        <defs>
+          <marker id="flujo-flecha" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L0,6 L9,3 z" class="flujo-flecha-punta" />
+          </marker>
+        </defs>
+        @for (linea of lineasTransicion(); track linea.origenId + '-' + linea.destinoId) {
+          <path
+            [attr.d]="linea.path"
+            class="flujo-linea"
+            marker-end="url(#flujo-flecha)"
+            (click)="quitarTransicion(linea.origenId, linea.destinoId)"
+          >
+            <title>Clic para eliminar esta transición</title>
+          </path>
+        }
+      </svg>
+
+      @for (columna of columnasTablero(); track columna.id) {
+        <div
+          class="flujo-caja"
+          [style.left.px]="posicionDe(columna.id).x"
+          [style.top.px]="posicionDe(columna.id).y"
+          [style.width.px]="ANCHO_CAJA"
+          [style.height.px]="ALTO_CAJA"
+          [class.flujo-caja-seleccionada]="origenTransicion()?.id === columna.id"
+          [class.flujo-caja-modo-transicion]="modoAgregarTransicion()"
+          (mousedown)="onCajaMouseDown($event, columna)"
+          (click)="onCajaClick(columna)"
+        >
+          <span class="flujo-caja-nombre" [title]="columna.nombre">{{ columna.nombre }}</span>
           <button
             type="button"
-            class="btn-danger small"
-            (click)="pedirEliminar(columna)"
-            [disabled]="columnasTablero().length <= 1 || (conteoPorColumna().get(columna.id) ?? 0) > 0"
-            [title]="
-              columnasTablero().length <= 1
-                ? 'Debe quedar al menos un estado'
-                : (conteoPorColumna().get(columna.id) ?? 0) > 0
-                  ? 'Mueve los tickets de esta columna antes de eliminarla'
-                  : ''
-            "
+            class="flujo-caja-candado"
+            (click)="$event.stopPropagation(); toggleRestriccionDiagrama(columna)"
+            [title]="esRestringida(columna) ? 'Restringida — clic para permitir mover a cualquier columna' : 'Sin restricción — clic para restringir'"
           >
-            Eliminar
+            {{ esRestringida(columna) ? '🔒' : '🔓' }}
           </button>
         </div>
-      </li>
-    }
-  </ul>
+      }
+    </div>
+  }
 }
 
 @if (modalAbierto()) {
