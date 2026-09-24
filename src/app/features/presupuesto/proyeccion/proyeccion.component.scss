@@ -40,6 +40,18 @@
 // (no en la fila) es el sticky horizontal ("left"/"right", para la
 // columna de etiquetas y la de "hoy") — eso nunca falló, cada celda de una
 // misma fila necesita su propio offset horizontal distinto.
+.proy-fila-encabezado-mes,
+.proy-fila-encabezado-quincena {
+  // El fondo va en la FILA, no solo en cada celda: aunque las celdas ya
+  // traían su propio "background", dejar la fila sin fondo propio hacía
+  // que el navegador, al recomponer la capa fija durante el scroll, dejara
+  // ver (un ligero "sangrado") el contenido que quedaba justo detrás —
+  // por eso seguía viéndose un resto de texto/números encimado aun con el
+  // sticky ya bien puesto en la fila. Con la fila también opaca, esa capa
+  // cubre por completo lo que hay debajo y el sangrado desaparece.
+  background: var(--paper-raised);
+}
+
 .proy-fila-encabezado-mes {
   position: sticky;
   top: 0;
