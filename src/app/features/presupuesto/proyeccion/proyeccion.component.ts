@@ -739,6 +739,13 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       );
     }
 
+    // Esta celda ya se maneja por Movimiento (real o ligado a un Fijo) de
+    // aquí en adelante — si quedó un ProyeccionAjuste manual de antes (de
+    // una edición anterior a que existiera esta vinculación, o de la propia
+    // celda vacía), se quita: si no, celda() lo seguiría mostrando en vez
+    // del monto real del movimiento, porque el ajuste tiene prioridad.
+    this.quitarAjuste(clave, quincenaClave);
+
     if (texto === '') {
       if (existentes.length > 0) {
         const objetivo = existentes[0];
