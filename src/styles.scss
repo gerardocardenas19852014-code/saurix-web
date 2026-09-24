@@ -246,6 +246,7 @@ h1, h2 { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(
   color: var(--ink-soft); border-bottom: 1px solid var(--line); padding-bottom: 8px; margin: 0 0 12px;
 }
 .catalog-group-title:hover { color: var(--text-strong); }
+.catalog-group-flecha { display: inline-block; width: 14px; }
 .catalog-group-count { margin-left: auto; background: var(--accent-soft); color: var(--accent); border-radius: 10px; padding: 2px 9px; font-size: 11px; font-weight: 700; }
 .catalog-list-item {
   display: flex; align-items: center; gap: 16px; padding: 14px 18px; background: var(--paper-raised);

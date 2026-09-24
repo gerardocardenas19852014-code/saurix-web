@@ -231,6 +231,23 @@ export class MovimientosComponent implements OnInit, OnDestroy {
     });
   });
 
+  // Cada grupo (mes) se puede expandir/contraer haciendo clic en su título,
+  // igual que los renglones de grupo en Proyección — y arrancan contraídos
+  // por default (el set solo guarda las claves que el usuario SÍ expandió)
+  // para que la lista no abrume al entrar con muchos meses ya cargados.
+  private readonly gruposExpandidos = signal<Set<string>>(new Set());
+
+  protected estaExpandido(clave: string): boolean {
+    return this.gruposExpandidos().has(clave);
+  }
+
+  protected toggleGrupo(clave: string): void {
+    const actualizado = new Set(this.gruposExpandidos());
+    if (actualizado.has(clave)) actualizado.delete(clave);
+    else actualizado.add(clave);
+    this.gruposExpandidos.set(actualizado);
+  }
+
   /** Resumen de los últimos 6 meses (ingresos vs gastos) para la gráfica de barras. */
   protected readonly resumenMensual = computed<ColumnaMensual[]>(() => {
     const hoy = new Date();

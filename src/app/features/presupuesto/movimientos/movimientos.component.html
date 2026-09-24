@@ -169,10 +169,12 @@
 } @else {
   @for (grupo of movimientosAgrupados(); track grupo.clave) {
     <div class="catalog-group">
-      <div class="catalog-group-title">
+      <div class="catalog-group-title" (click)="toggleGrupo(grupo.clave)">
+        <span class="catalog-group-flecha">{{ estaExpandido(grupo.clave) ? '▾' : '▸' }}</span>
         {{ grupo.etiqueta }}
         <span class="catalog-group-count">{{ grupo.movimientos.length }}</span>
       </div>
+      @if (estaExpandido(grupo.clave)) {
       <div class="wallet-tx-grid-wrap">
         <table class="wallet-tx-grid">
           <thead>
@@ -240,6 +242,7 @@
           </tbody>
         </table>
       </div>
+      }
     </div>
   }
 }
