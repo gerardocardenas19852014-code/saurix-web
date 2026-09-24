@@ -721,6 +721,14 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
    *    categoría; si no se puede identificar una sola cuenta, se guarda
    *    como ajuste manual (comportamiento anterior) y se avisa. */
   private confirmarEdicionMovimiento(prefijo: 'ing' | 'gas', categoriaId: number, quincenaClave: string, texto: string): void {
+    // Escribir "0" a mano equivale a dejar la celda vacía: un movimiento de
+    // $0 no aporta nada a la proyección, así que se trata igual que borrar
+    // (elimina el movimiento existente o no crea uno nuevo) en vez de dejar
+    // un movimiento fantasma en $0 sin cuenta asignada.
+    if (texto !== '' && Number(texto) === 0) {
+      texto = '';
+    }
+
     const clave = `${prefijo}:${categoriaId}`;
     const q = this.quincenas().find((qq) => qq.clave === quincenaClave);
     if (!q) return;
