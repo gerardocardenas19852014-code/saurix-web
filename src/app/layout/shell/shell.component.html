@@ -16,34 +16,7 @@
     @if (moduloActivo() === 'catalogos') {
       <span class="sidebar-label">Catálogos</span>
       <nav class="sidebar-nav" aria-label="Menú de catálogos">
-        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('catalogos', 'Presupuesto Personal')">
-          <span>{{ grupoAbierto('catalogos', 'Presupuesto Personal') ? '▾' : '▸' }} Presupuesto Personal</span>
-        </button>
-        @if (grupoAbierto('catalogos', 'Presupuesto Personal')) {
-          <a routerLink="/catalogos/categorias-presupuesto" routerLinkActive="active">🏷️ Categorías de presupuesto</a>
-          <a routerLink="/catalogos/cuentas-presupuesto" routerLinkActive="active">🏦 Cuentas de presupuesto</a>
-          <a routerLink="/catalogos/tipo-cuenta-presupuesto" routerLinkActive="active">💳 Tipo de cuenta</a>
-          <a routerLink="/catalogos/tipo-movimiento-presupuesto" routerLinkActive="active">↔️ Tipo de movimiento</a>
-          <a routerLink="/catalogos/frecuencia-fijos-presupuesto" routerLinkActive="active">🔁 Frecuencia de fijos</a>
-          <a routerLink="/catalogos/presupuesto-anual" routerLinkActive="active">🗓️ Presupuesto por año</a>
-          <a routerLink="/catalogos/estatus-presupuesto-anual" routerLinkActive="active">🚦 Estatus de presupuesto anual</a>
-        }
-
-        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('catalogos', 'Gestión de Proyectos')">
-          <span>{{ grupoAbierto('catalogos', 'Gestión de Proyectos') ? '▾' : '▸' }} Gestión de Proyectos</span>
-        </button>
-        @if (grupoAbierto('catalogos', 'Gestión de Proyectos')) {
-          <a routerLink="/catalogos/tipos-ticket" routerLinkActive="active">🏳️ Tipos de Ticket</a>
-          <a routerLink="/catalogos/prioridades" routerLinkActive="active">🚦 Prioridades</a>
-          <a routerLink="/catalogos/modulos" routerLinkActive="active">🧭 Módulos</a>
-        }
-
-        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('catalogos', 'Panel de Control')">
-          <span>{{ grupoAbierto('catalogos', 'Panel de Control') ? '▾' : '▸' }} Panel de Control</span>
-        </button>
-        @if (grupoAbierto('catalogos', 'Panel de Control')) {
-          <a routerLink="/catalogos/proveedor-conexion" routerLinkActive="active">🔌 Proveedor de conexión</a>
-        }
+        <a routerLink="/catalogos/proveedor-conexion" routerLinkActive="active">🔌 Proveedor de conexión</a>
       </nav>
     }
 
@@ -89,6 +62,19 @@
           <a routerLink="/presupuesto/reportes" routerLinkActive="active">📊 Reportes</a>
           <a routerLink="/presupuesto/calendario" routerLinkActive="active">📅 Calendario de pagos</a>
         }
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('presupuesto', 'Catálogos')">
+          <span>{{ grupoAbierto('presupuesto', 'Catálogos') ? '▾' : '▸' }} Catálogos</span>
+        </button>
+        @if (grupoAbierto('presupuesto', 'Catálogos')) {
+          <a routerLink="/presupuesto/categorias-presupuesto" routerLinkActive="active">🏷️ Categorías de presupuesto</a>
+          <a routerLink="/presupuesto/cuentas-presupuesto" routerLinkActive="active">🏦 Cuentas de presupuesto</a>
+          <a routerLink="/presupuesto/tipo-cuenta-presupuesto" routerLinkActive="active">💳 Tipo de cuenta</a>
+          <a routerLink="/presupuesto/tipo-movimiento-presupuesto" routerLinkActive="active">↔️ Tipo de movimiento</a>
+          <a routerLink="/presupuesto/frecuencia-fijos-presupuesto" routerLinkActive="active">🔁 Frecuencia de fijos</a>
+          <a routerLink="/presupuesto/presupuesto-anual" routerLinkActive="active">🗓️ Presupuesto por año</a>
+          <a routerLink="/presupuesto/estatus-presupuesto-anual" routerLinkActive="active">🚦 Estatus de presupuesto anual</a>
+        }
       </nav>
     }
 
@@ -111,6 +97,9 @@
         @if (grupoAbierto('proyectos', 'Configuracion')) {
           <a routerLink="/proyectos/gestor-estados" routerLinkActive="active">🧭 Gestor de Estados</a>
           <a routerLink="/proyectos/proyectos" routerLinkActive="active">📁 Proyectos</a>
+          <a routerLink="/proyectos/tipos-ticket" routerLinkActive="active">🏳️ Tipos de Ticket</a>
+          <a routerLink="/proyectos/prioridades" routerLinkActive="active">🚦 Prioridades</a>
+          <a routerLink="/proyectos/modulos" routerLinkActive="active">🧭 Módulos</a>
         }
 
         <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('proyectos', 'Reportes')">

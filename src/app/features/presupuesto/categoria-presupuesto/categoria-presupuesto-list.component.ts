@@ -9,7 +9,7 @@ import { BitacoraService } from '../../../shared/services/bitacora.service';
 import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { ToastService } from '../../../shared/services/toast.service';
 import { exportarCsv } from '../../../shared/utils/csv.util';
-import { ValorLista } from '../valor-lista/valor-lista.model';
+import { ValorLista } from '../../catalogos/valor-lista/valor-lista.model';
 import { CategoriaPresupuesto } from './categoria-presupuesto.model';
 
 const MODULO_BITACORA = 'Catálogos / Categorías de presupuesto';

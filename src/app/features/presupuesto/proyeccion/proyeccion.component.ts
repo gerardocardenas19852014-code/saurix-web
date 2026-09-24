@@ -3,13 +3,13 @@ import { forkJoin } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ToastService } from '../../../shared/services/toast.service';
-import { CategoriaPresupuesto } from '../../catalogos/categoria-presupuesto/categoria-presupuesto.model';
-import { CuentaPresupuesto } from '../../catalogos/cuenta-presupuesto/cuenta-presupuesto.model';
+import { CategoriaPresupuesto } from '../categoria-presupuesto/categoria-presupuesto.model';
+import { CuentaPresupuesto } from '../cuenta-presupuesto/cuenta-presupuesto.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
 import { MovimientoRecurrentePresupuesto } from '../recurrentes/recurrente.model';
 import { formatMoneda, textoFechaDeLocal } from '../shared/wallet.util';
 import { AnioTrabajoService } from '../shared/anio-trabajo.service';
-import { PresupuestoAnual } from '../../catalogos/presupuesto-anual/presupuesto-anual.model';
+import { PresupuestoAnual } from '../presupuesto-anual/presupuesto-anual.model';
 import { ProyeccionAjuste } from './proyeccion-ajuste.model';
 
 /** Una quincena (1-15 / 16-fin de mes) de la ventana de proyección. */

@@ -5,7 +5,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../../shared/services/toast.service';
-import { CategoriaPresupuesto } from '../../catalogos/categoria-presupuesto/categoria-presupuesto.model';
+import { CategoriaPresupuesto } from '../categoria-presupuesto/categoria-presupuesto.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
 import { fechaLocalDeTexto, formatMoneda, nivelUso } from '../shared/wallet.util';
 import { LimitePresupuesto } from './limite.model';

@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import { CuentaPresupuesto } from '../../catalogos/cuenta-presupuesto/cuenta-presupuesto.model';
+import { CuentaPresupuesto } from '../cuenta-presupuesto/cuenta-presupuesto.model';
 
 export interface SolicitudPagoTarjeta {
   cuentaId: number;

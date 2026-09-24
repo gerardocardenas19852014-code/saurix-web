@@ -48,4 +48,20 @@ export const PROYECTOS_ROUTES: Routes = [
     loadComponent: () =>
       import('./reportes-ejecutivos/reportes-ejecutivos.component').then((m) => m.ReportesEjecutivosComponent),
   },
+
+  // Catálogos de Gestión de Proyectos (antes en features/catalogos; se
+  // movieron aquí porque son propios de este módulo).
+  {
+    path: 'tipos-ticket',
+    loadComponent: () => import('./ticket-tipos/ticket-tipos.component').then((m) => m.TicketTiposComponent),
+  },
+  {
+    path: 'prioridades',
+    loadComponent: () =>
+      import('./ticket-prioridades/ticket-prioridades.component').then((m) => m.TicketPrioridadesComponent),
+  },
+  {
+    path: 'modulos',
+    loadComponent: () => import('./ticket-modulos/ticket-modulos.component').then((m) => m.TicketModulosComponent),
+  },
 ];

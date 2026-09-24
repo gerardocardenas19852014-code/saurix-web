@@ -6,7 +6,7 @@ import { Ticket } from '../../features/proyectos/kanban/ticket.model';
 import { TicketPrioridad, TicketPrioridadNotificar } from '../../features/proyectos/ticket-prioridades/ticket-prioridad.model';
 import { TableroColumna } from '../../features/proyectos/tableros/tablero-columna.model';
 import { AvisoTarjetaCiclo } from '../../features/presupuesto/shared/aviso-tarjeta.model';
-import { CuentaPresupuesto } from '../../features/catalogos/cuenta-presupuesto/cuenta-presupuesto.model';
+import { CuentaPresupuesto } from '../../features/presupuesto/cuenta-presupuesto/cuenta-presupuesto.model';
 import { MovimientoPresupuesto } from '../../features/presupuesto/movimientos/movimiento.model';
 import { formatMoneda, infoTarjeta } from '../../features/presupuesto/shared/wallet.util';
 

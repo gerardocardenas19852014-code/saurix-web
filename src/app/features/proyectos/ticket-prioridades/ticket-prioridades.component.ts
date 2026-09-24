@@ -6,8 +6,8 @@ import { DataClientService } from '../../../core/services/data-client.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../../shared/services/toast.service';
 import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
-import { UsuarioOpcion } from '../../proyectos/kanban/ticket.model';
-import { TicketPrioridad, TicketPrioridadNotificar } from '../../proyectos/ticket-prioridades/ticket-prioridad.model';
+import { UsuarioOpcion } from '../kanban/ticket.model';
+import { TicketPrioridad, TicketPrioridadNotificar } from './ticket-prioridad.model';
 
 @Component({
   selector: 'app-ticket-prioridades',

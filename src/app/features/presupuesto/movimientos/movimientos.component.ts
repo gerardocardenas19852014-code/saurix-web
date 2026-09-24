@@ -9,12 +9,12 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
 import { ToastService } from '../../../shared/services/toast.service';
 import { PagoTarjetaService } from '../shared/pago-tarjeta.service';
 import { AnioTrabajoService } from '../shared/anio-trabajo.service';
-import { CategoriaPresupuesto } from '../../catalogos/categoria-presupuesto/categoria-presupuesto.model';
-import { CuentaPresupuesto } from '../../catalogos/cuenta-presupuesto/cuenta-presupuesto.model';
+import { CategoriaPresupuesto } from '../categoria-presupuesto/categoria-presupuesto.model';
+import { CuentaPresupuesto } from '../cuenta-presupuesto/cuenta-presupuesto.model';
 import { InfoTarjeta, colorCategoria, etiquetaMes, formatMoneda, iconoTipoCuenta, infoTarjeta, nivelUso } from '../shared/wallet.util';
 import { ValorLista } from '../../catalogos/valor-lista/valor-lista.model';
 import { MovimientoPresupuesto } from './movimiento.model';
-import { PresupuestoAnual } from '../../catalogos/presupuesto-anual/presupuesto-anual.model';
+import { PresupuestoAnual } from '../presupuesto-anual/presupuesto-anual.model';
 
 interface ColumnaMensual {
   etiqueta: string;

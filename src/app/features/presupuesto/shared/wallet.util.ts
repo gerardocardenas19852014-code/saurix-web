@@ -5,8 +5,8 @@
  * de categoría se deriva de forma determinista de su id, ciclando sobre
  * la paleta de acento ya definida en styles.scss.
  */
-import type { CuentaPresupuesto } from '../../catalogos/cuenta-presupuesto/cuenta-presupuesto.model';
-import type { CategoriaPresupuesto } from '../../catalogos/categoria-presupuesto/categoria-presupuesto.model';
+import type { CuentaPresupuesto } from '../cuenta-presupuesto/cuenta-presupuesto.model';
+import type { CategoriaPresupuesto } from '../categoria-presupuesto/categoria-presupuesto.model';
 import type { MovimientoPresupuesto } from '../movimientos/movimiento.model';
 
 const PALETA_CATEGORIAS = [

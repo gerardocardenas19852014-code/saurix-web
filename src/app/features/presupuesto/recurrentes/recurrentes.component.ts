@@ -7,12 +7,12 @@ import { ColumnaTabla, DataTableComponent } from '../../../shared/components/dat
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { AdjuntosPanelComponent } from '../../../shared/components/adjuntos-panel/adjuntos-panel.component';
 import { ToastService } from '../../../shared/services/toast.service';
-import { CategoriaPresupuesto } from '../../catalogos/categoria-presupuesto/categoria-presupuesto.model';
-import { CuentaPresupuesto } from '../../catalogos/cuenta-presupuesto/cuenta-presupuesto.model';
+import { CategoriaPresupuesto } from '../categoria-presupuesto/categoria-presupuesto.model';
+import { CuentaPresupuesto } from '../cuenta-presupuesto/cuenta-presupuesto.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
 import { ValorLista } from '../../catalogos/valor-lista/valor-lista.model';
 import { MovimientoRecurrentePresupuesto } from './recurrente.model';
-import { PresupuestoAnual } from '../../catalogos/presupuesto-anual/presupuesto-anual.model';
+import { PresupuestoAnual } from '../presupuesto-anual/presupuesto-anual.model';
 import { fechaLocalDeTexto, textoFechaDeLocal } from '../shared/wallet.util';
 import { AnioTrabajoService } from '../shared/anio-trabajo.service';
 

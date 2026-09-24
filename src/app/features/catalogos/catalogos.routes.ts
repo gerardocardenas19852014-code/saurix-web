@@ -4,83 +4,23 @@ export const CATALOGOS_ROUTES: Routes = [
   // Sin landing/Inicio propio: el menú lateral ya lista cada catálogo
   // agrupado (ver shell.component.html), así que entrar a /catalogos a
   // secas manda directo al primero.
-  { path: '', redirectTo: 'categorias-presupuesto', pathMatch: 'full' },
+  { path: '', redirectTo: 'proveedor-conexion', pathMatch: 'full' },
 
   // Los catálogos de WikiDocs (Tipo de sistema, Categoría, Secciones) se
   // movieron por completo a features/wikidocs (jerarquía real
   // TipoSistema→Categoria→Sección, con FK padre obligatorio) y viven solo
   // en su propio módulo, no aquí.
 
-  // Catálogos de Presupuesto Personal (compartidos entre todos los usuarios).
-  {
-    path: 'tipo-cuenta-presupuesto',
-    loadComponent: () =>
-      import('./tipo-cuenta-presupuesto/tipo-cuenta-presupuesto.component').then(
-        (m) => m.TipoCuentaPresupuestoComponent,
-      ),
-  },
-  {
-    path: 'tipo-movimiento-presupuesto',
-    loadComponent: () =>
-      import('./tipo-movimiento-presupuesto/tipo-movimiento-presupuesto.component').then(
-        (m) => m.TipoMovimientoPresupuestoComponent,
-      ),
-  },
-  {
-    path: 'frecuencia-fijos-presupuesto',
-    loadComponent: () =>
-      import('./frecuencia-fijos-presupuesto/frecuencia-fijos-presupuesto.component').then(
-        (m) => m.FrecuenciaFijosPresupuestoComponent,
-      ),
-  },
+  // Los catálogos de Presupuesto Personal (categorías, cuentas, tipo de
+  // cuenta, tipo de movimiento, frecuencia de fijos, presupuesto anual y su
+  // estatus) se movieron a features/presupuesto — ver presupuesto.routes.ts.
+
+  // Los catálogos de Gestión de Proyectos (Tipos de Ticket, Prioridades,
+  // Módulos) se movieron a features/proyectos — ver proyectos.routes.ts.
+
   {
     path: 'proveedor-conexion',
     loadComponent: () =>
       import('./proveedor-conexion/proveedor-conexion.component').then((m) => m.ProveedorConexionComponent),
-  },
-
-  {
-    path: 'categorias-presupuesto',
-    loadComponent: () =>
-      import('./categoria-presupuesto/categoria-presupuesto-list.component').then(
-        (m) => m.CategoriaPresupuestoListComponent,
-      ),
-  },
-  {
-    path: 'cuentas-presupuesto',
-    loadComponent: () =>
-      import('./cuenta-presupuesto/cuenta-presupuesto-list.component').then((m) => m.CuentaPresupuestoListComponent),
-  },
-  {
-    path: 'presupuesto-anual',
-    loadComponent: () =>
-      import('./presupuesto-anual/presupuesto-anual-list.component').then((m) => m.PresupuestoAnualListComponent),
-  },
-  {
-    path: 'estatus-presupuesto-anual',
-    loadComponent: () =>
-      import('./presupuesto-anual-estatus/presupuesto-anual-estatus.component').then(
-        (m) => m.PresupuestoAnualEstatusComponent,
-      ),
-  },
-
-  // Catálogos de Gestión de Proyectos (los administra el mismo Catálogos
-  // general; el modelo de datos de cada uno sigue viviendo en su módulo de
-  // origen, dentro de features/proyectos, ya que las pantallas del propio
-  // módulo de Gestión de Proyectos también lo usan).
-  {
-    path: 'tipos-ticket',
-    loadComponent: () =>
-      import('./ticket-tipos/ticket-tipos.component').then((m) => m.TicketTiposComponent),
-  },
-  {
-    path: 'prioridades',
-    loadComponent: () =>
-      import('./ticket-prioridades/ticket-prioridades.component').then((m) => m.TicketPrioridadesComponent),
-  },
-  {
-    path: 'modulos',
-    loadComponent: () =>
-      import('./ticket-modulos/ticket-modulos.component').then((m) => m.TicketModulosComponent),
   },
 ];

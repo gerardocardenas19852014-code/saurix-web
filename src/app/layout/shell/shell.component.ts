@@ -113,12 +113,10 @@ export class ShellComponent implements OnDestroy {
       'proyectos:Procesos',
       'proyectos:Configuracion',
       'proyectos:Reportes',
-      'catalogos:Presupuesto Personal',
-      'catalogos:Gestión de Proyectos',
-      'catalogos:Panel de Control',
       'presupuesto:Movimientos',
       'presupuesto:Metas y límites',
       'presupuesto:Reportes',
+      'presupuesto:Catálogos',
     ]),
   );
 
