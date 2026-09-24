@@ -8,6 +8,7 @@ import { CuentaPresupuesto } from '../../catalogos/cuenta-presupuesto/cuenta-pre
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
 import { MovimientoRecurrentePresupuesto } from '../recurrentes/recurrente.model';
 import { formatMoneda, textoFechaDeLocal } from '../shared/wallet.util';
+import { AnioTrabajoService } from '../shared/anio-trabajo.service';
 import { PresupuestoAnual } from '../../catalogos/presupuesto-anual/presupuesto-anual.model';
 import { ProyeccionAjuste } from './proyeccion-ajuste.model';
 
@@ -159,7 +160,12 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
   /** "todos" = las 24 quincenas de la ventana; un año = solo sus quincenas
    *  dentro de esa ventana (la ventana sigue siendo la misma de 24 hacia
    *  adelante desde hoy — un año puede verse incompleto si cae en la punta). */
-  protected readonly filtroAnio = signal<'todos' | number>('todos');
+  protected readonly anioTrabajo = inject(AnioTrabajoService);
+
+  /** Año de trabajo COMPARTIDO con Movimientos y con Fijos y Proyección —
+   *  no es un filtro propio de esta pantalla: es la misma selección en las
+   *  3 (ver AnioTrabajoService). */
+  protected readonly filtroAnio = this.anioTrabajo.seleccionado;
 
   /** Solo los años dados de alta en Catálogos → "Presupuesto por año" —
    *  antes salían de la ventana de 24 quincenas (podía ofrecer un año que

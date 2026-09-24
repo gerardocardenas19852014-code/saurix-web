@@ -119,7 +119,7 @@
   </label>
   <label class="board-filter-field">
     Año
-    <select [value]="filtroAnio()" (change)="filtroAnio.set($any($event.target).value)">
+    <select [value]="filtroAnio()" (change)="establecerFiltroAnio($any($event.target).value)">
       <option value="">Todos</option>
       @for (anio of aniosDisponibles(); track anio) {
         <option [value]="anio">{{ anio }}</option>

@@ -14,6 +14,7 @@ import { ValorLista } from '../../catalogos/valor-lista/valor-lista.model';
 import { MovimientoRecurrentePresupuesto } from './recurrente.model';
 import { PresupuestoAnual } from '../../catalogos/presupuesto-anual/presupuesto-anual.model';
 import { fechaLocalDeTexto, textoFechaDeLocal } from '../shared/wallet.util';
+import { AnioTrabajoService } from '../shared/anio-trabajo.service';
 
 /**
  * "Fijos y Proyección": gastos/ingresos recurrentes (renta, nómina,
@@ -53,6 +54,10 @@ export class RecurrentesComponent implements OnInit {
   protected readonly aniosPresupuesto = computed(() =>
     [...this.presupuestosAnuales()].map((p) => p.anio).sort((a, b) => a - b),
   );
+
+  /** Año de trabajo COMPARTIDO con Movimientos y Proyección — cuando ya hay
+   *  uno elegido, "Desde" arranca ahí por defecto (ver resetearDesdeGenerar). */
+  protected readonly anioTrabajo = inject(AnioTrabajoService);
 
   /** Cuántos ciclos futuros generar de una vez con "Generar futuros"
    *  (meses si la frecuencia no es Anual; años si lo es). */
@@ -371,17 +376,27 @@ export class RecurrentesComponent implements OnInit {
    *  usuario lo cambie a mano. */
   private resetearDesdeGenerar(): void {
     const hoy = new Date();
-    this.mesInicioGenerar.set(`${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`);
-    // Si "Presupuesto por año" ya tiene años registrados y el actual no es
+    const anios = this.aniosPresupuesto();
+    const trabajo = this.anioTrabajo.seleccionado();
+    // Si ya hay un "año de trabajo" elegido (compartido con Movimientos y
+    // Proyección) y sigue registrado en el catálogo, "Desde" arranca ahí en
+    // vez de en el año calendario actual — así las 3 pantallas quedan
+    // alineadas al mismo año sin tener que volver a elegirlo aquí.
+    const anioBase = trabajo !== 'todos' && anios.includes(trabajo) ? trabajo : hoy.getFullYear();
+    this.mesInicioGenerar.set(`${anioBase}-${String(hoy.getMonth() + 1).padStart(2, '0')}`);
+    // Si "Presupuesto por año" ya tiene años registrados y anioBase no es
     // uno de ellos, el <select> de "Desde" (ver html) no tendría dónde
     // caer — se ajusta al más cercano disponible (el primero igual o
-    // posterior a hoy, o el último si todos quedaron en el pasado).
-    const anios = this.aniosPresupuesto();
+    // posterior a anioBase, o el último si todos quedaron en el pasado).
     if (anios.length === 0) {
-      this.anioInicioGenerar.set(hoy.getFullYear());
+      this.anioInicioGenerar.set(anioBase);
       return;
     }
-    const siguiente = anios.find((a) => a >= hoy.getFullYear());
+    if (anios.includes(anioBase)) {
+      this.anioInicioGenerar.set(anioBase);
+      return;
+    }
+    const siguiente = anios.find((a) => a >= anioBase);
     this.anioInicioGenerar.set(siguiente ?? anios[anios.length - 1]);
   }
 

@@ -8,6 +8,7 @@ import { AdjuntosPanelComponent } from '../../../shared/components/adjuntos-pane
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../../shared/services/toast.service';
 import { PagoTarjetaService } from '../shared/pago-tarjeta.service';
+import { AnioTrabajoService } from '../shared/anio-trabajo.service';
 import { CategoriaPresupuesto } from '../../catalogos/categoria-presupuesto/categoria-presupuesto.model';
 import { CuentaPresupuesto } from '../../catalogos/cuenta-presupuesto/cuenta-presupuesto.model';
 import { InfoTarjeta, colorCategoria, formatMoneda, iconoTipoCuenta, infoTarjeta, nivelUso } from '../shared/wallet.util';
@@ -119,8 +120,20 @@ export class MovimientosComponent implements OnInit {
   protected readonly filtroTipo = signal<string>('');
   /** "" = todos los meses; si no, "año-mes" (mes 0-indexado, ver claveMes()). */
   protected readonly filtroMes = signal<string>('');
-  /** "" = todos los años; si no, año como texto (p.ej. "2026"). */
-  protected readonly filtroAnio = signal<string>('');
+  protected readonly anioTrabajo = inject(AnioTrabajoService);
+
+  /** "" = todos los años; si no, año como texto (p.ej. "2026"). Alias de
+   *  SOLO LECTURA sobre el año de trabajo COMPARTIDO con Proyección y con
+   *  Fijos y Proyección (ver AnioTrabajoService) — para cambiarlo usa
+   *  establecerFiltroAnio(), no filtroAnio.set() (ya no existe: es un
+   *  computed). */
+  protected readonly filtroAnio = computed(() =>
+    this.anioTrabajo.seleccionado() === 'todos' ? '' : String(this.anioTrabajo.seleccionado()),
+  );
+
+  protected establecerFiltroAnio(valor: string): void {
+    this.anioTrabajo.seleccionado.set(valor === '' ? 'todos' : Number(valor));
+  }
   /** "" = sin límite; si no, fecha ISO "YYYY-MM-DD" (compara bien como texto). */
   protected readonly filtroFechaDesde = signal<string>('');
   protected readonly filtroFechaHasta = signal<string>('');
@@ -351,7 +364,7 @@ export class MovimientosComponent implements OnInit {
     this.filtroCategoriaId.set(0);
     this.filtroTipo.set('');
     this.filtroMes.set('');
-    this.filtroAnio.set('');
+    this.anioTrabajo.seleccionado.set('todos');
     this.filtroFechaDesde.set('');
     this.filtroFechaHasta.set('');
     this.ordenFecha.set('desc');
@@ -374,11 +387,22 @@ export class MovimientosComponent implements OnInit {
       .reduce((s, m) => s + (m.tipo === 'Ingreso' ? m.monto : -m.monto), 0);
   }
 
+  /** Fecha inicial de "Nuevo movimiento": hoy, salvo que haya un año de
+   *  trabajo elegido (compartido con Proyección y Fijos y Proyección) —
+   *  entonces arranca en ese año, mismo mes/día de hoy, para que la
+   *  captura quede alineada al año en el que se está trabajando. */
+  private fechaPorDefecto(): string {
+    const hoy = new Date();
+    const anio = this.anioTrabajo.seleccionado();
+    if (anio === 'todos') return hoy.toISOString().slice(0, 10);
+    return new Date(anio, hoy.getMonth(), hoy.getDate()).toISOString().slice(0, 10);
+  }
+
   nuevo(): void {
     this.movimientoEnEdicion.set(null);
     this.form.reset({
       id: 0,
-      fecha: new Date().toISOString().slice(0, 10),
+      fecha: this.fechaPorDefecto(),
       tipo: 'Gasto',
       cuentaPresupuestoId: 0,
       cuentaDestinoId: 0,
