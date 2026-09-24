@@ -282,12 +282,18 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
     return dia >= diaInicio && dia <= diaFin;
   }
 
-  /** Mapa clave → (quincenaClave → monto), calculado una sola vez a partir
-   *  de movimientos + fijos extrapolados (sin contar dos veces un ciclo que
-   *  ya tiene su movimiento real/proyectado). También arma, por cada clave
-   *  de categoría (ing:X / gas:X), el desglose por cuenta (clave::cta:Y) y
-   *  qué cuentas la componen — para poder mostrar "de qué cuentas sale"
-   *  cuando una categoría junta movimientos de más de una cuenta. */
+  /** Mapa clave → (quincenaClave → monto), calculado SOLO a partir de
+   *  movimientos ya existentes (reales o generados por adelantado con
+   *  "Generar futuros" en Fijos y Proyección) — NO extrapola en vivo la
+   *  regla de un Fijo para una quincena que todavía no tiene su movimiento
+   *  generado ahí (antes sí lo hacía; se quitó porque predecía dinero en
+   *  quincenas sin nada capturado, incluso antes de que el Fijo existiera).
+   *  Una quincena sin movimiento para una categoría se ve en $0 hasta que
+   *  se corra "Generar futuros" o se capture algo a mano. También arma,
+   *  por cada clave de categoría (ing:X / gas:X), el desglose por cuenta
+   *  (clave::cta:Y) y qué cuentas la componen — para poder mostrar "de qué
+   *  cuentas sale" cuando una categoría junta movimientos de más de una
+   *  cuenta. */
   private readonly valoresAuto = computed(() => {
     const mapa = new Map<string, Map<string, number>>();
     const cuentasPorClave = new Map<string, Set<number>>();
@@ -320,7 +326,6 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
 
     const quincenasVentana = new Set(this.quincenas().map((q) => q.clave));
     const cuentasAhorroIds = new Set(this.cuentas().filter((c) => c.tipo === 'Ahorro').map((c) => Number(c.id)));
-    const cubiertoPorMovimiento = new Set<string>(); // `${origenRecurrenteId}:${quincenaClave}`
 
     for (const m of this.movimientos()) {
       const quincenaClave = this.quincenaDeFecha(m.fecha);
@@ -331,22 +336,6 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       }
       if (cuentasAhorroIds.has(Number(m.cuentaPresupuestoId))) {
         sumar(`aho:${m.cuentaPresupuestoId}`, quincenaClave, m.tipo === 'Ingreso' ? m.monto : -m.monto);
-      }
-      if (m.origenRecurrenteId != null) cubiertoPorMovimiento.add(`${m.origenRecurrenteId}:${quincenaClave}`);
-    }
-
-    for (const fila of this.recurrentes()) {
-      if (fila.activo === false) continue;
-      for (const q of this.quincenas()) {
-        if (cubiertoPorMovimiento.has(`${fila.id}:${q.clave}`)) continue;
-        if (!this.fijoFiraEnQuincena(fila, q)) continue;
-        if (fila.categoriaPresupuestoId) {
-          if (fila.tipo === 'Ingreso') sumarPorCategoria('ing', fila.categoriaPresupuestoId, fila.cuentaPresupuestoId, q.clave, fila.monto);
-          else if (fila.tipo === 'Gasto') sumarPorCategoria('gas', fila.categoriaPresupuestoId, fila.cuentaPresupuestoId, q.clave, fila.monto);
-        }
-        if (cuentasAhorroIds.has(Number(fila.cuentaPresupuestoId))) {
-          sumar(`aho:${fila.cuentaPresupuestoId}`, q.clave, fila.tipo === 'Ingreso' ? fila.monto : -fila.monto);
-        }
       }
     }
 
