@@ -7,7 +7,16 @@
 }
 
 .proy-tabla {
-  border-collapse: collapse;
+  // "separate" (no "collapse") a propósito: con border-collapse:collapse,
+  // muchas celdas con position:sticky en la misma tabla (2 filas de
+  // encabezado + la columna de etiquetas + la columna de "hoy") pintan mal
+  // en Chrome al hacer scroll vertical — se encimaban y se veían texto y
+  // números revueltos, un bug conocido de ese motor con sticky + bordes
+  // colapsados, no algo arreglable ajustando pixeles. Con border-spacing
+  // en 0 se ve igual (un solo borde de 1px entre celdas, como antes) pero
+  // ya no truena al pegar celdas con scroll.
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 13px;
   font-family: 'JetBrains Mono', monospace;
   font-variant-numeric: tabular-nums;
@@ -92,8 +101,11 @@
   letter-spacing: 0.04em;
 }
 
+// Fondo gris claro SIEMPRE (no solo en hover) para que un renglón de grupo
+// colapsable (CREDITOS, HOGAR, SERVICIOS, TERRENOS...) se identifique de
+// un vistazo entre las demás filas, sin tener que pasar el mouse encima.
 .proy-fila-grupo td {
-  background: var(--paper-raised);
+  background: var(--technical-soft);
   font-weight: 700;
   padding: 6px 10px;
   color: var(--ink-soft);
