@@ -123,9 +123,9 @@
   <label class="board-filter-field">
     Año
     @if (aniosDisponibles().length > 0) {
-      <select [value]="filtroAnio()" (change)="establecerFiltroAnio($any($event.target).value)">
+      <select (change)="establecerFiltroAnio($any($event.target).value)">
         @for (anio of aniosDisponibles(); track anio) {
-          <option [value]="anio">{{ anio }}</option>
+          <option [value]="anio" [selected]="anio === filtroAnio()">{{ anio }}</option>
         }
       </select>
     } @else {

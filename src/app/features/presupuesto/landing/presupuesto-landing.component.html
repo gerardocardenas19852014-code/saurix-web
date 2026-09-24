@@ -6,9 +6,9 @@
   <label class="board-filter-field">
     Año
     @if (aniosDisponibles().length > 0) {
-      <select [value]="filtroAnio()" (change)="filtroAnio.set(+$any($event.target).value)">
+      <select (change)="filtroAnio.set(+$any($event.target).value)">
         @for (anio of aniosDisponibles(); track anio) {
-          <option [value]="anio">{{ anio }}</option>
+          <option [value]="anio" [selected]="anio === filtroAnio()">{{ anio }}</option>
         }
       </select>
     } @else {
@@ -19,9 +19,9 @@
   </label>
   <label class="board-filter-field">
     Mes
-    <select [value]="filtroMes()" (change)="filtroMes.set(+$any($event.target).value)">
+    <select (change)="filtroMes.set(+$any($event.target).value)">
       @for (mes of mesesOpciones; track mes) {
-        <option [value]="mes">{{ nombreMes(mes) }}</option>
+        <option [value]="mes" [selected]="mes === filtroMes()">{{ nombreMes(mes) }}</option>
       }
     </select>
   </label>
