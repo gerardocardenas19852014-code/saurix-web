@@ -23,22 +23,38 @@
   min-width: 100%;
 }
 
-// Las 2 filas del encabezado (banda de mes / número de quincena) van cada
-// una "pegada" (sticky) a un `top` distinto para apilarse una debajo de la
-// otra sin taparse. Antes ese segundo `top` era un pixelaje adivinado
-// (29px) que dependía de que la fila de arriba midiera EXACTAMENTE eso —
-// bastaba con que un texto largo (p. ej. "Septiembre de 2026" en una
-// columna angosta) no cupiera para que las dos filas se encimaran y todo
-// se viera revuelto ("se empalma y se pierde"). Ahora ambas filas miden
-// una altura fija (32px, box-sizing: border-box) y además se recorta con
-// "…" cualquier texto que no quepa, en vez de desbordarse encima de la
-// celda vecina.
-.proy-esquina,
-.proy-banda-mes,
-.proy-col-quincena {
+// IMPORTANTE — por qué el sticky vertical va en la FILA <tr>, no en cada
+// celda <th>: hicimos pruebas en vivo (misma app, misma tabla) y position:
+// sticky con "top" puesto en cada <th> SIMPLEMENTE NO SE APLICABA — el
+// navegador calculaba position:sticky correctamente (se veía en el
+// computed style) pero la celda igual se desplazaba con el scroll como si
+// fuera estática, así que la celda terminaba pintándose encima de
+// cualquier renglón de datos que quedara en esa misma franja ("se empalma
+// y se pierde"). No fue por bordes, colspan, cantidad de columnas, ancho
+// de tabla ni por ningún otro ajuste de CSS — probamos todo eso por
+// separado y ninguno lo arreglaba. Lo que sí funciona de forma consistente
+// es poner el "top" pegajoso en la FILA (<tr class="proy-fila-encabezado-
+// mes|quincena">, ver el html) en vez de en cada celda — eso si se queda
+// fijo siempre. Las celdas ya no necesitan su propio "top": basta con que
+// la fila que las contiene sea sticky. Lo que SÍ sigue yendo en la celda
+// (no en la fila) es el sticky horizontal ("left"/"right", para la
+// columna de etiquetas y la de "hoy") — eso nunca falló, cada celda de una
+// misma fila necesita su propio offset horizontal distinto.
+.proy-fila-encabezado-mes {
   position: sticky;
   top: 0;
   z-index: 3;
+}
+
+.proy-fila-encabezado-quincena {
+  position: sticky;
+  top: 32px;
+  z-index: 3;
+}
+
+.proy-esquina,
+.proy-banda-mes,
+.proy-col-quincena {
   background: var(--paper-raised);
   border-bottom: 1px solid var(--line);
   font-weight: 600;
@@ -47,18 +63,10 @@
   height: 32px;
   overflow: hidden;
   text-overflow: ellipsis;
-  // Chrome tiene un bug conocido de repintado con muchas celdas
-  // position:sticky apiladas en una tabla con scroll: al desplazarte
-  // rápido deja "fantasmas" de texto de celdas que ya deberían haberse
-  // ido, encimados con el encabezado. will-change:transform obliga a
-  // esta celda a pintarse en su propia capa (GPU) en vez de repintarse
-  // sobre el mismo lienzo que el cuerpo de la tabla, que es lo que evita
-  // el encimado — el border-collapse:separate ya arregló una causa, pero
-  // no esta.
-  will-change: transform;
 }
 
 .proy-esquina {
+  position: sticky;
   left: 0;
   z-index: 4;
   min-width: 190px;
@@ -72,14 +80,6 @@
   padding: 6px 10px;
   color: var(--ink-soft);
   border-left: 1px solid var(--line);
-}
-
-// La 2ª fila del encabezado (número de quincena, y el corner "Quincena"
-// que va justo debajo del corner vacío de la 1ª fila) se pega 32px más
-// abajo — la altura exacta de la 1ª fila, ya no adivinada.
-.proy-col-quincena,
-.proy-esquina-fila2 {
-  top: 32px;
 }
 
 .proy-col-quincena {
