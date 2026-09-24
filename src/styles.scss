@@ -618,12 +618,43 @@ html[data-theme='dark'] .edit-form input[type=date], html[data-theme='ocean'] .e
 .wallet-account-icon { font-size: 22px; }
 .wallet-account-name { font-size: 13.5px; color: var(--ink-soft); margin: 8px 0 4px; }
 .wallet-account-balance { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; color: var(--text-strong); }
-.wallet-tx-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.wallet-tx-item { display: flex; align-items: center; gap: 12px; background: var(--paper-raised); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; cursor: pointer; transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; }
-.wallet-tx-item:hover { transform: translateY(-1px); box-shadow: 0 6px 14px -10px rgba(0, 0, 0, .35); border-color: var(--accent); }
-.wallet-tx-cat-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-.wallet-tx-body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.wallet-tx-amount { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 15px; white-space: nowrap; }
+// Lista compacta de movimientos (Movimientos, Dashboard, y donde se
+// reutilice): antes cada renglón era una "tarjeta" alta y separada — con
+// pocos movimientos se veía bien, pero al crecer la lista se sentía muy
+// pesada para hojear. Ahora es un solo contenedor con renglones delgados
+// separados por una línea, como una lista de verdad.
+.wallet-tx-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--paper-raised);
+}
+.wallet-tx-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--line);
+  transition: background .12s ease;
+}
+.wallet-tx-item:last-child { border-bottom: none; }
+.wallet-tx-item:hover { background: var(--paper); }
+.wallet-tx-cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+// align-items: flex-start evita que <strong>/.tag/.hint se estiren al ancho
+// completo dentro del flex column (antes hacía que el badge "proyectado" se
+// viera como una barra gigante en vez de una etiqueta chica).
+.wallet-tx-body { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; max-width: 100%; }
+// Nombre + badges (transferencia/proyectado) en un mismo renglón, para que
+// el ítem quede en 2 líneas (título+badges, y meta) en vez de 3-4.
+.wallet-tx-titulo { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; max-width: 100%; }
+.wallet-tx-titulo strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 340px; }
+.wallet-tx-amount { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; white-space: nowrap; }
 .wallet-tx-amount-in { color: var(--client); }
 .wallet-tx-amount-out { color: var(--danger); }
 .wallet-monthly-chart { display: flex; align-items: flex-end; gap: 14px; height: 170px; padding: 10px 4px 0; border-bottom: 1px solid var(--line); overflow-x: auto; }

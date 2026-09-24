@@ -175,13 +175,15 @@
           <li class="wallet-tx-item" (click)="editar(movimiento)">
             <span class="wallet-tx-cat-dot" [style.background]="colorCategoria(movimiento.categoriaPresupuestoId)"></span>
             <div class="wallet-tx-body">
-              <strong>{{ movimiento.descripcion || nombreCategoria(movimiento.categoriaPresupuestoId) }}</strong>
-              @if (movimiento.transferenciaId) {
-                <span class="tag" title="Transferencia entre cuentas">🔄 transferencia</span>
-              }
-              @if (movimiento.proyectado) {
-                <span class="tag" title="Generado por adelantado con Generar futuros — aún no confirmado">🔮 proyectado</span>
-              }
+              <div class="wallet-tx-titulo">
+                <strong>{{ movimiento.descripcion || nombreCategoria(movimiento.categoriaPresupuestoId) }}</strong>
+                @if (movimiento.transferenciaId) {
+                  <span class="tag" title="Transferencia entre cuentas">🔄 transferencia</span>
+                }
+                @if (movimiento.proyectado) {
+                  <span class="tag" title="Generado por adelantado con Generar futuros — aún no confirmado">🔮 proyectado</span>
+                }
+              </div>
               <span class="hint" style="margin:0;">
                 {{ nombreCuenta(movimiento.cuentaPresupuestoId) }}
                 @if (!movimiento.transferenciaId) {
