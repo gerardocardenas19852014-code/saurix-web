@@ -47,6 +47,15 @@
   height: 32px;
   overflow: hidden;
   text-overflow: ellipsis;
+  // Chrome tiene un bug conocido de repintado con muchas celdas
+  // position:sticky apiladas en una tabla con scroll: al desplazarte
+  // rápido deja "fantasmas" de texto de celdas que ya deberían haberse
+  // ido, encimados con el encabezado. will-change:transform obliga a
+  // esta celda a pintarse en su propia capa (GPU) en vez de repintarse
+  // sobre el mismo lienzo que el cuerpo de la tabla, que es lo que evita
+  // el encimado — el border-collapse:separate ya arregló una causa, pero
+  // no esta.
+  will-change: transform;
 }
 
 .proy-esquina {
@@ -134,6 +143,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   border-bottom: 1px solid var(--line);
+  will-change: transform;
 }
 
 .proy-fila-resumen .proy-etiqueta,
@@ -211,6 +221,7 @@
   z-index: 4;
   background: var(--paper);
   color: var(--text-strong);
+  will-change: transform;
 }
 
 .proy-celda-hoy {
@@ -218,6 +229,7 @@
   left: 190px;
   z-index: 2;
   background: var(--paper);
+  will-change: transform;
 }
 
 .proy-celda {
