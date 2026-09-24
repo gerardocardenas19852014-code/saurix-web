@@ -33,14 +33,20 @@
         <tr>
           <th class="proy-esquina"></th>
           @for (banda of bandasMes(); track $index) {
-            <th [attr.colspan]="banda.colspan" class="proy-banda-mes">{{ banda.etiqueta }}</th>
+            <th [attr.colspan]="banda.colspan" [class]="'proy-banda-mes proy-mes-c' + banda.colorIndex">
+              {{ banda.etiqueta }}
+            </th>
           }
           <th class="proy-col-total-header"></th>
         </tr>
         <tr>
-          <th class="proy-esquina">Quincena</th>
+          <th class="proy-esquina proy-esquina-fila2">Quincena</th>
           @for (item of quincenasVisibles(); track item.indice) {
-            <th class="proy-col-quincena" [class.proy-col-hoy]="item.indice === 0" [title]="item.indice === 0 ? 'Quincena actual' : ''">
+            <th
+              [class]="'proy-col-quincena proy-mes-c' + colorMes(item.q.anio, item.q.mes)"
+              [class.proy-col-hoy]="item.indice === 0"
+              [title]="item.indice === 0 ? 'Quincena actual' : ''"
+            >
               {{ item.q.mitad }}
             </th>
           }

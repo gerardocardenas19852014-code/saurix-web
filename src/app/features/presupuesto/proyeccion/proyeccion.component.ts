@@ -207,16 +207,26 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       .filter(({ q }) => anio === 'todos' || q.anio === anio);
   });
 
+  /** Índice de color cíclico por mes (6 tonos, dan la vuelta y se
+   *  repiten) — dos meses consecutivos siempre caen en colores distintos.
+   *  Ayuda visual para ubicarse en qué mes se está al desplazarse por las
+   *  24 quincenas ("agregar visualmente que pueda ver como que mes
+   *  estoy moviendo"), inspirado en las bandas de color por mes del Excel
+   *  original del usuario. */
+  protected colorMes(anio: number, mes: number): number {
+    return (anio * 12 + mes) % 6;
+  }
+
   /** Encabezado superior: una banda por mes, con el colspan de cuántas
    *  quincenas VISIBLES de ese mes hay. */
-  protected readonly bandasMes = computed<{ etiqueta: string; colspan: number }[]>(() => {
-    const bandas: { etiqueta: string; colspan: number }[] = [];
+  protected readonly bandasMes = computed<{ etiqueta: string; colspan: number; colorIndex: number }[]>(() => {
+    const bandas: { etiqueta: string; colspan: number; colorIndex: number }[] = [];
     for (const { q } of this.quincenasVisibles()) {
       const texto = new Date(q.anio, q.mes, 1).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
       const etiqueta = texto.charAt(0).toUpperCase() + texto.slice(1);
       const anterior = bandas[bandas.length - 1];
       if (anterior && anterior.etiqueta === etiqueta) anterior.colspan++;
-      else bandas.push({ etiqueta, colspan: 1 });
+      else bandas.push({ etiqueta, colspan: 1, colorIndex: this.colorMes(q.anio, q.mes) });
     }
     return bandas;
   });

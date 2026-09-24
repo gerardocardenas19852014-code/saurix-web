@@ -14,6 +14,16 @@
   min-width: 100%;
 }
 
+// Las 2 filas del encabezado (banda de mes / número de quincena) van cada
+// una "pegada" (sticky) a un `top` distinto para apilarse una debajo de la
+// otra sin taparse. Antes ese segundo `top` era un pixelaje adivinado
+// (29px) que dependía de que la fila de arriba midiera EXACTAMENTE eso —
+// bastaba con que un texto largo (p. ej. "Septiembre de 2026" en una
+// columna angosta) no cupiera para que las dos filas se encimaran y todo
+// se viera revuelto ("se empalma y se pierde"). Ahora ambas filas miden
+// una altura fija (32px, box-sizing: border-box) y además se recorta con
+// "…" cualquier texto que no quepa, en vez de desbordarse encima de la
+// celda vecina.
 .proy-esquina,
 .proy-banda-mes,
 .proy-col-quincena {
@@ -24,6 +34,10 @@
   border-bottom: 1px solid var(--line);
   font-weight: 600;
   white-space: nowrap;
+  box-sizing: border-box;
+  height: 32px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .proy-esquina {
@@ -41,13 +55,33 @@
   border-left: 1px solid var(--line);
 }
 
+// La 2ª fila del encabezado (número de quincena, y el corner "Quincena"
+// que va justo debajo del corner vacío de la 1ª fila) se pega 32px más
+// abajo — la altura exacta de la 1ª fila, ya no adivinada.
+.proy-col-quincena,
+.proy-esquina-fila2 {
+  top: 32px;
+}
+
 .proy-col-quincena {
   text-align: center;
   padding: 6px 10px;
   min-width: 92px;
   border-left: 1px solid var(--line);
-  top: 29px;
 }
+
+// Bandas de color por mes en el encabezado (banda de mes + fila de
+// quincenas) — un tono distinto y cíclico por mes para ubicarse de un
+// vistazo en cuál se está al desplazarse por las 24 quincenas, inspirado
+// en el Excel original del usuario. Solo en el encabezado (sticky, siempre
+// visible), no en el cuerpo de la tabla, para no repetir el problema de
+// "se ve muy cargado" de los tintes por sección.
+.proy-mes-c0 { background: var(--client-soft); }
+.proy-mes-c1 { background: var(--danger-soft); }
+.proy-mes-c2 { background: var(--amber-soft); }
+.proy-mes-c3 { background: var(--indigo-soft); }
+.proy-mes-c4 { background: var(--teal-soft); }
+.proy-mes-c5 { background: var(--technical-soft); }
 
 .proy-fila-seccion td {
   background: var(--technical);
@@ -80,7 +114,7 @@
   position: sticky;
   left: 0;
   z-index: 2;
-  background: var(--paper);
+  background: var(--paper-raised);
   padding: 7px 10px;
   white-space: nowrap;
   border-bottom: 1px solid var(--line);
@@ -139,9 +173,11 @@
 
 // Resaltar al pasar el mouse sobre un renglón de datos completo, no solo
 // la celda — más fácil seguir la fila con la vista entre tantas columnas.
+// Blanco de por sí, gris solo al pasar el mouse ("mejor color blanco y al
+// seleccionar que sea gris").
 .proy-fila-hoja:hover td,
 .proy-fila-detalle:hover td {
-  background: var(--paper-raised);
+  background: var(--paper);
 }
 
 // Columna de la quincena actual — un ancla visual fija para ubicarse. Un
@@ -157,6 +193,7 @@
 }
 
 .proy-celda {
+  background: var(--paper-raised);
   padding: 7px 10px;
   text-align: right;
   white-space: nowrap;
