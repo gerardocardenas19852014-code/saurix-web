@@ -13,6 +13,7 @@ import { CuentaPresupuesto } from '../../catalogos/cuenta-presupuesto/cuenta-pre
 import { InfoTarjeta, colorCategoria, formatMoneda, iconoTipoCuenta, infoTarjeta, nivelUso } from '../shared/wallet.util';
 import { ValorLista } from '../../catalogos/valor-lista/valor-lista.model';
 import { MovimientoPresupuesto } from './movimiento.model';
+import { PresupuestoAnual } from '../../catalogos/presupuesto-anual/presupuesto-anual.model';
 
 interface ColumnaMensual {
   etiqueta: string;
@@ -84,6 +85,8 @@ export class MovimientosComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly pagoTarjeta = inject(PagoTarjetaService);
+
+  protected readonly presupuestosAnuales = signal<PresupuestoAnual[]>([]);
 
   protected readonly formatMoneda = formatMoneda;
   protected readonly colorCategoria = colorCategoria;
@@ -157,9 +160,15 @@ export class MovimientosComponent implements OnInit {
       });
   });
 
-  /** Años con al menos un movimiento (de más reciente a más antiguo), para el combo "Año". */
+  /** Años dados de alta en Catálogos → "Presupuesto por año" (de más
+   *  reciente a más antiguo), para el combo "Año" — antes salían de qué
+   *  años ya tenían movimientos; ahora, para que el filtro respete el año
+   *  de presupuesto igual que Proyección, sale de ese catálogo. Si un año
+   *  con movimientos todavía no está registrado ahí, no aparece como
+   *  opción individual (sigue viéndose con "Todos"): regístralo en
+   *  Catálogos → Presupuesto por año para poder filtrar solo por ese año. */
   protected readonly aniosDisponibles = computed<string[]>(() => {
-    const anios = new Set(this.movimientos().map((m) => m.fecha.slice(0, 4)));
+    const anios = new Set(this.presupuestosAnuales().map((p) => String(p.anio)));
     return [...anios].sort((a, b) => Number(b) - Number(a));
   });
 
@@ -291,6 +300,7 @@ export class MovimientosComponent implements OnInit {
         valores.filter((v) => v.grupo === 'MovimientoPresupuestoTipo').sort((a, b) => a.orden - b.orden),
       ),
     );
+    this.data.list<PresupuestoAnual>('PresupuestoAnual').subscribe((p) => this.presupuestosAnuales.set(p));
     this.cargar();
     this.abrirSolicitudPagoTarjetaSiExiste();
   }

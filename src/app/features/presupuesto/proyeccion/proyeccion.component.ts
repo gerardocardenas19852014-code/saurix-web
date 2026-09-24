@@ -161,8 +161,13 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
    *  adelante desde hoy — un año puede verse incompleto si cae en la punta). */
   protected readonly filtroAnio = signal<'todos' | number>('todos');
 
+  /** Solo los años dados de alta en Catálogos → "Presupuesto por año" —
+   *  antes salían de la ventana de 24 quincenas (podía ofrecer un año que
+   *  ni siquiera se ha "creado" todavía). Con "Todos" la tabla sigue
+   *  mostrando la ventana completa igual que antes; lo que cambia es que
+   *  ya no se puede aislar un año suelto hasta registrarlo ahí. */
   protected readonly aniosDisponibles = computed<number[]>(() => {
-    const anios = new Set(this.quincenas().map((q) => q.anio));
+    const anios = new Set(this.presupuestosAnuales().map((p) => Number(p.anio)));
     return [...anios].sort((a, b) => a - b);
   });
 
