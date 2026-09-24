@@ -36,6 +36,20 @@ export function textoFechaDeLocal(anio: number, mes0: number, dia: number): stri
   return `${anio}-${String(mes0 + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
 }
 
+/** "Septiembre 2026" a partir de año/mes (0-indexado) — mismo formato para
+ *  el combo "Mes" y los encabezados de grupo en Movimientos y el Dashboard. */
+export function etiquetaMes(anio: number, mes: number): string {
+  const texto = new Date(anio, mes, 1).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+/** Solo el nombre del mes (0-indexado), sin año — p.ej. "Septiembre" — para
+ *  las opciones de un selector de Mes independiente de Año. */
+export function nombreMes(mes: number): string {
+  const texto = new Date(2000, mes, 1).toLocaleDateString('es-MX', { month: 'long' });
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
 export function colorCategoria(id: number | null | undefined): string {
   if (!id) return 'var(--technical)';
   return PALETA_CATEGORIAS[id % PALETA_CATEGORIAS.length];

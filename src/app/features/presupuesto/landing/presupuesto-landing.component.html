@@ -2,18 +2,52 @@
   <h1>Presupuesto</h1>
 </div>
 
+<div class="board-filters" style="margin-bottom:16px;">
+  <label class="board-filter-field">
+    Año
+    @if (aniosDisponibles().length > 0) {
+      <select [value]="filtroAnio()" (change)="filtroAnio.set(+$any($event.target).value)">
+        @for (anio of aniosDisponibles(); track anio) {
+          <option [value]="anio">{{ anio }}</option>
+        }
+      </select>
+    } @else {
+      <select disabled title="Registra un año en Catálogos → Presupuesto por año para poder elegirlo aquí.">
+        <option>Sin años registrados</option>
+      </select>
+    }
+  </label>
+  <label class="board-filter-field">
+    Mes
+    <select [value]="filtroMes()" (change)="filtroMes.set(+$any($event.target).value)">
+      @for (mes of mesesOpciones; track mes) {
+        <option [value]="mes">{{ nombreMes(mes) }}</option>
+      }
+    </select>
+  </label>
+</div>
+
 <div class="dashboard-stats">
   <div class="dashboard-stat-card">
     <div class="num">{{ formatMoneda(saldoTotal()) }}</div>
-    <div class="label">Saldo total</div>
+    <div class="label">Saldo total (real, hoy)</div>
+    @if (haySaldoProyectado()) {
+      <div class="hint" style="margin:4px 0 0;">{{ formatMoneda(saldoProyectadoFinDeMes()) }} proyectado a fin de {{ nombreMes(filtroMes()) }}</div>
+    }
   </div>
   <div class="dashboard-stat-card">
-    <div class="num">{{ formatMoneda(ingresosDelMes()) }}</div>
-    <div class="label">Ingresos del mes</div>
+    <div class="num">{{ formatMoneda(ingresosRealesDelMes()) }}</div>
+    <div class="label">Ingresos reales · {{ etiquetaPeriodo() }}</div>
+    @if (ingresosProyectadosDelMes() > 0) {
+      <div class="hint" style="margin:4px 0 0;">+ {{ formatMoneda(ingresosProyectadosDelMes()) }} proyectado</div>
+    }
   </div>
   <div class="dashboard-stat-card dashboard-stat-danger">
-    <div class="num">{{ formatMoneda(gastosDelMes()) }}</div>
-    <div class="label">Gastos del mes</div>
+    <div class="num">{{ formatMoneda(gastosRealesDelMes()) }}</div>
+    <div class="label">Gastos reales · {{ etiquetaPeriodo() }}</div>
+    @if (gastosProyectadosDelMes() > 0) {
+      <div class="hint" style="margin:4px 0 0;">+ {{ formatMoneda(gastosProyectadosDelMes()) }} proyectado</div>
+    }
   </div>
   @if (hayVariasTarjetas()) {
     <div class="dashboard-stat-card dashboard-stat-danger">
@@ -25,7 +59,7 @@
 
 @if (inusuales().length > 0) {
   <div class="wallet-alert-block">
-    <strong>⚠ Gasto inusual este mes</strong>
+    <strong>⚠ Gasto inusual en {{ etiquetaPeriodo() }}</strong>
     <ul>
       @for (g of inusuales(); track g.categoriaId) {
         <li>{{ g.nombreCategoria }}: {{ formatMoneda(g.montoMes) }} — {{ g.veces | number: '1.1-1' }}× tu promedio de {{ formatMoneda(g.promedio) }} (últimos 3 meses)</li>
@@ -92,7 +126,7 @@
 </div>
 
 @if (topCategorias().length > 0) {
-  <h2 class="settings-card-title" style="margin:0 0 12px;">Top categorías del mes</h2>
+  <h2 class="settings-card-title" style="margin:0 0 12px;">Top categorías · {{ etiquetaPeriodo() }}</h2>
   <div style="margin-bottom:28px;">
     @for (c of topCategorias(); track c.id) {
       <div class="wallet-cat-bar-row">
@@ -107,14 +141,19 @@
 }
 
 @if (movimientosRecientes().length > 0) {
-  <h2 class="settings-card-title" style="margin:0 0 12px;">Movimientos recientes</h2>
+  <h2 class="settings-card-title" style="margin:0 0 12px;">Movimientos · {{ etiquetaPeriodo() }}</h2>
   <ul class="wallet-tx-list" style="margin-bottom:12px;">
     @for (r of movimientosRecientes(); track r.movimiento.id) {
       <li class="wallet-tx-item" style="cursor:default;">
         <span class="wallet-tx-cat-dot" [style.background]="colorCategoria(r.movimiento.categoriaPresupuestoId)"></span>
         <div class="wallet-tx-body">
           <strong>{{ r.movimiento.descripcion || r.nombreCategoria }}</strong>
-          <span class="hint" style="margin:0;">{{ r.nombreCuenta }} · {{ r.nombreCategoria }} · {{ r.movimiento.fecha | date: 'dd/MM/yyyy' }}</span>
+          <span class="hint" style="margin:0;">
+            {{ r.nombreCuenta }} · {{ r.nombreCategoria }} · {{ r.movimiento.fecha | date: 'dd/MM/yyyy' }}
+            @if (r.movimiento.proyectado) {
+              · <em>proyectado</em>
+            }
+          </span>
         </div>
         <span class="wallet-tx-amount" [class.wallet-tx-amount-in]="r.movimiento.tipo === 'Ingreso'" [class.wallet-tx-amount-out]="r.movimiento.tipo === 'Gasto'">
           {{ r.movimiento.tipo === 'Ingreso' ? '+' : '-' }}{{ formatMoneda(r.movimiento.monto) }}

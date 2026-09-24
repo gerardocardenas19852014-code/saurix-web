@@ -11,7 +11,7 @@ import { PagoTarjetaService } from '../shared/pago-tarjeta.service';
 import { AnioTrabajoService } from '../shared/anio-trabajo.service';
 import { CategoriaPresupuesto } from '../../catalogos/categoria-presupuesto/categoria-presupuesto.model';
 import { CuentaPresupuesto } from '../../catalogos/cuenta-presupuesto/cuenta-presupuesto.model';
-import { InfoTarjeta, colorCategoria, formatMoneda, iconoTipoCuenta, infoTarjeta, nivelUso } from '../shared/wallet.util';
+import { InfoTarjeta, colorCategoria, etiquetaMes, formatMoneda, iconoTipoCuenta, infoTarjeta, nivelUso } from '../shared/wallet.util';
 import { ValorLista } from '../../catalogos/valor-lista/valor-lista.model';
 import { MovimientoPresupuesto } from './movimiento.model';
 import { PresupuestoAnual } from '../../catalogos/presupuesto-anual/presupuesto-anual.model';
@@ -31,13 +31,6 @@ interface GrupoMovimientos {
   clave: string;
   etiqueta: string;
   movimientos: MovimientoPresupuesto[];
-}
-
-/** "2026-8" (año-mes, mes 0-indexado) → "Septiembre 2026" — mismo formato para
- *  el combo "Mes" y para los encabezados de grupo de la lista. */
-function etiquetaMes(anio: number, mes: number): string {
-  const texto = new Date(anio, mes, 1).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
-  return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
 /** Parsea "YYYY-MM-DD" directamente como texto (sin pasar por `new Date`):
