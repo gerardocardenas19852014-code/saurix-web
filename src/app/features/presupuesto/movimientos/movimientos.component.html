@@ -108,6 +108,9 @@
       }
     </select>
   </label>
+</div>
+
+<div class="board-filters">
   <label class="board-filter-field">
     Mes
     <select [value]="filtroMes()" (change)="filtroMes.set($any($event.target).value)">
@@ -195,6 +198,16 @@
             <span class="wallet-tx-amount" [class.wallet-tx-amount-in]="movimiento.tipo === 'Ingreso'" [class.wallet-tx-amount-out]="movimiento.tipo === 'Gasto'">
               {{ movimiento.tipo === 'Ingreso' ? '+' : '-' }}{{ formatMoneda(movimiento.monto) }}
             </span>
+            @if (movimiento.proyectado) {
+              <button
+                type="button"
+                class="btn-primary small"
+                title="Confirmar que este movimiento ya ocurrió tal cual está capturado"
+                (click)="$event.stopPropagation(); confirmarProyectadoRapido(movimiento)"
+              >
+                ✅ Confirmar
+              </button>
+            }
             <button
               type="button"
               class="btn-danger small"

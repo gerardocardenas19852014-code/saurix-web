@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -73,7 +73,7 @@ type TabMovimientos = 'movimientos' | 'cuentas' | 'grafica';
   styleUrl: './movimientos.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MovimientosComponent implements OnInit {
+export class MovimientosComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
@@ -310,6 +310,10 @@ export class MovimientosComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // Lista con varios filtros a la vez — usa el ancho "wide" del layout
+    // para no apretarlos (ver html[data-wide='grid'] en styles.scss, mismo
+    // patrón que Proyección).
+    document.documentElement.setAttribute('data-wide', 'grid');
     this.data.list<CuentaPresupuesto>('CuentaPresupuesto').subscribe((cuentas) => this.cuentas.set(cuentas));
     this.data.list<CategoriaPresupuesto>('CategoriaPresupuesto').subscribe((categorias) => this.categorias.set(categorias));
     this.data.list<ValorLista>('ValorLista', { grupo: 'MovimientoPresupuestoTipo' }).subscribe((valores) =>
@@ -320,6 +324,10 @@ export class MovimientosComponent implements OnInit {
     this.data.list<PresupuestoAnual>('PresupuestoAnual').subscribe((p) => this.presupuestosAnuales.set(p));
     this.cargar();
     this.abrirSolicitudPagoTarjetaSiExiste();
+  }
+
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
   }
 
   /** Atajo "Pagar tarjeta" desde la propia pestaña Cuentas de esta página
@@ -523,6 +531,18 @@ export class MovimientosComponent implements OnInit {
       next: (resultado) => {
         this.toast.exito('Movimiento confirmado.');
         this.movimientoEnEdicion.set(resultado);
+        this.cargar();
+      },
+    });
+  }
+
+  /** Igual que confirmarProyectado(), pero directo desde el renglón de la
+   *  lista (botón "✅ Confirmar") — sin tener que abrir el modal de edición
+   *  solo para aceptar un movimiento ya generado por adelantado. */
+  confirmarProyectadoRapido(movimiento: MovimientoPresupuesto): void {
+    this.data.modificacion<MovimientoPresupuesto>('MovimientoPresupuesto', { ...movimiento, proyectado: false }).subscribe({
+      next: () => {
+        this.toast.exito('Movimiento confirmado.');
         this.cargar();
       },
     });
