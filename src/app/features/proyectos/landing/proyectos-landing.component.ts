@@ -20,9 +20,8 @@ interface GrupoModulo {
 }
 
 // Los catálogos propios de este módulo (Tipos de Ticket, Prioridades,
-// Motivos de Solución) se administran desde Catálogos — mismo dato, una
-// sola pantalla de administración, para no duplicar mantenimiento. El
-// Gestor de Estados (columnas del tablero) sí vive aquí, en Proyectos.
+// Módulos) viven aquí, en Proyectos, junto con el Gestor de Estados
+// (columnas del tablero) — todos en el grupo "Configuración".
 //
 // Agrupación y orden pedidos explícitamente por el usuario (mismo agrupado que
 // el menú lateral, ver shell.component.html): "Procesos" (el día a día con
@@ -66,6 +65,30 @@ const GRUPOS: GrupoModulo[] = [
         color: 'slate',
         titulo: 'Proyectos',
         descripcion: 'Alta y edición de los proyectos que tienen su propio tablero Kanban.',
+        grupo: 'Configuración',
+      },
+      {
+        ruta: 'tipos-ticket',
+        icono: '🏳️',
+        color: 'slate',
+        titulo: 'Tipos de Ticket',
+        descripcion: 'Catálogo de tipos de ticket (bug, tarea, historia, etc.).',
+        grupo: 'Configuración',
+      },
+      {
+        ruta: 'prioridades',
+        icono: '🚦',
+        color: 'slate',
+        titulo: 'Prioridades',
+        descripcion: 'Catálogo de prioridades de ticket, con SLA y notificaciones.',
+        grupo: 'Configuración',
+      },
+      {
+        ruta: 'modulos',
+        icono: '🧭',
+        color: 'slate',
+        titulo: 'Módulos',
+        descripcion: 'Catálogo de módulos del sistema para clasificar tickets.',
         grupo: 'Configuración',
       },
     ],

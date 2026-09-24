@@ -142,7 +142,8 @@ export class ProyectosDashboardComponent implements OnInit {
             ticket.numeroTicket.toLowerCase().includes(termino) ||
             (ticket.folioInterno ?? '').toLowerCase().includes(termino) ||
             ticket.titulo.toLowerCase().includes(termino) ||
-            this.etiquetasDe(ticket.id).some((e) => e.texto.toLowerCase().includes(termino)),
+            this.etiquetasDe(ticket.id).some((e) => e.texto.toLowerCase().includes(termino)) ||
+            this.nombreSprintDeTicket(ticket).toLowerCase().includes(termino),
         ))
     );
   }
@@ -275,14 +276,19 @@ export class ProyectosDashboardComponent implements OnInit {
     return { clase: 'sla-ok', texto };
   }
 
+  /** Nombre del sprint de un ticket, o 'Backlog' si no tiene ninguno asignado —
+   *  mismo criterio que Kanban/Lista de tickets (kanban.component.ts::nombreSprint),
+   *  reutilizado aquí también para poder buscar por sprint en el filtro de texto. */
+  protected nombreSprintDeTicket(ticket: Ticket): string {
+    if (!ticket.sprintId) return 'Backlog';
+    return this.sprints().find((s) => Number(s.id) === Number(ticket.sprintId))?.nombre ?? 'Backlog';
+  }
+
   private aResumen(ticket: Ticket): TicketResumen {
     const proyecto = this.proyectos().find((p) => Number(p.id) === Number(ticket.proyectoId));
     const columna = this.columnas().find((c) => Number(c.id) === Number(ticket.tableroColumnaId));
     const prioridad = this.prioridades().find((p) => Number(p.id) === Number(ticket.ticketPrioridadId));
     const modulo = this.modulos().find((m) => Number(m.id) === Number(ticket.ticketModuloId));
-    const sprint = ticket.sprintId
-      ? this.sprints().find((s) => Number(s.id) === Number(ticket.sprintId))
-      : undefined;
     const sla = this.slaDe(ticket);
     return {
       ticket,
@@ -296,7 +302,7 @@ export class ProyectosDashboardComponent implements OnInit {
       clase: sla.clase,
       texto: sla.texto,
       critica: prioridad?.critica === true,
-      sprintNombre: sprint?.nombre ?? 'Backlog',
+      sprintNombre: this.nombreSprintDeTicket(ticket),
     };
   }
 

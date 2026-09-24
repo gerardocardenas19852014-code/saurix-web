@@ -107,7 +107,7 @@ export class ShellComponent implements OnDestroy {
    *  para que un mismo nombre de grupo en dos módulos (p.ej. "Reportes" en
    *  Proyectos y en Presupuesto) no comparta estado. Por defecto empiezan
    *  CERRADOS (pedido explícito del usuario); no se persiste entre sesiones
-   *  (se reinicia al recargar, igual que sprintsColapsados en Backlog). */
+   *  (se reinicia al recargar, igual que sprintsExpandidos en Backlog). */
   protected readonly gruposColapsados = signal<Set<string>>(
     new Set([
       'proyectos:Procesos',

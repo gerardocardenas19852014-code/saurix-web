@@ -38,7 +38,7 @@
     Buscar
     <input
       type="search"
-      placeholder="Folio, folio interno, título o etiqueta… (varios con coma)"
+      placeholder="Folio, folio interno, título, etiqueta o sprint… (varios con coma)"
       [value]="filtroTexto()"
       (input)="filtroTexto.set($any($event.target).value)"
     />

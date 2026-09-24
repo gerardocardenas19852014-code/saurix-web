@@ -389,7 +389,11 @@ export class KanbanComponent implements OnInit, OnDestroy {
               t.titulo.toLowerCase().includes(termino) ||
               // También busca por etiqueta (p.ej. "urgente-cliente") — mismo mapa
               // etiquetasPorTicket que ya se usa para pintar los tags en la tarjeta.
-              this.etiquetasDe(t.id).some((e) => e.texto.toLowerCase().includes(termino)),
+              this.etiquetasDe(t.id).some((e) => e.texto.toLowerCase().includes(termino)) ||
+              // También busca por sprint (nombre completo, p.ej. "10.74.0" o
+              // "Backlog" para los que no tienen sprint asignado) — mismo texto
+              // que ya se muestra en la columna Sprint de la vista de Lista.
+              this.nombreSprint(t).toLowerCase().includes(termino),
           )),
     );
   });

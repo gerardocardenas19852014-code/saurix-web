@@ -372,14 +372,15 @@ export class BacklogComponent implements OnInit {
    *  usuario, cuando hay varios sprints abiertos a la vez conviene poder
    *  ocultar el detalle (lista de tickets) de los que no se están usando en
    *  ese momento, sin perder de vista el encabezado (nombre/fechas/acciones).
-   *  Arrancan todos expandidos (mismo comportamiento que antes de este
-   *  cambio); colapsado es un estado explícito por sprint. */
-  private readonly sprintsColapsados = signal<Set<number>>(new Set());
+   *  Arrancan todos COLAPSADOS (pedido explícito del usuario); expandido es
+   *  un estado explícito por sprint. Ojo: no llamar "sprintsAbiertos" — ese
+   *  nombre ya lo usa el computed de arriba (activos + planeados). */
+  private readonly sprintsExpandidos = signal<Set<number>>(new Set());
   protected sprintAbierto(sprintId: number): boolean {
-    return !this.sprintsColapsados().has(sprintId);
+    return this.sprintsExpandidos().has(sprintId);
   }
   protected toggleSprint(sprintId: number): void {
-    this.sprintsColapsados.update((set) => {
+    this.sprintsExpandidos.update((set) => {
       const nuevo = new Set(set);
       if (nuevo.has(sprintId)) nuevo.delete(sprintId);
       else nuevo.add(sprintId);

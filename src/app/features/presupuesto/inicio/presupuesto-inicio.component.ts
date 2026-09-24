@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 
 /** Mismo criterio de color que Proyectos (proyectos-landing.component.ts):
  *  una de las clases .module-tile-* definidas en styles.scss, una por grupo. */
-type ColorIcono = 'indigo' | 'slate' | 'teal';
+type ColorIcono = 'indigo' | 'slate' | 'teal' | 'amber';
 
 interface EnlaceModulo {
   ruta: string;
@@ -92,6 +92,60 @@ const GRUPOS: GrupoModulo[] = [
         color: 'teal',
         titulo: 'Calendario de pagos',
         descripcion: 'Próximos fijos y próximo pago de cada tarjeta, a 60 días.',
+      },
+    ],
+  },
+  {
+    titulo: 'Catálogos',
+    enlaces: [
+      {
+        ruta: 'categorias-presupuesto',
+        icono: '🏷️',
+        color: 'amber',
+        titulo: 'Categorías de presupuesto',
+        descripcion: 'Categorías y subcategorías para clasificar movimientos.',
+      },
+      {
+        ruta: 'cuentas-presupuesto',
+        icono: '🏦',
+        color: 'amber',
+        titulo: 'Cuentas de presupuesto',
+        descripcion: 'Cuentas bancarias, tarjetas y efectivo que usas en Movimientos.',
+      },
+      {
+        ruta: 'tipo-cuenta-presupuesto',
+        icono: '💳',
+        color: 'amber',
+        titulo: 'Tipo de cuenta',
+        descripcion: 'Catálogo de tipos de cuenta (débito, crédito, efectivo, etc.).',
+      },
+      {
+        ruta: 'tipo-movimiento-presupuesto',
+        icono: '↔️',
+        color: 'amber',
+        titulo: 'Tipo de movimiento',
+        descripcion: 'Catálogo de tipos de movimiento (ingreso, gasto, transferencia).',
+      },
+      {
+        ruta: 'frecuencia-fijos-presupuesto',
+        icono: '🔁',
+        color: 'amber',
+        titulo: 'Frecuencia de fijos',
+        descripcion: 'Frecuencias disponibles para los movimientos recurrentes.',
+      },
+      {
+        ruta: 'presupuesto-anual',
+        icono: '🗓️',
+        color: 'amber',
+        titulo: 'Presupuesto por año',
+        descripcion: 'Monto presupuestado por categoría para cada año.',
+      },
+      {
+        ruta: 'estatus-presupuesto-anual',
+        icono: '🚦',
+        color: 'amber',
+        titulo: 'Estatus de presupuesto anual',
+        descripcion: 'Catálogo de estatus del presupuesto anual (borrador, aprobado, cerrado, etc.).',
       },
     ],
   },
