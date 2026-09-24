@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
@@ -68,7 +68,7 @@ const MESES_OPCIONES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
   styleUrl: './presupuesto-landing.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class PresupuestoLandingComponent implements OnInit {
+export class PresupuestoLandingComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
@@ -257,12 +257,20 @@ export class PresupuestoLandingComponent implements OnInit {
   );
 
   ngOnInit(): void {
+    // Varias tarjetas + selectores de Año/Mes lado a lado — usa el ancho
+    // "wide" del layout (ver html[data-wide='grid'] en styles.scss, mismo
+    // patrón que Proyección).
+    document.documentElement.setAttribute('data-wide', 'grid');
     this.data.list<CuentaPresupuesto>('CuentaPresupuesto').subscribe((c) => this.cuentas.set(c));
     this.data.list<CategoriaPresupuesto>('CategoriaPresupuesto').subscribe((c) => this.categorias.set(c));
     this.data.list<PresupuestoAnual>('PresupuestoAnual').subscribe((p) => this.presupuestosAnuales.set(p));
     this.data
       .list<MovimientoPresupuesto>('MovimientoPresupuesto', { creadoPorUsuarioId: this.auth.usuarioActual()?.id ?? 0 })
       .subscribe((m) => this.movimientos.set(m));
+  }
+
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
   }
 
   /** Atajo "Pagar tarjeta": deja la solicitud (cuenta destino + monto de la deuda)

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth.service';
@@ -32,7 +32,7 @@ import { AnioTrabajoService } from '../shared/anio-trabajo.service';
   styleUrl: './recurrentes.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class RecurrentesComponent implements OnInit {
+export class RecurrentesComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
@@ -128,6 +128,9 @@ export class RecurrentesComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // Usa el ancho "wide" del layout, igual que Proyección/Movimientos/
+    // Dashboard (ver html[data-wide='grid'] en styles.scss).
+    document.documentElement.setAttribute('data-wide', 'grid');
     this.data.list<CuentaPresupuesto>('CuentaPresupuesto').subscribe((c) => this.cuentas.set(c));
     this.data.list<CategoriaPresupuesto>('CategoriaPresupuesto').subscribe((c) => this.categorias.set(c));
     this.data.list<ValorLista>('ValorLista', { grupo: 'MovimientoPresupuestoTipo' }).subscribe((v) =>
@@ -553,5 +556,9 @@ export class RecurrentesComponent implements OnInit {
         this.cargar();
       },
     });
+  }
+
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
   }
 }
