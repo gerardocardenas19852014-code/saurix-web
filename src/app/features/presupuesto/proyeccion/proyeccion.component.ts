@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, OnDestroy, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { forkJoin } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { DataClientService } from '../../../core/services/data-client.service';
@@ -100,6 +100,21 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
 
   protected readonly editando = signal<{ clave: string; quincenaClave: string } | null>(null);
   protected readonly valorEditando = signal('');
+
+  /** El <input> de la celda que se está editando ahora mismo (si hay una) —
+   *  se usa para enfocarlo apenas aparece: sin esto, ni el primer clic para
+   *  editar una celda ni la navegación con flechas servirían de nada (lo
+   *  que se teclee no llegaría a ningún lado). */
+  private readonly inputEditando = viewChild<ElementRef<HTMLInputElement>>('inputEditando');
+
+  private readonly _enfocarAlEditar = effect(() => {
+    const editandoAhora = this.editando();
+    const el = this.inputEditando()?.nativeElement;
+    if (editandoAhora && el) {
+      el.focus();
+      el.select();
+    }
+  });
 
   private get usuarioActualId(): number {
     return this.auth.usuarioActual()?.id ?? 0;
@@ -643,6 +658,58 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
 
   protected cancelarEdicion(): void {
     this.editando.set(null);
+  }
+
+  /** Claves de renglón con una celda realmente editable (hoja/resumen con
+   *  `clave`) en el orden en que se están pintando AHORA MISMO — respeta
+   *  los grupos/hojas colapsados. Los 'detalle' (desglose por cuenta, solo
+   *  lectura) y los renglones sin `clave` (grupo/subtotal/total/título de
+   *  sección) se excluyen. Se usa para moverse con flechas entre celdas. */
+  private clavesFilasEditables(): string[] {
+    return this.filasTabla()
+      .filter((r) => r.clave !== null && (r.tipo === 'hoja' || r.tipo === 'resumen'))
+      .map((r) => r.clave as string);
+  }
+
+  /** Navegar entre celdas con las flechas mientras se edita, como en Excel:
+   *  la flecha primero confirma el valor actual (igual que salir de la
+   *  celda) y luego intenta abrir para editar la celda vecina en esa
+   *  dirección — saltándose celdas no editables (bloqueadas por año
+   *  Autorizado/Ejecutado, o renglones de solo lectura) hasta encontrar
+   *  una válida o salirse de la tabla, en cuyo caso simplemente se queda
+   *  sin editar ninguna (el valor ya quedó confirmado). */
+  protected moverEdicion(direccion: 'up' | 'down' | 'left' | 'right'): void {
+    const objetivo = this.editando();
+    if (!objetivo) return;
+    const { clave, quincenaClave } = objetivo;
+
+    const quincenasVis = this.quincenasVisibles();
+    const filas = this.clavesFilasEditables();
+    const indiceCol = quincenasVis.findIndex((q) => q.q.clave === quincenaClave);
+    const indiceFila = filas.indexOf(clave);
+
+    this.confirmarEdicion();
+    if (indiceCol === -1 || indiceFila === -1) return;
+
+    let col = indiceCol;
+    let fila = indiceFila;
+    const maxIntentos = Math.max(quincenasVis.length, filas.length);
+    for (let i = 0; i < maxIntentos; i++) {
+      if (direccion === 'left') col--;
+      else if (direccion === 'right') col++;
+      else if (direccion === 'up') fila--;
+      else fila++;
+
+      if (col < 0 || col >= quincenasVis.length || fila < 0 || fila >= filas.length) return;
+
+      const claveDestino = filas[fila];
+      const quincenaDestino = quincenasVis[col].q.clave;
+      const celdaDestino = this.celda(claveDestino, quincenaDestino);
+      if (celdaDestino.editable) {
+        this.iniciarEdicion(claveDestino, quincenaDestino, celdaDestino.valor);
+        return;
+      }
+    }
   }
 
   /** Claves de categoría de Ingreso/Gasto (ej. "gas:12") — SOLO estas

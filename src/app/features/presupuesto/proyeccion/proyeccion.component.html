@@ -95,14 +95,20 @@
                   @if (estaEditando(renglon.clave, item.q.clave)) {
                     <td class="proy-celda proy-celda-edit">
                       <input
+                        #inputEditando
                         type="number"
                         step="0.01"
                         class="proy-input"
+                        title="Flechas para moverte entre celdas, como en Excel"
                         [value]="valorEditando()"
                         (input)="valorEditando.set($any($event.target).value)"
                         (blur)="confirmarEdicion()"
-                        (keydown.enter)="confirmarEdicion()"
+                        (keydown.enter)="moverEdicion('down')"
                         (keydown.escape)="cancelarEdicion()"
+                        (keydown.arrowup)="$event.preventDefault(); moverEdicion('up')"
+                        (keydown.arrowdown)="$event.preventDefault(); moverEdicion('down')"
+                        (keydown.arrowleft)="$event.preventDefault(); moverEdicion('left')"
+                        (keydown.arrowright)="$event.preventDefault(); moverEdicion('right')"
                       />
                     </td>
                   } @else {
