@@ -44,6 +44,7 @@
   left: 0;
   z-index: 4;
   min-width: 190px;
+  max-width: 190px;
   text-align: left;
   padding: 6px 10px;
 }
@@ -117,6 +118,9 @@
   background: var(--paper-raised);
   padding: 7px 10px;
   white-space: nowrap;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   border-bottom: 1px solid var(--line);
 }
 
@@ -180,16 +184,28 @@
   background: var(--paper);
 }
 
-// Columna de la quincena actual — un ancla visual fija para ubicarse. Un
-// relleno gris (el mismo "gris técnico" que ya usan los títulos de
-// sección) en vez de líneas azules marcadas: más claro y menos ruidoso.
+// Columna de la quincena actual — un ancla visual fija para ubicarse, y se
+// queda pegada (sticky) justo después de la columna de etiquetas al
+// desplazarse horizontalmente, para que "hoy" nunca se pierda de vista
+// aunque estés viendo meses futuros más a la derecha ("esta siempre se
+// debe de ver"). El gris es sólido (--paper, no la variante "-soft"
+// traslúcida) a propósito: con TANTAS celdas fijas apiladas verticalmente
+// (una por renglón), un fondo semitransparente hacía que el navegador
+// pintara mal algunas filas al desplazarse (bandas grises de más, texto
+// encimado) — un color sólido evita ese problema de raíz.
 .proy-col-hoy {
-  background: var(--technical-soft);
+  position: sticky;
+  left: 190px;
+  z-index: 4;
+  background: var(--paper);
   color: var(--text-strong);
 }
 
 .proy-celda-hoy {
-  background: var(--technical-soft);
+  position: sticky;
+  left: 190px;
+  z-index: 2;
+  background: var(--paper);
 }
 
 .proy-celda {
