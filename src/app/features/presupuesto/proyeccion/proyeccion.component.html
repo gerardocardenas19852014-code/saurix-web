@@ -40,7 +40,9 @@
         <tr>
           <th class="proy-esquina">Quincena</th>
           @for (item of quincenasVisibles(); track item.indice) {
-            <th class="proy-col-quincena">{{ item.q.mitad }}</th>
+            <th class="proy-col-quincena" [class.proy-col-hoy]="item.indice === 0" [title]="item.indice === 0 ? 'Quincena actual' : ''">
+              {{ item.q.mitad }}
+            </th>
           }
           <th class="proy-col-total-header">Total</th>
         </tr>
@@ -68,6 +70,9 @@
                 [class.proy-fila-detalle]="renglon.tipo === 'detalle'"
                 [class.proy-fila-subtotal]="renglon.tipo === 'subtotal'"
                 [class.proy-fila-total]="renglon.tipo === 'total'"
+                [class.proy-seccion-ingreso]="renglon.seccion === 'ingreso'"
+                [class.proy-seccion-gasto]="renglon.seccion === 'gasto'"
+                [class.proy-seccion-ahorro]="renglon.seccion === 'ahorro'"
               >
                 <td
                   class="proy-etiqueta"
@@ -100,6 +105,7 @@
                       [class.proy-celda-editable]="celda.editable"
                       [class.proy-celda-manual]="celda.manual"
                       [class.proy-celda-negativa]="celda.valor < 0"
+                      [class.proy-celda-hoy]="item.indice === 0"
                       [title]="celda.manual ? 'Valor escrito a mano — déjala vacía al editar para volver al cálculo automático.' : ''"
                       (click)="celda.editable && iniciarEdicion(renglon.clave, item.q.clave, celda.valor)"
                     >

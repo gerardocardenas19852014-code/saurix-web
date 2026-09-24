@@ -50,6 +50,10 @@ interface RenglonProyeccion {
    *  eso tiene renglones 'detalle' debajo) — controla si se le pinta la
    *  flechita de contraer/expandir en la plantilla. */
   tieneDetalle?: boolean;
+  /** A qué sección pertenece (Ingreso/Gasto/Ahorro/Resumen) — solo para
+   *  pintar un tinte de fondo sutil por sección y ayudar a no perderse
+   *  al leer la tabla; no afecta ningún cálculo. */
+  seccion?: 'resumen' | 'ingreso' | 'gasto' | 'ahorro';
 }
 
 interface RaizFila {
@@ -488,6 +492,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       sumable: true,
       grupoId: null,
     });
+    renglones.forEach((r) => (r.seccion = idSeccion as 'ingreso' | 'gasto' | 'ahorro'));
     return renglones;
   }
 
@@ -528,7 +533,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       saldoFinal.push({ valor: saldoPrevio, manual: false, editable: false });
     }
 
-    return [
+    const filas: RenglonProyeccion[] = [
       {
         id: 'resumen:saldoInicial',
         tipo: 'resumen',
@@ -551,6 +556,8 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
         grupoId: null,
       },
     ];
+    filas.forEach((r) => (r.seccion = 'resumen'));
+    return filas;
   });
 
   // ---------------------------------------------------------------------
