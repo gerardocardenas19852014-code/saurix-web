@@ -97,6 +97,15 @@
   color: var(--ink-soft);
 }
 
+.proy-etiqueta-colapsable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.proy-etiqueta-colapsable:hover {
+  background: var(--paper-raised);
+}
+
 .proy-fila-detalle .proy-etiqueta {
   padding-left: 40px;
   color: var(--ink-soft);

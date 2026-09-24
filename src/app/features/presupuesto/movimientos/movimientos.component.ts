@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -140,6 +140,10 @@ export class MovimientosComponent implements OnInit {
   /** 'desc' = más reciente primero (por defecto), 'asc' = más antiguo primero. */
   protected readonly ordenFecha = signal<'desc' | 'asc'>('desc');
 
+  /** El Año ya no cuenta como "filtro activo": ahora es el año de trabajo
+   *  compartido (siempre hay uno elegido, no una opción para quitar), así
+   *  que "Limpiar filtros" y el aviso de filtros activos solo consideran
+   *  los demás campos. */
   protected readonly hayFiltros = computed(
     () =>
       !!this.filtroTexto() ||
@@ -147,7 +151,6 @@ export class MovimientosComponent implements OnInit {
       this.filtroCategoriaId() !== 0 ||
       this.filtroTipo() !== '' ||
       this.filtroMes() !== '' ||
-      this.filtroAnio() !== '' ||
       !!this.filtroFechaDesde() ||
       !!this.filtroFechaHasta(),
   );
@@ -184,6 +187,14 @@ export class MovimientosComponent implements OnInit {
     const anios = new Set(this.presupuestosAnuales().map((p) => String(p.anio)));
     return [...anios].sort((a, b) => Number(b) - Number(a));
   });
+
+  /** Ya no hay opción "Todos" en el selector de Año — apenas se conocen
+   *  los años registrados, se propone uno real si aún no hay ninguno
+   *  elegido (compartido con Proyección y Fijos; ver
+   *  AnioTrabajoService.asegurarSeleccion). */
+  private readonly _asegurarAnioTrabajo = effect(() =>
+    this.anioTrabajo.asegurarSeleccion(this.aniosDisponibles().map(Number)),
+  );
 
   protected readonly movimientosFiltrados = computed(() => {
     const texto = this.filtroTexto().trim().toLowerCase();
@@ -364,7 +375,7 @@ export class MovimientosComponent implements OnInit {
     this.filtroCategoriaId.set(0);
     this.filtroTipo.set('');
     this.filtroMes.set('');
-    this.anioTrabajo.seleccionado.set('todos');
+    // El Año (de trabajo, compartido) no se toca aquí — ver hayFiltros.
     this.filtroFechaDesde.set('');
     this.filtroFechaHasta.set('');
     this.ordenFecha.set('desc');

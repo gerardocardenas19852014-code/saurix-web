@@ -8,12 +8,17 @@
 <div class="board-filters">
   <label class="board-filter-field">
     Año
-    <select [value]="filtroAnio()" (change)="filtroAnio.set($any($event.target).value === 'todos' ? 'todos' : +$any($event.target).value)">
-      <option value="todos">Todos</option>
-      @for (anio of aniosDisponibles(); track anio) {
-        <option [value]="anio">{{ anio }}</option>
-      }
-    </select>
+    @if (aniosDisponibles().length > 0) {
+      <select [value]="filtroAnio()" (change)="filtroAnio.set(+$any($event.target).value)">
+        @for (anio of aniosDisponibles(); track anio) {
+          <option [value]="anio">{{ anio }}</option>
+        }
+      </select>
+    } @else {
+      <select disabled title="Registra un año en Catálogos → Presupuesto por año para poder verlo aquí.">
+        <option>Sin años registrados</option>
+      </select>
+    }
   </label>
 </div>
 
@@ -62,7 +67,16 @@
                 [class.proy-fila-subtotal]="renglon.tipo === 'subtotal'"
                 [class.proy-fila-total]="renglon.tipo === 'total'"
               >
-                <td class="proy-etiqueta">{{ renglon.nombre }}</td>
+                <td
+                  class="proy-etiqueta"
+                  [class.proy-etiqueta-colapsable]="renglon.tieneDetalle"
+                  (click)="renglon.tieneDetalle && toggleGrupo(renglon.clave)"
+                >
+                  @if (renglon.tieneDetalle) {
+                    <span class="proy-grupo-flecha">{{ estaColapsado(renglon.clave) ? '▸' : '▾' }}</span>
+                  }
+                  {{ renglon.nombre }}
+                </td>
                 @for (item of quincenasVisibles(); track item.indice) {
                   @let celda = renglon.celdas[item.indice];
                   @if (estaEditando(renglon.clave, item.q.clave)) {

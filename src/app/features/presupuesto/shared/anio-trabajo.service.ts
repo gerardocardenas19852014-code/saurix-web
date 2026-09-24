@@ -27,4 +27,18 @@ import { Injectable, signal } from '@angular/core';
 @Injectable({ providedIn: 'root' })
 export class AnioTrabajoService {
   readonly seleccionado = signal<number | 'todos'>('todos');
+
+  /** Ya no hay opción "Todos" en los selectores de Año (Movimientos y
+   *  Proyección) — el selector siempre debe mostrar un año real. Cada
+   *  pantalla llama esto con SUS años registrados (Catálogos →
+   *  Presupuesto por año) apenas los conoce; si todavía no hay ninguno
+   *  elegido, propone uno (el año actual si ya está registrado, si no el
+   *  más próximo) para que el selector nunca se quede sin nada que
+   *  mostrar. Si el usuario ya eligió un año a mano, no se toca. */
+  asegurarSeleccion(anios: number[]): void {
+    if (this.seleccionado() !== 'todos' || anios.length === 0) return;
+    const hoy = new Date().getFullYear();
+    const elegido = anios.includes(hoy) ? hoy : (anios.find((a) => a >= hoy) ?? anios[anios.length - 1]);
+    this.seleccionado.set(elegido);
+  }
 }

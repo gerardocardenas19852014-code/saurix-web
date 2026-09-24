@@ -119,12 +119,17 @@
   </label>
   <label class="board-filter-field">
     Año
-    <select [value]="filtroAnio()" (change)="establecerFiltroAnio($any($event.target).value)">
-      <option value="">Todos</option>
-      @for (anio of aniosDisponibles(); track anio) {
-        <option [value]="anio">{{ anio }}</option>
-      }
-    </select>
+    @if (aniosDisponibles().length > 0) {
+      <select [value]="filtroAnio()" (change)="establecerFiltroAnio($any($event.target).value)">
+        @for (anio of aniosDisponibles(); track anio) {
+          <option [value]="anio">{{ anio }}</option>
+        }
+      </select>
+    } @else {
+      <select disabled title="Registra un año en Catálogos → Presupuesto por año para poder filtrar por año.">
+        <option>Sin años registrados</option>
+      </select>
+    }
   </label>
   <label class="board-filter-field">
     Orden

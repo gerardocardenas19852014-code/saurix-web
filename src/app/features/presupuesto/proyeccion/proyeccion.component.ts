@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { forkJoin } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { DataClientService } from '../../../core/services/data-client.service';
@@ -41,6 +41,15 @@ interface RenglonProyeccion {
    *  de ese grupo (misma que su `clave` de toggle), para poder ocultarlas
    *  cuando el usuario lo colapsa. null en todo lo demás (siempre visible). */
   grupoId: string | null;
+  /** Solo en los renglones 'detalle' (desglose por cuenta): la clave de SU
+   *  PROPIA hoja (categoría) — un segundo nivel de colapsar/expandir,
+   *  independiente de `grupoId` (que es del grupo ANCESTRO, si lo hay). Así
+   *  "SALARIO" se puede contraer aunque no cuelgue de ningún grupo. */
+  hojaId?: string | null;
+  /** Solo en los renglones 'hoja': true cuando junta más de una cuenta (por
+   *  eso tiene renglones 'detalle' debajo) — controla si se le pinta la
+   *  flechita de contraer/expandir en la plantilla. */
+  tieneDetalle?: boolean;
 }
 
 interface RaizFila {
@@ -164,7 +173,9 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
 
   /** Año de trabajo COMPARTIDO con Movimientos y con Fijos y Proyección —
    *  no es un filtro propio de esta pantalla: es la misma selección en las
-   *  3 (ver AnioTrabajoService). */
+   *  3 (ver AnioTrabajoService). Ya no existe "Todos": si todavía no hay
+   *  nada elegido, se propone un año real apenas se conoce el catálogo
+   *  (ver el effect de más abajo). */
   protected readonly filtroAnio = this.anioTrabajo.seleccionado;
 
   /** Solo los años dados de alta en Catálogos → "Presupuesto por año" —
@@ -176,6 +187,11 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
     const anios = new Set(this.presupuestosAnuales().map((p) => Number(p.anio)));
     return [...anios].sort((a, b) => a - b);
   });
+
+  /** Ya no hay opción "Todos" en el selector de Año — apenas se conocen
+   *  los años registrados, se propone uno real si aún no hay ninguno
+   *  elegido (ver AnioTrabajoService.asegurarSeleccion). */
+  private readonly _asegurarAnioTrabajo = effect(() => this.anioTrabajo.asegurarSeleccion(this.aniosDisponibles()));
 
   /** Quincenas a pintar como columnas, ya filtradas por año — cada una trae
    *  el índice que le corresponde dentro de `quincenas()`/`celdas`, porque el
@@ -377,22 +393,49 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es-MX'));
   }
 
+  /** Si una categoría solo ha usado UNA cuenta hasta ahora, se agrega el
+   *  nombre de esa cuenta a la etiqueta del renglón (p.ej. "SALARIO ·
+   *  Banorte") — antes solo se avisaba de qué cuentas se compone cuando
+   *  eran 2 o más (sub-renglones); con una sola no se veía en ningún lado
+   *  cuál era. Con 0 o "Sin cuenta" no se agrega nada (no aporta info). */
+  private nombreConCuentaUnica(clave: string, nombre: string): string {
+    const ids = this.valoresAuto().cuentasPorClave.get(clave);
+    if (!ids || ids.size !== 1) return nombre;
+    const id = [...ids][0];
+    if (id === 0) return nombre;
+    const cuenta = this.cuentas().find((c) => Number(c.id) === id);
+    return cuenta ? `${nombre} · ${cuenta.nombre}` : nombre;
+  }
+
   /** Renglón(es) de una categoría hoja: el renglón normal (editable, como
    *  antes) y, si junta más de una cuenta, un sub-renglón informativo por
    *  cuenta debajo — así se ve de dónde sale sin duplicar el total. */
   private filasHoja(clave: string, nombre: string, grupoId: string | null = null): RenglonProyeccion[] {
     const quincenas = this.quincenas();
     const celdas = quincenas.map((q) => this.celda(clave, q.clave));
-    const filas: RenglonProyeccion[] = [{ id: `hoja:${clave}`, tipo: 'hoja', clave, nombre, celdas, sumable: true, grupoId }];
+    const nombreFinal = this.nombreConCuentaUnica(clave, nombre);
+    const cuentas = this.cuentasDeCategoria(clave);
+    const filas: RenglonProyeccion[] = [
+      { id: `hoja:${clave}`, tipo: 'hoja', clave, nombre: nombreFinal, celdas, sumable: true, grupoId, tieneDetalle: cuentas.length > 0 },
+    ];
 
-    for (const cuenta of this.cuentasDeCategoria(clave)) {
+    for (const cuenta of cuentas) {
       const claveCuenta = `${clave}::cta:${cuenta.id}`;
       const celdasCuenta = quincenas.map((q) => ({
         valor: this.valoresAuto().mapa.get(claveCuenta)?.get(q.clave) ?? 0,
         manual: false,
         editable: false,
       }));
-      filas.push({ id: `detalle:${claveCuenta}`, tipo: 'detalle', clave: null, nombre: cuenta.nombre, celdas: celdasCuenta, sumable: true, grupoId });
+      filas.push({
+        id: `detalle:${claveCuenta}`,
+        tipo: 'detalle',
+        clave: null,
+        nombre: cuenta.nombre,
+        celdas: celdasCuenta,
+        sumable: true,
+        grupoId,
+        hojaId: clave,
+      });
     }
 
     return filas;
@@ -526,6 +569,24 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
   // ---------------------------------------------------------------------
 
   protected readonly gruposColapsados = signal<Set<string>>(new Set());
+  private gruposColapsadosInicializados = false;
+
+  /** La primera vez que ya se conocen los grupos (categorías con
+   *  subcategorías, p.ej. CARRO/CREDITOS/HOGAR) y las hojas con desglose
+   *  por cuenta (p.ej. SALARIO con Banorte/Afirme), arrancan TODOS
+   *  contraídos — antes había que contraerlos uno por uno cada vez que se
+   *  entraba a la pantalla; ahora se ven así desde el inicio y el usuario
+   *  expande a mano solo los que quiera revisar. */
+  private readonly _colapsarGruposPorDefecto = effect(() => {
+    if (this.gruposColapsadosInicializados) return;
+    const todas = [...this.renglonesIngreso(), ...this.renglonesGasto(), ...this.renglonesAhorro()];
+    const claves = todas
+      .filter((r) => (r.tipo === 'grupo' || (r.tipo === 'hoja' && r.tieneDetalle)) && r.clave)
+      .map((r) => r.clave as string);
+    if (claves.length === 0) return;
+    this.gruposColapsadosInicializados = true;
+    this.gruposColapsados.set(new Set(claves));
+  });
 
   protected estaColapsado(clave: string | null): boolean {
     return !!clave && this.gruposColapsados().has(clave);
@@ -548,7 +609,11 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
     const todas = [...this.resumen(), ...this.renglonesIngreso(), ...this.renglonesGasto(), ...this.renglonesAhorro()];
     const colapsados = this.gruposColapsados();
     if (colapsados.size === 0) return todas;
-    return todas.filter((r) => !r.grupoId || !colapsados.has(r.grupoId));
+    return todas.filter((r) => {
+      if (r.grupoId && colapsados.has(r.grupoId)) return false;
+      if (r.hojaId && colapsados.has(r.hojaId)) return false;
+      return true;
+    });
   });
 
   // ---------------------------------------------------------------------
@@ -747,20 +812,20 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // Sin fijo que ligar: se crea el movimiento de todos modos aunque no se
+    // pueda identificar una sola cuenta histórica para esta categoría — la
+    // cuenta ya NO es obligatoria para poder capturar aquí (antes, en ese
+    // caso, se guardaba solo como ajuste manual y no se creaba movimiento).
+    // Con 0 o más de una cuenta distinta se crea "Sin cuenta" (id 0); se
+    // puede asignar una cuenta después desde Movimientos.
     const cuentaIds = [...(this.valoresAuto().cuentasPorClave.get(clave) ?? [])].filter((id) => id !== 0);
-    if (cuentaIds.length !== 1) {
-      this.guardarAjuste(clave, quincenaClave, monto);
-      this.toast.advertencia(
-        'No se identificó una sola cuenta para esta categoría; se guardó como valor manual (no crea movimiento). Captúralo desde Movimientos para ligarlo a una cuenta.',
-      );
-      return;
-    }
+    const cuentaResuelta = cuentaIds.length === 1 ? cuentaIds[0] : 0;
 
     const diaInicio = q.mitad === 1 ? 1 : 16;
     const payload = {
       fecha: textoFechaDeLocal(q.anio, q.mes, diaInicio),
       tipo,
-      cuentaPresupuestoId: cuentaIds[0],
+      cuentaPresupuestoId: cuentaResuelta,
       categoriaPresupuestoId: categoriaId,
       monto,
       descripcion: this.categorias().find((c) => Number(c.id) === categoriaId)?.nombre ?? '',
@@ -772,7 +837,11 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
     this.data.alta<MovimientoPresupuesto>('MovimientoPresupuesto', payload).subscribe({
       next: (creado) => {
         this.movimientos.update((lista) => [...lista, creado]);
-        this.toast.exito('Movimiento creado.');
+        if (cuentaResuelta === 0) {
+          this.toast.exito('Movimiento creado sin cuenta asignada — captúralo desde Movimientos si quieres ligarlo a una.');
+        } else {
+          this.toast.exito('Movimiento creado.');
+        }
       },
       error: () => this.toast.error('No se pudo crear el movimiento.'),
     });
