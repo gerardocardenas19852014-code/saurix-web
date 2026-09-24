@@ -820,7 +820,11 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       descripcion: this.categorias().find((c) => Number(c.id) === categoriaId)?.nombre ?? '',
       transferenciaId: null,
       origenRecurrenteId: null,
-      proyectado: false,
+      // Se crea desde Proyección (una pantalla de flujo A FUTURO), no desde
+      // Movimientos — igual que lo que genera "Generar futuros", se marca
+      // proyectado en vez de real; se "confirma" luego editándolo desde
+      // Movimientos si hace falta (p.ej. cuando de verdad ya ocurrió).
+      proyectado: true,
       creadoPorUsuarioId: this.usuarioActualId,
     };
     this.data.alta<MovimientoPresupuesto>('MovimientoPresupuesto', payload).subscribe({
