@@ -294,6 +294,14 @@ html[data-wide='grid'] .content { max-width: 1600px; }
 .board-view-toggle button.is-active { background: var(--accent); color: #fff; }
 .board-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; margin: 4px 0 18px; }
 .board-filter-field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--ink-soft); font-family: 'JetBrains Mono', monospace; flex: 1 1 140px; min-width: 0; }
+// El campo "Buscar" de texto libre necesita más ancho que un <select>: su
+// placeholder es más largo (folio, folio interno, título, etiqueta o sprint)
+// y el propio input trae el botón nativo de "limpiar" (×) que, con el mismo
+// flex-basis que un combo, terminaba empalmándose con el texto cuando había
+// muchos filtros en la misma fila (cada uno se lleva una porción igual del
+// espacio extra, sin importar cuánto necesite). Más peso de crecimiento y un
+// mínimo más generoso evita que se aplaste tanto como los demás.
+.board-filter-field-buscar { flex: 2.5 1 220px; min-width: 200px; }
 .board-filter-field select, .board-filter-field input[type='date'], .board-filter-field input[type='month'], .board-filter-field input[type='text'], .board-filter-field input[type='search'] {
   padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 14px;
   color: var(--text-strong); background: var(--paper-raised); width: 100%; min-width: 0; box-sizing: border-box;
