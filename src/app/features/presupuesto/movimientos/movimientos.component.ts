@@ -100,6 +100,22 @@ export class MovimientosComponent implements OnInit, OnDestroy {
   protected readonly movimientos = signal<MovimientoPresupuesto[]>([]);
   protected readonly cuentas = signal<CuentaPresupuesto[]>([]);
   protected readonly categorias = signal<CategoriaPresupuesto[]>([]);
+
+  /** Categorías organizadas en raíz + hijas directas (máx. 2 niveles, ver
+   *  CategoriaPresupuesto), para el filtro "Categoría": antes se listaban
+   *  todas iguales, una tras otra, y no se distinguía cuál era una
+   *  categoría padre (p. ej. HOGAR) y cuáles sus subcategorías (Hipoteca,
+   *  Gas, Luz...). Con <optgroup> el navegador las agrupa visualmente
+   *  (título en negritas, hijas con sangría) sin CSS a la medida. */
+  protected readonly categoriasJerarquia = computed(() => {
+    const todas = this.categorias();
+    return todas
+      .filter((c) => c.categoriaPresupuestoPadreId === null)
+      .map((raiz) => ({
+        raiz,
+        hijos: todas.filter((c) => c.categoriaPresupuestoPadreId === Number(raiz.id)),
+      }));
+  });
   protected readonly tiposMovimiento = signal<ValorLista[]>([]);
   protected readonly cargando = signal(false);
 

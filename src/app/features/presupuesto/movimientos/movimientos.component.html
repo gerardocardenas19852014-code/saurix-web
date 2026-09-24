@@ -94,8 +94,17 @@
     Categoría
     <select [value]="filtroCategoriaId()" (change)="filtroCategoriaId.set(+$any($event.target).value)">
       <option [value]="0">Todas</option>
-      @for (categoria of categorias(); track categoria.id) {
-        <option [value]="categoria.id">{{ categoria.nombre }}</option>
+      @for (grupo of categoriasJerarquia(); track grupo.raiz.id) {
+        @if (grupo.hijos.length > 0) {
+          <optgroup [label]="grupo.raiz.nombre">
+            <option [value]="grupo.raiz.id">{{ grupo.raiz.nombre }}</option>
+            @for (hijo of grupo.hijos; track hijo.id) {
+              <option [value]="hijo.id">{{ hijo.nombre }}</option>
+            }
+          </optgroup>
+        } @else {
+          <option [value]="grupo.raiz.id">{{ grupo.raiz.nombre }}</option>
+        }
       }
     </select>
   </label>
