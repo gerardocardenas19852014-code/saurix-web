@@ -1,0 +1,86 @@
+<div class="page-header">
+  <h1>🆔 Generación de RFC y CURP</h1>
+</div>
+
+<div class="settings-card">
+  <h2 class="settings-card-title">Datos de la persona</h2>
+  <p class="hint" style="margin:0 0 16px;">
+    Captura los datos y se calculan el RFC (con homoclave) y el CURP completos.
+  </p>
+
+  <form class="edit-form form-grid-2col" [formGroup]="form" (ngSubmit)="calcular()">
+    <label class="full-span">
+      Nombre(s)
+      <input type="text" formControlName="nombre" placeholder="Ej. Juan Gerardo" />
+    </label>
+
+    <label>
+      Apellido paterno
+      <input type="text" formControlName="apellidoPaterno" />
+    </label>
+
+    <label>
+      Apellido materno (opcional)
+      <input type="text" formControlName="apellidoMaterno" />
+    </label>
+
+    <label>
+      Fecha de nacimiento
+      <input type="date" formControlName="fechaNacimiento" />
+    </label>
+
+    <label>
+      Sexo
+      <select formControlName="sexo">
+        <option value="" disabled>Selecciona…</option>
+        @for (opcion of opcionesSexo; track opcion.valor) {
+          <option [value]="opcion.valor">{{ opcion.etiqueta }}</option>
+        }
+      </select>
+    </label>
+
+    <label class="full-span">
+      Entidad de nacimiento
+      <select formControlName="entidadNacimiento">
+        <option value="" disabled>Selecciona…</option>
+        @for (opcion of opcionesEntidad; track opcion.valor) {
+          <option [value]="opcion.valor">{{ opcion.etiqueta }}</option>
+        }
+      </select>
+    </label>
+
+    <div class="full-span form-actions">
+      <button type="button" class="btn-secondary" (click)="limpiar()">Limpiar</button>
+      <button type="submit" class="btn-primary">Calcular</button>
+    </div>
+  </form>
+</div>
+
+@if (resultado(); as r) {
+  <div class="settings-card">
+    <h2 class="settings-card-title">Resultado</h2>
+
+    <div class="rfccurp-resultado-row">
+      <div>
+        <p class="rfccurp-resultado-etiqueta">RFC</p>
+        <p class="rfccurp-resultado-valor">{{ r.rfc }}</p>
+      </div>
+      <button type="button" class="btn-secondary small" (click)="copiar(r.rfc, 'RFC')">📋 Copiar</button>
+    </div>
+
+    <div class="rfccurp-resultado-row">
+      <div>
+        <p class="rfccurp-resultado-etiqueta">CURP</p>
+        <p class="rfccurp-resultado-valor">{{ r.curp }}</p>
+      </div>
+      <button type="button" class="btn-secondary small" (click)="copiar(r.curp, 'CURP')">📋 Copiar</button>
+    </div>
+
+    <p class="hint" style="margin:14px 0 0;">
+      ⚠️ Esto es una <strong>pre-validación</strong> calculada con el algoritmo público oficial (IFAI/RENAPO), no un
+      documento oficial: el RFC lo emite el SAT y el CURP lo emite RENAPO. En especial, el penúltimo carácter del CURP
+      (el que distingue a personas que coincidirían en todo lo demás) solo lo asigna RENAPO cuando detecta ese caso —
+      aquí se usa el valor por defecto. Verifica siempre el resultado en el sitio oficial antes de usarlo en trámites.
+    </p>
+  </div>
+}

@@ -1,0 +1,28 @@
+.rfccurp-resultado-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.rfccurp-resultado-row:last-of-type {
+  border-bottom: none;
+}
+
+.rfccurp-resultado-etiqueta {
+  margin: 0 0 2px;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--ink-soft);
+}
+
+.rfccurp-resultado-valor {
+  margin: 0;
+  font-size: 22px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--heading-navy);
+}
