@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { forkJoin } from 'rxjs';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth.service';
@@ -57,7 +58,12 @@ export class DeudasComponent implements OnInit, OnDestroy {
 
   protected readonly totalPagadoEsteMes = computed(() => {
     const hoy = new Date();
+    // Filtra a abonos de deudas que SIGUEN existiendo — de haber alguno
+    // huérfano (abono cuya deuda ya se borró; con datos de antes de que
+    // confirmarEliminar empezara a limpiarlos también) no se cuenta aquí.
+    const idsDeudasExistentes = new Set(this.deudas().map((d) => Number(d.id)));
     return this.abonos()
+      .filter((a) => idsDeudasExistentes.has(Number(a.deudaPresupuestoId)))
       .filter((a) => {
         const f = fechaLocalDeTexto(a.fecha);
         return f.getFullYear() === hoy.getFullYear() && f.getMonth() === hoy.getMonth();
@@ -258,13 +264,29 @@ export class DeudasComponent implements OnInit, OnDestroy {
   confirmarEliminar(): void {
     const item = this.aEliminar();
     if (!item) return;
-    this.data.baja('DeudaPresupuesto', item.id).subscribe({
-      next: () => {
-        this.toast.exito('Eliminada.');
-        this.aEliminar.set(null);
-        this.cargar();
-      },
-    });
+
+    const eliminarDeuda = (): void => {
+      this.data.baja('DeudaPresupuesto', item.id).subscribe({
+        next: () => {
+          this.toast.exito('Eliminada.');
+          this.aEliminar.set(null);
+          this.cargar();
+        },
+      });
+    };
+
+    // El historial de abonos de esta deuda no tiene sentido sin su padre —
+    // se borra junto con ella para no dejar abonos huérfanos (que antes se
+    // colaban, por ejemplo, en el total de "Pagado este mes"). Los Gastos
+    // reales que algún abono haya generado en una cuenta se CONSERVAN a
+    // propósito: ese dinero ya salió de verdad, y borrar el rastreo de la
+    // deuda no debe "desaparecerlo" de Movimientos/Reportes/Dashboard.
+    const abonosDeEsta = this.abonosDe(item.id);
+    if (abonosDeEsta.length === 0) {
+      eliminarDeuda();
+    } else {
+      forkJoin(abonosDeEsta.map((a) => this.data.baja('DeudaPresupuestoAbono', a.id))).subscribe({ next: eliminarDeuda });
+    }
   }
 
 
