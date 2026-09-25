@@ -13,12 +13,6 @@
       </nav>
     }
 
-    @if (moduloActivo() === 'catalogos') {
-      <span class="sidebar-label">Catálogos</span>
-      <nav class="sidebar-nav" aria-label="Menú de catálogos">
-        <a routerLink="/catalogos/proveedor-conexion" routerLinkActive="active">🔌 Proveedor de conexión</a>
-      </nav>
-    }
 
     @if (moduloActivo() === 'wikidocs') {
       <span class="sidebar-label">WikiDocs</span>
@@ -121,7 +115,6 @@
       <nav class="sidebar-nav" aria-label="Menú de panel de control">
         <a routerLink="/panel-control" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
         <a routerLink="/panel-control/apariencia" routerLinkActive="active">🎨 Apariencia</a>
-        <a routerLink="/panel-control/conexiones" routerLinkActive="active">🔌 Conexiones</a>
         <a routerLink="/panel-control/respaldo" routerLinkActive="active">💾 Respaldo y restauración</a>
       </nav>
     }

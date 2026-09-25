@@ -23,10 +23,6 @@ export const routes: Routes = [
         loadChildren: () => import('./features/seguridad/seguridad.routes').then((m) => m.SEGURIDAD_ROUTES),
       },
       {
-        path: 'catalogos',
-        loadChildren: () => import('./features/catalogos/catalogos.routes').then((m) => m.CATALOGOS_ROUTES),
-      },
-      {
         path: 'wikidocs',
         loadChildren: () => import('./features/wikidocs/wikidocs.routes').then((m) => m.WIKIDOCS_ROUTES),
       },

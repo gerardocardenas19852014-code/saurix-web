@@ -6,12 +6,13 @@ import { hashPassword, pareceHashSha256 } from '../../shared/utils/password.util
 import { debeDesactivarsePorVigenciaVencida } from '../../shared/utils/vigencia.util';
 import { BitacoraService } from '../../shared/services/bitacora.service';
 
-/** Valores iniciales del catálogo genérico "Listas de valores" (Catálogos):
- *  sin esto las pantallas que ya dependen de él (Cuentas de presupuesto,
- *  Movimientos, Fijos y Proyección, Conexiones) arrancarían con combos
- *  vacíos hasta que alguien los cargue a mano. Solo se siembra si el store
- *  está completamente vacío (ver ejecutar()), así que agregar o quitar
- *  valores aquí después no pisa lo que el usuario ya haya editado. */
+/** Valores iniciales del catálogo genérico "Listas de valores" (ver
+ *  shared/valor-lista): sin esto las pantallas que ya dependen de él
+ *  (Cuentas de presupuesto, Movimientos, Fijos y Proyección) arrancarían
+ *  con combos vacíos hasta que alguien los cargue a mano. Solo se siembra
+ *  si el store está completamente vacío (ver ejecutar()), así que agregar
+ *  o quitar valores aquí después no pisa lo que el usuario ya haya
+ *  editado. */
 const VALORES_LISTA_INICIALES: { grupo: string; clave: string; etiqueta: string; orden: number }[] = [
   { grupo: 'CuentaPresupuestoTipo', clave: 'Efectivo', etiqueta: 'Efectivo', orden: 1 },
   { grupo: 'CuentaPresupuestoTipo', clave: 'Banco', etiqueta: 'Banco', orden: 2 },
@@ -21,9 +22,6 @@ const VALORES_LISTA_INICIALES: { grupo: string; clave: string; etiqueta: string;
   { grupo: 'MovimientoPresupuestoTipo', clave: 'Gasto', etiqueta: 'Gasto', orden: 2 },
   { grupo: 'MovimientoRecurrenteFrecuencia', clave: 'Mensual', etiqueta: 'Mensual', orden: 1 },
   { grupo: 'MovimientoRecurrenteFrecuencia', clave: 'Anual', etiqueta: 'Anual', orden: 2 },
-  { grupo: 'ConfiguracionConexionProveedor', clave: 'SqlServer', etiqueta: 'SQL Server', orden: 1 },
-  { grupo: 'ConfiguracionConexionProveedor', clave: 'PostgreSql', etiqueta: 'PostgreSQL', orden: 2 },
-  { grupo: 'ConfiguracionConexionProveedor', clave: 'MySql', etiqueta: 'MySQL', orden: 3 },
   { grupo: 'PresupuestoAnualEstatus', clave: 'Creacion', etiqueta: 'Creación', orden: 1 },
   { grupo: 'PresupuestoAnualEstatus', clave: 'Proyeccion', etiqueta: 'Proyección', orden: 2 },
   { grupo: 'PresupuestoAnualEstatus', clave: 'Autorizado', etiqueta: 'Autorizado', orden: 3 },

@@ -18,7 +18,6 @@ export const DESTINOS: DestinoPaleta[] = [
   { label: 'Inicio', grupo: 'Seguridad', ruta: '/seguridad', icono: '⌂' },
   { label: 'Usuarios', grupo: 'Seguridad', ruta: '/seguridad/usuarios', icono: '👥' },
 
-  { label: 'Proveedor de conexión', grupo: 'Catálogos', ruta: '/catalogos/proveedor-conexion', icono: '🔌' },
 
   { label: 'Inicio', grupo: 'WikiDocs', ruta: '/wikidocs', icono: '⌂' },
   { label: 'Documentos', grupo: 'WikiDocs', ruta: '/wikidocs/documentos', icono: '📚' },
@@ -61,6 +60,5 @@ export const DESTINOS: DestinoPaleta[] = [
 
   { label: 'Inicio', grupo: 'Panel de Control', ruta: '/panel-control', icono: '⌂' },
   { label: 'Apariencia', grupo: 'Panel de Control', ruta: '/panel-control/apariencia', icono: '🎨' },
-  { label: 'Conexiones', grupo: 'Panel de Control', ruta: '/panel-control/conexiones', icono: '🔌' },
   { label: 'Respaldo y restauración', grupo: 'Panel de Control', ruta: '/panel-control/respaldo', icono: '💾' },
 ];

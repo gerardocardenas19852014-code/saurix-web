@@ -10,7 +10,7 @@ import { PreferenciasGridService } from '../../../shared/services/preferencias-g
 import { ToastService } from '../../../shared/services/toast.service';
 import { exportarCsv } from '../../../shared/utils/csv.util';
 import { CuentaPresupuesto, TipoCuentaPresupuesto } from './cuenta-presupuesto.model';
-import { ValorLista } from '../../catalogos/valor-lista/valor-lista.model';
+import { ValorLista } from '../../../shared/valor-lista/valor-lista.model';
 
 const MODULO_BITACORA = 'Catálogos / Cuentas de presupuesto';
 const ENTIDAD = 'CuentaPresupuesto';

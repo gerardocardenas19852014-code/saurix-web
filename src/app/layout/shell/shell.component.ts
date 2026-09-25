@@ -343,11 +343,10 @@ export class ShellComponent implements OnDestroy {
   }
 
   protected readonly moduloActivo = computed<
-    'seguridad' | 'catalogos' | 'wikidocs' | 'presupuesto' | 'proyectos' | 'panel-control' | null
+    'seguridad' | 'wikidocs' | 'presupuesto' | 'proyectos' | 'panel-control' | null
   >(() => {
     const url = this.urlActual();
     if (url.startsWith('/seguridad')) return 'seguridad';
-    if (url.startsWith('/catalogos')) return 'catalogos';
     if (url.startsWith('/wikidocs')) return 'wikidocs';
     if (url.startsWith('/presupuesto')) return 'presupuesto';
     if (url.startsWith('/proyectos')) return 'proyectos';

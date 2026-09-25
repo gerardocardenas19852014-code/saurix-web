@@ -12,7 +12,7 @@ import { AnioTrabajoService } from '../shared/anio-trabajo.service';
 import { CategoriaPresupuesto } from '../categoria-presupuesto/categoria-presupuesto.model';
 import { CuentaPresupuesto } from '../cuenta-presupuesto/cuenta-presupuesto.model';
 import { InfoTarjeta, colorCategoria, etiquetaMes, formatMoneda, iconoTipoCuenta, infoTarjeta, nivelUso, opcionesCategoriasBuscable, opcionesCuentasBuscable } from '../shared/wallet.util';
-import { ValorLista } from '../../catalogos/valor-lista/valor-lista.model';
+import { ValorLista } from '../../../shared/valor-lista/valor-lista.model';
 import { MovimientoPresupuesto } from './movimiento.model';
 import { PresupuestoAnual } from '../presupuesto-anual/presupuesto-anual.model';
 import { SelectBuscableComponent } from '../../../shared/components/select-buscable/select-buscable.component';

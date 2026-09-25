@@ -1,11 +1,11 @@
 import { Directive, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
-import { AuthService } from '../../../core/services/auth.service';
-import { DataClientService } from '../../../core/services/data-client.service';
-import { ColumnaTabla } from '../../../shared/components/data-table/data-table.component';
-import { BitacoraService } from '../../../shared/services/bitacora.service';
-import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
-import { ToastService } from '../../../shared/services/toast.service';
+import { AuthService } from '../../core/services/auth.service';
+import { DataClientService } from '../../core/services/data-client.service';
+import { ColumnaTabla } from '../components/data-table/data-table.component';
+import { BitacoraService } from '../services/bitacora.service';
+import { PreferenciasGridService } from '../services/preferencias-grid.service';
+import { ToastService } from '../services/toast.service';
 import { ValorLista } from './valor-lista.model';
 
 const ENTIDAD = 'ValorLista';

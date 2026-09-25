@@ -10,7 +10,7 @@ import { ToastService } from '../../../shared/services/toast.service';
 import { CategoriaPresupuesto } from '../categoria-presupuesto/categoria-presupuesto.model';
 import { CuentaPresupuesto } from '../cuenta-presupuesto/cuenta-presupuesto.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
-import { ValorLista } from '../../catalogos/valor-lista/valor-lista.model';
+import { ValorLista } from '../../../shared/valor-lista/valor-lista.model';
 import { MovimientoRecurrentePresupuesto } from './recurrente.model';
 import { PresupuestoAnual } from '../presupuesto-anual/presupuesto-anual.model';
 import { fechaLocalDeTexto, opcionesCategoriasBuscable, opcionesCuentasBuscable, textoFechaDeLocal } from '../shared/wallet.util';

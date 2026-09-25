@@ -12,7 +12,6 @@ interface ModuloTile {
 const MODULOS: ModuloTile[] = [
   { ruta: '/wikidocs', icono: '📚', etiqueta: 'WikiDocs', clase: 'module-tile-green' },
   { ruta: '/seguridad', icono: '🔒', etiqueta: 'Seguridad', clase: 'module-tile-slate' },
-  { ruta: '/catalogos', icono: '🏷️', etiqueta: 'Catálogos', clase: 'module-tile-amber' },
   { ruta: '/panel-control', icono: '⚙️', etiqueta: 'Panel de control', clase: 'module-tile-navy' },
   { ruta: '/presupuesto', icono: '💰', etiqueta: 'Presupuesto Personal', clase: 'module-tile-teal' },
   { ruta: '/proyectos', icono: '📋', etiqueta: 'Gestión de Proyectos', clase: 'module-tile-indigo' },

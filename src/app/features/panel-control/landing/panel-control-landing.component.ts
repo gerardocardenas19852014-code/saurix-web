@@ -18,9 +18,9 @@ interface GrupoConfig {
 }
 
 // Panel de Control reúne la configuración GENERAL de la app (Apariencia,
-// Conexiones, Respaldo). La configuración propia de cada módulo (p.ej. el
-// Gestor de Estados de Gestión de Proyectos) vive dentro de ese mismo
-// módulo — así siempre queda claro a qué módulo pertenece cada pantalla.
+// Respaldo). La configuración propia de cada módulo (p.ej. el Gestor de
+// Estados de Gestión de Proyectos) vive dentro de ese mismo módulo — así
+// siempre queda claro a qué módulo pertenece cada pantalla.
 const GRUPOS: GrupoConfig[] = [
   {
     titulo: 'General',
@@ -31,14 +31,6 @@ const GRUPOS: GrupoConfig[] = [
         color: 'generic',
         titulo: 'Apariencia',
         descripcion: 'Tema, asistente de IA y tamaño de página, por usuario.',
-        grupo: 'General',
-      },
-      {
-        ruta: 'conexiones',
-        icono: '🔌',
-        color: 'generic',
-        titulo: 'Conexiones',
-        descripcion: 'Orígenes de datos y conexiones externas de la app.',
         grupo: 'General',
       },
       {
