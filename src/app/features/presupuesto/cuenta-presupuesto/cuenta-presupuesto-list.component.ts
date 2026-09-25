@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth.service';
 import { DataClientService } from '../../../core/services/data-client.service';
@@ -33,7 +33,7 @@ const ICONOS_TIPO_CONOCIDOS: Record<string, string> = { Efectivo: '💵', Banco:
   styleUrl: './cuenta-presupuesto-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class CuentaPresupuestoListComponent implements OnInit {
+export class CuentaPresupuestoListComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
@@ -97,6 +97,10 @@ export class CuentaPresupuestoListComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // Catálogo angosto atrapado en el ancho de lectura de 980px — usa el
+    // ancho "wide" del layout para aprovechar mejor el espacio (ver
+    // html[data-wide='grid'] en styles.scss, mismo patrón que Movimientos).
+    document.documentElement.setAttribute('data-wide', 'grid');
     this.cargar();
     this.data.list<ValorLista>('ValorLista', { grupo: GRUPO_VALOR_LISTA }).subscribe({
       next: (valores) =>
@@ -259,5 +263,10 @@ export class CuentaPresupuestoListComponent implements OnInit {
       },
       error: () => this.toast.error('No se pudo eliminar la cuenta. Intenta de nuevo.'),
     });
+  }
+
+
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
   }
 }

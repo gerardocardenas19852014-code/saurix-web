@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { BitacoraComponent } from '../../../shared/components/bitacora/bitacora.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -14,7 +14,7 @@ import { ValorListaGrupoBase } from '../../catalogos/valor-lista/valor-lista-gru
   styleUrl: '../../catalogos/valor-lista/valor-lista-grupo.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class FrecuenciaFijosPresupuestoComponent extends ValorListaGrupoBase {
+export class FrecuenciaFijosPresupuestoComponent extends ValorListaGrupoBase implements OnInit, OnDestroy {
   protected readonly grupo = 'MovimientoRecurrenteFrecuencia';
   protected readonly tituloGrupo = 'Frecuencia de fijos · Presupuesto Personal';
   protected readonly moduloBitacora = 'Catálogos / Frecuencia de fijos (Presupuesto)';
@@ -27,4 +27,16 @@ export class FrecuenciaFijosPresupuestoComponent extends ValorListaGrupoBase {
    * las únicas que ese código compara por nombre exacto. */
   protected readonly clavesProtegidas = ['Mensual', 'Anual'];
   protected override readonly soportaInactivos = true;
+  /** Catálogo angosto (3-4 columnas) atrapado en el ancho de lectura de
+   *  980px — usa el ancho "wide" del layout para aprovechar mejor el
+   *  espacio (ver html[data-wide='grid'] en styles.scss, mismo patrón que
+   *  Movimientos/Reportes/Calendario). */
+  override ngOnInit(): void {
+    document.documentElement.setAttribute('data-wide', 'grid');
+    super.ngOnInit();
+  }
+
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
+  }
 }
