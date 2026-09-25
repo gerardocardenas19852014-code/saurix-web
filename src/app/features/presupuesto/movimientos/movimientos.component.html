@@ -96,8 +96,12 @@
       <option [value]="0">Todas</option>
       @for (grupo of categoriasJerarquia(); track grupo.raiz.id) {
         @if (grupo.hijos.length > 0) {
+          <!-- La categoría padre (p.ej. SALARIO) ya es el label del optgroup
+               en negritas — listarla también como <option> aquí adentro se
+               veía como un duplicado confuso ("SALARIO" repetido dos veces
+               seguidas). Si un movimiento está categorizado directamente en
+               la raíz (sin hijo), sigue viéndose con "Todas". -->
           <optgroup [label]="grupo.raiz.nombre">
-            <option [value]="grupo.raiz.id">{{ grupo.raiz.nombre }}</option>
             @for (hijo of grupo.hijos; track hijo.id) {
               <option [value]="hijo.id">{{ hijo.nombre }}</option>
             }
