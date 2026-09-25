@@ -252,7 +252,10 @@ export class ShellComponent implements OnDestroy {
    *  tablas anchas, ese límite obliga a hacer scroll horizontal sin
    *  necesidad, así que a todas se les da todo el ancho disponible, igual
    *  que a Ticket (ver .content-wide). Backlog se agregó a pedido del
-   *  usuario, para que ocupe el mismo ancho que Reportes de horas. */
+   *  usuario, para que ocupe el mismo ancho que Reportes de horas. Tipos de
+   *  Ticket, Prioridades y Módulos se agregaron también a pedido del
+   *  usuario — sus tablas (hasta 8 columnas en Prioridades) se veían igual
+   *  de apretadas en 980px. */
   private static readonly RUTAS_ANCHO_COMPLETO = [
     '/proyectos/tablero',
     '/proyectos/dashboard',
@@ -264,6 +267,9 @@ export class ShellComponent implements OnDestroy {
     '/proyectos/gestor-estados',
     '/proyectos/balanceo',
     '/proyectos/reportes-ejecutivos',
+    '/proyectos/tipos-ticket',
+    '/proyectos/prioridades',
+    '/proyectos/modulos',
   ];
   protected readonly contenidoAncho = computed(() =>
     ShellComponent.RUTAS_ANCHO_COMPLETO.some((ruta) => this.urlActual().startsWith(ruta)),
