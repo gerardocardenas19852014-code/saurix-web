@@ -8,6 +8,7 @@ import { CuentaPresupuesto } from '../cuenta-presupuesto/cuenta-presupuesto.mode
 import { PresupuestoAnual } from '../presupuesto-anual/presupuesto-anual.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
 import { DeudaPresupuesto } from '../deudas/deuda.model';
+import { MetaPresupuesto } from '../metas/meta.model';
 import { PagoTarjetaService } from '../shared/pago-tarjeta.service';
 import { AnioTrabajoService } from '../shared/anio-trabajo.service';
 import {
@@ -85,6 +86,7 @@ export class PresupuestoLandingComponent implements OnInit, OnDestroy {
   protected readonly categorias = signal<CategoriaPresupuesto[]>([]);
   protected readonly presupuestosAnuales = signal<PresupuestoAnual[]>([]);
   protected readonly deudas = signal<DeudaPresupuesto[]>([]);
+  protected readonly metas = signal<MetaPresupuesto[]>([]);
 
   protected readonly anioTrabajo = inject(AnioTrabajoService);
   protected readonly mesesOpciones = MESES_OPCIONES;
@@ -231,6 +233,12 @@ export class PresupuestoLandingComponent implements OnInit, OnDestroy {
   protected readonly totalDeudasPrestamos = computed(() => this.deudas().reduce((s, d) => s + Math.max(d.saldoActual, 0), 0));
   protected readonly hayDeudasPrestamos = computed(() => this.totalDeudasPrestamos() > 0);
 
+  /** Metas de ahorro: total ya ahorrado (incluye metas cumplidas — a
+   *  diferencia de la deuda de arriba, ese dinero sigue siendo dinero
+   *  ahorrado, no "desaparece" al cumplir la meta). */
+  protected readonly totalAhorradoMetas = computed(() => this.metas().reduce((s, m) => s + m.montoActual, 0));
+  protected readonly hayMetasAhorro = computed(() => this.totalAhorradoMetas() > 0);
+
   protected readonly topCategorias = computed<CategoriaMonto[]>(() => {
     const gastos = this.movimientosReales().filter((m) => m.tipo === 'Gasto' && !m.transferenciaId && this.enElPeriodoSeleccionado(m.fecha));
     const porCategoria = new Map<number | null, number>();
@@ -288,6 +296,9 @@ export class PresupuestoLandingComponent implements OnInit, OnDestroy {
     this.data
       .list<DeudaPresupuesto>('DeudaPresupuesto', { creadoPorUsuarioId: this.auth.usuarioActual()?.id ?? 0 })
       .subscribe((d) => this.deudas.set(d));
+    this.data
+      .list<MetaPresupuesto>('MetaPresupuesto', { creadoPorUsuarioId: this.auth.usuarioActual()?.id ?? 0 })
+      .subscribe((m) => this.metas.set(m));
   }
 
   ngOnDestroy(): void {

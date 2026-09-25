@@ -6,6 +6,26 @@
 </div>
 <p class="hint" style="margin:-10px 0 24px;">Ponte objetivos de ahorro y ve registrando tus aportes conforme vayas guardando.</p>
 
+@if (!cargando() && metas().length > 0) {
+  <div class="dashboard-stats">
+    <div class="dashboard-stat-card">
+      <div class="num">{{ formatMoneda(totalAhorrado()) }}</div>
+      <div class="label">Total ahorrado · {{ metasActivas().length }} activa{{ metasActivas().length === 1 ? '' : 's' }}</div>
+    </div>
+    <div class="dashboard-stat-card">
+      <div class="num">{{ formatMoneda(totalAportadoEsteMes()) }}</div>
+      <div class="label">Aportado este mes</div>
+    </div>
+  </div>
+
+  @if (cantidadCumplidas() > 0) {
+    <label class="board-filter-field board-filter-checkbox" style="margin:0 0 18px;">
+      <input type="checkbox" [checked]="mostrarCumplidas()" (change)="mostrarCumplidas.set($any($event.target).checked)" />
+      Mostrar cumplidas ({{ cantidadCumplidas() }})
+    </label>
+  }
+}
+
 @if (cargando()) {
   <p class="empty">Cargando…</p>
 } @else if (metas().length === 0) {
@@ -13,20 +33,30 @@
     <p>Aún no tienes metas de ahorro.</p>
     <button type="button" class="btn-primary" (click)="nuevo()">+ Crear la primera</button>
   </div>
+} @else if (metasVisibles().length === 0) {
+  <p class="hint">Todas tus metas están cumplidas — activa "Mostrar cumplidas" arriba para verlas.</p>
 } @else {
-  @for (meta of metas(); track meta.id) {
+  @for (meta of metasVisibles(); track meta.id) {
     <div class="wallet-limit-card">
       <div class="wallet-limit-head">
         <span>
           <strong>{{ meta.nombre }}</strong>
           @if (cumplida(meta)) {
             <span class="tag" style="background:var(--client-soft); color:var(--client);">🎉 ¡Cumplida!</span>
+          } @else if (atrasada(meta)) {
+            <span class="tag" style="background:var(--danger-soft); color:var(--danger);">⚠ Atrasada</span>
           }
         </span>
         <span class="wallet-limit-amounts">{{ formatMoneda(meta.montoActual) }} <span class="hint" style="margin:0;">de {{ formatMoneda(meta.montoObjetivo) }}</span></span>
       </div>
       <div class="wallet-limit-track">
-        <div class="wallet-limit-fill" [class.wallet-limit-fill-ok]="cumplida(meta)" [class.wallet-limit-fill-goal]="!cumplida(meta)" [style.width.%]="pctAhorrado(meta)"></div>
+        <div
+          class="wallet-limit-fill"
+          [class.wallet-limit-fill-ok]="cumplida(meta)"
+          [class.wallet-limit-fill-over]="!cumplida(meta) && atrasada(meta)"
+          [class.wallet-limit-fill-goal]="!cumplida(meta) && !atrasada(meta)"
+          [style.width.%]="pctAhorrado(meta)"
+        ></div>
       </div>
       <div class="wallet-limit-foot">
         <span class="hint" style="margin:0;">
@@ -37,17 +67,46 @@
               ({{ diasRestantes(meta)! >= 0 ? 'faltan ' + diasRestantes(meta) + 'd' : 'ya venció' }})
             }
           }
+          @if (aportacionMensualNecesaria(meta); as mensual) {
+            · necesitas {{ formatMoneda(mensual) }}/mes para llegar a tiempo
+          }
         </span>
         <span>
+          <button type="button" class="btn-secondary small" (click)="toggleHistorial(meta)">{{ historialAbierto() === meta.id ? 'Ocultar' : 'Historial' }}</button>
           <button type="button" class="btn-secondary small" (click)="editar(meta)">Editar</button>
           <button type="button" class="btn-danger small" (click)="pedirEliminar(meta)">Eliminar</button>
         </span>
       </div>
       @if (!cumplida(meta)) {
         <div class="anexos-upload-row" style="margin-top:12px;">
-          <input type="text" inputmode="decimal" #aporteInput placeholder="Monto a aportar" />
-          <button type="button" class="btn-primary small" (click)="aportar(meta, aporteInput.value); aporteInput.value = ''">+ Aportar</button>
+          <input type="text" inputmode="decimal" #aporteInput placeholder="Monto a aportar" style="max-width:160px;" />
+          <select #cuentaAporte title="Si eliges una cuenta, el aporte también se registra como un gasto real ahí (afecta su saldo y aparece en Movimientos/Reportes)." style="max-width:240px;">
+            <option value="0">No registrar como gasto</option>
+            @for (cuenta of cuentas(); track cuenta.id) {
+              <option [value]="cuenta.id">Desde: {{ cuenta.nombre }}</option>
+            }
+          </select>
+          <button type="button" class="btn-primary small" (click)="aportar(meta, aporteInput.value, cuentaAporte.value); aporteInput.value = ''; cuentaAporte.value = '0'">+ Aportar</button>
         </div>
+      }
+      @if (historialAbierto() === meta.id) {
+        <ul class="anexos-list" style="margin-top:12px;">
+          @for (aporte of aportesDe(meta.id); track aporte.id) {
+            <li class="actividad-item">
+              <div class="actividad-item-head">
+                <span>
+                  {{ aporte.fecha | date: 'dd/MM/yyyy' }} · {{ formatMoneda(aporte.monto) }}
+                  @if (aporte.cuentaPresupuestoId) {
+                    <span class="hint" style="margin:0;">· 💳 {{ nombreCuenta(aporte.cuentaPresupuestoId) }}</span>
+                  }
+                </span>
+                <button type="button" class="btn-danger small" title="Eliminar aporte" (click)="eliminarAporte(aporte, meta)">✕</button>
+              </div>
+            </li>
+          } @empty {
+            <p class="hint" style="margin:0;">Sin aportes registrados todavía (el progreso de antes de este historial sigue contando arriba, solo no aparece desglosado aquí).</p>
+          }
+        </ul>
       }
     </div>
   }

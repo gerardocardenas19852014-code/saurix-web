@@ -67,6 +67,12 @@
         <div class="label">Deudas y préstamos</div>
       </div>
     }
+    @if (hayMetasAhorro()) {
+      <div class="dashboard-stat-card">
+        <div class="num">{{ formatMoneda(totalAhorradoMetas()) }}</div>
+        <div class="label">Ahorrado en metas</div>
+      </div>
+    }
   </div>
 
   @if (inusuales().length > 0) {
