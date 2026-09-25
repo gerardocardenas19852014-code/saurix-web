@@ -1,0 +1,50 @@
+<div class="selbuscable">
+  <input
+    #inputBuscable
+    type="text"
+    class="selbuscable-input"
+    [value]="textoMostrado()"
+    [placeholder]="placeholder"
+    [disabled]="disabled"
+    autocomplete="off"
+    (focus)="onFocus()"
+    (input)="onInput($any($event.target).value)"
+  />
+</div>
+
+@if (abierta()) {
+  <div
+    class="selbuscable-panel"
+    role="listbox"
+    [style.top.px]="panelRect()?.top ?? 0"
+    [style.left.px]="panelRect()?.left ?? 0"
+    [style.width.px]="panelRect()?.width ?? 0"
+  >
+    @if (listaPlanaFiltrada().length === 0) {
+      <p class="selbuscable-vacio">Sin resultados{{ texto() ? ' para "' + texto() + '"' : '' }}.</p>
+    }
+    @for (opcion of gruposFiltrados().sinGrupo; track opcion.valor) {
+      <button
+        type="button"
+        class="selbuscable-item"
+        [class.activo]="esActiva(opcion)"
+        (mousedown)="$event.preventDefault(); seleccionar(opcion)"
+      >
+        {{ opcion.etiqueta }}
+      </button>
+    }
+    @for (grupo of gruposFiltrados().grupos; track grupo.grupo) {
+      <div class="selbuscable-grupo">{{ grupo.grupo }}</div>
+      @for (opcion of grupo.opciones; track opcion.valor) {
+        <button
+          type="button"
+          class="selbuscable-item selbuscable-item-hijo"
+          [class.activo]="esActiva(opcion)"
+          (mousedown)="$event.preventDefault(); seleccionar(opcion)"
+        >
+          {{ opcion.etiqueta }}
+        </button>
+      }
+    }
+  </div>
+}

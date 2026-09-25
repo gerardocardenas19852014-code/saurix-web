@@ -8,8 +8,9 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
 import { ToastService } from '../../../shared/services/toast.service';
 import { CuentaPresupuesto } from '../cuenta-presupuesto/cuenta-presupuesto.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
-import { fechaLocalDeTexto, formatMoneda } from '../shared/wallet.util';
+import { fechaLocalDeTexto, formatMoneda, opcionesCuentasBuscable } from '../shared/wallet.util';
 import { DeudaPresupuesto, DeudaPresupuestoAbono } from './deuda.model';
+import { SelectBuscableComponent } from '../../../shared/components/select-buscable/select-buscable.component';
 
 /**
  * Deudas (préstamos). El saldo de cada deuda se calcula 100% a partir de su
@@ -21,7 +22,7 @@ import { DeudaPresupuesto, DeudaPresupuestoAbono } from './deuda.model';
 @Component({
   selector: 'app-deudas',
   standalone: true,
-  imports: [ReactiveFormsModule, ConfirmDialogComponent, DatePipe, DecimalPipe],
+  imports: [ReactiveFormsModule, ConfirmDialogComponent, DatePipe, DecimalPipe, SelectBuscableComponent],
   templateUrl: './deudas.component.html',
   styleUrl: './deudas.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -37,6 +38,12 @@ export class DeudasComponent implements OnInit, OnDestroy {
   protected readonly deudas = signal<DeudaPresupuesto[]>([]);
   protected readonly abonos = signal<DeudaPresupuestoAbono[]>([]);
   protected readonly cuentas = signal<CuentaPresupuesto[]>([]);
+
+  /** Opciones del combo buscable de cuenta en la fila de "+ Abonar". */
+  protected readonly opcionesCuentaAbono = computed(() => [
+    { valor: 0, etiqueta: 'No registrar como gasto' },
+    ...opcionesCuentasBuscable(this.cuentas()),
+  ]);
   protected readonly cargando = signal(false);
   protected readonly modalAbierto = signal(false);
   protected readonly enEdicion = signal<DeudaPresupuesto | null>(null);
@@ -183,7 +190,7 @@ export class DeudasComponent implements OnInit, OnDestroy {
    *  usuario elige una cuenta, además se genera un Gasto real en Movimientos
    *  para que el pago se refleje en el saldo de esa cuenta y en
    *  Reportes/Dashboard, igual que cualquier otro gasto. */
-  abonar(deuda: DeudaPresupuesto, montoTexto: string, cuentaIdTexto: string): void {
+  abonar(deuda: DeudaPresupuesto, montoTexto: string, cuentaIdTexto: number | string | null): void {
     const monto = parseFloat(montoTexto);
     if (!monto || monto <= 0) {
       this.toast.advertencia('Escribe un monto válido para abonar.');

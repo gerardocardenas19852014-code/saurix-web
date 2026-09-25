@@ -80,6 +80,31 @@ export function agruparCategoriasJerarquia(categorias: CategoriaPresupuesto[]): 
     }));
 }
 
+// ── Listas para <app-select-buscable> (combo con búsqueda) ──
+
+export interface OpcionBuscableLike {
+  valor: number | string;
+  etiqueta: string;
+  grupo?: string;
+}
+
+/** Aplana agruparCategoriasJerarquia() al formato que espera
+ *  <app-select-buscable>: una raíz con hijas se vuelve un grupo (una fila
+ *  por hija, todas con el mismo "grupo"); una raíz sin hijas se lista suelta
+ *  (sin "grupo"), igual que hoy se decide entre <optgroup> y <option> plana. */
+export function opcionesCategoriasBuscable(categorias: CategoriaPresupuesto[]): OpcionBuscableLike[] {
+  return agruparCategoriasJerarquia(categorias).flatMap((grupo) =>
+    grupo.hijos.length > 0
+      ? grupo.hijos.map((hijo) => ({ valor: hijo.id, etiqueta: hijo.nombre, grupo: grupo.raiz.nombre }))
+      : [{ valor: grupo.raiz.id, etiqueta: grupo.raiz.nombre }],
+  );
+}
+
+/** Lista plana de cuentas para <app-select-buscable> (sin agrupar). */
+export function opcionesCuentasBuscable(cuentas: CuentaPresupuesto[]): OpcionBuscableLike[] {
+  return cuentas.map((c) => ({ valor: c.id, etiqueta: c.nombre }));
+}
+
 export function colorCategoria(id: number | null | undefined): string {
   if (!id) return 'var(--technical)';
   return PALETA_CATEGORIAS[id % PALETA_CATEGORIAS.length];

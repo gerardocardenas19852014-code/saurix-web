@@ -11,10 +11,11 @@ import { PagoTarjetaService } from '../shared/pago-tarjeta.service';
 import { AnioTrabajoService } from '../shared/anio-trabajo.service';
 import { CategoriaPresupuesto } from '../categoria-presupuesto/categoria-presupuesto.model';
 import { CuentaPresupuesto } from '../cuenta-presupuesto/cuenta-presupuesto.model';
-import { InfoTarjeta, agruparCategoriasJerarquia, colorCategoria, etiquetaMes, formatMoneda, iconoTipoCuenta, infoTarjeta, nivelUso } from '../shared/wallet.util';
+import { InfoTarjeta, colorCategoria, etiquetaMes, formatMoneda, iconoTipoCuenta, infoTarjeta, nivelUso, opcionesCategoriasBuscable, opcionesCuentasBuscable } from '../shared/wallet.util';
 import { ValorLista } from '../../catalogos/valor-lista/valor-lista.model';
 import { MovimientoPresupuesto } from './movimiento.model';
 import { PresupuestoAnual } from '../presupuesto-anual/presupuesto-anual.model';
+import { SelectBuscableComponent } from '../../../shared/components/select-buscable/select-buscable.component';
 
 interface ColumnaMensual {
   etiqueta: string;
@@ -68,7 +69,7 @@ type TabMovimientos = 'movimientos' | 'cuentas' | 'grafica';
 @Component({
   selector: 'app-movimientos',
   standalone: true,
-  imports: [ReactiveFormsModule, ConfirmDialogComponent, AdjuntosPanelComponent, DatePipe, DecimalPipe],
+  imports: [ReactiveFormsModule, ConfirmDialogComponent, AdjuntosPanelComponent, DatePipe, DecimalPipe, SelectBuscableComponent],
   templateUrl: './movimientos.component.html',
   styleUrl: './movimientos.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -101,13 +102,23 @@ export class MovimientosComponent implements OnInit, OnDestroy {
   protected readonly cuentas = signal<CuentaPresupuesto[]>([]);
   protected readonly categorias = signal<CategoriaPresupuesto[]>([]);
 
+  /** Opciones del combo buscable "Cuenta" (filtro) — "Todas" primero. */
+  protected readonly opcionesCuentaFiltro = computed(() => [
+    { valor: 0, etiqueta: 'Todas' },
+    ...opcionesCuentasBuscable(this.cuentas()),
+  ]);
+
   /** Categorías organizadas en raíz + hijas directas (máx. 2 niveles, ver
-   *  CategoriaPresupuesto), para el filtro "Categoría": antes se listaban
-   *  todas iguales, una tras otra, y no se distinguía cuál era una
+   *  CategoriaPresupuesto), para el combo buscable "Categoría": antes se
+   *  listaban todas iguales, una tras otra, y no se distinguía cuál era una
    *  categoría padre (p. ej. HOGAR) y cuáles sus subcategorías (Hipoteca,
-   *  Gas, Luz...). Con <optgroup> el navegador las agrupa visualmente
-   *  (título en negritas, hijas con sangría) sin CSS a la medida. */
-  protected readonly categoriasJerarquia = computed(() => agruparCategoriasJerarquia(this.categorias()));
+   *  Gas, Luz...). Agrupadas, <app-select-buscable> las agrupa visualmente
+   *  (título en negritas, hijas con sangría) igual que hacía el <optgroup>
+   *  anterior, pero ahora también se pueden filtrar escribiendo. */
+  protected readonly opcionesCategoriaFiltro = computed(() => [
+    { valor: 0, etiqueta: 'Todas' },
+    ...opcionesCategoriasBuscable(this.categorias()),
+  ]);
   protected readonly tiposMovimiento = signal<ValorLista[]>([]);
   protected readonly cargando = signal(false);
 
@@ -320,12 +331,23 @@ export class MovimientosComponent implements OnInit, OnDestroy {
     return this.categorias().filter((c) => !c.tipo || c.tipo === tipo);
   });
 
-  /** Igual que categoriasJerarquia pero ya filtrado por Tipo, para el <select>
-   *  del formulario Nuevo/Editar movimiento — antes ese combo listaba todas
-   *  las categorías del Tipo actual en fila, una tras otra, sin distinguir
-   *  padres de subcategorías (mismo problema que ya se había arreglado en el
-   *  filtro de arriba). */
-  protected readonly categoriasFiltradasJerarquia = computed(() => agruparCategoriasJerarquia(this.categoriasFiltradas()));
+  /** Igual que opcionesCategoriaFiltro pero ya filtrado por Tipo, para el
+   *  combo del formulario Nuevo/Editar movimiento — antes ese combo listaba
+   *  todas las categorías del Tipo actual en fila, una tras otra, sin
+   *  distinguir padres de subcategorías (mismo problema que ya se había
+   *  arreglado en el filtro de arriba). */
+  protected readonly opcionesCategoriaFormulario = computed(() => [
+    { valor: 0, etiqueta: 'Sin categoría' },
+    ...opcionesCategoriasBuscable(this.categoriasFiltradas()),
+  ]);
+
+  /** Opciones del combo buscable "Cuenta"/"Cuenta origen"/"Cuenta destino"
+   *  del formulario Nuevo/Editar movimiento (sin "Todas": aquí siempre hay
+   *  que elegir una cuenta real). */
+  protected readonly opcionesCuentaFormulario = computed(() => [
+    { valor: 0, etiqueta: 'Selecciona...' },
+    ...opcionesCuentasBuscable(this.cuentas()),
+  ]);
 
   /** Si al cambiar Tipo la categoría ya elegida deja de aplicar, se limpia (evita guardar una combinación inconsistente). */
   onTipoChange(): void {

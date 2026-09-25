@@ -61,13 +61,15 @@
       @if (!liquidada(deuda)) {
         <div class="anexos-upload-row" style="margin-top:12px;">
           <input type="text" inputmode="decimal" #abonoInput placeholder="Monto a abonar" style="max-width:160px;" />
-          <select #cuentaAbono title="Si eliges una cuenta, el abono también se registra como un gasto real ahí (afecta su saldo y aparece en Movimientos/Reportes)." style="max-width:240px;">
-            <option value="0">No registrar como gasto</option>
-            @for (cuenta of cuentas(); track cuenta.id) {
-              <option [value]="cuenta.id">Desde: {{ cuenta.nombre }}</option>
-            }
-          </select>
-          <button type="button" class="btn-primary small" (click)="abonar(deuda, abonoInput.value, cuentaAbono.value); abonoInput.value = ''; cuentaAbono.value = '0'">+ Abonar</button>
+          <app-select-buscable
+            #cuentaAbono
+            [opciones]="opcionesCuentaAbono()"
+            [value]="0"
+            title="Si eliges una cuenta, el abono también se registra como un gasto real ahí (afecta su saldo y aparece en Movimientos/Reportes)."
+            style="max-width:240px;"
+            placeholder="Buscar cuenta…"
+          />
+          <button type="button" class="btn-primary small" (click)="abonar(deuda, abonoInput.value, cuentaAbono.value); abonoInput.value = ''; cuentaAbono.value = 0">+ Abonar</button>
         </div>
       }
       @if (historialAbierto() === deuda.id) {

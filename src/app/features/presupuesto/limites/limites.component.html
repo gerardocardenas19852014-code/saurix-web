@@ -51,18 +51,7 @@
 
       <div class="edit-form" style="margin-bottom:18px;">
         <label>Categoría (vacío = general)
-          <select formControlName="categoriaPresupuestoId">
-            <option [ngValue]="0">General (todas)</option>
-            @for (grupo of categoriasGastoJerarquia(); track grupo.raiz.id) {
-              @if (grupo.hijos.length > 0) {
-                <optgroup [label]="grupo.raiz.nombre">
-                  @for (hijo of grupo.hijos; track hijo.id) { <option [ngValue]="hijo.id">{{ hijo.nombre }}</option> }
-                </optgroup>
-              } @else {
-                <option [ngValue]="grupo.raiz.id">{{ grupo.raiz.nombre }}</option>
-              }
-            }
-          </select>
+          <app-select-buscable [opciones]="opcionesCategoriaFormulario()" formControlName="categoriaPresupuestoId" placeholder="Buscar categoría…" />
         </label>
         <label>Límite mensual<input type="number" step="0.01" formControlName="montoLimite" /></label>
       </div>

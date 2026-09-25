@@ -13,8 +13,9 @@ import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
 import { ValorLista } from '../../catalogos/valor-lista/valor-lista.model';
 import { MovimientoRecurrentePresupuesto } from './recurrente.model';
 import { PresupuestoAnual } from '../presupuesto-anual/presupuesto-anual.model';
-import { agruparCategoriasJerarquia, fechaLocalDeTexto, textoFechaDeLocal } from '../shared/wallet.util';
+import { fechaLocalDeTexto, opcionesCategoriasBuscable, opcionesCuentasBuscable, textoFechaDeLocal } from '../shared/wallet.util';
 import { AnioTrabajoService } from '../shared/anio-trabajo.service';
+import { SelectBuscableComponent } from '../../../shared/components/select-buscable/select-buscable.component';
 
 /**
  * "Fijos y Proyección": gastos/ingresos recurrentes (renta, nómina,
@@ -27,7 +28,7 @@ import { AnioTrabajoService } from '../shared/anio-trabajo.service';
 @Component({
   selector: 'app-recurrentes',
   standalone: true,
-  imports: [ReactiveFormsModule, DataTableComponent, ConfirmDialogComponent, AdjuntosPanelComponent],
+  imports: [ReactiveFormsModule, DataTableComponent, ConfirmDialogComponent, AdjuntosPanelComponent, SelectBuscableComponent],
   templateUrl: './recurrentes.component.html',
   styleUrl: './recurrentes.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -117,11 +118,20 @@ export class RecurrentesComponent implements OnInit, OnDestroy {
     return this.categorias().filter((c) => !c.tipo || c.tipo === tipo);
   });
 
-  /** categoriasFiltradas agrupada en raíz + hijas para el <select> del
-   *  formulario (mismo <optgroup> ya usado en Movimientos, para no listar
+  /** categoriasFiltradas agrupada en raíz + hijas para el combo buscable del
+   *  formulario (mismo agrupado ya usado en Movimientos, para no listar
    *  padres e hijas todas iguales una tras otra ni repetir el padre como
    *  opción dentro de su propio grupo). */
-  protected readonly categoriasFiltradasJerarquia = computed(() => agruparCategoriasJerarquia(this.categoriasFiltradas()));
+  protected readonly opcionesCategoriaFormulario = computed(() => [
+    { valor: 0, etiqueta: 'Sin categoría' },
+    ...opcionesCategoriasBuscable(this.categoriasFiltradas()),
+  ]);
+
+  /** Opciones del combo buscable "Cuenta" del formulario. */
+  protected readonly opcionesCuentaFormulario = computed(() => [
+    { valor: 0, etiqueta: 'Selecciona...' },
+    ...opcionesCuentasBuscable(this.cuentas()),
+  ]);
 
   /** Si al cambiar Tipo la categoría ya elegida deja de aplicar, se limpia (evita guardar una combinación inconsistente). */
   onTipoChange(): void {

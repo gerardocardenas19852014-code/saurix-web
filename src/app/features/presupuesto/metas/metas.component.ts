@@ -8,8 +8,9 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
 import { ToastService } from '../../../shared/services/toast.service';
 import { CuentaPresupuesto } from '../cuenta-presupuesto/cuenta-presupuesto.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
-import { fechaLocalDeTexto, formatMoneda } from '../shared/wallet.util';
+import { fechaLocalDeTexto, formatMoneda, opcionesCuentasBuscable } from '../shared/wallet.util';
 import { MetaPresupuesto, MetaPresupuestoAporte } from './meta.model';
+import { SelectBuscableComponent } from '../../../shared/components/select-buscable/select-buscable.component';
 
 /** Metas de ahorro — seguimiento manual (el usuario aporta y montoActual sube),
  *  con historial de aportes (MetaPresupuestoAporte) para saber cuándo se
@@ -18,7 +19,7 @@ import { MetaPresupuesto, MetaPresupuestoAporte } from './meta.model';
 @Component({
   selector: 'app-metas',
   standalone: true,
-  imports: [ReactiveFormsModule, ConfirmDialogComponent, DatePipe, DecimalPipe],
+  imports: [ReactiveFormsModule, ConfirmDialogComponent, DatePipe, DecimalPipe, SelectBuscableComponent],
   templateUrl: './metas.component.html',
   styleUrl: './metas.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -34,6 +35,12 @@ export class MetasComponent implements OnInit, OnDestroy {
   protected readonly metas = signal<MetaPresupuesto[]>([]);
   protected readonly aportes = signal<MetaPresupuestoAporte[]>([]);
   protected readonly cuentas = signal<CuentaPresupuesto[]>([]);
+
+  /** Opciones del combo buscable de cuenta en la fila de "+ Aportar". */
+  protected readonly opcionesCuentaAporte = computed(() => [
+    { valor: 0, etiqueta: 'No registrar como gasto' },
+    ...opcionesCuentasBuscable(this.cuentas()),
+  ]);
   protected readonly cargando = signal(false);
   protected readonly modalAbierto = signal(false);
   protected readonly enEdicion = signal<MetaPresupuesto | null>(null);
@@ -197,7 +204,7 @@ export class MetasComponent implements OnInit, OnDestroy {
    *  vacío) significa que este aporte NO debe afectar ninguna cuenta (el
    *  comportamiento de siempre). Si el usuario elige una cuenta, además se
    *  genera un Gasto real en Movimientos, igual que el "abonar" de Deudas. */
-  aportar(meta: MetaPresupuesto, montoTexto: string, cuentaIdTexto: string): void {
+  aportar(meta: MetaPresupuesto, montoTexto: string, cuentaIdTexto: number | string | null): void {
     const monto = parseFloat(montoTexto);
     if (!monto || monto <= 0) {
       this.toast.advertencia('Escribe un monto válido para aportar.');

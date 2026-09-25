@@ -83,34 +83,21 @@
   </label>
   <label class="board-filter-field">
     Cuenta
-    <select [value]="filtroCuentaId()" (change)="filtroCuentaId.set(+$any($event.target).value)">
-      <option [value]="0">Todas</option>
-      @for (cuenta of cuentas(); track cuenta.id) {
-        <option [value]="cuenta.id">{{ cuenta.nombre }}</option>
-      }
-    </select>
+    <app-select-buscable
+      [opciones]="opcionesCuentaFiltro()"
+      [value]="filtroCuentaId()"
+      (valueChange)="filtroCuentaId.set(+($event ?? 0))"
+      placeholder="Buscar cuenta…"
+    />
   </label>
   <label class="board-filter-field">
     Categoría
-    <select [value]="filtroCategoriaId()" (change)="filtroCategoriaId.set(+$any($event.target).value)">
-      <option [value]="0">Todas</option>
-      @for (grupo of categoriasJerarquia(); track grupo.raiz.id) {
-        @if (grupo.hijos.length > 0) {
-          <!-- La categoría padre (p.ej. SALARIO) ya es el label del optgroup
-               en negritas — listarla también como <option> aquí adentro se
-               veía como un duplicado confuso ("SALARIO" repetido dos veces
-               seguidas). Si un movimiento está categorizado directamente en
-               la raíz (sin hijo), sigue viéndose con "Todas". -->
-          <optgroup [label]="grupo.raiz.nombre">
-            @for (hijo of grupo.hijos; track hijo.id) {
-              <option [value]="hijo.id">{{ hijo.nombre }}</option>
-            }
-          </optgroup>
-        } @else {
-          <option [value]="grupo.raiz.id">{{ grupo.raiz.nombre }}</option>
-        }
-      }
-    </select>
+    <app-select-buscable
+      [opciones]="opcionesCategoriaFiltro()"
+      [value]="filtroCategoriaId()"
+      (valueChange)="filtroCategoriaId.set(+($event ?? 0))"
+      placeholder="Buscar categoría…"
+    />
   </label>
   <label class="board-filter-field">
     Tipo
@@ -286,41 +273,18 @@
 
         <label>
           {{ esTransferencia ? 'Cuenta origen' : 'Cuenta' }}
-          <select formControlName="cuentaPresupuestoId">
-            <option [ngValue]="0">Selecciona...</option>
-            @for (cuenta of cuentas(); track cuenta.id) {
-              <option [ngValue]="cuenta.id">{{ cuenta.nombre }}</option>
-            }
-          </select>
+          <app-select-buscable [opciones]="opcionesCuentaFormulario()" formControlName="cuentaPresupuestoId" placeholder="Buscar cuenta…" />
         </label>
 
         @if (esTransferencia) {
           <label>
             Cuenta destino
-            <select formControlName="cuentaDestinoId">
-              <option [ngValue]="0">Selecciona...</option>
-              @for (cuenta of cuentas(); track cuenta.id) {
-                <option [ngValue]="cuenta.id">{{ cuenta.nombre }}</option>
-              }
-            </select>
+            <app-select-buscable [opciones]="opcionesCuentaFormulario()" formControlName="cuentaDestinoId" placeholder="Buscar cuenta…" />
           </label>
         } @else {
           <label>
             Categoría
-            <select formControlName="categoriaPresupuestoId">
-              <option [ngValue]="0">Sin categoría</option>
-              @for (grupo of categoriasFiltradasJerarquia(); track grupo.raiz.id) {
-                @if (grupo.hijos.length > 0) {
-                  <optgroup [label]="grupo.raiz.nombre">
-                    @for (hijo of grupo.hijos; track hijo.id) {
-                      <option [ngValue]="hijo.id">{{ hijo.nombre }}</option>
-                    }
-                  </optgroup>
-                } @else {
-                  <option [ngValue]="grupo.raiz.id">{{ grupo.raiz.nombre }}</option>
-                }
-              }
-            </select>
+            <app-select-buscable [opciones]="opcionesCategoriaFormulario()" formControlName="categoriaPresupuestoId" placeholder="Buscar categoría…" />
           </label>
         }
 

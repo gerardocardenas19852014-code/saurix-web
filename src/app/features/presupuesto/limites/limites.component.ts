@@ -7,14 +7,15 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
 import { ToastService } from '../../../shared/services/toast.service';
 import { CategoriaPresupuesto } from '../categoria-presupuesto/categoria-presupuesto.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
-import { agruparCategoriasJerarquia, fechaLocalDeTexto, formatMoneda, nivelUso } from '../shared/wallet.util';
+import { fechaLocalDeTexto, formatMoneda, nivelUso, opcionesCategoriasBuscable } from '../shared/wallet.util';
 import { LimitePresupuesto } from './limite.model';
+import { SelectBuscableComponent } from '../../../shared/components/select-buscable/select-buscable.component';
 
 /** Límites de gasto mensual: por categoría, o general (todas) si categoriaPresupuestoId es NULL. */
 @Component({
   selector: 'app-limites',
   standalone: true,
-  imports: [ReactiveFormsModule, ConfirmDialogComponent, DecimalPipe],
+  imports: [ReactiveFormsModule, ConfirmDialogComponent, DecimalPipe, SelectBuscableComponent],
   templateUrl: './limites.component.html',
   styleUrl: './limites.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -34,11 +35,14 @@ export class LimitesComponent implements OnInit, OnDestroy {
   /** Un límite de gasto solo tiene sentido contra categorías de Gasto (o sin Tipo definido — catálogo previo a este campo). */
   protected readonly categoriasGasto = computed(() => this.categorias().filter((c) => !c.tipo || c.tipo === 'Gasto'));
 
-  /** categoriasGasto agrupada en raíz + hijas para el <select> del formulario
-   *  (mismo <optgroup> ya usado en Movimientos/Fijos, para no listar padres
-   *  e hijas todas iguales una tras otra ni repetir el padre como opción
-   *  dentro de su propio grupo). */
-  protected readonly categoriasGastoJerarquia = computed(() => agruparCategoriasJerarquia(this.categoriasGasto()));
+  /** categoriasGasto agrupada en raíz + hijas para el combo buscable del
+   *  formulario (mismo agrupado ya usado en Movimientos/Fijos, para no
+   *  listar padres e hijas todas iguales una tras otra ni repetir el padre
+   *  como opción dentro de su propio grupo). */
+  protected readonly opcionesCategoriaFormulario = computed(() => [
+    { valor: 0, etiqueta: 'General (todas)' },
+    ...opcionesCategoriasBuscable(this.categoriasGasto()),
+  ]);
   protected readonly cargando = signal(false);
   protected readonly modalAbierto = signal(false);
   protected readonly enEdicion = signal<LimitePresupuesto | null>(null);

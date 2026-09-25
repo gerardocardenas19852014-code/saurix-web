@@ -1,0 +1,75 @@
+:host {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.selbuscable {
+  position: relative;
+  width: 100%;
+}
+
+.selbuscable-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.selbuscable-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+// position:fixed a propósito (ver comentario en el .ts): así el panel no
+// queda recortado por un .modal-box con overflow-y:auto. Su posición se
+// calcula en JS a partir del <input> cada vez que se abre.
+.selbuscable-panel {
+  position: fixed;
+  z-index: 400;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 16px 32px -14px rgba(0, 0, 0, 0.35);
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.selbuscable-grupo {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  padding: 8px 10px 4px;
+}
+
+.selbuscable-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-strong);
+}
+
+.selbuscable-item-hijo {
+  padding-left: 18px;
+}
+
+.selbuscable-item:hover,
+.selbuscable-item.activo {
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.selbuscable-vacio {
+  padding: 10px;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 13px;
+  margin: 0;
+}
