@@ -23,6 +23,16 @@ export interface DeudaPresupuestoAbono {
   fecha: string;
   monto: number;
   nota: string | null;
+  /** Cuenta desde la que se pagó este abono, SOLO cuando el usuario decidió
+   *  que también se registrara como un Gasto real (afecta el saldo de esa
+   *  cuenta y aparece en Movimientos/Reportes/Dashboard). null = abono
+   *  "manual" de solo este ledger, sin tocar ninguna cuenta (comportamiento
+   *  original, antes de que existiera esta opción). */
+  cuentaPresupuestoId: number | null;
+  /** Id del MovimientoPresupuesto (Gasto) generado para este abono cuando
+   *  cuentaPresupuestoId no es null — permite revertirlo si el abono se
+   *  borra (ver DeudasComponent.eliminarAbono). */
+  movimientoPresupuestoId: number | null;
   creadoPorUsuarioId: number;
   fechaCreacion?: string;
 }

@@ -61,6 +61,12 @@
         <div class="label">Deuda en tarjetas</div>
       </div>
     }
+    @if (hayDeudasPrestamos()) {
+      <div class="dashboard-stat-card dashboard-stat-danger">
+        <div class="num">{{ formatMoneda(totalDeudasPrestamos()) }}</div>
+        <div class="label">Deudas y préstamos</div>
+      </div>
+    }
   </div>
 
   @if (inusuales().length > 0) {

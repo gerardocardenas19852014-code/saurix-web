@@ -7,6 +7,7 @@ import { CategoriaPresupuesto } from '../categoria-presupuesto/categoria-presupu
 import { CuentaPresupuesto } from '../cuenta-presupuesto/cuenta-presupuesto.model';
 import { PresupuestoAnual } from '../presupuesto-anual/presupuesto-anual.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
+import { DeudaPresupuesto } from '../deudas/deuda.model';
 import { PagoTarjetaService } from '../shared/pago-tarjeta.service';
 import { AnioTrabajoService } from '../shared/anio-trabajo.service';
 import {
@@ -83,6 +84,7 @@ export class PresupuestoLandingComponent implements OnInit, OnDestroy {
   protected readonly movimientos = signal<MovimientoPresupuesto[]>([]);
   protected readonly categorias = signal<CategoriaPresupuesto[]>([]);
   protected readonly presupuestosAnuales = signal<PresupuestoAnual[]>([]);
+  protected readonly deudas = signal<DeudaPresupuesto[]>([]);
 
   protected readonly anioTrabajo = inject(AnioTrabajoService);
   protected readonly mesesOpciones = MESES_OPCIONES;
@@ -223,6 +225,12 @@ export class PresupuestoLandingComponent implements OnInit, OnDestroy {
   /** Solo tiene sentido mostrar el total agregado cuando hay más de una tarjeta. */
   protected readonly hayVariasTarjetas = computed(() => this.cuentasConInfo().filter((c) => c.esTarjeta).length > 1);
 
+  /** Deudas y préstamos (pantalla Deudas — distinto de la deuda en tarjetas
+   *  de arriba): saldoActual ya viene precalculado desde su propio ledger de
+   *  abonos, así que aquí solo se suma el de las que siguen activas. */
+  protected readonly totalDeudasPrestamos = computed(() => this.deudas().reduce((s, d) => s + Math.max(d.saldoActual, 0), 0));
+  protected readonly hayDeudasPrestamos = computed(() => this.totalDeudasPrestamos() > 0);
+
   protected readonly topCategorias = computed<CategoriaMonto[]>(() => {
     const gastos = this.movimientosReales().filter((m) => m.tipo === 'Gasto' && !m.transferenciaId && this.enElPeriodoSeleccionado(m.fecha));
     const porCategoria = new Map<number | null, number>();
@@ -277,6 +285,9 @@ export class PresupuestoLandingComponent implements OnInit, OnDestroy {
     this.data
       .list<MovimientoPresupuesto>('MovimientoPresupuesto', { creadoPorUsuarioId: this.auth.usuarioActual()?.id ?? 0 })
       .subscribe((m) => this.movimientos.set(m));
+    this.data
+      .list<DeudaPresupuesto>('DeudaPresupuesto', { creadoPorUsuarioId: this.auth.usuarioActual()?.id ?? 0 })
+      .subscribe((d) => this.deudas.set(d));
   }
 
   ngOnDestroy(): void {

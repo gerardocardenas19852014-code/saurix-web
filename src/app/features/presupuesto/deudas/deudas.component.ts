@@ -1,11 +1,13 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth.service';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../../shared/services/toast.service';
-import { formatMoneda } from '../shared/wallet.util';
+import { CuentaPresupuesto } from '../cuenta-presupuesto/cuenta-presupuesto.model';
+import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
+import { fechaLocalDeTexto, formatMoneda } from '../shared/wallet.util';
 import { DeudaPresupuesto, DeudaPresupuestoAbono } from './deuda.model';
 
 /**
@@ -33,11 +35,35 @@ export class DeudasComponent implements OnInit, OnDestroy {
 
   protected readonly deudas = signal<DeudaPresupuesto[]>([]);
   protected readonly abonos = signal<DeudaPresupuestoAbono[]>([]);
+  protected readonly cuentas = signal<CuentaPresupuesto[]>([]);
   protected readonly cargando = signal(false);
   protected readonly modalAbierto = signal(false);
   protected readonly enEdicion = signal<DeudaPresupuesto | null>(null);
   protected readonly aEliminar = signal<DeudaPresupuesto | null>(null);
   protected readonly historialAbierto = signal<number | null>(null);
+
+  /** Antes las deudas liquidadas se quedaban mezcladas para siempre con las
+   *  activas en la misma lista; ahora se ocultan por default (igual que
+   *  "Mostrar inactivas" en los catálogos) y este checkbox las regresa. */
+  protected readonly mostrarLiquidadas = signal(false);
+
+  protected readonly deudasActivas = computed(() => this.deudas().filter((d) => !this.liquidada(d)));
+  protected readonly cantidadLiquidadas = computed(() => this.deudas().length - this.deudasActivas().length);
+  protected readonly deudasVisibles = computed(() => (this.mostrarLiquidadas() ? this.deudas() : this.deudasActivas()));
+
+  /** Resumen arriba de la lista: cuánto debes hoy (solo deudas activas) y
+   *  cuánto ya abonaste este mes calendario (a cualquier deuda, activa o no). */
+  protected readonly totalAdeudado = computed(() => this.deudasActivas().reduce((s, d) => s + this.saldoDeuda(d), 0));
+
+  protected readonly totalPagadoEsteMes = computed(() => {
+    const hoy = new Date();
+    return this.abonos()
+      .filter((a) => {
+        const f = fechaLocalDeTexto(a.fecha);
+        return f.getFullYear() === hoy.getFullYear() && f.getMonth() === hoy.getMonth();
+      })
+      .reduce((s, a) => s + a.monto, 0);
+  });
 
   protected readonly form = this.fb.nonNullable.group({
     id: [0],
@@ -55,6 +81,7 @@ export class DeudasComponent implements OnInit, OnDestroy {
     // layout para aprovechar mejor el espacio (ver html[data-wide='grid']
     // en styles.scss, mismo patrón que Movimientos).
     document.documentElement.setAttribute('data-wide', 'grid');
+    this.data.list<CuentaPresupuesto>('CuentaPresupuesto').subscribe((c) => this.cuentas.set(c));
     this.cargar();
   }
 
@@ -68,6 +95,13 @@ export class DeudasComponent implements OnInit, OnDestroy {
       },
       error: () => this.cargando.set(false),
     });
+  }
+
+  /** Nombre de la cuenta de un abono que sí se registró como Gasto real —
+   *  para el historial (ver plantilla). '—' si esa cuenta ya no existe. */
+  nombreCuenta(cuentaId: number | null | undefined): string {
+    if (!cuentaId) return '—';
+    return this.cuentas().find((c) => Number(c.id) === Number(cuentaId))?.nombre ?? '—';
   }
 
   abonosDe(deudaId: number): DeudaPresupuestoAbono[] {
@@ -137,35 +171,75 @@ export class DeudasComponent implements OnInit, OnDestroy {
     });
   }
 
-  abonar(deuda: DeudaPresupuesto, montoTexto: string): void {
+  /** cuentaIdTexto viene del <select> "Desde: <cuenta>" del abono — "0" (o
+   *  vacío) significa que este abono NO debe afectar ninguna cuenta (el
+   *  comportamiento de siempre: solo un registro en este ledger). Si el
+   *  usuario elige una cuenta, además se genera un Gasto real en Movimientos
+   *  para que el pago se refleje en el saldo de esa cuenta y en
+   *  Reportes/Dashboard, igual que cualquier otro gasto. */
+  abonar(deuda: DeudaPresupuesto, montoTexto: string, cuentaIdTexto: string): void {
     const monto = parseFloat(montoTexto);
     if (!monto || monto <= 0) {
       this.toast.advertencia('Escribe un monto válido para abonar.');
       return;
     }
-    const abono = {
-      deudaPresupuestoId: deuda.id,
+    const cuentaId = Number(cuentaIdTexto) || 0;
+
+    const registrarAbono = (movimientoPresupuestoId: number | null): void => {
+      const abono = {
+        deudaPresupuestoId: deuda.id,
+        fecha: new Date().toISOString().slice(0, 10),
+        monto,
+        nota: null,
+        cuentaPresupuestoId: cuentaId || null,
+        movimientoPresupuestoId,
+        creadoPorUsuarioId: this.usuarioActualId,
+      };
+      this.data.alta<DeudaPresupuestoAbono>('DeudaPresupuestoAbono', abono).subscribe({
+        next: () => {
+          const nuevoSaldo = Math.max(deuda.saldoActual - monto, 0);
+          this.data.modificacion<DeudaPresupuesto>('DeudaPresupuesto', { ...deuda, saldoActual: nuevoSaldo }).subscribe({
+            next: () => {
+              const sufijoCuenta = cuentaId ? ` desde ${this.nombreCuenta(cuentaId)}` : '';
+              this.toast.exito(nuevoSaldo <= 0 ? `🎉 ¡Liquidaste "${deuda.descripcion}"!` : `Se abonaron ${this.formatMoneda(monto)}${sufijoCuenta}.`);
+              this.cargar();
+            },
+          });
+        },
+      });
+    };
+
+    if (!cuentaId) {
+      registrarAbono(null);
+      return;
+    }
+
+    const movimiento: Partial<MovimientoPresupuesto> = {
       fecha: new Date().toISOString().slice(0, 10),
+      tipo: 'Gasto',
+      cuentaPresupuestoId: cuentaId,
+      categoriaPresupuestoId: null,
       monto,
-      nota: null,
+      descripcion: `Abono a "${deuda.descripcion}"`,
+      transferenciaId: null,
+      origenRecurrenteId: null,
+      proyectado: false,
       creadoPorUsuarioId: this.usuarioActualId,
     };
-    this.data.alta<DeudaPresupuestoAbono>('DeudaPresupuestoAbono', abono).subscribe({
-      next: () => {
-        const nuevoSaldo = Math.max(deuda.saldoActual - monto, 0);
-        this.data.modificacion<DeudaPresupuesto>('DeudaPresupuesto', { ...deuda, saldoActual: nuevoSaldo }).subscribe({
-          next: () => {
-            this.toast.exito(nuevoSaldo <= 0 ? `🎉 ¡Liquidaste "${deuda.descripcion}"!` : `Se abonaron ${this.formatMoneda(monto)}.`);
-            this.cargar();
-          },
-        });
-      },
+    this.data.alta<MovimientoPresupuesto>('MovimientoPresupuesto', movimiento).subscribe({
+      next: (creado) => registrarAbono(creado.id),
+      error: () => this.toast.error('No se pudo registrar el gasto en la cuenta. Intenta de nuevo.'),
     });
   }
 
   eliminarAbono(abono: DeudaPresupuestoAbono, deuda: DeudaPresupuesto): void {
     this.data.baja('DeudaPresupuestoAbono', abono.id).subscribe({
       next: () => {
+        // Si este abono había generado un Gasto real en una cuenta, se
+        // revierte también (best-effort: si ya no existe, no pasa nada).
+        if (abono.movimientoPresupuestoId) {
+          this.data.baja('MovimientoPresupuesto', abono.movimientoPresupuestoId).subscribe();
+        }
         const nuevoSaldo = Math.min(deuda.saldoActual + abono.monto, deuda.montoOriginal);
         this.data.modificacion<DeudaPresupuesto>('DeudaPresupuesto', { ...deuda, saldoActual: nuevoSaldo }).subscribe({
           next: () => {

@@ -6,6 +6,26 @@
 </div>
 <p class="hint" style="margin:-10px 0 24px;">Lleva el control de préstamos personales, de auto, etc.</p>
 
+@if (!cargando() && deudas().length > 0) {
+  <div class="dashboard-stats">
+    <div class="dashboard-stat-card dashboard-stat-danger">
+      <div class="num">{{ formatMoneda(totalAdeudado()) }}</div>
+      <div class="label">Total adeudado · {{ deudasActivas().length }} activa{{ deudasActivas().length === 1 ? '' : 's' }}</div>
+    </div>
+    <div class="dashboard-stat-card">
+      <div class="num">{{ formatMoneda(totalPagadoEsteMes()) }}</div>
+      <div class="label">Pagado este mes</div>
+    </div>
+  </div>
+
+  @if (cantidadLiquidadas() > 0) {
+    <label class="board-filter-field board-filter-checkbox" style="margin:0 0 18px;">
+      <input type="checkbox" [checked]="mostrarLiquidadas()" (change)="mostrarLiquidadas.set($any($event.target).checked)" />
+      Mostrar liquidadas ({{ cantidadLiquidadas() }})
+    </label>
+  }
+}
+
 @if (cargando()) {
   <p class="empty">Cargando…</p>
 } @else if (deudas().length === 0) {
@@ -13,8 +33,10 @@
     <p>No tienes deudas ni préstamos registrados.</p>
     <button type="button" class="btn-primary" (click)="nuevo()">+ Registrar la primera</button>
   </div>
+} @else if (deudasVisibles().length === 0) {
+  <p class="hint">Todas tus deudas están liquidadas — activa "Mostrar liquidadas" arriba para verlas.</p>
 } @else {
-  @for (deuda of deudas(); track deuda.id) {
+  @for (deuda of deudasVisibles(); track deuda.id) {
     <div class="wallet-limit-card">
       <div class="wallet-limit-head">
         <span>
@@ -38,8 +60,14 @@
       </div>
       @if (!liquidada(deuda)) {
         <div class="anexos-upload-row" style="margin-top:12px;">
-          <input type="text" inputmode="decimal" #abonoInput placeholder="Monto a abonar" />
-          <button type="button" class="btn-primary small" (click)="abonar(deuda, abonoInput.value); abonoInput.value = ''">+ Abonar</button>
+          <input type="text" inputmode="decimal" #abonoInput placeholder="Monto a abonar" style="max-width:160px;" />
+          <select #cuentaAbono title="Si eliges una cuenta, el abono también se registra como un gasto real ahí (afecta su saldo y aparece en Movimientos/Reportes)." style="max-width:240px;">
+            <option value="0">No registrar como gasto</option>
+            @for (cuenta of cuentas(); track cuenta.id) {
+              <option [value]="cuenta.id">Desde: {{ cuenta.nombre }}</option>
+            }
+          </select>
+          <button type="button" class="btn-primary small" (click)="abonar(deuda, abonoInput.value, cuentaAbono.value); abonoInput.value = ''; cuentaAbono.value = '0'">+ Abonar</button>
         </div>
       }
       @if (historialAbierto() === deuda.id) {
@@ -47,7 +75,12 @@
           @for (abono of abonosDe(deuda.id); track abono.id) {
             <li class="actividad-item">
               <div class="actividad-item-head">
-                <span>{{ abono.fecha | date: 'dd/MM/yyyy' }} · {{ formatMoneda(abono.monto) }}</span>
+                <span>
+                  {{ abono.fecha | date: 'dd/MM/yyyy' }} · {{ formatMoneda(abono.monto) }}
+                  @if (abono.cuentaPresupuestoId) {
+                    <span class="hint" style="margin:0;">· 💳 {{ nombreCuenta(abono.cuentaPresupuestoId) }}</span>
+                  }
+                </span>
                 <button type="button" class="btn-danger small" title="Eliminar abono" (click)="eliminarAbono(abono, deuda)">✕</button>
               </div>
             </li>
