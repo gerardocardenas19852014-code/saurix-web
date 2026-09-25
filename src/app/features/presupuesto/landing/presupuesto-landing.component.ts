@@ -187,6 +187,16 @@ export class PresupuestoLandingComponent implements OnInit, OnDestroy {
     }),
   );
 
+  /** Pestaña principal del Dashboard: "Resumen" (KPIs, alertas, top
+   *  categorías y movimientos recientes) o "Cuentas" (antes siempre visible
+   *  debajo de los KPIs, ahora en su propia pestaña para no empujar los
+   *  Movimientos tan abajo). */
+  protected readonly tabPrincipal = signal<'resumen' | 'cuentas'>('resumen');
+
+  seleccionarTabPrincipal(tab: 'resumen' | 'cuentas'): void {
+    this.tabPrincipal.set(tab);
+  }
+
   /** Pestaña de Cuentas seleccionada ('Todas' o un tipo, p.ej. 'Tarjeta'). */
   protected readonly tabCuentaActiva = signal<string>(TAB_TODAS);
 
