@@ -93,8 +93,20 @@ export class SelectBuscableComponent implements ControlValueAccessor, OnDestroy 
 
   private onChange: ((v: number | string | null) => void) | null = null;
   private onTouched: (() => void) | null = null;
-  private readonly manejarScrollGlobal = () => {
-    if (this.abierta()) this.cerrar();
+  // El panel de opciones tiene su propia lista con overflow-y:auto (para
+  // categorías largas, como en la captura que reportó el usuario): hacer
+  // scroll ADENTRO de esa lista disparaba este mismo listener (está en fase
+  // de captura, así que ve el scroll de cualquier descendiente) y cerraba
+  // el combo en cuanto se quería bajar para ver más opciones. Por eso acá
+  // se ignora el scroll cuyo target cae dentro de este mismo componente
+  // (el <input> + el panel, aunque el panel sea position:fixed sigue
+  // siendo hijo del host en el DOM) — solo cierra cuando el scroll viene
+  // de afuera (la página o un modal con overflow-y:auto).
+  private readonly manejarScrollGlobal = (evento: Event) => {
+    if (!this.abierta()) return;
+    const objetivo = evento.target as Node | null;
+    if (objetivo && this.elementRef.nativeElement.contains(objetivo)) return;
+    this.cerrar();
   };
 
   protected readonly etiquetaSeleccion = computed(() => {

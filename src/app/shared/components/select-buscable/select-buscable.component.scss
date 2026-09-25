@@ -31,6 +31,12 @@
   box-shadow: 0 16px 32px -14px rgba(0, 0, 0, 0.35);
   max-height: 260px;
   overflow-y: auto;
+  // Sin esto, al llegar al final de la lista un scroll con mouse/trackpad
+  // sigue "encadenándose" hacia la página de atrás (el bug reportado: bajar
+  // con la rueda del mouse cerraba el combo, porque ese scroll de la página
+  // sí cuenta como "afuera" y lo cierra). overscroll-behavior:contain frena
+  // el scroll en el borde del panel en vez de dejarlo pasar al fondo.
+  overscroll-behavior: contain;
   padding: 6px;
 }
 
