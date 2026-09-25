@@ -26,4 +26,5 @@ export class FrecuenciaFijosPresupuestoComponent extends ValorListaGrupoBase {
    * 28, 30 o 31 días). Por eso solo 'Mensual'/'Anual' están protegidas: son
    * las únicas que ese código compara por nombre exacto. */
   protected readonly clavesProtegidas = ['Mensual', 'Anual'];
+  protected override readonly soportaInactivos = true;
 }

@@ -19,6 +19,10 @@ export interface CategoriaPresupuesto {
   nombre: string;
   tipo: TipoCategoriaPresupuesto | null;
   categoriaPresupuestoPadreId: number | null;
+  /** Igual que en otros catálogos (Tipos de Ticket, Prioridades, Módulos):
+   *  alternativa al borrado duro (que ya se bloquea si la usan subcategorías
+   *  o registros de Presupuesto). undefined en filas viejas se trata como activo. */
+  activo?: boolean;
   fechaCreacion?: string;
   fechaModificacion?: string;
 }

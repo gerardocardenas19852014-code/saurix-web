@@ -24,4 +24,5 @@ export class PresupuestoAnualEstatusComponent extends ValorListaGrupoBase {
    * (o cualquier clave nueva) no las compara nadie, así que no hace falta
    * protegerlas. */
   protected readonly clavesProtegidas = ['Autorizado', 'Ejecutado'];
+  protected override readonly soportaInactivos = true;
 }

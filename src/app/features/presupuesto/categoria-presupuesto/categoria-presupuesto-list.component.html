@@ -28,6 +28,10 @@
       [value]="busqueda()"
       (input)="busqueda.set($any($event.target).value)"
     />
+    <label class="board-filter-field board-filter-checkbox" style="margin:0;">
+      <input type="checkbox" [checked]="mostrarInactivos()" (change)="mostrarInactivos.set($any($event.target).checked)" />
+      Mostrar inactivas
+    </label>
   </div>
 </div>
 
@@ -73,6 +77,11 @@
           @if (tipoHeredado()) {
             <span class="hint" style="margin:4px 0 0;">Heredado de su categoría padre.</span>
           }
+        </label>
+
+        <label class="checkbox-inline">
+          <input type="checkbox" formControlName="activo" />
+          Activa
         </label>
       </div>
 

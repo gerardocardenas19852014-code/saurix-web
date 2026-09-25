@@ -20,4 +20,5 @@ export class TipoMovimientoPresupuestoComponent extends ValorListaGrupoBase {
   protected readonly moduloBitacora = 'Catálogos / Tipo de movimiento (Presupuesto)';
   /** Límites de gasto, Reportes y Calendario de pagos comparan 'Ingreso'/'Gasto' tal cual. */
   protected readonly clavesProtegidas = ['Ingreso', 'Gasto'];
+  protected override readonly soportaInactivos = true;
 }

@@ -20,4 +20,5 @@ export class TipoCuentaPresupuestoComponent extends ValorListaGrupoBase {
   protected readonly moduloBitacora = 'Catálogos / Tipo de cuenta (Presupuesto)';
   /** Efectivo/Banco/Tarjeta/Ahorro: CuentaPresupuesto.tipo + wallet.util (iconoTipoCuenta) y Calendario/Dashboard comparan 'Tarjeta' tal cual. */
   protected readonly clavesProtegidas = ['Efectivo', 'Banco', 'Tarjeta', 'Ahorro'];
+  protected override readonly soportaInactivos = true;
 }

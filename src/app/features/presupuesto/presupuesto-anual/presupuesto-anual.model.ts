@@ -22,6 +22,11 @@ export interface PresupuestoAnual {
   fechaAlta: string;
   descripcion: string;
   estatusClave: EstatusPresupuestoAnual;
+  /** Igual que en otros catálogos: permite archivar/ocultar un año viejo de
+   *  la lista por default sin borrarlo (independiente de estatusClave, que
+   *  es la etapa del flujo Creación→Proyección→Autorizado→Ejecutado).
+   *  undefined en filas viejas se trata como activo. */
+  activo?: boolean;
   fechaCreacion?: string;
   fechaModificacion?: string;
 }

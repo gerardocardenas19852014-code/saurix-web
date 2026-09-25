@@ -170,6 +170,16 @@
     </header>
 
     <main class="content" [class.content-wide]="contenidoAncho()">
+      @if (migajaActual(); as migaja) {
+        <div class="breadcrumbs">
+          @if (migaja.rutaInicioModulo) {
+            <a [routerLink]="migaja.rutaInicioModulo">{{ migaja.grupo }}</a> /
+          } @else {
+            <span>{{ migaja.grupo }}</span>
+          }
+          <span>{{ migaja.label }}</span>
+        </div>
+      }
       <router-outlet />
     </main>
 
@@ -178,6 +188,16 @@
 </div>
 
 <app-toast />
+<app-comando-paleta />
+
+<app-confirm-dialog
+  [visible]="avisoCierreVisible()"
+  titulo="Cambios sin guardar"
+  mensaje="Este formulario tiene cambios sin guardar. ¿Seguro que quieres cerrarlo sin guardarlos?"
+  textoConfirmar="Cerrar sin guardar"
+  (confirmar)="confirmarCierrePendiente()"
+  (cancelar)="cancelarCierrePendiente()"
+/>
 
 <button
   type="button"
@@ -195,7 +215,7 @@
       <strong>Asistente Saurix</strong>
       <span class="ai-panel-sub">Responde con base en la documentación cargada</span>
     </div>
-    <button type="button" class="ai-panel-close" (click)="toggleAiChat()">✕</button>
+    <button type="button" class="ai-panel-close" (click)="toggleAiChat()" aria-label="Cerrar asistente">✕</button>
   </div>
   <div class="ai-panel-messages">
     @for (m of aiMensajes(); track $index) {

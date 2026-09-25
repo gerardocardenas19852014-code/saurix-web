@@ -13,6 +13,11 @@ export interface ValorLista {
   clave: string;
   etiqueta: string;
   orden: number;
+  /** Opcional y solo relevante para los grupos cuya pantalla habilita
+   *  `soportaInactivos` (ver ValorListaGrupoBase) — el resto de los grupos
+   *  (p.ej. Proveedor de conexión) lo ignoran por completo, así que
+   *  quedarse sin valor (undefined) en filas viejas se trata como activo. */
+  activo?: boolean;
   fechaCreacion?: string;
   fechaModificacion?: string;
 }

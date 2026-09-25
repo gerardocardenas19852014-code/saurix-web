@@ -5,7 +5,7 @@
       <p>{{ mensaje() }}</p>
       <div class="modal-actions">
         <button type="button" class="btn-secondary" (click)="cancelar.emit()">Cancelar</button>
-        <button type="button" class="btn-danger" (click)="confirmar.emit()">Eliminar</button>
+        <button type="button" class="btn-danger" (click)="confirmar.emit()">{{ textoConfirmar() }}</button>
       </div>
     </div>
   </div>

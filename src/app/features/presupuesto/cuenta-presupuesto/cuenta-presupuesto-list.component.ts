@@ -48,10 +48,13 @@ export class CuentaPresupuestoListComponent implements OnInit {
   protected readonly cargando = signal(false);
   protected readonly busqueda = signal('');
 
+  protected readonly mostrarInactivos = signal(false);
+
   protected readonly registros = computed(() => {
     const texto = this.busqueda().trim().toLowerCase();
-    if (!texto) return this.registrosTodos();
-    return this.registrosTodos().filter((r) => r.nombre.toLowerCase().includes(texto));
+    const base = this.registrosTodos().filter((r) => this.mostrarInactivos() || r.activo !== false);
+    if (!texto) return base;
+    return base.filter((r) => r.nombre.toLowerCase().includes(texto));
   });
 
   protected readonly modalAbierto = signal(false);
@@ -69,6 +72,12 @@ export class CuentaPresupuestoListComponent implements OnInit {
           ? `Corte día ${r.diaCorte ?? '—'} · Pago día ${r.diaPago ?? '—'}`
           : '—',
     },
+    {
+      campo: 'activo',
+      etiqueta: 'Activo',
+      formatear: (r) => (r.activo !== false ? 'Sí' : 'No'),
+      claseValor: (r) => (r.activo !== false ? 'grid-badge-success' : 'grid-badge-muted'),
+    },
   ];
 
   protected readonly form = this.fb.nonNullable.group({
@@ -80,6 +89,7 @@ export class CuentaPresupuestoListComponent implements OnInit {
     diaPago: [null as number | null],
     pagoMinimo: [null as number | null],
     pagoSinIntereses: [null as number | null],
+    activo: [true],
   });
 
   protected get esTarjeta(): boolean {
@@ -117,6 +127,7 @@ export class CuentaPresupuestoListComponent implements OnInit {
       diaPago: null,
       pagoMinimo: null,
       pagoSinIntereses: null,
+      activo: true,
     });
     this.modalAbierto.set(true);
   }
@@ -132,6 +143,7 @@ export class CuentaPresupuestoListComponent implements OnInit {
       diaPago: registro.diaPago,
       pagoMinimo: registro.pagoMinimo,
       pagoSinIntereses: registro.pagoSinIntereses,
+      activo: registro.activo !== false,
     });
     this.modalAbierto.set(true);
   }

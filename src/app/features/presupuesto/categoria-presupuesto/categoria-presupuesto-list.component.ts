@@ -46,10 +46,13 @@ export class CategoriaPresupuestoListComponent implements OnInit {
   /** Solo las raíces (sin padre) son elegibles como "categoría padre" — así se limita a 2 niveles. */
   protected readonly raices = computed(() => this.registrosTodos().filter((c) => !c.categoriaPresupuestoPadreId));
 
+  protected readonly mostrarInactivos = signal(false);
+
   protected readonly registros = computed(() => {
     const texto = this.busqueda().trim().toLowerCase();
-    if (!texto) return this.registrosTodos();
-    return this.registrosTodos().filter((r) => r.nombre.toLowerCase().includes(texto));
+    const base = this.registrosTodos().filter((r) => this.mostrarInactivos() || r.activo !== false);
+    if (!texto) return base;
+    return base.filter((r) => r.nombre.toLowerCase().includes(texto));
   });
 
   protected readonly modalAbierto = signal(false);
@@ -69,6 +72,12 @@ export class CategoriaPresupuestoListComponent implements OnInit {
       etiqueta: 'Categoría padre',
       formatear: (r) => this.nombrePadre(r.categoriaPresupuestoPadreId),
     },
+    {
+      campo: 'activo',
+      etiqueta: 'Activo',
+      formatear: (r) => (r.activo !== false ? 'Sí' : 'No'),
+      claseValor: (r) => (r.activo !== false ? 'grid-badge-success' : 'grid-badge-muted'),
+    },
   ];
 
   protected readonly form = this.fb.nonNullable.group({
@@ -76,6 +85,7 @@ export class CategoriaPresupuestoListComponent implements OnInit {
     nombre: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(60)]],
     tipo: ['Gasto' as string, Validators.required],
     categoriaPresupuestoPadreId: [0],
+    activo: [true],
   });
 
   /** true mientras el Tipo lo hereda de la categoría padre elegida (el select se deshabilita) — ver onPadreChange(). */
@@ -134,7 +144,7 @@ export class CategoriaPresupuestoListComponent implements OnInit {
   nuevo(): void {
     this.registroEnEdicion.set(null);
     this.tipoHeredado.set(false);
-    this.form.reset({ id: 0, nombre: '', tipo: 'Gasto', categoriaPresupuestoPadreId: 0 });
+    this.form.reset({ id: 0, nombre: '', tipo: 'Gasto', categoriaPresupuestoPadreId: 0, activo: true });
     this.form.controls.tipo.enable();
     this.modalAbierto.set(true);
   }
@@ -146,6 +156,7 @@ export class CategoriaPresupuestoListComponent implements OnInit {
       nombre: registro.nombre,
       tipo: registro.tipo ?? 'Gasto',
       categoriaPresupuestoPadreId: registro.categoriaPresupuestoPadreId ?? 0,
+      activo: registro.activo !== false,
     });
     this.form.controls.tipo.enable();
     this.onPadreChange();

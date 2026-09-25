@@ -33,6 +33,10 @@
       [value]="busqueda()"
       (input)="busqueda.set($any($event.target).value)"
     />
+    <label class="board-filter-field board-filter-checkbox" style="margin:0;">
+      <input type="checkbox" [checked]="mostrarInactivos()" (change)="mostrarInactivos.set($any($event.target).checked)" />
+      Mostrar inactivos
+    </label>
   </div>
 </div>
 
@@ -73,6 +77,11 @@
         <label class="floating-field full-span">
           <span>Descripción <b>*</b></span>
           <textarea class="form-control pill-control" formControlName="descripcion" rows="3" placeholder=" " aria-label="Descripción"></textarea>
+        </label>
+
+        <label class="checkbox-inline">
+          <input type="checkbox" formControlName="activo" />
+          Activo
         </label>
       </div>
 

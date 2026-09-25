@@ -7,12 +7,18 @@
 
 <div class="grid-toolbar">
   <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo valor</button>
+  @if (soportaInactivos) {
+    <label class="board-filter-field board-filter-checkbox" style="margin:0;">
+      <input type="checkbox" [checked]="mostrarInactivos()" (change)="mostrarInactivos.set($any($event.target).checked)" />
+      Mostrar inactivos
+    </label>
+  }
   <app-bitacora [modulo]="moduloBitacora" />
 </div>
 
 <app-data-table
   [columnas]="columnas"
-  [filas]="registros()"
+  [filas]="registrosFiltrados()"
   [cargando]="cargando()"
   [tamanoPagina]="preferenciasGrid.tamanoPagina()"
   (editar)="editar($event)"
@@ -44,6 +50,13 @@
           <span>Orden <b>*</b></span>
           <input type="number" min="1" class="form-control pill-control" formControlName="orden" placeholder=" " aria-label="Orden" />
         </label>
+
+        @if (soportaInactivos) {
+          <label class="checkbox-inline">
+            <input type="checkbox" formControlName="activo" />
+            Activo
+          </label>
+        }
       </div>
 
       <div class="modal-actions">

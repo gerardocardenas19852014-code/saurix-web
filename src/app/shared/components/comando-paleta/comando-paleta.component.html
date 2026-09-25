@@ -1,0 +1,38 @@
+@if (abierta()) {
+  <div class="modal-overlay paleta-overlay" (click)="cerrar()">
+    <div class="paleta-caja" (click)="$event.stopPropagation()">
+      <div class="paleta-buscador">
+        <span class="paleta-icono-lupa" aria-hidden="true">🔎</span>
+        <input
+          #inputBuscador
+          type="text"
+          [value]="consulta()"
+          (input)="onConsultaCambia($any($event.target).value)"
+          placeholder="Ir a una pantalla… (Ticket, Movimientos, Reportes…)"
+          autocomplete="off"
+          aria-label="Buscar pantalla"
+        />
+        <kbd>Esc</kbd>
+      </div>
+
+      <div class="paleta-lista" role="listbox">
+        @for (destino of resultados(); track destino.ruta; let i = $index) {
+          <button
+            type="button"
+            class="paleta-item"
+            [class.activo]="i === indiceActivo()"
+            (click)="irAResultado(i)"
+          >
+            <span class="paleta-item-icono" aria-hidden="true">{{ destino.icono }}</span>
+            <span class="paleta-item-textos">
+              <span class="paleta-item-label">{{ destino.label }}</span>
+              <span class="paleta-item-grupo">{{ destino.grupo }}</span>
+            </span>
+          </button>
+        } @empty {
+          <p class="paleta-vacio">Sin resultados para "{{ consulta() }}".</p>
+        }
+      </div>
+    </div>
+  </div>
+}

@@ -47,15 +47,46 @@ export abstract class ValorListaGrupoBase implements OnInit {
   protected readonly registros = signal<ValorLista[]>([]);
   protected readonly cargando = signal(false);
 
-  protected readonly columnas: ColumnaTabla<ValorLista>[] = [
-    { campo: 'etiqueta', etiqueta: 'Etiqueta' },
-    {
-      campo: 'clave',
-      etiqueta: 'Clave (valor guardado)',
-      formatear: (r) => (this.esClaveProtegida(r) ? `🔒 ${r.clave}` : r.clave),
-    },
-    { campo: 'orden', etiqueta: 'Orden' },
-  ];
+  /** false por defecto (p.ej. Proveedor de conexión, en Catálogos): un grupo
+   *  solo gana la columna/filtro/casilla de "Activo" cuando su pantalla
+   *  concreta declara `protected readonly soportaInactivos = true;` — así
+   *  se puede prender por grupo sin afectar a los demás consumidores de
+   *  esta misma base compartida. IMPORTANTE: la base NUNCA debe leer
+   *  `this.soportaInactivos` desde el inicializador de OTRO campo (el
+   *  orden de inicialización de clases en JS/TS corre los campos de la
+   *  base ANTES que los de la subclase, así que en ese momento todavía
+   *  valdría el default `false` aunque la subclase lo redefina a `true`)
+   *  — por eso `columnas` es un getter (se evalúa en cada acceso, ya con
+   *  la subclase totalmente construida) y no un campo plano. */
+  protected readonly soportaInactivos: boolean = false;
+
+  protected readonly mostrarInactivos = signal(false);
+
+  protected readonly registrosFiltrados = computed(() =>
+    this.registros().filter((r) => !this.soportaInactivos || this.mostrarInactivos() || r.activo !== false),
+  );
+
+  protected get columnas(): ColumnaTabla<ValorLista>[] {
+    const base: ColumnaTabla<ValorLista>[] = [
+      { campo: 'etiqueta', etiqueta: 'Etiqueta' },
+      {
+        campo: 'clave',
+        etiqueta: 'Clave (valor guardado)',
+        formatear: (r) => (this.esClaveProtegida(r) ? `🔒 ${r.clave}` : r.clave),
+      },
+      { campo: 'orden', etiqueta: 'Orden' },
+    ];
+    if (!this.soportaInactivos) return base;
+    return [
+      ...base,
+      {
+        campo: 'activo',
+        etiqueta: 'Activo',
+        formatear: (r) => (r.activo !== false ? 'Sí' : 'No'),
+        claseValor: (r) => (r.activo !== false ? 'grid-badge-success' : 'grid-badge-muted'),
+      },
+    ];
+  }
 
   protected readonly modalAbierto = signal(false);
   protected readonly registroEnEdicion = signal<ValorLista | null>(null);
@@ -66,6 +97,7 @@ export abstract class ValorListaGrupoBase implements OnInit {
     clave: ['', [Validators.required, Validators.minLength(1), Validators.maxLength(60)]],
     etiqueta: ['', [Validators.required, Validators.minLength(1), Validators.maxLength(80)]],
     orden: [1, [Validators.required, Validators.min(1)]],
+    activo: [true],
   });
 
   protected readonly claveBloqueada = computed(() => {
@@ -99,14 +131,20 @@ export abstract class ValorListaGrupoBase implements OnInit {
 
   nuevo(): void {
     this.registroEnEdicion.set(null);
-    this.form.reset({ id: 0, clave: '', etiqueta: '', orden: this.siguienteOrden() });
+    this.form.reset({ id: 0, clave: '', etiqueta: '', orden: this.siguienteOrden(), activo: true });
     this.form.controls.clave.enable();
     this.modalAbierto.set(true);
   }
 
   editar(registro: ValorLista): void {
     this.registroEnEdicion.set(registro);
-    this.form.reset({ id: registro.id, clave: registro.clave, etiqueta: registro.etiqueta, orden: registro.orden });
+    this.form.reset({
+      id: registro.id,
+      clave: registro.clave,
+      etiqueta: registro.etiqueta,
+      orden: registro.orden,
+      activo: registro.activo !== false,
+    });
     if (this.esClaveProtegida(registro)) {
       this.form.controls.clave.disable();
     } else {

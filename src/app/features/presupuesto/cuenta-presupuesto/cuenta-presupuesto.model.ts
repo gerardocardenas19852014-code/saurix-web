@@ -18,6 +18,10 @@ export interface CuentaPresupuesto {
   diaPago: number | null;
   pagoMinimo: number | null;
   pagoSinIntereses: number | null;
+  /** Igual que en otros catálogos: alternativa al borrado duro (que ya se
+   *  bloquea si la usan movimientos/recurrentes). undefined en filas viejas
+   *  se trata como activo. */
+  activo?: boolean;
   fechaCreacion?: string;
   fechaModificacion?: string;
 }

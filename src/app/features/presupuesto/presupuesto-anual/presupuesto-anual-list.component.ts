@@ -53,9 +53,13 @@ export class PresupuestoAnualListComponent implements OnInit {
   protected readonly cargando = signal(false);
   protected readonly busqueda = signal('');
 
+  protected readonly mostrarInactivos = signal(false);
+
   protected readonly registros = computed(() => {
     const texto = this.busqueda().trim().toLowerCase();
-    const todos = [...this.registrosTodos()].sort((a, b) => b.anio - a.anio);
+    const todos = [...this.registrosTodos()]
+      .filter((r) => this.mostrarInactivos() || r.activo !== false)
+      .sort((a, b) => b.anio - a.anio);
     if (!texto) return todos;
     return todos.filter((r) => String(r.anio).includes(texto) || r.descripcion.toLowerCase().includes(texto));
   });
@@ -74,6 +78,12 @@ export class PresupuestoAnualListComponent implements OnInit {
     },
     { campo: 'descripcion', etiqueta: 'Descripción' },
     { campo: 'fechaAlta', etiqueta: 'Fecha alta' },
+    {
+      campo: 'activo',
+      etiqueta: 'Activo',
+      formatear: (r) => (r.activo !== false ? 'Sí' : 'No'),
+      claseValor: (r) => (r.activo !== false ? 'grid-badge-success' : 'grid-badge-muted'),
+    },
   ];
 
   protected readonly form = this.fb.nonNullable.group({
@@ -82,6 +92,7 @@ export class PresupuestoAnualListComponent implements OnInit {
     fechaAlta: [hoyTexto(), Validators.required],
     descripcion: ['', [Validators.required, Validators.maxLength(200)]],
     estatusClave: ['', Validators.required],
+    activo: [true],
   });
 
   ngOnInit(): void {
@@ -123,7 +134,7 @@ export class PresupuestoAnualListComponent implements OnInit {
     this.registroEnEdicion.set(null);
     const anio = new Date().getFullYear();
     const primerEstatus = this.estatus()[0]?.clave ?? '';
-    this.form.reset({ id: 0, anio, fechaAlta: hoyTexto(), descripcion: `Año ${anio}`, estatusClave: primerEstatus });
+    this.form.reset({ id: 0, anio, fechaAlta: hoyTexto(), descripcion: `Año ${anio}`, estatusClave: primerEstatus, activo: true });
     this.modalAbierto.set(true);
   }
 
@@ -135,6 +146,7 @@ export class PresupuestoAnualListComponent implements OnInit {
       fechaAlta: registro.fechaAlta,
       descripcion: registro.descripcion,
       estatusClave: registro.estatusClave,
+      activo: registro.activo !== false,
     });
     this.modalAbierto.set(true);
   }

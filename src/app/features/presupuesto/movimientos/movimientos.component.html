@@ -77,9 +77,9 @@
 
 @if (tabActiva() === 'movimientos') {
 <div class="board-filters">
-  <label class="board-filter-field">
+  <label class="board-filter-field board-filter-field-buscar">
     Buscar
-    <input type="text" [value]="filtroTexto()" placeholder="Buscar por descripción…" (input)="filtroTexto.set($any($event.target).value)" />
+    <input type="search" [value]="filtroTexto()" placeholder="Buscar por descripción…" (input)="filtroTexto.set($any($event.target).value)" />
   </label>
   <label class="board-filter-field">
     Cuenta
