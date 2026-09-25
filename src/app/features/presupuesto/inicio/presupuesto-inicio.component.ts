@@ -73,6 +73,13 @@ const GRUPOS: GrupoModulo[] = [
     titulo: 'Reportes',
     enlaces: [
       {
+        ruta: 'dashboard',
+        icono: '📊',
+        color: 'teal',
+        titulo: 'Dashboard',
+        descripcion: 'Panorama general: saldo, ingresos/gastos del mes y tarjetas.',
+      },
+      {
         ruta: 'proyeccion',
         icono: '📈',
         color: 'teal',

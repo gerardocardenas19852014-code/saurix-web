@@ -29,8 +29,6 @@
       <span class="sidebar-label">Presupuesto Personal</span>
       <nav class="sidebar-nav" aria-label="Menú de presupuesto personal">
         <a routerLink="/presupuesto" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
-        <a routerLink="/presupuesto/dashboard" routerLinkActive="active">📊 Dashboard</a>
-        <a routerLink="/presupuesto/proyeccion" routerLinkActive="active">📈 Proyección</a>
 
         <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('presupuesto', 'Movimientos')">
           <span>{{ grupoAbierto('presupuesto', 'Movimientos') ? '▾' : '▸' }} Movimientos</span>
@@ -53,6 +51,8 @@
           <span>{{ grupoAbierto('presupuesto', 'Reportes') ? '▾' : '▸' }} Reportes</span>
         </button>
         @if (grupoAbierto('presupuesto', 'Reportes')) {
+          <a routerLink="/presupuesto/dashboard" routerLinkActive="active">📊 Dashboard</a>
+          <a routerLink="/presupuesto/proyeccion" routerLinkActive="active">📈 Proyección</a>
           <a routerLink="/presupuesto/reportes" routerLinkActive="active">📊 Reportes</a>
           <a routerLink="/presupuesto/calendario" routerLinkActive="active">📅 Calendario de pagos</a>
         }
