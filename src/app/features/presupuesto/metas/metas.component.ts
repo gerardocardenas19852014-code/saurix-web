@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth.service';
@@ -17,7 +17,7 @@ import { MetaPresupuesto } from './meta.model';
   styleUrl: './metas.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MetasComponent implements OnInit {
+export class MetasComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
@@ -44,6 +44,10 @@ export class MetasComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // Tarjetas con barra de progreso apiladas — usa el ancho "wide" del
+    // layout para aprovechar mejor el espacio (ver html[data-wide='grid']
+    // en styles.scss, mismo patrón que Movimientos).
+    document.documentElement.setAttribute('data-wide', 'grid');
     this.cargar();
   }
 
@@ -138,5 +142,10 @@ export class MetasComponent implements OnInit {
         this.cargar();
       },
     });
+  }
+
+
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
   }
 }

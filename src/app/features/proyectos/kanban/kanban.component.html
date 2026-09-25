@@ -251,7 +251,7 @@
 }
 
 @if (modalAbierto()) {
-  <div class="modal-overlay show">
+  <div class="modal-overlay show" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
     <form class="modal-box" style="max-width: 1120px;" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardarTicket()">
       <h3>Nuevo ticket</h3>
 
@@ -375,7 +375,7 @@
 }
 
 @if (ticketActivo(); as activo) {
-  <div class="modal-overlay show">
+  <div class="modal-overlay show" (click)="cerrarDetalle(); toast.info('Cambios descartados.')">
     <div class="modal-box" style="max-width: 1160px; width: 96%; text-align: left;" (click)="$event.stopPropagation()">
       <div class="page-header" style="margin-bottom: 12px;">
         <h3>#{{ activo.numeroTicket }} — {{ activo.titulo }}</h3>
@@ -395,7 +395,7 @@
           </span>
           <span class="hint" style="margin:0;">Creado: {{ formatearFecha(activo.fechaCreacion) }}</span>
           @if (claseSla(activo); as clase) {
-            <span [class]="'sla-badge ' + clase" style="margin-top: 4px; width: fit-content;">{{ textoSla(activo) }}</span>
+            <span [class]="'sla-badge ' + clase" style="width: fit-content;">{{ textoSla(activo) }}</span>
           }
         </div>
         <div class="ticket-status-bar-action">

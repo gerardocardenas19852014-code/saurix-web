@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { AuthService } from '../../../core/services/auth.service';
 import { DataClientService } from '../../../core/services/data-client.service';
@@ -36,7 +36,7 @@ interface DiaCalendario {
   styleUrl: './calendario.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class CalendarioComponent implements OnInit {
+export class CalendarioComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
   private readonly auth = inject(AuthService);
 
@@ -53,6 +53,10 @@ export class CalendarioComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // Lista de eventos que se ve apretada en el ancho de lectura de 980px —
+    // usa el ancho "wide" del layout (ver html[data-wide='grid'] en
+    // styles.scss, mismo patrón que Movimientos).
+    document.documentElement.setAttribute('data-wide', 'grid');
     this.cargando.set(true);
     this.data.list<CuentaPresupuesto>('CuentaPresupuesto').subscribe((c) => this.cuentas.set(c));
     this.data
@@ -163,5 +167,10 @@ export class CalendarioComponent implements OnInit {
     if (dias === 0) return 'hoy';
     if (dias === 1) return 'mañana';
     return `en ${dias} días`;
+  }
+
+
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
   }
 }

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { AuthService } from '../../../core/services/auth.service';
 import { DataClientService } from '../../../core/services/data-client.service';
@@ -51,7 +51,7 @@ interface PlaneadoReal {
   styleUrl: './reportes.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ReportesComponent implements OnInit {
+export class ReportesComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
   private readonly auth = inject(AuthService);
 
@@ -75,6 +75,10 @@ export class ReportesComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // Reporte con tarjetas, gráficas y tablas — usa el ancho "wide" del layout
+    // para aprovechar mejor el espacio (ver html[data-wide='grid'] en
+    // styles.scss, mismo patrón que Movimientos/Proyección).
+    document.documentElement.setAttribute('data-wide', 'grid');
     this.cargando.set(true);
     this.data.list<CategoriaPresupuesto>('CategoriaPresupuesto').subscribe((c) => this.categorias.set(c));
     this.data
@@ -330,5 +334,10 @@ export class ReportesComponent implements OnInit {
     if (diferencia === 0) return 'exacto';
     const signo = diferencia > 0 ? '+' : '−';
     return `${signo}${this.formatMoneda(Math.abs(diferencia))}`;
+  }
+
+
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
   }
 }

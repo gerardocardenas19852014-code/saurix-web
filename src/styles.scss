@@ -359,8 +359,12 @@ html[data-wide='grid'] .content { max-width: 1600px; }
 .kanban-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .kanban-status-select { flex: 1; min-width: 0; font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper-raised); color: var(--text-strong); cursor: pointer; }
 
-.ticket-status-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; background: var(--accent-soft); border: 1px dashed var(--accent); border-radius: 12px; padding: 14px 18px; margin-bottom: 22px; }
-.ticket-status-bar-info { display: flex; flex-direction: column; gap: 2px; }
+.ticket-status-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; background: var(--accent-soft); border: 1px dashed var(--accent); border-radius: 12px; padding: 10px 16px; margin-bottom: 22px; }
+// Antes cada dato (tipo·prioridad, sprint, fecha, SLA) iba en su propia línea
+// (flex-direction: column), lo que hacía la barra innecesariamente alta con
+// tickets que tienen sprint y SLA a la vez. Ahora se acomodan en una sola
+// fila que envuelve si hace falta (flex-wrap), mucho más compacto.
+.ticket-status-bar-info { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; row-gap: 4px; column-gap: 12px; }
 .ticket-status-bar-info strong { font-family: 'JetBrains Mono', monospace; font-size: 15px; color: var(--text-strong); }
 .ticket-status-bar-info span { font-size: 12.5px; color: var(--ink-soft); }
 .ticket-status-bar-action { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
