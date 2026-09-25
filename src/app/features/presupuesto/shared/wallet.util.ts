@@ -50,6 +50,36 @@ export function nombreMes(mes: number): string {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
+// ── Jerarquía de categorías (raíz + hijas directas, para <optgroup>) ──
+
+export interface GrupoCategoriaJerarquia {
+  raiz: CategoriaPresupuesto;
+  hijos: CategoriaPresupuesto[];
+}
+
+/** Agrupa una lista de categorías (ya filtrada por Tipo si aplica) en
+ *  raíz + hijas directas, para pintarlas con <optgroup> en un <select>: la
+ *  raíz es el label en negritas y sus hijas van adentro como <option>s. Si
+ *  una raíz no tiene hijas EN LA LISTA RECIBIDA, la plantilla debe mostrarla
+ *  como <option> plana en vez de <optgroup> — así nunca se repite su nombre
+ *  como opción dentro de su propio grupo (bug reportado: "SALARIO" aparecía
+ *  como label Y como primera opción bajo su propio optgroup).
+ *  Si una hija quedara sin su padre en la lista (p. ej. un filtro por Tipo
+ *  raro dejara fuera al padre), se conserva como raíz suelta para no
+ *  perderla en silencio del combo — aunque en la práctica no pasa, porque
+ *  una subcategoría siempre hereda el Tipo de su padre. */
+export function agruparCategoriasJerarquia(categorias: CategoriaPresupuesto[]): GrupoCategoriaJerarquia[] {
+  const idsPresentes = new Set(categorias.map((c) => Number(c.id)));
+  const esRaiz = (c: CategoriaPresupuesto) =>
+    c.categoriaPresupuestoPadreId === null || !idsPresentes.has(Number(c.categoriaPresupuestoPadreId));
+  return categorias
+    .filter(esRaiz)
+    .map((raiz) => ({
+      raiz,
+      hijos: categorias.filter((c) => c.id !== raiz.id && Number(c.categoriaPresupuestoPadreId) === Number(raiz.id)),
+    }));
+}
+
 export function colorCategoria(id: number | null | undefined): string {
   if (!id) return 'var(--technical)';
   return PALETA_CATEGORIAS[id % PALETA_CATEGORIAS.length];

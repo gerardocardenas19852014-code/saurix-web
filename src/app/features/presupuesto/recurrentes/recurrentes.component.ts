@@ -13,7 +13,7 @@ import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
 import { ValorLista } from '../../catalogos/valor-lista/valor-lista.model';
 import { MovimientoRecurrentePresupuesto } from './recurrente.model';
 import { PresupuestoAnual } from '../presupuesto-anual/presupuesto-anual.model';
-import { fechaLocalDeTexto, textoFechaDeLocal } from '../shared/wallet.util';
+import { agruparCategoriasJerarquia, fechaLocalDeTexto, textoFechaDeLocal } from '../shared/wallet.util';
 import { AnioTrabajoService } from '../shared/anio-trabajo.service';
 
 /**
@@ -116,6 +116,12 @@ export class RecurrentesComponent implements OnInit, OnDestroy {
     const tipo = this.tipoFormulario();
     return this.categorias().filter((c) => !c.tipo || c.tipo === tipo);
   });
+
+  /** categoriasFiltradas agrupada en raíz + hijas para el <select> del
+   *  formulario (mismo <optgroup> ya usado en Movimientos, para no listar
+   *  padres e hijas todas iguales una tras otra ni repetir el padre como
+   *  opción dentro de su propio grupo). */
+  protected readonly categoriasFiltradasJerarquia = computed(() => agruparCategoriasJerarquia(this.categoriasFiltradas()));
 
   /** Si al cambiar Tipo la categoría ya elegida deja de aplicar, se limpia (evita guardar una combinación inconsistente). */
   onTipoChange(): void {

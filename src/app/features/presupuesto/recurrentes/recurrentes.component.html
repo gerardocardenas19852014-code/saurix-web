@@ -38,7 +38,15 @@
         <label>Categoría
           <select formControlName="categoriaPresupuestoId">
             <option [ngValue]="0">Sin categoría</option>
-            @for (c of categoriasFiltradas(); track c.id) { <option [ngValue]="c.id">{{ c.nombre }}</option> }
+            @for (grupo of categoriasFiltradasJerarquia(); track grupo.raiz.id) {
+              @if (grupo.hijos.length > 0) {
+                <optgroup [label]="grupo.raiz.nombre">
+                  @for (hijo of grupo.hijos; track hijo.id) { <option [ngValue]="hijo.id">{{ hijo.nombre }}</option> }
+                </optgroup>
+              } @else {
+                <option [ngValue]="grupo.raiz.id">{{ grupo.raiz.nombre }}</option>
+              }
+            }
           </select>
         </label>
 

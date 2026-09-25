@@ -11,7 +11,7 @@ import { PagoTarjetaService } from '../shared/pago-tarjeta.service';
 import { AnioTrabajoService } from '../shared/anio-trabajo.service';
 import { CategoriaPresupuesto } from '../categoria-presupuesto/categoria-presupuesto.model';
 import { CuentaPresupuesto } from '../cuenta-presupuesto/cuenta-presupuesto.model';
-import { InfoTarjeta, colorCategoria, etiquetaMes, formatMoneda, iconoTipoCuenta, infoTarjeta, nivelUso } from '../shared/wallet.util';
+import { InfoTarjeta, agruparCategoriasJerarquia, colorCategoria, etiquetaMes, formatMoneda, iconoTipoCuenta, infoTarjeta, nivelUso } from '../shared/wallet.util';
 import { ValorLista } from '../../catalogos/valor-lista/valor-lista.model';
 import { MovimientoPresupuesto } from './movimiento.model';
 import { PresupuestoAnual } from '../presupuesto-anual/presupuesto-anual.model';
@@ -107,15 +107,7 @@ export class MovimientosComponent implements OnInit, OnDestroy {
    *  categoría padre (p. ej. HOGAR) y cuáles sus subcategorías (Hipoteca,
    *  Gas, Luz...). Con <optgroup> el navegador las agrupa visualmente
    *  (título en negritas, hijas con sangría) sin CSS a la medida. */
-  protected readonly categoriasJerarquia = computed(() => {
-    const todas = this.categorias();
-    return todas
-      .filter((c) => c.categoriaPresupuestoPadreId === null)
-      .map((raiz) => ({
-        raiz,
-        hijos: todas.filter((c) => c.categoriaPresupuestoPadreId === Number(raiz.id)),
-      }));
-  });
+  protected readonly categoriasJerarquia = computed(() => agruparCategoriasJerarquia(this.categorias()));
   protected readonly tiposMovimiento = signal<ValorLista[]>([]);
   protected readonly cargando = signal(false);
 
@@ -327,6 +319,13 @@ export class MovimientosComponent implements OnInit, OnDestroy {
     const tipo = this.tipoFormulario();
     return this.categorias().filter((c) => !c.tipo || c.tipo === tipo);
   });
+
+  /** Igual que categoriasJerarquia pero ya filtrado por Tipo, para el <select>
+   *  del formulario Nuevo/Editar movimiento — antes ese combo listaba todas
+   *  las categorías del Tipo actual en fila, una tras otra, sin distinguir
+   *  padres de subcategorías (mismo problema que ya se había arreglado en el
+   *  filtro de arriba). */
+  protected readonly categoriasFiltradasJerarquia = computed(() => agruparCategoriasJerarquia(this.categoriasFiltradas()));
 
   /** Si al cambiar Tipo la categoría ya elegida deja de aplicar, se limpia (evita guardar una combinación inconsistente). */
   onTipoChange(): void {
