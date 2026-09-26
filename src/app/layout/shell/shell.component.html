@@ -1,9 +1,19 @@
 <div class="app-shell">
-  <aside class="sidebar">
+  <aside class="sidebar" [class.sidebar-menu-abierto]="menuMovilAbierto()">
     <a class="brand" routerLink="/">
       <span class="brand-mark">§</span>
       <span class="brand-name">Sauri<em>x</em></span>
     </a>
+    <button
+      type="button"
+      class="sidebar-menu-toggle"
+      [class.is-open]="menuMovilAbierto()"
+      (click)="toggleMenuMovil()"
+      [attr.aria-expanded]="menuMovilAbierto()"
+      aria-label="Abrir menú"
+    >
+      <span class="hamburger-icon" aria-hidden="true"></span>
+    </button>
 
     @if (moduloActivo() === 'seguridad') {
       <span class="sidebar-label">Seguridad</span>

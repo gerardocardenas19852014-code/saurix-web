@@ -190,12 +190,42 @@ h1, h2 { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(
 .topbar-exit { padding: 6px 12px; background: var(--paper); border-color: var(--line); color: var(--text-strong); }
 .topbar-exit:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
 
+/* Botón "☰" que abre/cierra el menú lateral completo en celular — ver
+   .sidebar-menu-toggle y sidebar-menu-abierto en shell.component.ts/.html.
+   Oculto en escritorio: ahí el menú siempre está visible, como antes. */
+.sidebar-menu-toggle {
+  display: none;
+  margin-left: auto;
+  width: 38px; height: 38px; flex-shrink: 0;
+  align-items: center; justify-content: center;
+  border-radius: 8px; border: 1px solid var(--line);
+  background: var(--paper-raised); cursor: pointer;
+}
+/* Ícono de "☰"/"✕" dibujado en CSS (3 barras) en vez de un carácter Unicode:
+   algunos entornos no traen ese glifo en su fuente y el botón se veía vacío. */
+.hamburger-icon, .hamburger-icon::before, .hamburger-icon::after {
+  display: block; position: absolute; width: 18px; height: 2px; border-radius: 1px;
+  background: var(--text-strong); transition: transform .15s ease, opacity .15s ease, top .15s ease;
+}
+.hamburger-icon { position: relative; }
+.hamburger-icon::before { content: ''; position: absolute; top: -6px; left: 0; }
+.hamburger-icon::after { content: ''; position: absolute; top: 6px; left: 0; }
+.sidebar-menu-toggle.is-open .hamburger-icon { background: transparent; }
+.sidebar-menu-toggle.is-open .hamburger-icon::before { top: 0; transform: rotate(45deg); }
+.sidebar-menu-toggle.is-open .hamburger-icon::after { top: 0; transform: rotate(-45deg); }
+
 @media (max-width: 860px) {
   .app-shell { flex-direction: column; }
   .sidebar { width: 100%; min-height: auto; position: static; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 14px 16px; }
   .sidebar-label { display: none; }
   .sidebar-group-toggle { display: none; }
-  .sidebar-nav { flex-direction: row; flex-wrap: wrap; }
+  .sidebar-menu-toggle { display: inline-flex; }
+  /* El menú completo arranca escondido (ver ShellComponent.menuMovilAbierto)
+     y ocupa todo el ancho como una lista vertical al abrirse — antes, a este
+     ancho, quedaba siempre visible envolviendo en filas cortas y podía tapar
+     la pantalla completa con solo el menú, sin dejar ver nada del contenido. */
+  .sidebar-nav { display: none; width: 100%; flex-direction: column; align-items: stretch; margin-top: 12px; order: 3; }
+  .sidebar.sidebar-menu-abierto .sidebar-nav { display: flex; }
   .session-card { margin-left: auto; }
   .main-topbar { position: static; flex-wrap: wrap; padding: 12px 16px; }
 }

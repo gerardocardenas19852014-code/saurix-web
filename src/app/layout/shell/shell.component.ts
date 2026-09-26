@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, HostListener, OnDestroy, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener, OnDestroy, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
@@ -208,6 +208,10 @@ export class ShellComponent implements OnDestroy {
       ShellComponent.INTERVALO_REVISION_SLA_MS,
     );
     this.mediaQuerySidebarAngosta.addEventListener('change', this.onCambioSidebarAngosta);
+    effect(() => {
+      this.urlActual();
+      this.menuMovilAbierto.set(false);
+    });
 
     // Aviso de cambios sin guardar (ver comentario largo junto a
     // hayFormularioSucio más abajo): hay que escuchar el clic en fase de
@@ -323,6 +327,21 @@ export class ShellComponent implements OnDestroy {
   private readonly onCambioSidebarAngosta = (evento: MediaQueryListEvent): void => {
     this.sidebarAngosta.set(evento.matches);
   };
+
+  /** Menú lateral completo, escondido detrás de un botón "☰" en pantallas
+   *  angostas (ver .sidebar-menu-toggle en styles.scss): antes, en celular,
+   *  TODOS los enlaces de un módulo (hasta 13 en Presupuesto) quedaban
+   *  siempre visibles y empujaban el contenido real fuera de la pantalla —
+   *  había que hacer scroll por todo el menú antes de ver nada. Arranca
+   *  cerrado y se cierra solo al navegar (abajo), para no taparle la
+   *  pantalla completa al usuario después de elegir una opción. En
+   *  escritorio (sidebarAngosta() === false) esta bandera no tiene efecto:
+   *  el menú siempre se ve, como antes. */
+  protected readonly menuMovilAbierto = signal(false);
+
+  toggleMenuMovil(): void {
+    this.menuMovilAbierto.update((v) => !v);
+  }
 
   grupoAbierto(modulo: string, titulo: string): boolean {
     if (this.sidebarAngosta()) return true;
