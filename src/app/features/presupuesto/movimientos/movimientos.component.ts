@@ -11,11 +11,12 @@ import { PagoTarjetaService } from '../shared/pago-tarjeta.service';
 import { AnioTrabajoService } from '../shared/anio-trabajo.service';
 import { CategoriaPresupuesto } from '../categoria-presupuesto/categoria-presupuesto.model';
 import { CuentaPresupuesto } from '../cuenta-presupuesto/cuenta-presupuesto.model';
-import { InfoTarjeta, colorCategoria, etiquetaMes, formatMoneda, iconoTipoCuenta, infoTarjeta, nivelUso, opcionesCategoriasBuscable, opcionesCuentasBuscable } from '../shared/wallet.util';
+import { InfoTarjeta, colorCategoria, etiquetaMes, formatMoneda, formatMonedaCompacta, iconoTipoCuenta, infoTarjeta, nivelUso, nombreMes, opcionesCategoriasBuscable, opcionesCuentasBuscable } from '../shared/wallet.util';
 import { ValorLista } from '../../../shared/valor-lista/valor-lista.model';
 import { MovimientoPresupuesto } from './movimiento.model';
 import { PresupuestoAnual } from '../presupuesto-anual/presupuesto-anual.model';
 import { SelectBuscableComponent } from '../../../shared/components/select-buscable/select-buscable.component';
+import { exportarCsv } from '../../../shared/utils/csv.util';
 
 interface ColumnaMensual {
   etiqueta: string;
@@ -84,6 +85,7 @@ export class MovimientosComponent implements OnInit, OnDestroy {
   protected readonly presupuestosAnuales = signal<PresupuestoAnual[]>([]);
 
   protected readonly formatMoneda = formatMoneda;
+  protected readonly formatMonedaCompacta = formatMonedaCompacta;
   protected readonly colorCategoria = colorCategoria;
   protected readonly iconoTipoCuenta = iconoTipoCuenta;
   protected readonly nivelUso = nivelUso;
@@ -125,6 +127,13 @@ export class MovimientosComponent implements OnInit, OnDestroy {
   protected readonly modalAbierto = signal(false);
   protected readonly movimientoEnEdicion = signal<MovimientoPresupuesto | null>(null);
   protected readonly movimientoAEliminar = signal<MovimientoPresupuesto | null>(null);
+
+  /** true cuando el movimiento en edición es una de las dos piernas de una
+   *  transferencia entre cuentas (tiene transferenciaId). En ese caso el
+   *  formulario bloquea Tipo/Cuenta/Categoría (cambiarlos rompería el par) y
+   *  guardar()/confirmarEliminar() también actualizan/eliminan la pierna
+   *  contraria para que ambas no se desincronicen. */
+  protected readonly esTransferenciaEdicion = computed(() => !!this.movimientoEnEdicion()?.transferenciaId);
 
   protected readonly filtroTexto = signal('');
   protected readonly filtroCuentaId = signal(0);
@@ -225,7 +234,7 @@ export class MovimientosComponent implements OnInit, OnDestroy {
       .filter((m) => !anio || m.fecha.slice(0, 4) === anio)
       .filter((m) => !desde || m.fecha >= desde)
       .filter((m) => !hasta || m.fecha <= hasta)
-      .filter((m) => !texto || m.descripcion.toLowerCase().includes(texto))
+      .filter((m) => !texto || m.descripcion.toLowerCase().includes(texto) || String(m.monto).includes(texto))
       .sort((a, b) => {
         const signo = this.ordenFecha() === 'asc' ? 1 : -1;
         return a.fecha < b.fecha ? signo : a.fecha > b.fecha ? -signo : 0;
@@ -267,15 +276,46 @@ export class MovimientosComponent implements OnInit, OnDestroy {
     this.gruposExpandidos.set(actualizado);
   }
 
-  /** Resumen de los últimos 6 meses (ingresos vs gastos) para la gráfica de barras. */
+  /** Mes "desde"/"hasta" (1-12) del rango que se grafica — independientes
+   *  del filtro de Mes de la lista (ese es un solo mes; aquí es un rango).
+   *  El Año en cambio SÍ es el mismo "año de trabajo" compartido (filtroAnio
+   *  / AnioTrabajoService) que ya usan Movimientos, Fijos y Proyección y
+   *  Proyección, para no tener un cuarto selector de Año desincronizado. */
+  /** Como valor de <option> (string "1".."12"), no número — así el
+   *  [selected] por opción (ver template) hace la comparación directa,
+   *  igual que ya hace el selector de Año (evita el problema conocido de
+   *  Angular donde un [value] en el <select> no "encuentra" la opción si
+   *  las opciones se generan con @for). */
+  protected readonly graficaMesDesde = signal<string>('1');
+  protected readonly graficaMesHasta = signal<string>('12');
+
+  /** Opciones fijas (Enero..Diciembre) para los selectores "Desde"/"Hasta" de la gráfica. */
+  protected readonly mesesGrafica: OpcionMes[] = Array.from({ length: 12 }, (_, i) => ({
+    valor: String(i + 1),
+    etiqueta: nombreMes(i),
+  }));
+
+  /** Texto del encabezado de la gráfica: el año solo si es Ene-Dic completo,
+   *  o "Mes – Mes Año" cuando el usuario acotó el rango. */
+  protected readonly etiquetaRangoGrafica = computed(() => {
+    const anio = this.filtroAnio() || String(new Date().getFullYear());
+    const desde = Math.min(Number(this.graficaMesDesde()), Number(this.graficaMesHasta()));
+    const hasta = Math.max(Number(this.graficaMesDesde()), Number(this.graficaMesHasta()));
+    if (desde === 1 && hasta === 12) return anio;
+    if (desde === hasta) return `${nombreMes(desde - 1)} ${anio}`;
+    return `${nombreMes(desde - 1)} – ${nombreMes(hasta - 1)} ${anio}`;
+  });
+
+  /** Ingresos vs. gastos del año y rango de meses elegidos (ver
+   *  graficaMesDesde/graficaMesHasta y filtroAnio) para la gráfica de barras. */
   protected readonly resumenMensual = computed<ColumnaMensual[]>(() => {
-    const hoy = new Date();
+    const anio = this.filtroAnio() ? Number(this.filtroAnio()) : new Date().getFullYear();
+    const desde = Math.min(Number(this.graficaMesDesde()), Number(this.graficaMesHasta()));
+    const hasta = Math.max(Number(this.graficaMesDesde()), Number(this.graficaMesHasta()));
     const columnas: ColumnaMensual[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const fecha = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
-      const anio = fecha.getFullYear();
-      const mes = fecha.getMonth();
-      const etiqueta = fecha.toLocaleDateString('es-MX', { month: 'short' });
+    for (let mes1 = desde; mes1 <= hasta; mes1++) {
+      const mes = mes1 - 1; // 0-indexado, igual que claveMes()
+      const etiqueta = new Date(anio, mes, 1).toLocaleDateString('es-MX', { month: 'short' });
       const claveColumna = `${anio}-${mes}`;
       const delMes = this.movimientosReales().filter((m) => claveMes(m.fecha) === claveColumna && !m.transferenciaId);
       columnas.push({
@@ -445,6 +485,32 @@ export class MovimientosComponent implements OnInit, OnDestroy {
     return this.categorias().find((c) => Number(c.id) === Number(id))?.nombre ?? '—';
   }
 
+  /** Exporta lo que esté filtrado/visible en la lista (respeta buscador,
+   *  cuenta, categoría, tipo, mes/año y rango de fechas ya aplicados). */
+  exportarCsvArchivo(): void {
+    const filas = this.movimientosFiltrados();
+    exportarCsv(
+      'movimientos.csv',
+      [
+        { clave: 'fecha', etiqueta: 'Fecha' },
+        { clave: 'tipo', etiqueta: 'Tipo' },
+        { clave: 'cuenta', etiqueta: 'Cuenta' },
+        { clave: 'categoria', etiqueta: 'Categoría' },
+        { clave: 'monto', etiqueta: 'Monto' },
+        { clave: 'descripcion', etiqueta: 'Descripción' },
+      ],
+      filas.map((m) => ({
+        fecha: m.fecha,
+        tipo: m.transferenciaId ? 'Transferencia' : m.tipo,
+        cuenta: this.nombreCuenta(m.cuentaPresupuestoId),
+        categoria: m.transferenciaId ? '—' : this.nombreCategoria(m.categoriaPresupuestoId),
+        monto: m.monto,
+        descripcion: m.descripcion,
+      })),
+    );
+    this.toast.exito(`Se descargó movimientos.csv (${filas.length} registro${filas.length === 1 ? '' : 's'}).`);
+  }
+
   /** Saldo actual de una cuenta = suma de sus ingresos menos sus gastos (no hay saldo inicial en el catálogo).
    *  Solo cuenta movimientos reales — uno proyectado a futuro aún no pasó. */
   saldoCuenta(cuentaId: number): number {
@@ -464,8 +530,21 @@ export class MovimientosComponent implements OnInit, OnDestroy {
     return new Date(anio, hoy.getMonth(), hoy.getDate()).toISOString().slice(0, 10);
   }
 
+  /** Busca la otra pierna de una transferencia (mismo transferenciaId,
+   *  distinto id) en la lista ya cargada en memoria — evita otra llamada al
+   *  backend solo para encontrarla. */
+  private piernaContraria(movimiento: MovimientoPresupuesto): MovimientoPresupuesto | undefined {
+    if (!movimiento.transferenciaId) return undefined;
+    return this.movimientos().find((m) => m.transferenciaId === movimiento.transferenciaId && m.id !== movimiento.id);
+  }
+
   nuevo(): void {
     this.movimientoEnEdicion.set(null);
+    // Por si el modal anterior fue la edición de una pierna de transferencia
+    // y quedaron deshabilitados (ver editar()).
+    this.form.controls.tipo.enable();
+    this.form.controls.cuentaPresupuestoId.enable();
+    this.form.controls.categoriaPresupuestoId.enable();
     this.form.reset({
       id: 0,
       fecha: this.fechaPorDefecto(),
@@ -493,6 +572,14 @@ export class MovimientosComponent implements OnInit, OnDestroy {
       descripcion: movimiento.descripcion,
       proyectado: movimiento.proyectado ?? false,
     });
+    // Una pierna de transferencia no puede cambiar de Tipo/Cuenta/Categoría
+    // sin romper el par (la otra pierna quedaría apuntando a información
+    // inconsistente) — se bloquean esos campos; fecha/monto/descripción sí
+    // se pueden editar y guardar() los replica en la pierna contraria.
+    const esTransferencia = !!movimiento.transferenciaId;
+    this.form.controls.tipo[esTransferencia ? 'disable' : 'enable']();
+    this.form.controls.cuentaPresupuestoId[esTransferencia ? 'disable' : 'enable']();
+    this.form.controls.categoriaPresupuestoId[esTransferencia ? 'disable' : 'enable']();
     this.modalAbierto.set(true);
   }
 
@@ -567,7 +654,28 @@ export class MovimientosComponent implements OnInit, OnDestroy {
 
     peticion.subscribe({
       next: (resultado) => {
-        this.toast.exito(esEdicion ? 'Movimiento actualizado.' : 'Movimiento creado.');
+        // Si esta pierna pertenece a una transferencia, la fecha/monto/
+        // descripción/proyectado se replican en la pierna contraria para que
+        // ambas no queden desincronizadas (Tipo/Cuenta/Categoría están
+        // bloqueados en el formulario para esta pierna — ver editar()).
+        const pareja = esEdicion ? this.piernaContraria(resultado) : undefined;
+        if (pareja) {
+          this.data
+            .modificacion<MovimientoPresupuesto>('MovimientoPresupuesto', {
+              ...pareja,
+              fecha: payload.fecha,
+              monto: payload.monto,
+              descripcion: payload.descripcion,
+              proyectado: payload.proyectado,
+            })
+            .subscribe({
+              error: () =>
+                this.toast.advertencia('Se actualizó este movimiento, pero no se pudo sincronizar su transferencia pareja.'),
+            });
+        }
+        this.toast.exito(
+          esEdicion ? (pareja ? 'Transferencia actualizada (ambos movimientos).' : 'Movimiento actualizado.') : 'Movimiento creado.',
+        );
         this.movimientoEnEdicion.set(resultado);
         this.cargar();
         if (!esEdicion) this.modalAbierto.set(false);
@@ -606,16 +714,41 @@ export class MovimientosComponent implements OnInit, OnDestroy {
     this.movimientoAEliminar.set(movimiento);
   }
 
+  /** Texto del diálogo de confirmación de borrado — distinto cuando el
+   *  movimiento es una pierna de transferencia, para avisar que se borran
+   *  ambos movimientos juntos. */
+  protected mensajeEliminar(): string {
+    return this.movimientoAEliminar()?.transferenciaId
+      ? '¿Eliminar esta transferencia? Se eliminarán los dos movimientos (salida y entrada) juntos.'
+      : '¿Eliminar este movimiento?';
+  }
+
   confirmarEliminar(): void {
     const movimiento = this.movimientoAEliminar();
     if (!movimiento) return;
+    // Si es una pierna de transferencia, se borra junto con su pareja para
+    // no dejar un movimiento huérfano sin su contraparte.
+    const pareja = this.piernaContraria(movimiento);
 
     this.data.baja('MovimientoPresupuesto', movimiento.id).subscribe({
       next: () => {
-        this.toast.exito('Movimiento eliminado.');
-        this.movimientoAEliminar.set(null);
-        if (this.movimientoEnEdicion()?.id === movimiento.id) this.modalAbierto.set(false);
-        this.cargar();
+        const finalizar = (mensaje?: string) => {
+          if (mensaje) this.toast.exito(mensaje);
+          this.movimientoAEliminar.set(null);
+          if (this.movimientoEnEdicion()?.id === movimiento.id) this.modalAbierto.set(false);
+          this.cargar();
+        };
+        if (pareja) {
+          this.data.baja('MovimientoPresupuesto', pareja.id).subscribe({
+            next: () => finalizar('Transferencia eliminada (ambos movimientos).'),
+            error: () => {
+              this.toast.advertencia('Se eliminó este movimiento, pero no se pudo eliminar su transferencia pareja; revísala manualmente.');
+              finalizar();
+            },
+          });
+        } else {
+          finalizar('Movimiento eliminado.');
+        }
       },
     });
   }

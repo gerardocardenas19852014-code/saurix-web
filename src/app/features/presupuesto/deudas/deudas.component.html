@@ -1,6 +1,15 @@
 <div class="page-header">
   <h1>Deudas y Préstamos</h1>
   <div class="page-actions">
+    <button
+      type="button"
+      class="btn-secondary small"
+      title="Exportar CSV"
+      aria-label="Exportar deudas a CSV"
+      (click)="exportarCsvArchivo()"
+    >
+      ⇩ Exportar CSV
+    </button>
     <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nueva</button>
   </div>
 </div>
@@ -51,7 +60,14 @@
         <div class="wallet-limit-fill wallet-limit-fill-ok" [style.width.%]="pctPagado(deuda)"></div>
       </div>
       <div class="wallet-limit-foot">
-        <span class="hint" style="margin:0;">{{ pctPagado(deuda) | number: '1.0-0' }}% pagado · desde {{ deuda.fechaInicio | date: 'dd/MM/yyyy' }}</span>
+        <span class="hint" style="margin:0;">
+          {{ pctPagado(deuda) | number: '1.0-0' }}% pagado · desde {{ deuda.fechaInicio | date: 'dd/MM/yyyy' }}
+          @if (deuda.fechaVencimiento) {
+            · <span [style.color]="deudaVencida(deuda) ? 'var(--danger)' : null">
+              {{ deudaVencida(deuda) ? '⚠ venció' : 'vence' }} {{ deuda.fechaVencimiento | date: 'dd/MM/yyyy' }}
+            </span>
+          }
+        </span>
         <span>
           <button type="button" class="btn-secondary small" (click)="toggleHistorial(deuda)">{{ historialAbierto() === deuda.id ? 'Ocultar' : 'Historial' }}</button>
           <button type="button" class="btn-secondary small" (click)="editar(deuda)">Editar</button>
@@ -104,6 +120,7 @@
         <label>Descripción<input type="text" formControlName="descripcion" /></label>
         <label>Monto original<input type="number" step="0.01" formControlName="montoOriginal" /></label>
         <label>Fecha de inicio<input type="date" formControlName="fechaInicio" /></label>
+        <label>Fecha de vencimiento (opcional)<input type="date" formControlName="fechaVencimiento" /></label>
       </div>
       @if (enEdicion()) {
         <p class="hint" style="margin:-8px 0 14px;">El saldo se calcula solo, a partir de los abonos registrados.</p>

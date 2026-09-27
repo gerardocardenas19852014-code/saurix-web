@@ -73,10 +73,31 @@ export class LimitesComponent implements OnInit, OnDestroy {
     return this.categorias().find((c) => Number(c.id) === Number(id))?.nombre ?? '—';
   }
 
+  /** categoriaId + los ids de sus subcategorías directas (2 niveles nada más,
+   *  como en el resto de la app) — para que un límite puesto en la categoría
+   *  padre también sume lo gastado en sus hijas, en vez de solo lo que se
+   *  haya registrado directamente en la categoría padre misma. */
+  private idsConSubcategorias(categoriaId: number): Set<number> {
+    const ids = new Set<number>([Number(categoriaId)]);
+    for (const c of this.categorias()) {
+      if (Number(c.categoriaPresupuestoPadreId) === Number(categoriaId)) ids.add(Number(c.id));
+    }
+    return ids;
+  }
+
+  /** true si la categoría tiene subcategorías directas — para mostrar un
+   *  indicador de que el gasto acumulado ya las incluye. */
+  tieneSubcategorias(categoriaId: number | null): boolean {
+    if (!categoriaId) return false;
+    return this.categorias().some((c) => Number(c.categoriaPresupuestoPadreId) === Number(categoriaId));
+  }
+
   /** Gasto acumulado en el mes en curso para una categoría (o el total, si id es null = límite general).
+   *  Si la categoría tiene subcategorías, también suma lo gastado en ellas.
    *  Excluye movimientos proyectados a futuro (aún sin confirmar): no cuentan como gasto real todavía. */
   gastoDelMes(categoriaId: number | null): number {
     const hoy = new Date();
+    const idsCategoria = categoriaId ? this.idsConSubcategorias(categoriaId) : null;
     return this.movimientos()
       .filter((m) => !m.proyectado)
       .filter((m) => m.tipo === 'Gasto' && !m.transferenciaId)
@@ -84,7 +105,7 @@ export class LimitesComponent implements OnInit, OnDestroy {
         const f = fechaLocalDeTexto(m.fecha);
         return f.getFullYear() === hoy.getFullYear() && f.getMonth() === hoy.getMonth();
       })
-      .filter((m) => (categoriaId ? Number(m.categoriaPresupuestoId) === Number(categoriaId) : true))
+      .filter((m) => (idsCategoria ? idsCategoria.has(Number(m.categoriaPresupuestoId)) : true))
       .reduce((s, m) => s + m.monto, 0);
   }
 
@@ -131,9 +152,27 @@ export class LimitesComponent implements OnInit, OnDestroy {
       return;
     }
     const valor = this.form.getRawValue();
+    const categoriaId = valor.categoriaPresupuestoId ? Number(valor.categoriaPresupuestoId) : null;
+
+    // Evita dos límites para la misma categoría (o dos límites "General") —
+    // antes no había ninguna validación y se podían crear duplicados que
+    // solo confundirían cuál es el que realmente aplica.
+    const norm = (v: number | null | undefined) => (v ? Number(v) : null);
+    const duplicado = this.limites().some(
+      (l) => norm(l.categoriaPresupuestoId) === categoriaId && l.id !== this.enEdicion()?.id,
+    );
+    if (duplicado) {
+      this.toast.advertencia(
+        categoriaId
+          ? `Ya existe un límite para "${this.nombreCategoria(categoriaId)}" — edítalo en vez de crear otro.`
+          : 'Ya existe un límite general — edítalo en vez de crear otro.',
+      );
+      return;
+    }
+
     const payload = {
       ...valor,
-      categoriaPresupuestoId: valor.categoriaPresupuestoId ? Number(valor.categoriaPresupuestoId) : null,
+      categoriaPresupuestoId: categoriaId,
       creadoPorUsuarioId: this.usuarioActualId,
     };
     const esEdicion = this.enEdicion() !== null;

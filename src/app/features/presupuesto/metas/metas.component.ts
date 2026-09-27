@@ -9,6 +9,7 @@ import { ToastService } from '../../../shared/services/toast.service';
 import { CuentaPresupuesto } from '../cuenta-presupuesto/cuenta-presupuesto.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
 import { fechaLocalDeTexto, formatMoneda, opcionesCuentasBuscable } from '../shared/wallet.util';
+import { exportarCsv } from '../../../shared/utils/csv.util';
 import { MetaPresupuesto, MetaPresupuestoAporte } from './meta.model';
 import { SelectBuscableComponent } from '../../../shared/components/select-buscable/select-buscable.component';
 
@@ -122,6 +123,29 @@ export class MetasComponent implements OnInit, OnDestroy {
       .sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
   }
 
+  /** Exporta lo que esté visible en la lista (respeta "Mostrar cumplidas"). */
+  exportarCsvArchivo(): void {
+    const filas = this.metasVisibles();
+    exportarCsv(
+      'metas.csv',
+      [
+        { clave: 'nombre', etiqueta: 'Nombre' },
+        { clave: 'montoObjetivo', etiqueta: 'Monto objetivo' },
+        { clave: 'montoActual', etiqueta: 'Monto actual' },
+        { clave: 'fechaLimite', etiqueta: 'Fecha límite' },
+        { clave: 'estado', etiqueta: 'Estado' },
+      ],
+      filas.map((m) => ({
+        nombre: m.nombre,
+        montoObjetivo: m.montoObjetivo,
+        montoActual: m.montoActual,
+        fechaLimite: m.fechaLimite,
+        estado: this.cumplida(m) ? 'Cumplida' : 'En progreso',
+      })),
+    );
+    this.toast.exito(`Se descargó metas.csv (${filas.length} registro${filas.length === 1 ? '' : 's'}).`);
+  }
+
   toggleHistorial(meta: MetaPresupuesto): void {
     this.historialAbierto.update((id) => (id === meta.id ? null : meta.id));
   }
@@ -205,8 +229,10 @@ export class MetasComponent implements OnInit, OnDestroy {
    *  comportamiento de siempre). Si el usuario elige una cuenta, además se
    *  genera un Gasto real en Movimientos, igual que el "abonar" de Deudas. */
   aportar(meta: MetaPresupuesto, montoTexto: string, cuentaIdTexto: number | string | null): void {
-    const monto = parseFloat(montoTexto);
-    if (!monto || monto <= 0) {
+    // Ver comentario equivalente en Deudas.abonar(): Number(...) en vez de
+    // parseFloat para no truncar silenciosamente un texto mal escrito.
+    const monto = Number(montoTexto);
+    if (!montoTexto?.trim() || !Number.isFinite(monto) || monto <= 0) {
       this.toast.advertencia('Escribe un monto válido para aportar.');
       return;
     }

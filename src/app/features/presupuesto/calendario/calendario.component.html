@@ -1,33 +1,68 @@
 <div class="page-header">
   <h1>Calendario de pagos</h1>
+  <div class="page-actions">
+    <button type="button" class="tab-btn" [class.is-active]="vista() === 'lista'" (click)="vista.set('lista')">📋 Lista</button>
+    <button type="button" class="tab-btn" [class.is-active]="vista() === 'cuadricula'" (click)="vista.set('cuadricula')">▦ Cuadrícula</button>
+  </div>
 </div>
-<p class="hint" style="margin:-10px 0 24px;">Próximos fijos y próximo pago de cada tarjeta, a 60 días.</p>
+<p class="hint" style="margin:-10px 0 24px;">Próximos fijos, deudas por vencer, metas por cumplir y próximo pago de cada tarjeta, a 60 días.</p>
 
 @if (cargando()) {
   <p class="empty">Cargando…</p>
-} @else if (diasAgrupados().length === 0) {
-  <div class="empty-state-block">
-    <p>No hay pagos ni fijos próximos en los siguientes 60 días.</p>
-  </div>
-} @else {
-  @for (dia of diasAgrupados(); track dia.fecha.getTime()) {
-    <div class="wallet-calendar-day">
-      <div class="wallet-calendar-date">
-        <strong>{{ dia.fecha | date: 'dd MMM' }}</strong>
-        <span class="hint" style="margin:0;">{{ diasRestantes(dia.fecha) }}</span>
+} @else if (vista() === 'lista') {
+  @if (diasAgrupados().length === 0) {
+    <div class="empty-state-block">
+      <p>No hay pagos ni fijos próximos en los siguientes 60 días.</p>
+    </div>
+  } @else {
+    @for (dia of diasAgrupados(); track dia.fecha.getTime()) {
+      <div class="wallet-calendar-day">
+        <div class="wallet-calendar-date">
+          <strong>{{ dia.fecha | date: 'dd MMM' }}</strong>
+          <span class="hint" style="margin:0;">{{ diasRestantes(dia.fecha) }}</span>
+        </div>
+        <div class="wallet-calendar-events">
+          @for (evento of dia.eventos; track evento.titulo + evento.tipo) {
+            <div class="wallet-calendar-event">
+              <span>{{ evento.icono }} {{ evento.titulo }} <span class="hint" style="margin:0;">· {{ evento.detalle }}</span></span>
+              @if (evento.monto !== null) {
+                <span [class.wallet-tx-amount-in]="evento.tipo === 'Ingreso'" [class.wallet-tx-amount-out]="evento.tipo === 'Gasto'" style="font-family:'JetBrains Mono', monospace; font-weight:700;">
+                  {{ evento.tipo === 'Ingreso' ? '+' : '-' }}{{ formatMoneda(evento.monto) }}
+                </span>
+              }
+            </div>
+          }
+        </div>
       </div>
-      <div class="wallet-calendar-events">
-        @for (evento of dia.eventos; track evento.titulo + evento.tipo) {
-          <div class="wallet-calendar-event">
-            <span>{{ evento.icono }} {{ evento.titulo }} <span class="hint" style="margin:0;">· {{ evento.detalle }}</span></span>
-            @if (evento.monto !== null) {
-              <span [class.wallet-tx-amount-in]="evento.tipo === 'Ingreso'" [class.wallet-tx-amount-out]="evento.tipo === 'Gasto'" style="font-family:'JetBrains Mono', monospace; font-weight:700;">
-                {{ evento.tipo === 'Ingreso' ? '+' : '-' }}{{ formatMoneda(evento.monto) }}
-              </span>
-            }
-          </div>
+    }
+  }
+} @else {
+  <div class="wallet-calgrid-nav">
+    <button type="button" class="btn-secondary small" (click)="irMesAnterior()">‹ Anterior</button>
+    <strong style="text-transform:capitalize;">{{ etiquetaMesGrid() }}</strong>
+    <button type="button" class="btn-secondary small" (click)="irMesSiguiente()">Siguiente ›</button>
+    <button type="button" class="btn-secondary small" (click)="irMesHoy()">Hoy</button>
+  </div>
+  <div class="wallet-calgrid-head">
+    <span>Dom</span><span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span>
+  </div>
+  <div class="wallet-calgrid">
+    @for (celda of celdasGrid(); track $index) {
+      <div class="wallet-calgrid-cell" [class.wallet-calgrid-cell-vacia]="!celda.fecha" [class.wallet-calgrid-cell-hoy]="celda.esHoy">
+        @if (celda.fecha) {
+          <span class="wallet-calgrid-num">{{ celda.fecha | date: 'd' }}</span>
+          @for (evento of celda.eventos; track evento.titulo + evento.tipo) {
+            <span
+              class="wallet-calgrid-evento"
+              [class.wallet-calgrid-evento-in]="evento.tipo === 'Ingreso'"
+              [class.wallet-calgrid-evento-out]="evento.tipo === 'Gasto'"
+              [title]="evento.titulo + ' · ' + evento.detalle + (evento.monto !== null ? ' · ' + formatMoneda(evento.monto) : '')"
+            >
+              {{ evento.icono }} {{ evento.titulo }}
+            </span>
+          }
         }
       </div>
-    </div>
-  }
+    }
+  </div>
 }

@@ -10,6 +10,11 @@ export interface DeudaPresupuesto {
   montoOriginal: number;
   saldoActual: number;
   fechaInicio: string;
+  /** Opcional — cuándo vence/hay que liquidarla (p.ej. un préstamo con
+   *  fecha límite). null en deudas sin una fecha de vencimiento definida
+   *  (p.ej. una deuda informal sin plazo fijo). Se muestra en Calendario
+   *  igual que los Fijos y el pago de tarjetas. */
+  fechaVencimiento: string | null;
   creadoPorUsuarioId: number;
   activo: boolean;
   fechaCreacion?: string;

@@ -48,6 +48,17 @@ export class RecurrentesComponent implements OnInit, OnDestroy {
   protected readonly presupuestosAnuales = signal<PresupuestoAnual[]>([]);
   protected readonly cargando = signal(false);
 
+  /** Buscador por descripción o monto (mismo patrón que Movimientos). */
+  protected readonly filtroTexto = signal('');
+
+  protected readonly recurrentesFiltrados = computed(() => {
+    const texto = this.filtroTexto().trim().toLowerCase();
+    if (!texto) return this.recurrentes();
+    return this.recurrentes().filter(
+      (r) => r.descripcion.toLowerCase().includes(texto) || String(r.monto).includes(texto),
+    );
+  });
+
   /** Años dados de alta en Catálogos → "Presupuesto por año" — el campo
    *  "Desde" de un fijo Anual elige entre estos en vez de escribir el año
    *  libremente. Si todavía no hay ninguno registrado, se cae de vuelta a

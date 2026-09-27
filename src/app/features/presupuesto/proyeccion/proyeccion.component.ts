@@ -590,6 +590,12 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
   // ---------------------------------------------------------------------
 
   protected readonly gruposColapsados = signal<Set<string>>(new Set());
+
+  /** Buscador por nombre de categoría/cuenta — solo oculta renglones hoja/
+   *  detalle (las hojas y su desglose por cuenta); los títulos de sección,
+   *  grupo, subtotal y total de cada bloque se mantienen visibles siempre
+   *  para no romper la estructura ni los subtotales ya calculados. */
+  protected readonly filtroTextoProyeccion = signal('');
   private gruposColapsadosInicializados = false;
 
   /** La primera vez que ya se conocen los grupos (categorías con
@@ -629,10 +635,12 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
   protected readonly filasTabla = computed<RenglonProyeccion[]>(() => {
     const todas = [...this.resumen(), ...this.renglonesIngreso(), ...this.renglonesGasto(), ...this.renglonesAhorro()];
     const colapsados = this.gruposColapsados();
-    if (colapsados.size === 0) return todas;
+    const texto = this.filtroTextoProyeccion().trim().toLowerCase();
+    if (colapsados.size === 0 && !texto) return todas;
     return todas.filter((r) => {
       if (r.grupoId && colapsados.has(r.grupoId)) return false;
       if (r.hojaId && colapsados.has(r.hojaId)) return false;
+      if (texto && (r.tipo === 'hoja' || r.tipo === 'detalle') && !r.nombre.toLowerCase().includes(texto)) return false;
       return true;
     });
   });

@@ -5,9 +5,16 @@
   </div>
 </div>
 
+<div class="board-filters">
+  <label class="board-filter-field board-filter-field-buscar">
+    Buscar
+    <input type="search" [value]="filtroTexto()" placeholder="Buscar por descripción…" (input)="filtroTexto.set($any($event.target).value)" />
+  </label>
+</div>
+
 <app-data-table
   [columnas]="columnas"
-  [filas]="recurrentes()"
+  [filas]="recurrentesFiltrados()"
   [cargando]="cargando()"
   accionExtraEtiqueta="↻ Registrar ciclo"
   accionExtraTitulo="Registrar este ciclo como movimiento"

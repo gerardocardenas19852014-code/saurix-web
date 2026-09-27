@@ -126,6 +126,21 @@ export function formatMoneda(valor: number): string {
   return signo + Math.abs(valor).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/** Versión corta de formatMoneda (p.ej. "$12.4k"), pensada para etiquetas
+ *  directas sobre barras angostas donde el monto completo no cabe. Para el
+ *  monto exacto se sigue usando formatMoneda (p.ej. en el tooltip). */
+export function formatMonedaCompacta(valor: number): string {
+  const signo = valor < 0 ? '-$' : '$';
+  const abs = Math.abs(valor);
+  if (abs >= 1_000_000) {
+    return signo + (abs / 1_000_000).toLocaleString('es-MX', { maximumFractionDigits: 1 }) + 'M';
+  }
+  if (abs >= 1_000) {
+    return signo + (abs / 1_000).toLocaleString('es-MX', { maximumFractionDigits: 1 }) + 'k';
+  }
+  return signo + Math.round(abs).toLocaleString('es-MX');
+}
+
 /** Nivel de uso (ok/warn/over) para pintar una barra de límite/progreso. */
 export function nivelUso(pctReal: number): 'ok' | 'warn' | 'over' {
   if (pctReal >= 100) return 'over';

@@ -9,6 +9,7 @@ import { ToastService } from '../../../shared/services/toast.service';
 import { CuentaPresupuesto } from '../cuenta-presupuesto/cuenta-presupuesto.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
 import { fechaLocalDeTexto, formatMoneda, opcionesCuentasBuscable } from '../shared/wallet.util';
+import { exportarCsv } from '../../../shared/utils/csv.util';
 import { DeudaPresupuesto, DeudaPresupuestoAbono } from './deuda.model';
 import { SelectBuscableComponent } from '../../../shared/components/select-buscable/select-buscable.component';
 
@@ -83,6 +84,8 @@ export class DeudasComponent implements OnInit, OnDestroy {
     descripcion: ['', Validators.required],
     montoOriginal: [0, [Validators.required, Validators.min(0.01)]],
     fechaInicio: [new Date().toISOString().slice(0, 10), Validators.required],
+    /** Opcional — string vacío en el formulario se guarda como null (ver guardar()). */
+    fechaVencimiento: ['' as string],
   });
 
   private get usuarioActualId(): number {
@@ -142,19 +145,58 @@ export class DeudasComponent implements OnInit, OnDestroy {
     return this.saldoDeuda(deuda) <= 0;
   }
 
+  /** true si tiene fecha de vencimiento, no está liquidada, y esa fecha ya pasó. */
+  deudaVencida(deuda: DeudaPresupuesto): boolean {
+    if (!deuda.fechaVencimiento || this.liquidada(deuda)) return false;
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    return fechaLocalDeTexto(deuda.fechaVencimiento) < hoy;
+  }
+
   toggleHistorial(deuda: DeudaPresupuesto): void {
     this.historialAbierto.update((id) => (id === deuda.id ? null : deuda.id));
   }
 
+  /** Exporta lo que esté visible en la lista (respeta "Mostrar liquidadas"). */
+  exportarCsvArchivo(): void {
+    const filas = this.deudasVisibles();
+    exportarCsv(
+      'deudas.csv',
+      [
+        { clave: 'descripcion', etiqueta: 'Descripción' },
+        { clave: 'montoOriginal', etiqueta: 'Monto original' },
+        { clave: 'saldoActual', etiqueta: 'Saldo actual' },
+        { clave: 'fechaInicio', etiqueta: 'Fecha de inicio' },
+        { clave: 'fechaVencimiento', etiqueta: 'Fecha de vencimiento' },
+        { clave: 'estado', etiqueta: 'Estado' },
+      ],
+      filas.map((d) => ({
+        descripcion: d.descripcion,
+        montoOriginal: d.montoOriginal,
+        saldoActual: this.saldoDeuda(d),
+        fechaInicio: d.fechaInicio,
+        fechaVencimiento: d.fechaVencimiento ?? '—',
+        estado: this.liquidada(d) ? 'Liquidada' : 'Activa',
+      })),
+    );
+    this.toast.exito(`Se descargó deudas.csv (${filas.length} registro${filas.length === 1 ? '' : 's'}).`);
+  }
+
   nuevo(): void {
     this.enEdicion.set(null);
-    this.form.reset({ id: 0, descripcion: '', montoOriginal: 0, fechaInicio: new Date().toISOString().slice(0, 10) });
+    this.form.reset({ id: 0, descripcion: '', montoOriginal: 0, fechaInicio: new Date().toISOString().slice(0, 10), fechaVencimiento: '' });
     this.modalAbierto.set(true);
   }
 
   editar(item: DeudaPresupuesto): void {
     this.enEdicion.set(item);
-    this.form.reset({ id: item.id, descripcion: item.descripcion, montoOriginal: item.montoOriginal, fechaInicio: item.fechaInicio?.slice(0, 10) });
+    this.form.reset({
+      id: item.id,
+      descripcion: item.descripcion,
+      montoOriginal: item.montoOriginal,
+      fechaInicio: item.fechaInicio?.slice(0, 10),
+      fechaVencimiento: item.fechaVencimiento?.slice(0, 10) ?? '',
+    });
     this.modalAbierto.set(true);
   }
 
@@ -169,6 +211,7 @@ export class DeudasComponent implements OnInit, OnDestroy {
     const abonadoPrevio = esEdicion ? this.totalAbonado(valor.id) : 0;
     const payload = {
       ...valor,
+      fechaVencimiento: valor.fechaVencimiento?.trim() ? valor.fechaVencimiento : null,
       saldoActual: Math.max(valor.montoOriginal - abonadoPrevio, 0),
       creadoPorUsuarioId: this.usuarioActualId,
     };
@@ -191,8 +234,12 @@ export class DeudasComponent implements OnInit, OnDestroy {
    *  para que el pago se refleje en el saldo de esa cuenta y en
    *  Reportes/Dashboard, igual que cualquier otro gasto. */
   abonar(deuda: DeudaPresupuesto, montoTexto: string, cuentaIdTexto: number | string | null): void {
-    const monto = parseFloat(montoTexto);
-    if (!monto || monto <= 0) {
+    // Number(...) en vez de parseFloat: parseFloat('12.34.56') truncaría en
+    // el primer carácter inválido y guardaría "12.34" sin avisar — Number(...)
+    // exige que el texto completo sea un número válido, así un typo se
+    // rechaza en vez de guardarse silenciosamente mal.
+    const monto = Number(montoTexto);
+    if (!montoTexto?.trim() || !Number.isFinite(monto) || monto <= 0) {
       this.toast.advertencia('Escribe un monto válido para abonar.');
       return;
     }

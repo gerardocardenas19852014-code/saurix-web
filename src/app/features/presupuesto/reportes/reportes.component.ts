@@ -1,13 +1,15 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { AuthService } from '../../../core/services/auth.service';
+import { ToastService } from '../../../shared/services/toast.service';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { CategoriaPresupuesto } from '../categoria-presupuesto/categoria-presupuesto.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
 import { MovimientoRecurrentePresupuesto } from '../recurrentes/recurrente.model';
-import { colorCategoria, fechaLocalDeTexto, formatMoneda } from '../shared/wallet.util';
+import { colorCategoria, fechaLocalDeTexto, formatMoneda, formatMonedaCompacta } from '../shared/wallet.util';
+import { exportarCsv } from '../../../shared/utils/csv.util';
 
-type PeriodoId = 'mes-actual' | 'mes-anterior' | 'anio-actual' | 'anio-anterior';
+type PeriodoId = 'mes-actual' | 'mes-anterior' | 'anio-actual' | 'anio-anterior' | 'personalizado';
 
 interface RangoFecha {
   inicio: Date;
@@ -54,8 +56,10 @@ interface PlaneadoReal {
 export class ReportesComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
   private readonly auth = inject(AuthService);
+  protected readonly toast = inject(ToastService);
 
   protected readonly formatMoneda = formatMoneda;
+  protected readonly formatMonedaCompacta = formatMonedaCompacta;
 
   protected readonly movimientos = signal<MovimientoPresupuesto[]>([]);
 
@@ -69,6 +73,16 @@ export class ReportesComponent implements OnInit, OnDestroy {
 
   protected readonly periodo = signal<PeriodoId>('mes-actual');
   protected readonly vistaCategoria = signal<'dona' | 'barra'>('dona');
+
+  /** Rango "Personalizado": dos periodos arbitrarios elegidos a mano, en vez
+   *  de los 4 fijos de siempre — para comparar, por ejemplo, "lo que va del
+   *  año" contra el mismo tramo del año pasado, o cualquier par de fechas.
+   *  Comparación vacía = sin comparación (mismo resultado que "sin datos del
+   *  periodo anterior" ya usado para los demás periodos). */
+  protected readonly personalizadoInicio = signal(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10));
+  protected readonly personalizadoFin = signal(new Date().toISOString().slice(0, 10));
+  protected readonly personalizadoCompInicio = signal('');
+  protected readonly personalizadoCompFin = signal('');
 
   private get usuarioActualId(): number {
     return this.auth.usuarioActual()?.id ?? 0;
@@ -93,8 +107,46 @@ export class ReportesComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** Exporta el desglose de gasto e ingreso por categoría del periodo
+   *  seleccionado arriba (mismos datos que las gráficas de dona/barra). */
+  exportarCsvArchivo(): void {
+    const filas = [
+      ...this.gastoPorCategoria().map((c) => ({ tipo: 'Gasto', categoria: c.nombre, monto: c.monto, porcentaje: c.pct })),
+      ...this.ingresoPorCategoria().map((c) => ({ tipo: 'Ingreso', categoria: c.nombre, monto: c.monto, porcentaje: c.pct })),
+    ];
+    exportarCsv(
+      'reportes-por-categoria.csv',
+      [
+        { clave: 'tipo', etiqueta: 'Tipo' },
+        { clave: 'categoria', etiqueta: 'Categoría' },
+        { clave: 'monto', etiqueta: 'Monto' },
+        { clave: 'porcentaje', etiqueta: '% del periodo' },
+      ],
+      filas,
+    );
+    this.toast.exito(`Se descargó reportes-por-categoria.csv (${filas.length} registro${filas.length === 1 ? '' : 's'}).`);
+  }
+
   private rangosDe(id: PeriodoId): { actual: RangoFecha; anterior: RangoFecha; etiqueta: string } {
     const hoy = new Date();
+    if (id === 'personalizado') {
+      const finDeDia = (f: Date) => new Date(f.getFullYear(), f.getMonth(), f.getDate(), 23, 59, 59);
+      const inicioActual = fechaLocalDeTexto(this.personalizadoInicio() || hoy.toISOString().slice(0, 10));
+      const finActual = finDeDia(fechaLocalDeTexto(this.personalizadoFin() || hoy.toISOString().slice(0, 10)));
+      // Rango de comparación vacío (el usuario no llenó "Comparar contra") =
+      // un rango sin movimientos posibles (fin antes que inicio) — se traduce
+      // en totales(anterior) = 0, que variacionPct() ya interpreta como "sin
+      // datos del periodo anterior" en vez de mostrar una variación falsa.
+      const hayComparacion = !!this.personalizadoCompInicio() && !!this.personalizadoCompFin();
+      const inicioAnterior = hayComparacion ? fechaLocalDeTexto(this.personalizadoCompInicio()) : new Date(0);
+      const finAnterior = hayComparacion ? finDeDia(fechaLocalDeTexto(this.personalizadoCompFin())) : new Date(0);
+      const fmt = (f: Date) => f.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      return {
+        actual: { inicio: inicioActual, fin: finActual },
+        anterior: { inicio: inicioAnterior, fin: finAnterior },
+        etiqueta: `${fmt(inicioActual)} – ${fmt(finActual)}`,
+      };
+    }
     if (id === 'mes-actual' || id === 'mes-anterior') {
       const offset = id === 'mes-actual' ? 0 : -1;
       const base = new Date(hoy.getFullYear(), hoy.getMonth() + offset, 1);
@@ -154,14 +206,25 @@ export class ReportesComponent implements OnInit, OnDestroy {
     return `${signo} ${Math.abs(variacion).toFixed(0)}% vs. periodo anterior`;
   }
 
-  /** Gasto por categoría del periodo seleccionado, de mayor a menor. */
+  /** Categoría "raíz" de un movimiento: si es una subcategoría, la de su
+   *  padre — así el gasto/ingreso de "Comida > Restaurantes" se suma junto
+   *  con el de "Comida" en vez de aparecer como una rebanada aparte (mismo
+   *  criterio que ya usa Límites al acumular gasto contra un límite puesto
+   *  en la categoría padre). */
+  private categoriaRaizId(categoriaId: number | string | null): number | null {
+    if (!categoriaId) return null;
+    const cat = this.categorias().find((c) => Number(c.id) === Number(categoriaId));
+    return cat?.categoriaPresupuestoPadreId ? Number(cat.categoriaPresupuestoPadreId) : Number(categoriaId);
+  }
+
+  /** Gasto por categoría del periodo seleccionado, de mayor a menor (subcategorías sumadas a su padre). */
   protected readonly gastoPorCategoria = computed<GastoCategoria[]>(() => {
     const rango = this.rangosDe(this.periodo()).actual;
     const gastos = this.movimientosReales().filter((m) => m.tipo === 'Gasto' && !m.transferenciaId && this.enRango(m.fecha, rango));
     const total = gastos.reduce((s, m) => s + m.monto, 0);
     const porCategoria = new Map<number | null, number>();
     for (const m of gastos) {
-      const id = m.categoriaPresupuestoId ? Number(m.categoriaPresupuestoId) : null;
+      const id = this.categoriaRaizId(m.categoriaPresupuestoId);
       porCategoria.set(id, (porCategoria.get(id) ?? 0) + m.monto);
     }
     return [...porCategoria.entries()]
@@ -179,14 +242,14 @@ export class ReportesComponent implements OnInit, OnDestroy {
 
   protected readonly maxCategoria = computed(() => Math.max(1, ...this.gastoPorCategoria().map((c) => c.monto)));
 
-  /** Ingresos por categoría del periodo seleccionado, de mayor a menor (misma lógica que gasto por categoría). */
+  /** Ingresos por categoría del periodo seleccionado, de mayor a menor (misma lógica que gasto por categoría, subcategorías sumadas a su padre). */
   protected readonly ingresoPorCategoria = computed<GastoCategoria[]>(() => {
     const rango = this.rangosDe(this.periodo()).actual;
     const ingresos = this.movimientosReales().filter((m) => m.tipo === 'Ingreso' && !m.transferenciaId && this.enRango(m.fecha, rango));
     const total = ingresos.reduce((s, m) => s + m.monto, 0);
     const porCategoria = new Map<number | null, number>();
     for (const m of ingresos) {
-      const id = m.categoriaPresupuestoId ? Number(m.categoriaPresupuestoId) : null;
+      const id = this.categoriaRaizId(m.categoriaPresupuestoId);
       porCategoria.set(id, (porCategoria.get(id) ?? 0) + m.monto);
     }
     return [...porCategoria.entries()]

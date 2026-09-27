@@ -17,7 +17,12 @@
   @for (limite of limites(); track limite.id) {
     <div class="wallet-limit-card">
       <div class="wallet-limit-head">
-        <span><strong>{{ nombreCategoria(limite.categoriaPresupuestoId) }}</strong></span>
+        <span>
+          <strong>{{ nombreCategoria(limite.categoriaPresupuestoId) }}</strong>
+          @if (tieneSubcategorias(limite.categoriaPresupuestoId)) {
+            <span class="hint" style="margin-left:6px;" title="El gasto acumulado incluye lo gastado en sus subcategorías.">(incluye subcategorías)</span>
+          }
+        </span>
         <span class="wallet-limit-amounts">{{ formatMoneda(gastoDelMes(limite.categoriaPresupuestoId)) }} <span class="hint" style="margin:0;">de {{ formatMoneda(limite.montoLimite) }}</span></span>
       </div>
       <div class="wallet-limit-track">

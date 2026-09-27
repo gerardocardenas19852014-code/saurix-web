@@ -1,6 +1,17 @@
 <div class="page-header">
   <h1>Movimientos</h1>
   <div class="page-actions">
+    @if (tabActiva() === 'movimientos') {
+      <button
+        type="button"
+        class="btn-secondary small"
+        title="Exportar CSV"
+        aria-label="Exportar movimientos a CSV"
+        (click)="exportarCsvArchivo()"
+      >
+        ⇩ Exportar CSV
+      </button>
+    }
     <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo movimiento</button>
   </div>
 </div>
@@ -41,6 +52,19 @@
           @if (c.cuenta.diaPago) {
             <div class="hint" style="margin:6px 0 0;">Corte día {{ c.cuenta.diaCorte }} · paga día {{ c.cuenta.diaPago }}</div>
           }
+          @if (c.cuenta.pagoMinimo || c.cuenta.pagoSinIntereses) {
+            <div class="hint" style="margin:2px 0 0;">
+              @if (c.cuenta.pagoMinimo) {
+                Mínimo {{ formatMoneda(c.cuenta.pagoMinimo) }}
+              }
+              @if (c.cuenta.pagoMinimo && c.cuenta.pagoSinIntereses) {
+                ·
+              }
+              @if (c.cuenta.pagoSinIntereses) {
+                Sin intereses {{ formatMoneda(c.cuenta.pagoSinIntereses) }}
+              }
+            </div>
+          }
           @if (c.info.deuda > 0) {
             <div>
               <button type="button" class="btn-primary small" style="margin-top:10px;" (click)="pagarTarjeta(c)">💳 Pagar tarjeta</button>
@@ -57,14 +81,73 @@
 }
 
 @if (tabActiva() === 'grafica') {
+  <div class="board-filters" style="margin-bottom:18px;">
+    <label class="board-filter-field">
+      Año
+      @if (aniosDisponibles().length > 0) {
+        <select (change)="establecerFiltroAnio($any($event.target).value)">
+          @for (anio of aniosDisponibles(); track anio) {
+            <option [value]="anio" [selected]="anio === filtroAnio()">{{ anio }}</option>
+          }
+        </select>
+      } @else {
+        <select disabled title="Registra un año en Catálogos → Presupuesto por año para poder elegirlo aquí.">
+          <option>Sin años registrados</option>
+        </select>
+      }
+    </label>
+    <label class="board-filter-field">
+      Desde
+      <select (change)="graficaMesDesde.set($any($event.target).value)">
+        @for (opcion of mesesGrafica; track opcion.valor) {
+          <option [value]="opcion.valor" [selected]="opcion.valor === graficaMesDesde()">{{ opcion.etiqueta }}</option>
+        }
+      </select>
+    </label>
+    <label class="board-filter-field">
+      Hasta
+      <select (change)="graficaMesHasta.set($any($event.target).value)">
+        @for (opcion of mesesGrafica; track opcion.valor) {
+          <option [value]="opcion.valor" [selected]="opcion.valor === graficaMesHasta()">{{ opcion.etiqueta }}</option>
+        }
+      </select>
+    </label>
+  </div>
+
   @if (resumenMensual().length > 0) {
-    <h2 class="settings-card-title" style="margin:0 0 12px;">Ingresos vs. gastos (últimos 6 meses)</h2>
+    <h2 class="settings-card-title" style="margin:0 0 10px;">Ingresos vs. gastos ({{ etiquetaRangoGrafica() }})</h2>
+    <div class="wallet-monthly-legend">
+      <span class="wallet-monthly-legend-item">
+        <span class="wallet-monthly-legend-swatch wallet-monthly-legend-swatch-in"></span>Ingresos
+      </span>
+      <span class="wallet-monthly-legend-item">
+        <span class="wallet-monthly-legend-swatch wallet-monthly-legend-swatch-out"></span>Gastos
+      </span>
+    </div>
     <div class="wallet-monthly-chart" style="margin-bottom:28px;">
       @for (columna of resumenMensual(); track columna.etiqueta) {
         <div class="wallet-monthly-col">
           <div class="wallet-monthly-bars">
-            <div class="wallet-monthly-bar wallet-monthly-bar-in" [style.height.px]="(columna.ingreso / maxMensual()) * 140"></div>
-            <div class="wallet-monthly-bar wallet-monthly-bar-out" [style.height.px]="(columna.gasto / maxMensual()) * 140"></div>
+            <div class="wallet-monthly-bar-wrap">
+              @if (columna.ingreso > 0) {
+                <span class="wallet-monthly-bar-valor">{{ formatMonedaCompacta(columna.ingreso) }}</span>
+              }
+              <div
+                class="wallet-monthly-bar wallet-monthly-bar-in"
+                [style.height.px]="(columna.ingreso / maxMensual()) * 120"
+                [attr.title]="'Ingresos ' + columna.etiqueta + ': ' + formatMoneda(columna.ingreso)"
+              ></div>
+            </div>
+            <div class="wallet-monthly-bar-wrap">
+              @if (columna.gasto > 0) {
+                <span class="wallet-monthly-bar-valor">{{ formatMonedaCompacta(columna.gasto) }}</span>
+              }
+              <div
+                class="wallet-monthly-bar wallet-monthly-bar-out"
+                [style.height.px]="(columna.gasto / maxMensual()) * 120"
+                [attr.title]="'Gastos ' + columna.etiqueta + ': ' + formatMoneda(columna.gasto)"
+              ></div>
+            </div>
           </div>
           <span class="wallet-monthly-label">{{ columna.etiqueta }}</span>
         </div>
@@ -253,6 +336,12 @@
     <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()" style="max-width:560px;">
       <h3>{{ movimientoEnEdicion() ? 'Editar movimiento' : 'Nuevo movimiento' }}</h3>
 
+      @if (esTransferenciaEdicion()) {
+        <p style="margin:0 0 14px;padding:8px 10px;border-radius:8px;border:1px solid var(--line);font-size:12.5px;color:var(--ink-soft);">
+          🔁 Este movimiento es una pierna de una transferencia entre cuentas. Tipo, cuenta y categoría no se pueden cambiar aquí; fecha, monto y descripción se sincronizan automáticamente con su pareja al guardar.
+        </p>
+      }
+
       <div class="edit-form form-grid-2col" style="margin-bottom:18px;">
         <label>
           Fecha
@@ -326,7 +415,7 @@
 <app-confirm-dialog
   [visible]="movimientoAEliminar() !== null"
   titulo="Eliminar movimiento"
-  [mensaje]="'¿Eliminar este movimiento?'"
+  [mensaje]="mensajeEliminar()"
   (confirmar)="confirmarEliminar()"
   (cancelar)="movimientoAEliminar.set(null)"
 />

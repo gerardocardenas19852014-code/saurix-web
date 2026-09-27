@@ -762,9 +762,24 @@ html[data-theme='dark'] .edit-form input[type=date], html[data-theme='ocean'] .e
 .wallet-tx-grid .tag.wallet-tx-amount-in { color: var(--client); border-color: var(--client); }
 .wallet-tx-grid .tag.wallet-tx-amount-out { color: var(--danger); border-color: var(--danger); }
 .wallet-tx-grid-tag-ok { color: var(--client); border-color: var(--client); }
-.wallet-monthly-chart { display: flex; align-items: flex-end; gap: 14px; height: 170px; padding: 10px 4px 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
-.wallet-monthly-col { flex: 1; min-width: 44px; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 8px; }
-.wallet-monthly-bars { display: flex; gap: 4px; align-items: flex-end; height: 100%; }
+.wallet-monthly-legend { display: flex; gap: 18px; margin: 0 0 10px; }
+.wallet-monthly-legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-soft); }
+.wallet-monthly-legend-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.wallet-monthly-legend-swatch-in { background: var(--client); }
+.wallet-monthly-legend-swatch-out { background: var(--danger); }
+
+.wallet-monthly-chart { display: flex; align-items: flex-end; gap: 14px; height: 170px; padding: 10px 4px 0; border-bottom: 1px solid var(--line); overflow-x: auto; overflow-y: visible; }
+.wallet-monthly-col { flex: 1; min-width: 50px; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 8px; }
+.wallet-monthly-bars { display: flex; gap: 6px; align-items: flex-end; height: 100%; }
+.wallet-monthly-bar-wrap { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+.wallet-monthly-bar-valor {
+  font-size: 10.5px;
+  line-height: 1;
+  color: var(--text-strong);
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 3px;
+  white-space: nowrap;
+}
 .wallet-monthly-bar { width: 16px; border-radius: 4px 4px 0 0; min-height: 2px; }
 .wallet-monthly-bar-in { background: var(--client); }
 .wallet-monthly-bar-out { background: var(--danger); }
@@ -773,6 +788,39 @@ html[data-theme='dark'] .edit-form input[type=date], html[data-theme='ocean'] .e
 .wallet-calendar-date { flex: 0 0 110px; display: flex; flex-direction: column; gap: 4px; text-transform: capitalize; font-size: 13px; }
 .wallet-calendar-events { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .wallet-calendar-event { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+
+// Vista de cuadrícula mensual del Calendario de pagos (alternativa a la
+// Lista de agenda de arriba) — misma fuente de eventos, distinta forma de
+// mostrarlos: un mes completo tipo calendario de pared.
+.wallet-calgrid-nav { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.wallet-calgrid-head { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 6px; }
+.wallet-calgrid-head span { text-align: center; font-size: 11.5px; color: var(--ink-soft); text-transform: uppercase; }
+.wallet-calgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.wallet-calgrid-cell {
+  min-height: 84px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow: hidden;
+}
+.wallet-calgrid-cell-vacia { border-color: transparent; }
+.wallet-calgrid-cell-hoy { border-color: var(--client); background: var(--client-soft); }
+.wallet-calgrid-num { font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--ink-soft); }
+.wallet-calgrid-evento {
+  font-size: 10.5px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wallet-calgrid-evento-in { border-color: var(--client); }
+.wallet-calgrid-evento-out { border-color: var(--danger); }
 .wallet-limit-card { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; }
 .wallet-limit-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
 .wallet-limit-amounts { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
@@ -808,7 +856,9 @@ html[data-theme='dark'] .edit-form input[type=date], html[data-theme='ocean'] .e
 .wallet-cat-bar-amount { flex: 0 0 auto; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
 .wallet-networth-chart { width: 100%; height: 220px; }
 .wallet-networth-labels { display: flex; justify-content: space-between; margin-top: 6px; }
-.wallet-networth-labels span { font-size: 11px; color: var(--ink-soft); font-family: 'JetBrains Mono', monospace; text-transform: capitalize; }
+.wallet-networth-label-col { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.wallet-networth-label-valor { font-size: 10.5px; color: var(--text-strong); font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
+.wallet-networth-label-mes { font-size: 11px; color: var(--ink-soft); font-family: 'JetBrains Mono', monospace; text-transform: capitalize; }
 /* Aviso de gasto inusual (Dashboard de Presupuesto) — mes actual vs. promedio de los últimos 3 meses por categoría. */
 .wallet-alert-block { background: var(--amber-soft); border: 1px solid var(--amber); border-radius: 12px; padding: 14px 18px; margin-bottom: 24px; }
 .wallet-alert-block strong { color: var(--amber); }

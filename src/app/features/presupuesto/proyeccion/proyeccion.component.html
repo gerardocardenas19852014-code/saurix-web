@@ -8,6 +8,15 @@
 </p>
 
 <div class="board-filters">
+  <label class="board-filter-field board-filter-field-buscar">
+    Buscar
+    <input
+      type="search"
+      [value]="filtroTextoProyeccion()"
+      placeholder="Buscar categoría o cuenta…"
+      (input)="filtroTextoProyeccion.set($any($event.target).value)"
+    />
+  </label>
   <label class="board-filter-field">
     Año
     @if (aniosDisponibles().length > 0) {

@@ -1,5 +1,16 @@
 <div class="page-header">
   <h1>Reportes</h1>
+  <div class="page-actions">
+    <button
+      type="button"
+      class="btn-secondary small"
+      title="Exportar CSV"
+      aria-label="Exportar gasto e ingreso por categoría a CSV"
+      (click)="exportarCsvArchivo()"
+    >
+      ⇩ Exportar CSV
+    </button>
+  </div>
 </div>
 
 @if (cargando()) {
@@ -13,8 +24,27 @@
         <option value="mes-anterior">Mes anterior</option>
         <option value="anio-actual">Este año</option>
         <option value="anio-anterior">Año anterior</option>
+        <option value="personalizado">Personalizado…</option>
       </select>
     </label>
+    @if (periodo() === 'personalizado') {
+      <label class="board-filter-field">
+        Desde
+        <input type="date" [value]="personalizadoInicio()" (input)="personalizadoInicio.set($any($event.target).value)" />
+      </label>
+      <label class="board-filter-field">
+        Hasta
+        <input type="date" [value]="personalizadoFin()" (input)="personalizadoFin.set($any($event.target).value)" />
+      </label>
+      <label class="board-filter-field">
+        Comparar contra (opcional)
+        <input type="date" [value]="personalizadoCompInicio()" (input)="personalizadoCompInicio.set($any($event.target).value)" />
+      </label>
+      <label class="board-filter-field">
+        Hasta
+        <input type="date" [value]="personalizadoCompFin()" (input)="personalizadoCompFin.set($any($event.target).value)" />
+      </label>
+    }
   </div>
 
   <h2 class="settings-card-title" style="margin:0 0 12px; text-transform:capitalize;">Ingresos vs. gastos — {{ etiquetaPeriodo() }}</h2>
@@ -133,7 +163,10 @@
   </svg>
   <div class="wallet-networth-labels">
     @for (punto of patrimonioHistorico(); track punto.etiqueta + punto.x) {
-      <span>{{ punto.etiqueta }}</span>
+      <span class="wallet-networth-label-col">
+        <span class="wallet-networth-label-valor">{{ formatMonedaCompacta(punto.valor) }}</span>
+        <span class="wallet-networth-label-mes">{{ punto.etiqueta }}</span>
+      </span>
     }
   </div>
 }
