@@ -558,6 +558,15 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       saldoFinal.push({ valor: saldoPrevio, manual: false, editable: false });
     }
 
+    // "Saldo inicial" hace de renglón-cabecera colapsable de todo el bloque
+    // resumen (mismo patrón que una hoja con >1 cuenta, ej. SALARIO): se
+    // reutiliza su propia clave ('saldoInicial') como llave de toggle, y los
+    // demás renglones del bloque cuelgan de ella vía hojaId — así el usuario
+    // puede contraer Total ingresos/Total gastos/Ahorro/Saldo final para
+    // ganar espacio vertical sin perder de vista el saldo inicial. No se
+    // agrega a los grupos colapsados por defecto (_colapsarGruposPorDefecto
+    // solo mira renglonesIngreso/Gasto/Ahorro, no resumen()), así que arranca
+    // siempre expandido.
     const filas: RenglonProyeccion[] = [
       {
         id: 'resumen:saldoInicial',
@@ -567,10 +576,38 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
         celdas: saldoInicial,
         sumable: false,
         grupoId: null,
+        tieneDetalle: true,
       },
-      { id: 'resumen:totalIngreso', tipo: 'resumen', clave: null, nombre: 'Total ingresos', celdas: totalIngreso, sumable: true, grupoId: null },
-      { id: 'resumen:totalGasto', tipo: 'resumen', clave: null, nombre: 'Total gastos', celdas: totalGasto, sumable: true, grupoId: null },
-      { id: 'resumen:ahorro', tipo: 'resumen', clave: null, nombre: 'Ahorro', celdas: totalAhorro, sumable: true, grupoId: null },
+      {
+        id: 'resumen:totalIngreso',
+        tipo: 'resumen',
+        clave: null,
+        nombre: 'Total ingresos',
+        celdas: totalIngreso,
+        sumable: true,
+        grupoId: null,
+        hojaId: 'saldoInicial',
+      },
+      {
+        id: 'resumen:totalGasto',
+        tipo: 'resumen',
+        clave: null,
+        nombre: 'Total gastos',
+        celdas: totalGasto,
+        sumable: true,
+        grupoId: null,
+        hojaId: 'saldoInicial',
+      },
+      {
+        id: 'resumen:ahorro',
+        tipo: 'resumen',
+        clave: null,
+        nombre: 'Ahorro',
+        celdas: totalAhorro,
+        sumable: true,
+        grupoId: null,
+        hojaId: 'saldoInicial',
+      },
       {
         id: 'resumen:saldoFinal',
         tipo: 'resumen',
@@ -579,6 +616,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
         celdas: saldoFinal,
         sumable: false,
         grupoId: null,
+        hojaId: 'saldoInicial',
       },
     ];
     filas.forEach((r) => (r.seccion = 'resumen'));
@@ -637,11 +675,35 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
     const colapsados = this.gruposColapsados();
     const texto = this.filtroTextoProyeccion().trim().toLowerCase();
     if (colapsados.size === 0 && !texto) return todas;
+
+    // Buscar "hipoteca" no servía de nada si esa hoja vivía dentro de un
+    // grupo contraído (el colapsado la ocultaba de todos modos, antes de
+    // que el buscador tuviera oportunidad de mostrarla) — con texto de
+    // búsqueda activo se ignora el colapsado manual por completo. Una hoja
+    // también cuenta como match si el nombre no coincide pero sí el de
+    // alguno de sus detalles (desglose por cuenta), para no dejarlo huérfano.
+    const hojaConDetalleQueMatchea = new Set<string>();
+    if (texto) {
+      for (const r of todas) {
+        if (r.tipo === 'detalle' && r.hojaId && r.nombre.toLowerCase().includes(texto)) {
+          hojaConDetalleQueMatchea.add(r.hojaId);
+        }
+      }
+    }
+
     return todas.filter((r) => {
-      if (r.grupoId && colapsados.has(r.grupoId)) return false;
-      if (r.hojaId && colapsados.has(r.hojaId)) return false;
-      if (texto && (r.tipo === 'hoja' || r.tipo === 'detalle') && !r.nombre.toLowerCase().includes(texto)) return false;
-      return true;
+      if (!texto) {
+        if (r.grupoId && colapsados.has(r.grupoId)) return false;
+        if (r.hojaId && colapsados.has(r.hojaId)) return false;
+        return true;
+      }
+      if (r.tipo === 'hoja') {
+        return r.nombre.toLowerCase().includes(texto) || (r.clave !== null && hojaConDetalleQueMatchea.has(r.clave));
+      }
+      if (r.tipo === 'detalle') {
+        return r.nombre.toLowerCase().includes(texto);
+      }
+      return true; // resumen/seccion-titulo/grupo/subtotal/total: siempre visibles
     });
   });
 
