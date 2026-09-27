@@ -66,8 +66,11 @@
         @for (renglon of filasTabla(); track renglon.id) {
           @switch (renglon.tipo) {
             @case ('seccion-titulo') {
-              <tr class="proy-fila-seccion">
-                <td [attr.colspan]="quincenasVisibles().length + 2">{{ renglon.nombre }}</td>
+              <tr class="proy-fila-seccion" (click)="toggleGrupo(renglon.clave)">
+                <td [attr.colspan]="quincenasVisibles().length + 2">
+                  <span class="proy-grupo-flecha">{{ estaColapsado(renglon.clave) ? '▸' : '▾' }}</span>
+                  {{ renglon.nombre }}
+                </td>
               </tr>
             }
             @case ('grupo') {

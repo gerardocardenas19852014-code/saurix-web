@@ -474,8 +474,14 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
 
   private construirSeccion(idSeccion: string, titulo: string, raices: RaizFila[]): RenglonProyeccion[] {
     const quincenas = this.quincenas();
+    // El título de sección (INGRESO/GASTOS/AHORROS) también es colapsable
+    // ahora: usa su propia idSeccion ('ingreso'/'gasto'/'ahorro') como llave
+    // de toggle (mismo Set gruposColapsados de siempre) — al contraerlo se
+    // ocultan todos los grupos/hojas/detalles/subtotales de la sección (ver
+    // filasTabla), dejando visibles solo el título y el TOTAL de la
+    // sección, igual que un grupo colapsado deja ver su Subtotal.
     const renglones: RenglonProyeccion[] = [
-      { id: `sec:${idSeccion}`, tipo: 'seccion-titulo', clave: null, nombre: titulo, celdas: [], sumable: false, grupoId: null },
+      { id: `sec:${idSeccion}`, tipo: 'seccion-titulo', clave: idSeccion, nombre: titulo, celdas: [], sumable: false, grupoId: null },
     ];
     const totalSeccion = quincenas.map(() => 0);
 
@@ -643,12 +649,25 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
    *  entraba a la pantalla; ahora se ven así desde el inicio y el usuario
    *  expande a mano solo los que quiera revisar. */
   private readonly _colapsarGruposPorDefecto = effect(() => {
-    if (this.gruposColapsadosInicializados) return;
-    const todas = [...this.renglonesIngreso(), ...this.renglonesGasto(), ...this.renglonesAhorro()];
+    // Espera a que termine cargar() (en vez de adivinar por "¿ya hay algún
+    // grupo?"): antes, con una cuenta sin categorías padre/hijo todavía,
+    // `claves` podía salir vacío en la primera pasada y el efecto se volvía
+    // a intentar seguido sin problema — pero ahora que también se colapsan
+    // por defecto los títulos de sección (INGRESO/GASTOS/AHORROS) y "Saldo
+    // inicial", que existen SIEMPRE aunque no haya categorías, `claves`
+    // dejaría de estar vacío desde el primer render (antes de que
+    // categorias/movimientos llegaran de verdad) y la inicialización se
+    // marcaría lista de más, perdiéndose los grupos reales que aparecen
+    // después. Esperar a `cargando() === false` es la señal correcta.
+    if (this.gruposColapsadosInicializados || this.cargando()) return;
+    const todas = [...this.resumen(), ...this.renglonesIngreso(), ...this.renglonesGasto(), ...this.renglonesAhorro()];
     const claves = todas
-      .filter((r) => (r.tipo === 'grupo' || (r.tipo === 'hoja' && r.tieneDetalle)) && r.clave)
+      .filter(
+        (r) =>
+          (r.tipo === 'grupo' || r.tipo === 'seccion-titulo' || ((r.tipo === 'hoja' || r.tipo === 'resumen') && r.tieneDetalle)) &&
+          r.clave,
+      )
       .map((r) => r.clave as string);
-    if (claves.length === 0) return;
     this.gruposColapsadosInicializados = true;
     this.gruposColapsados.set(new Set(claves));
   });
@@ -695,6 +714,11 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       if (!texto) {
         if (r.grupoId && colapsados.has(r.grupoId)) return false;
         if (r.hojaId && colapsados.has(r.hojaId)) return false;
+        // Sección (INGRESO/GASTOS/AHORROS) colapsada: oculta todo lo de
+        // adentro (grupo/hoja/detalle/subtotal), pero deja ver el propio
+        // título de sección y su TOTAL — igual que un grupo colapsado deja
+        // ver su Subtotal.
+        if (r.seccion && r.tipo !== 'seccion-titulo' && r.tipo !== 'total' && colapsados.has(r.seccion)) return false;
         return true;
       }
       if (r.tipo === 'hoja') {
