@@ -174,22 +174,22 @@
     />
   </label>
   <label class="board-filter-field">
-    Categoría
-    <app-select-buscable
-      [opciones]="opcionesCategoriaFiltro()"
-      [value]="filtroCategoriaId()"
-      (valueChange)="filtroCategoriaId.set(+($event ?? 0))"
-      placeholder="Buscar categoría…"
-    />
-  </label>
-  <label class="board-filter-field">
     Tipo
-    <select [value]="filtroTipo()" (change)="filtroTipo.set($any($event.target).value)">
+    <select [value]="filtroTipo()" (change)="establecerFiltroTipo($any($event.target).value)">
       <option value="">Todos</option>
       @for (t of tiposMovimiento(); track t.id) {
         <option [value]="t.clave">{{ t.etiqueta }}</option>
       }
     </select>
+  </label>
+  <label class="board-filter-field">
+    Categoría
+    <app-select-buscable
+      [opciones]="opcionesCategoriaFiltro()"
+      [value]="filtroCategoriaId()"
+      (valueChange)="filtroCategoriaId.set(+($event ?? 0))"
+      placeholder="Buscar categoría… (según el Tipo elegido)"
+    />
   </label>
 </div>
 

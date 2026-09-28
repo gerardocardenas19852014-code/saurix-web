@@ -117,9 +117,19 @@ export class MovimientosComponent implements OnInit, OnDestroy {
    *  Gas, Luz...). Agrupadas, <app-select-buscable> las agrupa visualmente
    *  (título en negritas, hijas con sangría) igual que hacía el <optgroup>
    *  anterior, pero ahora también se pueden filtrar escribiendo. */
+  /** Solo categorías del Tipo elegido en el filtro de arriba (o sin Tipo
+   *  definido — catálogo previo a ese campo). Antes el combo de "Categoría"
+   *  del filtro mostraba TODAS las categorías sin importar el Tipo elegido,
+   *  aunque Categoría depende de Tipo (mismo patrón ya usado en el
+   *  formulario Nuevo/Editar movimiento, ver categoriasFiltradas). */
+  protected readonly categoriasFiltroPorTipo = computed(() => {
+    const tipo = this.filtroTipo();
+    return tipo === '' ? this.categorias() : this.categorias().filter((c) => !c.tipo || c.tipo === tipo);
+  });
+
   protected readonly opcionesCategoriaFiltro = computed(() => [
     { valor: 0, etiqueta: 'Todas' },
-    ...opcionesCategoriasBuscable(this.categorias()),
+    ...opcionesCategoriasBuscable(this.categoriasFiltroPorTipo()),
   ]);
   protected readonly tiposMovimiento = signal<ValorLista[]>([]);
   protected readonly cargando = signal(false);
@@ -139,6 +149,18 @@ export class MovimientosComponent implements OnInit, OnDestroy {
   protected readonly filtroCuentaId = signal(0);
   protected readonly filtroCategoriaId = signal(0);
   protected readonly filtroTipo = signal<string>('');
+
+  /** Al cambiar el Tipo del filtro, si la Categoría ya elegida deja de
+   *  aplicar a ese Tipo, se limpia a "Todas" — evita dejar un filtro
+   *  imposible de cumplir (p.ej. Tipo=Ingreso + Categoría de gasto), igual
+   *  que onTipoChange() ya hace en el formulario Nuevo/Editar movimiento. */
+  protected establecerFiltroTipo(valor: string): void {
+    this.filtroTipo.set(valor);
+    const categoria = this.categorias().find((c) => Number(c.id) === Number(this.filtroCategoriaId()));
+    if (valor !== '' && categoria?.tipo && categoria.tipo !== valor) {
+      this.filtroCategoriaId.set(0);
+    }
+  }
   /** "" = todos los meses; si no, "año-mes" (mes 0-indexado, ver claveMes()). */
   protected readonly filtroMes = signal<string>('');
   protected readonly anioTrabajo = inject(AnioTrabajoService);
