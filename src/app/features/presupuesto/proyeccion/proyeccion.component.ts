@@ -7,10 +7,11 @@ import { CategoriaPresupuesto } from '../categoria-presupuesto/categoria-presupu
 import { CuentaPresupuesto } from '../cuenta-presupuesto/cuenta-presupuesto.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
 import { MovimientoRecurrentePresupuesto } from '../recurrentes/recurrente.model';
-import { formatMoneda, textoFechaDeLocal } from '../shared/wallet.util';
+import { formatMoneda, formatMonedaCompacta, textoFechaDeLocal } from '../shared/wallet.util';
 import { AnioTrabajoService } from '../shared/anio-trabajo.service';
 import { PresupuestoAnual } from '../presupuesto-anual/presupuesto-anual.model';
 import { ProyeccionAjuste } from './proyeccion-ajuste.model';
+import { ColumnaCsv, exportarCsv } from '../../../shared/utils/csv.util';
 
 /** Una quincena (1-15 / 16-fin de mes) de la ventana de proyección. */
 interface Quincena {
@@ -24,6 +25,12 @@ interface Celda {
   valor: number;
   manual: boolean;
   editable: boolean;
+  /** Solo en el renglón de comparación con el año anterior: true cuando
+   *  no hay NINGÚN movimiento real en esa quincena de hace un año — se
+   *  distingue de un $0 real (si de verdad no gastó nada) para no dar a
+   *  entender que "el año pasado no gastaste nada" cuando en realidad
+   *  todavía no existía el registro. */
+  sinDatos?: boolean;
 }
 
 /** Un renglón de la tabla — resumen, título de sección, grupo (categoría con
@@ -54,6 +61,11 @@ interface RenglonProyeccion {
    *  pintar un tinte de fondo sutil por sección y ayudar a no perderse
    *  al leer la tabla; no afecta ningún cálculo. */
   seccion?: 'resumen' | 'ingreso' | 'gasto' | 'ahorro';
+  /** Solo en los 2 renglones de referencia "(año anterior)" que se
+   *  agregan al resumen cuando se activa "Comparar con el año anterior"
+   *  — para poder darles un estilo distinto (más discreto) sin tener que
+   *  adivinarlo por el nombre. */
+  esComparacion?: boolean;
 }
 
 interface RaizFila {
@@ -89,6 +101,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
   protected readonly toast = inject(ToastService);
 
   protected readonly formatMoneda = formatMoneda;
+  protected readonly formatMonedaCompacta = formatMonedaCompacta;
 
   protected readonly cargando = signal(false);
   protected readonly categorias = signal<CategoriaPresupuesto[]>([]);
@@ -106,6 +119,11 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
    *  editar una celda ni la navegación con flechas servirían de nada (lo
    *  que se teclee no llegaría a ningún lado). */
   private readonly inputEditando = viewChild<ElementRef<HTMLInputElement>>('inputEditando');
+
+  /** El contenedor con scroll horizontal de la tabla — para "Ir a hoy"
+   *  (regresar de un salto a la quincena actual sin tener que arrastrar
+   *  la barra de scroll a mano). */
+  private readonly scrollContenedor = viewChild<ElementRef<HTMLDivElement>>('scrollContenedor');
 
   private readonly _enfocarAlEditar = effect(() => {
     const editandoAhora = this.editando();
@@ -569,10 +587,9 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
     // reutiliza su propia clave ('saldoInicial') como llave de toggle, y los
     // demás renglones del bloque cuelgan de ella vía hojaId — así el usuario
     // puede contraer Total ingresos/Total gastos/Ahorro/Saldo final para
-    // ganar espacio vertical sin perder de vista el saldo inicial. No se
-    // agrega a los grupos colapsados por defecto (_colapsarGruposPorDefecto
-    // solo mira renglonesIngreso/Gasto/Ahorro, no resumen()), así que arranca
-    // siempre expandido.
+    // ganar espacio vertical sin perder de vista el saldo inicial.
+    const comparacion = this.compararAnioAnterior() ? this.comparacionAnioAnterior() : null;
+
     const filas: RenglonProyeccion[] = [
       {
         id: 'resumen:saldoInicial',
@@ -594,6 +611,21 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
         grupoId: null,
         hojaId: 'saldoInicial',
       },
+      ...(comparacion
+        ? [
+            {
+              id: 'resumen:totalIngresoAnioAnterior',
+              tipo: 'resumen' as const,
+              clave: null,
+              nombre: 'Total ingresos (año anterior)',
+              celdas: comparacion.map((c) => ({ valor: c.ingreso, manual: false, editable: false, sinDatos: !c.hayDatos })),
+              sumable: true,
+              grupoId: null,
+              hojaId: 'saldoInicial',
+              esComparacion: true,
+            },
+          ]
+        : []),
       {
         id: 'resumen:totalGasto',
         tipo: 'resumen',
@@ -604,6 +636,21 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
         grupoId: null,
         hojaId: 'saldoInicial',
       },
+      ...(comparacion
+        ? [
+            {
+              id: 'resumen:totalGastoAnioAnterior',
+              tipo: 'resumen' as const,
+              clave: null,
+              nombre: 'Total gastos (año anterior)',
+              celdas: comparacion.map((c) => ({ valor: c.gasto, manual: false, editable: false, sinDatos: !c.hayDatos })),
+              sumable: true,
+              grupoId: null,
+              hojaId: 'saldoInicial',
+              esComparacion: true,
+            },
+          ]
+        : []),
       {
         id: 'resumen:ahorro',
         tipo: 'resumen',
@@ -629,6 +676,30 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
     return filas;
   });
 
+  /** Para cada quincena de la ventana visible, el total real de
+   *  ingresos/gastos de la MISMA quincena (1-15/16-fin) pero un año
+   *  antes — NO es una proyección: son movimientos reales ya capturados
+   *  (si los hay). `hayDatos` distingue "de verdad gastó $0 esa
+   *  quincena" de "todavía no existía ningún registro esa fecha", para
+   *  no confundir al usuario con puros ceros de una época sin captura. */
+  protected readonly comparacionAnioAnterior = computed(() => {
+    const quincenas = this.quincenas();
+    const totales = new Map<string, { ingreso: number; gasto: number }>();
+    for (const m of this.movimientos()) {
+      if (m.transferenciaId || (m.tipo !== 'Ingreso' && m.tipo !== 'Gasto')) continue;
+      const quincenaClave = this.quincenaDeFecha(m.fecha);
+      const entrada = totales.get(quincenaClave) ?? { ingreso: 0, gasto: 0 };
+      if (m.tipo === 'Ingreso') entrada.ingreso += m.monto;
+      else entrada.gasto += m.monto;
+      totales.set(quincenaClave, entrada);
+    }
+    return quincenas.map((q) => {
+      const claveHaceUnAnio = `${q.anio - 1}-${q.mes}-${q.mitad}`;
+      const entrada = totales.get(claveHaceUnAnio);
+      return { ingreso: entrada?.ingreso ?? 0, gasto: entrada?.gasto ?? 0, hayDatos: !!entrada };
+    });
+  });
+
   // ---------------------------------------------------------------------
   // Colapsar/expandir grupos (categorías con subcategorías) para lectura.
   // ---------------------------------------------------------------------
@@ -642,34 +713,80 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
   protected readonly filtroTextoProyeccion = signal('');
   private gruposColapsadosInicializados = false;
 
+  /** "Comparar con el año anterior": agrega 2 renglones de referencia
+   *  (Total ingresos/Total gastos de la misma quincena, un año antes) al
+   *  bloque de resumen — ver comparacionAnioAnterior(). */
+  protected readonly compararAnioAnterior = signal(false);
+
+  /** Mostrar/ocultar la lista desplegable de celdas con ajuste manual
+   *  (ver celdasManuales()). */
+  protected readonly mostrarManuales = signal(false);
+
+  /** Pestaña activa: la tabla de quincenas o el gráfico de tendencia
+   *  del saldo final proyectado (ver graficoSaldo()). */
+  protected readonly vista = signal<'tabla' | 'grafica'>('tabla');
+
   /** La primera vez que ya se conocen los grupos (categorías con
    *  subcategorías, p.ej. CARRO/CREDITOS/HOGAR) y las hojas con desglose
    *  por cuenta (p.ej. SALARIO con Banorte/Afirme), arrancan TODOS
    *  contraídos — antes había que contraerlos uno por uno cada vez que se
    *  entraba a la pantalla; ahora se ven así desde el inicio y el usuario
    *  expande a mano solo los que quiera revisar. */
-  private readonly _colapsarGruposPorDefecto = effect(() => {
-    // Espera a que termine cargar() (en vez de adivinar por "¿ya hay algún
-    // grupo?"): antes, con una cuenta sin categorías padre/hijo todavía,
-    // `claves` podía salir vacío en la primera pasada y el efecto se volvía
-    // a intentar seguido sin problema — pero ahora que también se colapsan
-    // por defecto los títulos de sección (INGRESO/GASTOS/AHORROS) y "Saldo
-    // inicial", que existen SIEMPRE aunque no haya categorías, `claves`
-    // dejaría de estar vacío desde el primer render (antes de que
-    // categorias/movimientos llegaran de verdad) y la inicialización se
-    // marcaría lista de más, perdiéndose los grupos reales que aparecen
-    // después. Esperar a `cargando() === false` es la señal correcta.
-    if (this.gruposColapsadosInicializados || this.cargando()) return;
+  /** Todas las claves de renglones colapsables que existen AHORA MISMO:
+   *  grupos de categorías con subcategorías, hojas con desglose por
+   *  cuenta, títulos de sección (INGRESO/GASTOS/AHORROS) y "Saldo
+   *  inicial" — se reutiliza tanto para el colapsado por defecto de un
+   *  usuario nuevo como para "Contraer todo". */
+  private todasLasClavesColapsables(): string[] {
     const todas = [...this.resumen(), ...this.renglonesIngreso(), ...this.renglonesGasto(), ...this.renglonesAhorro()];
-    const claves = todas
+    return todas
       .filter(
         (r) =>
           (r.tipo === 'grupo' || r.tipo === 'seccion-titulo' || ((r.tipo === 'hoja' || r.tipo === 'resumen') && r.tieneDetalle)) &&
           r.clave,
       )
       .map((r) => r.clave as string);
+  }
+
+  /** Clave de localStorage donde se recuerda qué grupos dejó contraídos/
+   *  expandidos este usuario la última vez — por usuario, para no mezclar
+   *  la preferencia de "root" con la de otra cuenta en el mismo navegador. */
+  private get claveStorageColapsados(): string {
+    return `saurix.proyeccion.colapsados.${this.usuarioActualId}`;
+  }
+
+  private leerColapsadosGuardados(): Set<string> | null {
+    try {
+      const texto = localStorage.getItem(this.claveStorageColapsados);
+      if (!texto) return null;
+      const arreglo: unknown = JSON.parse(texto);
+      if (!Array.isArray(arreglo)) return null;
+      return new Set(arreglo.filter((v): v is string => typeof v === 'string'));
+    } catch {
+      // Modo privado, cuota llena, JSON corrupto, etc. — se ignora y se
+      // cae de vuelta al colapsado por defecto, no es un error fatal.
+      return null;
+    }
+  }
+
+  private guardarColapsadosEnStorage(): void {
+    try {
+      localStorage.setItem(this.claveStorageColapsados, JSON.stringify([...this.gruposColapsados()]));
+    } catch {
+      // No es crítico: en el peor de los casos, simplemente no se
+      // recuerda el estado la próxima vez que se entre a esta pantalla.
+    }
+  }
+
+  /** La primera vez que ya se conoce la tabla completa (cargando() ===
+   *  false), se restaura el colapsado que este usuario dejó guardado la
+   *  última vez (localStorage) — o, si es la primera vez que entra aquí,
+   *  arranca con TODO contraído (ver todasLasClavesColapsables). */
+  private readonly _colapsarGruposPorDefecto = effect(() => {
+    if (this.gruposColapsadosInicializados || this.cargando()) return;
     this.gruposColapsadosInicializados = true;
-    this.gruposColapsados.set(new Set(claves));
+    const guardados = this.leerColapsadosGuardados();
+    this.gruposColapsados.set(guardados ?? new Set(this.todasLasClavesColapsables()));
   });
 
   protected estaColapsado(clave: string | null): boolean {
@@ -684,6 +801,26 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       else nuevo.add(clave);
       return nuevo;
     });
+    this.guardarColapsadosEnStorage();
+  }
+
+  /** "Contraer todo"/"Expandir todo" — para no tener que darle clic
+   *  renglón por renglón cuando se quiere lo opuesto al estado actual. */
+  protected contraerTodo(): void {
+    this.gruposColapsados.set(new Set(this.todasLasClavesColapsables()));
+    this.guardarColapsadosEnStorage();
+  }
+
+  protected expandirTodo(): void {
+    this.gruposColapsados.set(new Set());
+    this.guardarColapsadosEnStorage();
+  }
+
+  /** Regresa el scroll horizontal de la tabla al principio (columna de
+   *  "hoy") de un salto — solo tiene sentido mostrar el botón cuando esa
+   *  columna sigue visible con el filtro de Año actual (ver el html). */
+  protected irAHoy(): void {
+    this.scrollContenedor()?.nativeElement.scrollTo({ left: 0, behavior: 'smooth' });
   }
 
   /** Todos los renglones de la tabla, en el orden en que se pintan — sin las
@@ -729,6 +866,82 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       }
       return true; // resumen/seccion-titulo/grupo/subtotal/total: siempre visibles
     });
+  });
+
+  // ---------------------------------------------------------------------
+  // Ayudas de lectura: celdas con ajuste manual, quincenas en rojo y la
+  // tendencia del saldo final proyectado.
+  // ---------------------------------------------------------------------
+
+  /** Todas las celdas con un valor escrito a mano (ProyeccionAjuste, o el
+   *  primer saldo inicial si se sobreescribió) dentro de la ventana de año
+   *  visible — SIN filtrar por colapsado/búsqueda: el punto de esta lista
+   *  es poder auditar los ajustes manuales aunque su renglón esté
+   *  contraído en este momento. */
+  protected readonly celdasManuales = computed(() => {
+    const todas = [...this.resumen(), ...this.renglonesIngreso(), ...this.renglonesGasto(), ...this.renglonesAhorro()];
+    const visibles = this.quincenasVisibles();
+    const resultado: { id: string; renglon: string; quincenaEtiqueta: string; valor: number }[] = [];
+    for (const r of todas) {
+      if (r.celdas.length === 0) continue;
+      for (const { q, indice } of visibles) {
+        const celda = r.celdas[indice];
+        if (celda?.manual) {
+          resultado.push({ id: `${r.id}|${q.clave}`, renglon: r.nombre, quincenaEtiqueta: this.etiquetaQuincena(q), valor: celda.valor });
+        }
+      }
+    }
+    return resultado;
+  });
+
+  /** Quincenas visibles donde "Saldo final proyectado" queda en negativo
+   *  — para el aviso arriba de la tabla; no reemplaza el color rojo que ya
+   *  trae cada celda negativa, solo lo resume en una sola línea. */
+  protected readonly quincenasSaldoNegativo = computed(() => {
+    const saldoFinal = this.resumen().find((r) => r.id === 'resumen:saldoFinal');
+    if (!saldoFinal) return [];
+    const resultado: { etiqueta: string; valor: number }[] = [];
+    for (const { q, indice } of this.quincenasVisibles()) {
+      const celda = saldoFinal.celdas[indice];
+      if (celda && celda.valor < 0) resultado.push({ etiqueta: this.etiquetaQuincena(q), valor: celda.valor });
+    }
+    return resultado;
+  });
+
+  private etiquetaQuincena(q: Quincena): string {
+    const mes = new Date(q.anio, q.mes, 1).toLocaleDateString('es-MX', { month: 'short', year: '2-digit' });
+    return `${mes.charAt(0).toUpperCase()}${mes.slice(1)} Q${q.mitad}`;
+  }
+
+  /** Puntos (x,y en un viewBox de 640×120) de la línea de tendencia del
+   *  Saldo final proyectado a lo largo de las quincenas visibles — mismo
+   *  patrón de "serie → puntos SVG" que el chart de Patrimonio neto de
+   *  Reportes, para quedar visualmente consistente con esa pantalla. */
+  protected readonly graficoSaldo = computed(() => {
+    const saldoFinal = this.resumen().find((r) => r.id === 'resumen:saldoFinal');
+    const visibles = this.quincenasVisibles();
+    const vacio = { puntos: [] as { x: number; y: number; valor: number; etiqueta: string; esHoy: boolean }[], puntosSvg: '', areaSvg: '', ejeCeroY: 0 };
+    if (!saldoFinal || visibles.length < 2) return vacio;
+
+    const valores = visibles.map(({ indice }) => saldoFinal.celdas[indice]?.valor ?? 0);
+    const minValor = Math.min(0, ...valores);
+    const maxValor = Math.max(1, ...valores);
+    const rango = maxValor - minValor || 1;
+    const ancho = 640;
+    const alto = 120;
+    const paso = ancho / (visibles.length - 1);
+    const y = (valor: number) => Math.round(alto - ((valor - minValor) / rango) * alto);
+
+    const puntos = visibles.map(({ q, indice }, i) => ({
+      x: Math.round(i * paso),
+      y: y(saldoFinal.celdas[indice]?.valor ?? 0),
+      valor: saldoFinal.celdas[indice]?.valor ?? 0,
+      etiqueta: this.etiquetaQuincena(q),
+      esHoy: indice === 0,
+    }));
+    const puntosSvg = puntos.map((p) => `${p.x},${p.y}`).join(' ');
+    const areaSvg = `${puntos[0].x},${alto} ${puntosSvg} ${puntos[puntos.length - 1].x},${alto}`;
+    return { puntos, puntosSvg, areaSvg, ejeCeroY: y(0) };
   });
 
   // ---------------------------------------------------------------------
@@ -1032,4 +1245,39 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       error: () => this.toast.error('No se pudo crear el movimiento.'),
     });
   }
+
+  // ---------------------------------------------------------------------
+  // Exportar a CSV (mismo botón/patrón que Movimientos, Deudas, Metas y
+  // Reportes) — exporta lo que esté visible AHORA MISMO en pantalla
+  // (filtro de Año, colapsado y buscador), una columna por quincena.
+  // ---------------------------------------------------------------------
+
+  exportarCsvArchivo(): void {
+    const visibles = this.quincenasVisibles();
+    const columnas: ColumnaCsv<FilaCsvProyeccion>[] = [
+      { clave: 'renglon', etiqueta: 'Renglón' },
+      ...visibles.map(({ q }, i) => ({ clave: `q${i}`, etiqueta: `${this.etiquetaQuincena(q)} ${q.anio}` }) as ColumnaCsv<FilaCsvProyeccion>),
+      { clave: 'total', etiqueta: 'Total' },
+    ];
+    const filas: FilaCsvProyeccion[] = this.filasTabla()
+      .filter((r) => r.tipo !== 'seccion-titulo' && r.tipo !== 'grupo')
+      .map((r) => {
+        const fila: FilaCsvProyeccion = { renglon: r.nombre, total: r.sumable ? this.totalFila(r.celdas) : '' };
+        visibles.forEach(({ indice }, i) => {
+          fila[`q${i}`] = r.celdas[indice]?.valor ?? 0;
+        });
+        return fila;
+      });
+    exportarCsv<FilaCsvProyeccion>('proyeccion.csv', columnas, filas);
+    this.toast.exito(`Se descargó proyeccion.csv (${filas.length} renglones).`);
+  }
+}
+
+/** Fila plana para el CSV de Proyección: un renglón de la tabla, con una
+ *  columna dinámica "qN" por cada quincena visible (N = su posición en
+ *  `quincenasVisibles()`, no el índice real de la ventana de 24). */
+interface FilaCsvProyeccion {
+  renglon: string;
+  total: number | string;
+  [quincena: string]: string | number;
 }

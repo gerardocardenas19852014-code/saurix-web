@@ -324,3 +324,34 @@
   text-align: center;
 }
 
+
+
+// Mini-gráfico de tendencia del Saldo final proyectado, arriba de la
+// tabla — mismo patrón visual (SVG + wallet-networth-labels, definidas en
+// styles.scss) que el chart de Patrimonio neto en Reportes.
+.proy-grafico-wrap {
+  margin: 0 0 16px;
+  max-width: 900px;
+}
+
+.proy-grafico-svg {
+  width: 100%;
+  height: 120px;
+  display: block;
+}
+
+// Renglones de referencia "(año anterior)" cuando está activo "Comparar
+// con el año anterior" — mismo look que un sub-renglón de detalle
+// (itálica, más chico, tono apagado) para que se lean como información de
+// contexto y no como parte del cálculo principal.
+.proy-fila-comparacion .proy-etiqueta {
+  font-style: italic;
+  color: var(--ink-soft);
+  font-weight: 400;
+}
+
+.proy-fila-comparacion .proy-celda {
+  font-style: italic;
+  color: var(--ink-soft);
+  font-weight: 400;
+}

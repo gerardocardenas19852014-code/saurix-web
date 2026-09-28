@@ -1,4 +1,13 @@
-<h2>Proyección</h2>
+<div class="page-header">
+  <h2 style="margin:0;">Proyección</h2>
+  <div class="page-actions">
+    <button type="button" class="btn-secondary small" title="Exportar CSV" aria-label="Exportar proyección a CSV" (click)="exportarCsvArchivo()">
+      ⇩ Exportar CSV
+    </button>
+    <button type="button" class="btn-secondary small" (click)="expandirTodo()">▾ Expandir todo</button>
+    <button type="button" class="btn-secondary small" (click)="contraerTodo()">▸ Contraer todo</button>
+  </div>
+</div>
 <p class="hint" style="margin-top:-6px; max-width:1200px;">
   Flujo de efectivo a futuro por quincena (1-15 / 16-fin de mes). Cada celda suma tus Movimientos (reales o ya
   generados por adelantado con "Generar futuros" en Fijos y Proyección) — una quincena sin nada capturado ahí se
@@ -6,6 +15,13 @@
   renglón con nombre de categoría/cuenta para escribir un valor a mano — déjala vacía para que vuelva a
   calcularse sola.
 </p>
+
+<div class="tab-bar" style="margin:0 0 18px;">
+  <button type="button" class="tab-btn" [class.is-active]="vista() === 'tabla'" (click)="vista.set('tabla')">📋 Tabla</button>
+  <button type="button" class="tab-btn" [class.is-active]="vista() === 'grafica'" (click)="vista.set('grafica')">📈 Tendencia</button>
+</div>
+
+@if (vista() === 'tabla') {
 
 <div class="board-filters">
   <label class="board-filter-field board-filter-field-buscar">
@@ -31,12 +47,79 @@
       </select>
     }
   </label>
+  <label class="board-filter-field" style="flex-direction:row; align-items:center; gap:6px;">
+    <input type="checkbox" [checked]="compararAnioAnterior()" (change)="compararAnioAnterior.set($any($event.target).checked)" style="width:auto;" />
+    Comparar con el año anterior
+  </label>
+  @if (quincenasVisibles().some((v) => v.indice === 0)) {
+    <button type="button" class="btn-secondary small" style="align-self:flex-end;" (click)="irAHoy()">📍 Ir a hoy</button>
+  }
 </div>
 
+@if (quincenasSaldoNegativo().length > 0) {
+  <p
+    style="margin:0 0 14px;padding:8px 10px;border-radius:8px;border:1px solid var(--danger);background:var(--danger-soft);font-size:12.5px;color:var(--ink-soft);"
+  >
+    ⚠️ {{ quincenasSaldoNegativo().length }} quincena{{ quincenasSaldoNegativo().length === 1 ? '' : 's' }} con saldo final proyectado
+    negativo — la primera es <strong>{{ quincenasSaldoNegativo()[0].etiqueta }}</strong> ({{ formatMoneda(quincenasSaldoNegativo()[0].valor) }}).
+  </p>
+}
+
+@if (celdasManuales().length > 0) {
+  <div style="margin:0 0 14px;">
+    <button type="button" class="btn-secondary small" (click)="mostrarManuales.set(!mostrarManuales())">
+      {{ mostrarManuales() ? '▾' : '▸' }} ✏️ {{ celdasManuales().length }} celda{{ celdasManuales().length === 1 ? '' : 's' }} con ajuste manual
+    </button>
+    @if (mostrarManuales()) {
+      <ul style="margin:8px 0 0; padding-left:20px; font-size:12.5px; color:var(--ink-soft);">
+        @for (m of celdasManuales(); track m.id) {
+          <li>{{ m.renglon }} — {{ m.quincenaEtiqueta }}: {{ formatMoneda(m.valor) }}</li>
+        }
+      </ul>
+    }
+  </div>
+}
+
+}
+
+@if (vista() === 'grafica') {
+
+@if (graficoSaldo().puntos.length > 1) {
+    <div class="proy-grafico-wrap">
+      <p class="hint" style="margin:0 0 6px;">Tendencia del saldo final proyectado</p>
+      <svg class="proy-grafico-svg" viewBox="0 0 640 120" preserveAspectRatio="none">
+        <line x1="0" [attr.y1]="graficoSaldo().ejeCeroY" x2="640" [attr.y2]="graficoSaldo().ejeCeroY" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 3" />
+        <polygon [attr.points]="graficoSaldo().areaSvg" fill="var(--client-soft)" opacity="0.5" />
+        <polyline [attr.points]="graficoSaldo().puntosSvg" fill="none" stroke="var(--client)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
+        @for (p of graficoSaldo().puntos; track p.etiqueta + p.x) {
+          <circle [attr.cx]="p.x" [attr.cy]="p.y" r="3" [attr.fill]="p.esHoy ? 'var(--danger)' : 'var(--client)'">
+            <title>{{ p.etiqueta }}: {{ formatMoneda(p.valor) }}</title>
+          </circle>
+        }
+      </svg>
+      <div class="wallet-networth-labels">
+        <span class="wallet-networth-label-col">
+          <span class="wallet-networth-label-valor">{{ formatMonedaCompacta(graficoSaldo().puntos[0].valor) }}</span>
+          <span class="wallet-networth-label-mes">{{ graficoSaldo().puntos[0].etiqueta }}</span>
+        </span>
+        <span class="wallet-networth-label-col">
+          <span class="wallet-networth-label-valor">{{ formatMonedaCompacta(graficoSaldo().puntos[graficoSaldo().puntos.length - 1].valor) }}</span>
+          <span class="wallet-networth-label-mes">{{ graficoSaldo().puntos[graficoSaldo().puntos.length - 1].etiqueta }}</span>
+        </span>
+      </div>
+    </div>
+  } @else {
+    <p class="empty">No hay suficientes quincenas visibles para dibujar una tendencia.</p>
+  }
+
+}
+
+@if (vista() === 'tabla') {
+
 @if (cargando()) {
-  <p class="empty">Cargando…</p>
-} @else {
-  <div class="proy-scroll">
+    <p class="empty">Cargando…</p>
+  } @else {
+  <div class="proy-scroll" #scrollContenedor>
     <table class="proy-tabla">
       <thead>
         <tr class="proy-fila-encabezado-mes">
@@ -91,6 +174,7 @@
                 [class.proy-seccion-ingreso]="renglon.seccion === 'ingreso'"
                 [class.proy-seccion-gasto]="renglon.seccion === 'gasto'"
                 [class.proy-seccion-ahorro]="renglon.seccion === 'ahorro'"
+                [class.proy-fila-comparacion]="renglon.esComparacion"
               >
                 <td
                   class="proy-etiqueta"
@@ -133,7 +217,7 @@
                       [title]="celda.manual ? 'Valor escrito a mano — déjala vacía al editar para volver al cálculo automático.' : ''"
                       (click)="celda.editable && iniciarEdicion(renglon.clave, item.q.clave, celda.valor)"
                     >
-                      {{ formatMoneda(celda.valor) }}
+                      @if (celda.sinDatos) { — } @else { {{ formatMoneda(celda.valor) }} }
                     </td>
                   }
                 }
@@ -149,4 +233,6 @@
       </tbody>
     </table>
   </div>
+}
+
 }
