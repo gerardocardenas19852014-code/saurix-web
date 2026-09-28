@@ -7,12 +7,13 @@ import { Ticket, TicketHistorialEstado, UsuarioOpcion } from '../kanban/ticket.m
 import { Sprint } from '../sprints/sprint.model';
 import { ProyectoOpcion, TableroColumna } from '../tableros/tablero-columna.model';
 import { TicketPrioridad } from '../ticket-prioridades/ticket-prioridad.model';
+import { TicketModulo } from '../ticket-modulos/ticket-modulo.model';
 import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
 
 type Pestana = 'hecho' | 'pendiente' | 'sprint' | 'velocidad' | 'cfd' | 'control';
 type Metrica = 'tickets' | 'horas';
 type OrdenSprint = 'nombre' | 'estado' | 'fecha' | 'tickets' | 'horas';
-type OrdenTicket = 'folio' | 'folioInterno' | 'titulo' | 'estado' | 'prioridad' | 'asignado' | 'horas';
+type OrdenTicket = 'folio' | 'folioInterno' | 'titulo' | 'estado' | 'prioridad' | 'modulo' | 'asignado' | 'horas';
 
 interface PuntoBarra {
   etiqueta: string;
@@ -93,6 +94,7 @@ export class ReportesEjecutivosComponent implements OnInit {
   protected readonly sprints = signal<Sprint[]>([]);
   protected readonly historial = signal<TicketHistorialEstado[]>([]);
   protected readonly prioridades = signal<TicketPrioridad[]>([]);
+  protected readonly modulos = signal<TicketModulo[]>([]);
   protected readonly usuarios = signal<UsuarioOpcion[]>([]);
 
   /** Orden de la tabla "Todos los sprints" — por defecto el más reciente primero
@@ -108,6 +110,7 @@ export class ReportesEjecutivosComponent implements OnInit {
     this.data.list<Sprint>('Sprint').subscribe((s) => this.sprints.set(s));
     this.data.list<TicketHistorialEstado>('TicketHistorialEstado').subscribe((h) => this.historial.set(h));
     this.data.list<TicketPrioridad>('TicketPrioridad').subscribe((p) => this.prioridades.set(p));
+    this.data.list<TicketModulo>('TicketModulo').subscribe((m) => this.modulos.set(m));
     // 'Usuario' no trae un campo nombreCompleto propio — hay que armarlo con
     // nombreCompletoUsuario(), igual que en Mi Dashboard/Resumen ejecutivo/Kanban.
     this.data
@@ -158,6 +161,19 @@ export class ReportesEjecutivosComponent implements OnInit {
 
   protected nombreColumna(id: number): string {
     return this.columnas().find((c) => Number(c.id) === Number(id))?.nombre ?? '—';
+  }
+
+  /** Módulo/área del sistema del ticket (Catálogos → Módulos de ticket,
+   *  ver ticket-modulos/ticket-modulo.model.ts) — opcional: un ticket sin
+   *  módulo asignado se ve como "—", igual que Folio interno vacío. */
+  protected nombreModulo(id: number | null): string {
+    if (!id) return '—';
+    return this.modulos().find((m) => Number(m.id) === Number(id))?.nombre ?? '—';
+  }
+
+  protected iconoModulo(id: number | null): string | null {
+    if (!id) return null;
+    return this.modulos().find((m) => Number(m.id) === Number(id))?.icono ?? null;
   }
 
   /** Página actual de la lista de tickets del sprint — mismo footer/paginación
@@ -225,6 +241,8 @@ export class ReportesEjecutivosComponent implements OnInit {
           return this.nombreColumna(t.tableroColumnaId).toLowerCase();
         case 'prioridad':
           return this.nombrePrioridad(t.ticketPrioridadId).toLowerCase();
+        case 'modulo':
+          return this.nombreModulo(t.ticketModuloId).toLowerCase();
         case 'asignado':
           return this.nombreUsuario(t.asignadoUsuarioId).toLowerCase();
         case 'horas':
@@ -244,6 +262,7 @@ export class ReportesEjecutivosComponent implements OnInit {
       ...t,
       estadoTexto: this.nombreColumna(t.tableroColumnaId),
       prioridadTexto: this.nombrePrioridad(t.ticketPrioridadId),
+      moduloTexto: this.nombreModulo(t.ticketModuloId),
       asignadoTexto: this.nombreUsuario(t.asignadoUsuarioId),
       horasTexto: this.horasDeTicket(t),
     }));
@@ -254,6 +273,7 @@ export class ReportesEjecutivosComponent implements OnInit {
       { clave: 'titulo', etiqueta: 'Título' },
       { clave: 'estadoTexto', etiqueta: 'Estado' },
       { clave: 'prioridadTexto', etiqueta: 'Prioridad' },
+      { clave: 'moduloTexto', etiqueta: 'Módulo' },
       { clave: 'asignadoTexto', etiqueta: 'Asignado a' },
       { clave: 'horasTexto', etiqueta: 'Horas est.' },
     ];
