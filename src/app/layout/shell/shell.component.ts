@@ -310,6 +310,7 @@ export class ShellComponent implements OnDestroy {
       'presupuesto:Metas y límites',
       'presupuesto:Reportes',
       'presupuesto:Catálogos',
+      'familia:Catálogos',
     ]),
   );
 
@@ -362,7 +363,7 @@ export class ShellComponent implements OnDestroy {
   }
 
   protected readonly moduloActivo = computed<
-    'seguridad' | 'wikidocs' | 'presupuesto' | 'proyectos' | 'panel-control' | null
+    'seguridad' | 'wikidocs' | 'presupuesto' | 'proyectos' | 'panel-control' | 'familia' | null
   >(() => {
     const url = this.urlActual();
     if (url.startsWith('/seguridad')) return 'seguridad';
@@ -370,6 +371,7 @@ export class ShellComponent implements OnDestroy {
     if (url.startsWith('/presupuesto')) return 'presupuesto';
     if (url.startsWith('/proyectos')) return 'proyectos';
     if (url.startsWith('/panel-control')) return 'panel-control';
+    if (url.startsWith('/familia')) return 'familia';
     return null;
   });
 

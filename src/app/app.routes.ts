@@ -43,6 +43,11 @@ export const routes: Routes = [
         loadChildren: () => import('./features/proyectos/proyectos.routes').then((m) => m.PROYECTOS_ROUTES),
       },
 
+      {
+        path: 'familia',
+        loadChildren: () => import('./features/familia/familia.routes').then((m) => m.FAMILIA_ROUTES),
+      },
+
       // Deshabilitado temporalmente mientras se termina de trabajar en los demás
       // módulos. El código sigue aquí, solo se quitó del router: entrar a esta
       // ruta cae en el '**' de abajo y redirige a /modulos. Para reactivarlo,

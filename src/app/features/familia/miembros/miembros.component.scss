@@ -1,0 +1,46 @@
+/* Tarjeta de emergencia en pantalla — mismo contenido y proporción (más
+ * ancha que alta, tamaño credencial) que el PDF que genera descargarTarjeta()
+ * en miembros.component.ts, para que lo que se ve coincida con lo que se
+ * descarga. */
+.tarjeta-emergencia {
+  max-width: 420px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: var(--ink);
+  color: #fff;
+  box-shadow: 0 16px 30px -14px rgba(0, 0, 0, .45);
+}
+
+.tarjeta-emergencia-titulo {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  opacity: .75;
+  margin-bottom: 6px;
+}
+
+.tarjeta-emergencia-nombre {
+  font-size: 19px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.tarjeta-emergencia-fila {
+  font-size: 13px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 4px 0;
+  opacity: .92;
+}
+
+.tarjeta-emergencia-fila span:first-child {
+  opacity: .7;
+}
+
+.tarjeta-emergencia-separador {
+  height: 1px;
+  background: rgba(255, 255, 255, .25);
+  margin: 10px 0;
+}

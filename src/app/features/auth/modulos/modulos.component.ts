@@ -15,6 +15,7 @@ const MODULOS: ModuloTile[] = [
   { ruta: '/panel-control', icono: '⚙️', etiqueta: 'Panel de control', clase: 'module-tile-navy' },
   { ruta: '/presupuesto', icono: '💰', etiqueta: 'Presupuesto Personal', clase: 'module-tile-teal' },
   { ruta: '/proyectos', icono: '📋', etiqueta: 'Gestión de Proyectos', clase: 'module-tile-indigo' },
+  { ruta: '/familia', icono: '👪', etiqueta: 'Familia', clase: 'module-tile-amber' },
 ];
 
 // Deshabilitado temporalmente mientras se termina de trabajar en los de arriba:

@@ -1,0 +1,314 @@
+@if (vista() === 'lista') {
+  <div class="page-header">
+    <h1>Miembros de familia</h1>
+    <div class="page-actions">
+      <button type="button" class="toolbar-btn" (click)="nuevoMiembro()">+ Nuevo miembro</button>
+    </div>
+  </div>
+
+  <div class="grid-toolbar">
+    <label class="board-filter-field board-filter-checkbox" style="margin:0;">
+      <input type="checkbox" [checked]="mostrarInactivos()" (change)="mostrarInactivos.set($any($event.target).checked)" />
+      Mostrar inactivos
+    </label>
+    <app-bitacora [modulo]="moduloBitacora" />
+  </div>
+
+  <app-data-table
+    [columnas]="columnas"
+    [filas]="miembrosVisibles()"
+    [cargando]="cargando()"
+    (editar)="abrirMiembro($event)"
+    (eliminar)="pedirEliminarMiembro($event)"
+  />
+} @else {
+  <div class="page-header">
+    <h1>{{ miembroActivo() ? (miembroActivo()!.nombre + ' ' + miembroActivo()!.apellidoPaterno) : 'Nuevo miembro' }}</h1>
+    <div class="page-actions">
+      <button type="button" class="btn-secondary" (click)="volverALista()">← Volver</button>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button type="button" class="tab-btn" [class.is-active]="tabFicha() === 'datos'" (click)="tabFicha.set('datos')">📝 Datos</button>
+    <button
+      type="button"
+      class="tab-btn"
+      [class.is-active]="tabFicha() === 'documentos'"
+      [disabled]="!miembroActivo()"
+      [title]="!miembroActivo() ? 'Guarda primero los Datos para poder agregar documentos.' : ''"
+      (click)="miembroActivo() && tabFicha.set('documentos')"
+    >
+      📎 Documentos
+    </button>
+    <button
+      type="button"
+      class="tab-btn"
+      [class.is-active]="tabFicha() === 'tarjeta'"
+      [disabled]="!miembroActivo()"
+      [title]="!miembroActivo() ? 'Guarda primero los Datos para ver la tarjeta.' : ''"
+      (click)="miembroActivo() && tabFicha.set('tarjeta')"
+    >
+      🆔 Tarjeta de emergencia
+    </button>
+  </div>
+
+  @if (tabFicha() === 'datos') {
+    <form [formGroup]="form" (ngSubmit)="guardarMiembro()">
+      <h3 class="catalog-group-title">Datos personales</h3>
+      <div class="edit-form">
+        <label class="floating-field">
+          <span>Nombre(s) <b>*</b></span>
+          <input type="text" class="form-control pill-control" formControlName="nombre" placeholder=" " />
+        </label>
+        <label class="floating-field">
+          <span>Apellido paterno <b>*</b></span>
+          <input type="text" class="form-control pill-control" formControlName="apellidoPaterno" placeholder=" " />
+        </label>
+        <label class="floating-field">
+          <span>Apellido materno</span>
+          <input type="text" class="form-control pill-control" formControlName="apellidoMaterno" placeholder=" " />
+        </label>
+        <label class="floating-field">
+          <span>Parentesco <b>*</b></span>
+          <select class="form-control pill-control" formControlName="parentescoClave">
+            <option value="">Selecciona...</option>
+            @for (p of parentescos(); track p.id) {
+              <option [value]="p.clave">{{ p.etiqueta }}</option>
+            }
+          </select>
+        </label>
+        <label class="floating-field">
+          <span>Fecha de nacimiento <b>*</b></span>
+          <input type="date" class="form-control pill-control" formControlName="fechaNacimiento" placeholder=" " />
+        </label>
+        <label class="floating-field">
+          <span>Sexo <b>*</b></span>
+          <select class="form-control pill-control" formControlName="sexo">
+            <option value="">Selecciona...</option>
+            @for (s of opcionesSexo; track s.valor) {
+              <option [value]="s.valor">{{ s.etiqueta }}</option>
+            }
+          </select>
+        </label>
+        <label class="floating-field">
+          <span>Entidad de nacimiento <b>*</b></span>
+          <select class="form-control pill-control" formControlName="entidadNacimiento">
+            <option value="">Selecciona...</option>
+            @for (e of opcionesEntidad; track e.valor) {
+              <option [value]="e.valor">{{ e.etiqueta }}</option>
+            }
+          </select>
+        </label>
+        <label class="floating-field">
+          <span>Teléfono</span>
+          <input type="text" class="form-control pill-control" formControlName="telefono" placeholder=" " />
+        </label>
+        <label class="checkbox-inline">
+          <input type="checkbox" formControlName="activo" />
+          Activo
+        </label>
+      </div>
+
+      <h3 class="catalog-group-title">
+        RFC y CURP
+        <button type="button" class="btn-secondary small" style="margin-left:10px;" (click)="generarRfcCurp()">🔄 Generar RFC y CURP</button>
+      </h3>
+      <p class="hint" style="margin:-6px 0 12px;">
+        Se calculan a partir de los datos de arriba (misma calculadora que Panel de Control → Generación de RFC y CURP) — son una
+        pre-validación, no el documento oficial: revísalos y corrígelos a mano si no coinciden.
+      </p>
+      <div class="edit-form">
+        <label class="floating-field">
+          <span>RFC</span>
+          <input type="text" class="form-control pill-control" formControlName="rfc" placeholder=" " style="text-transform:uppercase;" />
+        </label>
+        <label class="floating-field">
+          <span>CURP</span>
+          <input type="text" class="form-control pill-control" formControlName="curp" placeholder=" " style="text-transform:uppercase;" />
+        </label>
+      </div>
+
+      <h3 class="catalog-group-title">Información médica de emergencia</h3>
+      <div class="edit-form">
+        <label class="floating-field">
+          <span>Tipo de sangre</span>
+          <select class="form-control pill-control" formControlName="tipoSangre">
+            <option value="">Selecciona...</option>
+            @for (t of tiposSangre; track t) {
+              <option [value]="t">{{ t }}</option>
+            }
+          </select>
+        </label>
+        <label class="floating-field">
+          <span>Alergias</span>
+          <input type="text" class="form-control pill-control" formControlName="alergias" placeholder=" " />
+        </label>
+        <label class="floating-field">
+          <span>Condiciones crónicas</span>
+          <input type="text" class="form-control pill-control" formControlName="condicionesCronicas" placeholder=" " />
+        </label>
+        <label class="floating-field">
+          <span>Medicamentos</span>
+          <input type="text" class="form-control pill-control" formControlName="medicamentos" placeholder=" " />
+        </label>
+      </div>
+
+      <h3 class="catalog-group-title">Contacto de emergencia y seguro</h3>
+      <div class="edit-form">
+        <label class="floating-field">
+          <span>Nombre de contacto</span>
+          <input type="text" class="form-control pill-control" formControlName="contactoEmergenciaNombre" placeholder=" " />
+        </label>
+        <label class="floating-field">
+          <span>Teléfono de contacto</span>
+          <input type="text" class="form-control pill-control" formControlName="contactoEmergenciaTelefono" placeholder=" " />
+        </label>
+        <label class="floating-field">
+          <span>Aseguradora</span>
+          <input type="text" class="form-control pill-control" formControlName="aseguradora" placeholder=" " />
+        </label>
+        <label class="floating-field">
+          <span>Número de póliza</span>
+          <input type="text" class="form-control pill-control" formControlName="numeroPoliza" placeholder=" " />
+        </label>
+      </div>
+
+      <div class="modal-actions" style="justify-content:flex-start;">
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  } @else if (tabFicha() === 'documentos') {
+    <div class="grid-toolbar">
+      <button type="button" class="toolbar-btn" (click)="nuevoDocumento()">+ Nuevo documento</button>
+    </div>
+
+    @if (documentosDelMiembro().length === 0) {
+      <p class="empty">Todavía no hay documentos capturados para este miembro.</p>
+    } @else {
+      <div class="grid-table-scroll">
+        <table class="grid-table">
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th>Vencimiento</th>
+              <th>Estado</th>
+              <th>Notas</th>
+              <th class="grid-actions-col">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (documento of documentosDelMiembro(); track documento.id) {
+              <tr>
+                <td>{{ etiquetaTipoDocumento(documento.tipoDocumentoClave) }}</td>
+                <td>{{ documento.fechaVencimiento ? (documento.fechaVencimiento | date: 'dd/MM/yyyy') : '—' }}</td>
+                <td>
+                  <span class="grid-badge {{ claseEstadoVencimiento[estadoVencimiento(documento)] }}">
+                    {{ etiquetaEstadoVencimiento[estadoVencimiento(documento)] }}
+                  </span>
+                </td>
+                <td>{{ documento.notas || '—' }}</td>
+                <td class="grid-actions-col" data-label="Acciones">
+                  <div class="grid-actions-inner">
+                    <button type="button" class="btn-secondary small" (click)="toggleAdjuntosDocumento(documento)">
+                      {{ documentoExpandidoId() === documento.id ? '▾' : '▸' }} 📎
+                    </button>
+                    <button type="button" class="btn-secondary small grid-action-icon" title="Editar" (click)="editarDocumento(documento)">✎</button>
+                    <button type="button" class="btn-danger small grid-action-icon" title="Eliminar" (click)="pedirEliminarDocumento(documento)">🗑</button>
+                  </div>
+                </td>
+              </tr>
+              @if (documentoExpandidoId() === documento.id) {
+                <tr>
+                  <td colspan="5">
+                    <app-adjuntos-panel entidad="DocumentoFamiliaAdjunto" campoPadre="documentoFamiliaId" [padreId]="documento.id" etiqueta="Archivos" />
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @if (modalDocumentoAbierto()) {
+      <div class="modal-overlay modal show d-block" (click)="cerrarModalDocumento()">
+        <form class="modal-box modal-dialog modal-content" [formGroup]="formDocumento" (click)="$event.stopPropagation()" (ngSubmit)="guardarDocumento()">
+          <h3 class="modal-title mb-3">{{ documentoEnEdicion() ? 'Editar documento' : 'Nuevo documento' }}</h3>
+          <div class="edit-form">
+            <label class="floating-field">
+              <span>Tipo de documento <b>*</b></span>
+              <select class="form-control pill-control" formControlName="tipoDocumentoClave">
+                <option value="">Selecciona...</option>
+                @for (t of tiposDocumento(); track t.id) {
+                  <option [value]="t.clave">{{ t.etiqueta }}</option>
+                }
+              </select>
+            </label>
+            <label class="floating-field">
+              <span>Fecha de vencimiento</span>
+              <input type="date" class="form-control pill-control" formControlName="fechaVencimiento" placeholder=" " />
+            </label>
+            <label class="floating-field">
+              <span>Notas</span>
+              <input type="text" class="form-control pill-control" formControlName="notas" placeholder=" " />
+            </label>
+          </div>
+          <p class="hint" style="margin:-6px 0 0;">Deja la fecha de vencimiento vacía si el documento no vence (p.ej. un acta de nacimiento).</p>
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" (click)="cerrarModalDocumento()">Cancelar</button>
+            <button type="submit" class="btn-primary">Guardar</button>
+          </div>
+        </form>
+      </div>
+    }
+
+    <app-confirm-dialog
+      [visible]="documentoAEliminar() !== null"
+      titulo="Eliminar documento"
+      mensaje="¿Eliminar este documento? Sus archivos adjuntos dejarán de mostrarse."
+      (confirmar)="confirmarEliminarDocumento()"
+      (cancelar)="documentoAEliminar.set(null)"
+    />
+  } @else if (tabFicha() === 'tarjeta' && miembroActivo(); as m) {
+    <div class="page-actions" style="margin-bottom:16px;">
+      <button type="button" class="btn-primary" (click)="descargarTarjeta()">⇩ Descargar como PDF</button>
+    </div>
+
+    <div class="tarjeta-emergencia">
+      <div class="tarjeta-emergencia-titulo">🆔 Tarjeta de emergencia</div>
+      <div class="tarjeta-emergencia-nombre">{{ m.nombre }} {{ m.apellidoPaterno }} {{ m.apellidoMaterno }}</div>
+      <div class="tarjeta-emergencia-fila">
+        <span>Edad: {{ calcularEdad(m.fechaNacimiento) ?? '—' }} años</span>
+        <span>Tipo de sangre: <strong>{{ m.tipoSangre || '—' }}</strong></span>
+      </div>
+      @if (m.alergias) {
+        <div class="tarjeta-emergencia-fila"><span>Alergias:</span> {{ m.alergias }}</div>
+      }
+      @if (m.condicionesCronicas) {
+        <div class="tarjeta-emergencia-fila"><span>Condiciones:</span> {{ m.condicionesCronicas }}</div>
+      }
+      @if (m.medicamentos) {
+        <div class="tarjeta-emergencia-fila"><span>Medicamentos:</span> {{ m.medicamentos }}</div>
+      }
+      <div class="tarjeta-emergencia-separador"></div>
+      <div class="tarjeta-emergencia-fila">
+        <span>Contacto de emergencia:</span> {{ m.contactoEmergenciaNombre || '—' }}
+        @if (m.contactoEmergenciaTelefono) { · {{ m.contactoEmergenciaTelefono }} }
+      </div>
+      @if (m.aseguradora || m.numeroPoliza) {
+        <div class="tarjeta-emergencia-fila">
+          <span>Seguro:</span> {{ m.aseguradora || '—' }} @if (m.numeroPoliza) { · Póliza {{ m.numeroPoliza }} }
+        </div>
+      }
+    </div>
+  }
+}
+
+<app-confirm-dialog
+  [visible]="aEliminar() !== null"
+  titulo="Eliminar miembro"
+  [mensaje]="'¿Eliminar a ' + (aEliminar()?.nombre ?? '') + '? Sus documentos capturados dejarán de asociarse a nadie.'"
+  (confirmar)="confirmarEliminarMiembro()"
+  (cancelar)="aEliminar.set(null)"
+/>

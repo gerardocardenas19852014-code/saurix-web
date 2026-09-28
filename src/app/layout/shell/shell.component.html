@@ -129,6 +129,22 @@
         <a routerLink="/panel-control/rfc-curp" routerLinkActive="active">🆔 Generación de RFC y CURP</a>
       </nav>
     }
+
+    @if (moduloActivo() === 'familia') {
+      <span class="sidebar-label">Familia</span>
+      <nav class="sidebar-nav" aria-label="Menú de familia">
+        <a routerLink="/familia" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
+        <a routerLink="/familia/miembros" routerLinkActive="active">👪 Miembros de familia</a>
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('familia', 'Catálogos')">
+          <span>{{ grupoAbierto('familia', 'Catálogos') ? '▾' : '▸' }} Catálogos</span>
+        </button>
+        @if (grupoAbierto('familia', 'Catálogos')) {
+          <a routerLink="/familia/parentesco" routerLinkActive="active">👤 Parentesco</a>
+          <a routerLink="/familia/tipo-documento" routerLinkActive="active">🗂️ Tipo de documento</a>
+        }
+      </nav>
+    }
   </aside>
 
   <div class="main-area">
