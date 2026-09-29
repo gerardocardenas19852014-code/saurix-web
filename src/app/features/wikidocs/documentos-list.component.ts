@@ -3,14 +3,18 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { marked } from 'marked';
+import { jsPDF } from 'jspdf';
 import { DataClientService } from '../../core/services/data-client.service';
+import { AuthService } from '../../core/services/auth.service';
 import { AdjuntosPanelComponent } from '../../shared/components/adjuntos-panel/adjuntos-panel.component';
 import { EditorTextoComponent } from '../../shared/components/editor-texto/editor-texto.component';
 import { ColumnaTabla, DataTableComponent } from '../../shared/components/data-table/data-table.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../shared/services/toast.service';
 import { insertarEmbeds } from '../../shared/utils/embeds.util';
-import { CategoriaOpcion, Documento, SeccionOpcion, TipoSistemaOpcion } from './documento.model';
+import { generarTablaContenido } from '../../shared/utils/tabla-contenido.util';
+import { truncarTexto } from '../../shared/utils/texto.util';
+import { CategoriaOpcion, Documento, DocumentoFavorito, DocumentoVersion, SeccionOpcion, TipoSistemaOpcion } from './documento.model';
 
 interface Migaja {
   etiqueta: string;
@@ -54,6 +58,7 @@ interface Migaja {
 export class DocumentosListComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly data = inject(DataClientService);
+  private readonly auth = inject(AuthService);
   protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
   private readonly sanitizer = inject(DomSanitizer);
@@ -68,11 +73,19 @@ export class DocumentosListComponent implements OnInit {
   /** Búsqueda por título Y por el texto del contenido, todo en cliente (mismo
    *  criterio ya usado en Usuarios) — así encuentra un documento aunque la
    *  palabra buscada no esté en el título, solo en la redacción. */
+  protected readonly soloFavoritos = signal(false);
+  /** Ids de documentos favoritos del usuario actual — un Set para O(1) al
+   *  pintar la estrella de cada renglón y al filtrar "Solo favoritos". */
+  private readonly favoritos = signal<Map<number, DocumentoFavorito>>(new Map());
+
   protected readonly documentos = computed(() => {
     const texto = this.busqueda().trim().toLowerCase();
-    const todos = this.documentosTodos();
-    if (!texto) return todos;
-    return todos.filter(
+    const soloFav = this.soloFavoritos();
+    const favoritos = this.favoritos();
+    let lista = this.documentosTodos();
+    if (soloFav) lista = lista.filter((doc) => favoritos.has(doc.id));
+    if (!texto) return lista;
+    return lista.filter(
       (doc) => doc.titulo.toLowerCase().includes(texto) || this.textoPlano(doc.contenido).toLowerCase().includes(texto),
     );
   });
@@ -89,9 +102,25 @@ export class DocumentosListComponent implements OnInit {
   private readonly mapaSecciones = computed(() => new Map(this.todasLasSecciones().map((s) => [s.id, s])));
 
   /** null = listado; 'ver'/'editar'/'adjuntos' = documento abierto en esa pestaña. */
-  protected readonly vista = signal<'lista' | 'ver' | 'editar' | 'adjuntos'>('lista');
+  protected readonly vista = signal<'lista' | 'ver' | 'editar' | 'adjuntos' | 'historial'>('lista');
   protected readonly documentoActual = signal<Documento | null>(null);
   protected readonly documentoAEliminar = signal<Documento | null>(null);
+
+  protected readonly versiones = signal<DocumentoVersion[]>([]);
+  protected readonly versionARestaurar = signal<DocumentoVersion | null>(null);
+  protected readonly columnasVersiones: ColumnaTabla<DocumentoVersion>[] = [
+    {
+      campo: 'fechaCreacion',
+      etiqueta: 'Fecha',
+      formatear: (fila) => (fila.fechaCreacion ? new Date(fila.fechaCreacion).toLocaleString('es-MX') : '—'),
+    },
+    { campo: 'usuario', etiqueta: 'Usuario' },
+    {
+      campo: 'contenido',
+      etiqueta: 'Resumen',
+      formatear: (fila) => truncarTexto(this.textoPlano(fila.contenido), 90),
+    },
+  ];
 
   protected readonly esNuevo = computed(() => this.vista() !== 'lista' && this.documentoActual() === null);
 
@@ -105,11 +134,30 @@ export class DocumentosListComponent implements OnInit {
     { campo: 'activo', etiqueta: 'Activo', formatear: (fila) => (fila.activo ? 'Sí' : 'No') },
   ];
 
-  protected readonly contenidoRenderizado = computed<SafeHtml>(() => {
+  /** Encabezados (h1/h2/h3) del documento actual + el mismo HTML con esos
+   *  encabezados ya con id — una sola pasada para no parsear el HTML dos
+   *  veces (una vez para el índice, otra para el contenido mostrado). */
+  private readonly tocYContenido = computed(() => {
     const doc = this.documentoActual();
     const html = doc ? this.aHtml(doc.contenido) : '';
-    return this.sanitizer.bypassSecurityTrustHtml(insertarEmbeds(html));
+    return generarTablaContenido(insertarEmbeds(html));
   });
+
+  /** Índice de contenido de la vista "Ver" — solo tiene caso mostrarlo
+   *  cuando el documento realmente tiene varias secciones. */
+  protected readonly tablaContenido = computed(() => {
+    const items = this.tocYContenido().items;
+    return items.length > 1 ? items : [];
+  });
+
+  protected readonly contenidoRenderizado = computed<SafeHtml>(() => {
+    return this.sanitizer.bypassSecurityTrustHtml(this.tocYContenido().html);
+  });
+
+  /** Salta suavemente al encabezado elegido del índice de contenido. */
+  irASeccion(id: string): void {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   protected readonly form = this.fb.nonNullable.group({
     id: [0],
@@ -135,7 +183,55 @@ export class DocumentosListComponent implements OnInit {
 
     this.data.list<SeccionOpcion>('Seccion').subscribe((secciones) => this.todasLasSecciones.set(secciones));
 
+    this.cargarFavoritos();
     this.cargar();
+  }
+
+  private cargarFavoritos(): void {
+    const usuario = this.auth.usuarioActual()?.nombreUsuario;
+    if (!usuario) return;
+    this.data.list<DocumentoFavorito>('DocumentoFavorito', { usuario }).subscribe((favoritos) => {
+      this.favoritos.set(new Map(favoritos.map((f) => [f.documentoId, f])));
+    });
+  }
+
+  protected esFavorito(documento: Documento): boolean {
+    return this.favoritos().has(documento.id);
+  }
+
+  protected iconoFavorito = (documento: Documento): string => (this.esFavorito(documento) ? '⭐' : '☆');
+
+  toggleFavorito(documento: Documento): void {
+    const usuario = this.auth.usuarioActual()?.nombreUsuario;
+    if (!usuario) return;
+    const existente = this.favoritos().get(documento.id);
+
+    if (existente) {
+      this.data.baja('DocumentoFavorito', existente.id).subscribe({
+        next: () => {
+          this.favoritos.update((mapa) => {
+            const nuevo = new Map(mapa);
+            nuevo.delete(documento.id);
+            return nuevo;
+          });
+        },
+        error: () => this.toast.error('No se pudo quitar de favoritos.'),
+      });
+      return;
+    }
+
+    this.data
+      .alta<DocumentoFavorito>('DocumentoFavorito', { documentoId: documento.id, usuario })
+      .subscribe({
+        next: (favorito) => {
+          this.favoritos.update((mapa) => {
+            const nuevo = new Map(mapa);
+            nuevo.set(documento.id, favorito);
+            return nuevo;
+          });
+        },
+        error: () => this.toast.error('No se pudo marcar como favorito.'),
+      });
   }
 
   private cargarMigajas(seccionId: number): void {
@@ -213,12 +309,61 @@ export class DocumentosListComponent implements OnInit {
     this.vista.set('editar');
   }
 
-  cambiarTab(tab: 'ver' | 'editar' | 'adjuntos'): void {
+  cambiarTab(tab: 'ver' | 'editar' | 'adjuntos' | 'historial'): void {
     if (tab === 'editar') {
       const doc = this.documentoActual();
       if (doc) this.cargarFormDesde(doc);
     }
+    if (tab === 'historial') this.cargarVersiones();
     this.vista.set(tab);
+  }
+
+  private cargarVersiones(): void {
+    const doc = this.documentoActual();
+    if (!doc) return;
+    this.data
+      .list<DocumentoVersion>('DocumentoVersion', { documentoId: doc.id })
+      .subscribe((versiones) => {
+        // Más reciente primero.
+        this.versiones.set(
+          [...versiones].sort((a, b) => (b.fechaCreacion ?? '').localeCompare(a.fechaCreacion ?? '')),
+        );
+      });
+  }
+
+  pedirRestaurar(version: DocumentoVersion): void {
+    this.versionARestaurar.set(version);
+  }
+
+  confirmarRestaurar(): void {
+    const version = this.versionARestaurar();
+    const doc = this.documentoActual();
+    if (!version || !doc) return;
+
+    // La versión que se está por reemplazar también se guarda como
+    // snapshot antes de restaurar, así "restaurar" nunca es un camino sin
+    // vuelta atrás — queda en el historial igual que cualquier otra edición.
+    this.data
+      .alta<DocumentoVersion>('DocumentoVersion', {
+        documentoId: doc.id,
+        titulo: doc.titulo,
+        contenido: doc.contenido,
+        usuario: this.auth.usuarioActual()?.nombreUsuario ?? 'desconocido',
+      })
+      .subscribe(() => {
+        this.data
+          .modificacion<Documento>('Documento', { ...doc, titulo: version.titulo, contenido: version.contenido })
+          .subscribe({
+            next: (documento) => {
+              this.toast.exito('Versión restaurada.');
+              this.documentoActual.set(documento);
+              this.versionARestaurar.set(null);
+              this.cargarVersiones();
+              this.vista.set('ver');
+            },
+            error: () => this.toast.error('No se pudo restaurar la versión.'),
+          });
+      });
   }
 
   private cargarFormDesde(documento: Documento): void {
@@ -257,26 +402,79 @@ export class DocumentosListComponent implements OnInit {
     }
 
     const { tipoSistemaId: _tipoSistemaId, categoriaId: _categoriaId, ...valor } = valorBruto;
-    const activo = this.documentoActual()?.activo ?? true;
+    const documentoPrevio = this.documentoActual();
+    const activo = documentoPrevio?.activo ?? true;
     const dto = { ...valor, activo };
-    const esEdicion = this.documentoActual() !== null;
-    const peticion = esEdicion
-      ? this.data.modificacion<Documento>('Documento', dto)
-      : this.data.alta<Documento>('Documento', dto);
+    const esEdicion = documentoPrevio !== null;
 
-    peticion.subscribe({
-      next: (documento) => {
-        this.toast.exito(esEdicion ? 'Documento actualizado.' : 'Documento creado.');
-        this.documentoActual.set(documento);
-        this.vista.set('ver');
-        this.cargar();
-      },
-      error: () => this.toast.error('No se pudo guardar el documento. Intenta de nuevo.'),
-    });
+    const guardarDocumento = (): void => {
+      const peticion = esEdicion
+        ? this.data.modificacion<Documento>('Documento', dto)
+        : this.data.alta<Documento>('Documento', dto);
+
+      peticion.subscribe({
+        next: (documento) => {
+          this.toast.exito(esEdicion ? 'Documento actualizado.' : 'Documento creado.');
+          this.documentoActual.set(documento);
+          this.vista.set('ver');
+          this.cargar();
+        },
+        error: () => this.toast.error('No se pudo guardar el documento. Intenta de nuevo.'),
+      });
+    };
+
+    // Antes de sobrescribir un documento existente, se guarda un snapshot
+    // del contenido TAL COMO ESTABA (no el nuevo) — así el historial de
+    // versiones siempre tiene "cómo se veía antes de este cambio".
+    if (esEdicion && documentoPrevio) {
+      this.data
+        .alta<DocumentoVersion>('DocumentoVersion', {
+          documentoId: documentoPrevio.id,
+          titulo: documentoPrevio.titulo,
+          contenido: documentoPrevio.contenido,
+          usuario: this.auth.usuarioActual()?.nombreUsuario ?? 'desconocido',
+        })
+        .subscribe({ next: guardarDocumento, error: guardarDocumento });
+    } else {
+      guardarDocumento();
+    }
   }
 
   private renderParaDescarga(documento: Documento): string {
     return insertarEmbeds(this.aHtml(documento.contenido));
+  }
+
+  /** Genera un PDF del documento actual a partir del mismo HTML ya usado
+   *  para "Descargar" (.html) — se renderiza en un contenedor invisible
+   *  fuera de pantalla y jsPDF.html() (basado en html2canvas) lo rasteriza
+   *  a páginas tamaño carta, igual que ya hace Comercio con sus PDFs, solo
+   *  que ahí construyen el PDF a mano por ser datos tabulares; aquí el
+   *  contenido es HTML libre (imágenes, tablas, código, etc.), así que
+   *  conviene rasterizarlo en vez de reconstruirlo campo por campo. */
+  exportarPdf(documento: Documento): void {
+    const contenedor = document.createElement('div');
+    contenedor.style.cssText =
+      'position:fixed; left:-9999px; top:0; width:700px; padding:24px; ' +
+      'font-family: Helvetica, Arial, sans-serif; color:#111; background:#fff;';
+    contenedor.innerHTML =
+      `<h1 style="font-size:22px;margin:0 0 4px;">${documento.titulo}</h1>` +
+      `<p style="font-size:11px;color:#666;margin:0 0 16px;">Última modificación: ${this.formatearFecha(documento)}</p>` +
+      this.renderParaDescarga(documento);
+    document.body.appendChild(contenedor);
+
+    this.toast.info('Generando PDF…');
+    const pdf = new jsPDF({ unit: 'pt', format: 'letter' });
+    pdf.html(contenedor, {
+      x: 24,
+      y: 24,
+      width: 550,
+      windowWidth: 700,
+      autoPaging: 'text',
+      callback: (pdfFinal) => {
+        pdfFinal.save(`${documento.titulo || 'documento'}.pdf`);
+        document.body.removeChild(contenedor);
+      },
+    });
   }
 
   /** Los documentos creados con el editor visual ya guardan HTML; los

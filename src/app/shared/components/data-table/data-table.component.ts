@@ -41,6 +41,13 @@ export class DataTableComponent<T extends { id: number }> {
    *  Pensado para bitácoras/históricos donde no tiene sentido editar o borrar un registro
    *  ya generado (p.ej. el historial de cambios de estado de un ticket). */
   readonly soloLectura = input<boolean>(false);
+  /** true = oculta SOLO los botones Editar/Eliminar (a diferencia de
+   *  soloLectura, que oculta toda la columna Acciones incluyendo
+   *  accionExtra/accionExtra2) — pensado para listas de solo-consulta que
+   *  sí necesitan una acción propia (p.ej. "Restaurar" en el historial de
+   *  versiones de WikiDocs), donde editar/eliminar el registro tal cual no
+   *  tiene sentido. */
+  readonly ocultarEditarEliminar = input<boolean>(false);
 
   readonly editar = output<T>();
   readonly eliminar = output<T>();
@@ -50,6 +57,15 @@ export class DataTableComponent<T extends { id: number }> {
   /** Título/aria-label de esa acción extra (si no se da, se usa la etiqueta tal cual). */
   readonly accionExtraTitulo = input<string | undefined>(undefined);
   readonly accionExtra = output<T>();
+
+  /** Segundo botón de acción extra opcional por fila, con etiqueta DINÁMICA
+   *  por renglón (a diferencia de accionExtraEtiqueta, que es fija) — pensado
+   *  para un icono que cambia según el estado de esa fila (p.ej. ⭐/☆ de
+   *  favorito en WikiDocs). Si no se define esta función, el botón no se
+   *  muestra, igual que accionExtraEtiqueta. */
+  readonly accionExtra2EtiquetaFn = input<((fila: T) => string) | undefined>(undefined);
+  readonly accionExtra2Titulo = input<string | undefined>(undefined);
+  readonly accionExtra2 = output<T>();
 
   readonly paginaActual = signal(1);
   readonly campoOrden = signal<keyof T & string | null>(null);

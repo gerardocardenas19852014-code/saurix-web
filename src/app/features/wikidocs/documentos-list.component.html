@@ -33,12 +33,19 @@
         (input)="busqueda.set($any($event.target).value)"
       />
     </div>
+    <label class="checkbox-inline">
+      <input type="checkbox" [checked]="soloFavoritos()" (change)="soloFavoritos.set($any($event.target).checked)" />
+      ⭐ Solo favoritos
+    </label>
   </div>
 
   <app-data-table
     [columnas]="columnas"
     [filas]="documentos()"
     [cargando]="cargando()"
+    [accionExtra2EtiquetaFn]="iconoFavorito"
+    accionExtra2Titulo="Marcar/quitar favorito"
+    (accionExtra2)="toggleFavorito($event)"
     accionExtraEtiqueta="Ver"
     (accionExtra)="verDocumento($event)"
     (editar)="editarDocumento($event)"
@@ -46,10 +53,21 @@
   />
 } @else {
   <div class="page-header">
-    <h1>{{ documentoActual()?.titulo ?? 'Nuevo documento' }}</h1>
+    <h1>
+      {{ documentoActual()?.titulo ?? 'Nuevo documento' }}
+      @if (documentoActual()) {
+        <button
+          type="button"
+          class="btn-favorito-inline"
+          [title]="esFavorito(documentoActual()!) ? 'Quitar de favoritos' : 'Marcar como favorito'"
+          (click)="toggleFavorito(documentoActual()!)"
+        >{{ esFavorito(documentoActual()!) ? '⭐' : '☆' }}</button>
+      }
+    </h1>
     <div class="page-actions">
       @if (documentoActual()) {
         <button type="button" class="btn-secondary" (click)="descargar(documentoActual()!)">⬇️ Descargar</button>
+        <button type="button" class="btn-secondary" (click)="exportarPdf(documentoActual()!)">🧾 Descargar PDF</button>
       }
       <button type="button" class="btn-secondary" (click)="volverALista()">← Volver</button>
     </div>
@@ -60,10 +78,25 @@
       <button type="button" class="tab-btn" [class.is-active]="vista() === 'ver'" (click)="cambiarTab('ver')">Ver</button>
       <button type="button" class="tab-btn" [class.is-active]="vista() === 'editar'" (click)="cambiarTab('editar')">Editar</button>
       <button type="button" class="tab-btn" [class.is-active]="vista() === 'adjuntos'" (click)="cambiarTab('adjuntos')">Adjuntos</button>
+      <button type="button" class="tab-btn" [class.is-active]="vista() === 'historial'" (click)="cambiarTab('historial')">Historial</button>
     </div>
   }
 
   @if (vista() === 'ver') {
+    @if (tablaContenido().length > 0) {
+      <nav class="toc-documento" aria-label="Tabla de contenido">
+        <span class="toc-titulo">Contenido</span>
+        @for (item of tablaContenido(); track item.id) {
+          <a
+            class="toc-item"
+            [class.toc-nivel-1]="item.nivel === 1"
+            [class.toc-nivel-2]="item.nivel === 2"
+            [class.toc-nivel-3]="item.nivel === 3"
+            (click)="irASeccion(item.id)"
+          >{{ item.texto }}</a>
+        }
+      </nav>
+    }
     <article class="page-body" [innerHTML]="contenidoRenderizado()"></article>
     <div class="page-meta">Última modificación: {{ formatearFecha(documentoActual()!) }}</div>
   } @else if (vista() === 'adjuntos') {
@@ -73,6 +106,21 @@
       [padreId]="documentoActual()!.id"
       etiqueta="Adjuntos"
     />
+  } @else if (vista() === 'historial') {
+    @if (versiones().length === 0) {
+      <div class="empty-state-block">
+        <p>Todavía no hay versiones anteriores guardadas de este documento — se registra una cada vez que se edita.</p>
+      </div>
+    } @else {
+      <app-data-table
+        [columnas]="columnasVersiones"
+        [filas]="versiones()"
+        [ocultarEditarEliminar]="true"
+        accionExtraEtiqueta="↩️ Restaurar"
+        accionExtraTitulo="Restaurar esta versión"
+        (accionExtra)="pedirRestaurar($event)"
+      />
+    }
   } @else {
     <form [formGroup]="form" (ngSubmit)="guardar()">
       <div class="edit-form">
@@ -133,4 +181,13 @@
   [mensaje]="'¿Eliminar el documento ' + (documentoAEliminar()?.titulo ?? '') + '?'"
   (confirmar)="confirmarEliminar()"
   (cancelar)="documentoAEliminar.set(null)"
+/>
+
+<app-confirm-dialog
+  [visible]="versionARestaurar() !== null"
+  titulo="Restaurar versión"
+  mensaje="El contenido actual se reemplazará por el de esta versión (quedará guardado como una versión más antes de hacerlo, así que también se puede deshacer)."
+  textoConfirmar="Restaurar"
+  (confirmar)="confirmarRestaurar()"
+  (cancelar)="versionARestaurar.set(null)"
 />

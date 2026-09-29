@@ -39,3 +39,27 @@ export interface SeccionOpcion {
   nombre: string;
   categoriaId: number;
 }
+
+/** Documento marcado como favorito por un usuario — un registro por
+ *  usuario+documento (no un campo booleano en Documento, para que cada
+ *  usuario tenga sus propios favoritos sin pisar los de los demás). */
+export interface DocumentoFavorito {
+  id: number;
+  documentoId: number;
+  usuario: string;
+}
+
+/** Snapshot del contenido de un Documento justo ANTES de sobrescribirlo —
+ *  se crea uno nuevo cada vez que se guarda una edición (ver guardar() en
+ *  documentos-list.component.ts), nunca se modifica ni se borra, así que
+ *  sirve como historial de cambios simple (quién y cuándo) con opción de
+ *  restaurar una versión anterior. */
+export interface DocumentoVersion {
+  id: number;
+  documentoId: number;
+  titulo: string;
+  contenido: string;
+  usuario: string;
+  /** Estampada automáticamente por IndexedDbDataClientService en el alta. */
+  fechaCreacion?: string;
+}
