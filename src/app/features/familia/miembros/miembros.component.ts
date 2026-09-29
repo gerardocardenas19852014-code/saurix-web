@@ -12,6 +12,7 @@ import { BitacoraService } from '../../../shared/services/bitacora.service';
 import { ToastService } from '../../../shared/services/toast.service';
 import { ValorLista } from '../../../shared/valor-lista/valor-lista.model';
 import { calcularRfcYCurp, OPCIONES_ENTIDAD, OPCIONES_SEXO } from '../../panel-control/rfc-curp/rfc-curp.util';
+import { colorAvatar, iniciales } from '../../proyectos/kanban/avatar.util';
 import { DocumentoFamilia } from '../documento-familia.model';
 import {
   CLASE_ESTADO_VENCIMIENTO,
@@ -59,6 +60,11 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
 
   protected readonly moduloBitacora = MODULO_BITACORA;
   protected readonly calcularEdad = calcularEdad;
+  /** Mismo avatar por iniciales que usa Gestión de Proyectos para las
+   *  personas asignadas (ver avatar.util.ts) — reutilizado aquí para la
+   *  tarjeta de emergencia, ya que el miembro de familia no tiene foto. */
+  protected readonly colorAvatar = colorAvatar;
+  protected readonly iniciales = iniciales;
   protected readonly estadoVencimiento = estadoVencimiento;
   protected readonly etiquetaEstadoVencimiento = ETIQUETA_ESTADO_VENCIMIENTO;
   protected readonly claseEstadoVencimiento = CLASE_ESTADO_VENCIMIENTO;
@@ -421,31 +427,81 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
    *  que una tarjeta bancaria/INE) en PDF, dibujada con jsPDF (ya es
    *  dependencia del proyecto — ver Comercio/Cotizaciones), no una captura
    *  de pantalla: así el texto sale nítido y seleccionable en el PDF. */
+  private hexARgbTarjeta(hex: string): [number, number, number] {
+    const limpio = hex.replace('#', '');
+    return [
+      parseInt(limpio.slice(0, 2), 16) || 0,
+      parseInt(limpio.slice(2, 4), 16) || 0,
+      parseInt(limpio.slice(4, 6), 16) || 0,
+    ];
+  }
+
   descargarTarjeta(): void {
     const m = this.miembroActivo();
     if (!m) return;
 
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [54, 85.6] });
-    const anchoUtil = 85.6 - 10;
-    let y = 8;
+    // Mismo formato "credencial física" que se ve en pantalla (ver
+    // .tarjeta-emergencia en el .scss): franja de color arriba con avatar +
+    // franja de color abajo con el CURP, cuerpo blanco en medio — sin
+    // ningún escudo/logotipo oficial, es una tarjeta propia de Saurix.
+    const ANCHO = 85.6;
+    const ALTO = 54;
+    const [rDanger, gDanger, bDanger] = this.hexARgbTarjeta('#b3432f');
+    const nombreCompleto = [m.nombre, m.apellidoPaterno].filter(Boolean).join(' ');
+    const [rAvatar, gAvatar, bAvatar] = this.hexARgbTarjeta(colorAvatar(nombreCompleto));
 
-    doc.setFillColor(20, 30, 45);
-    doc.rect(0, 0, 85.6, 54, 'F');
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [ALTO, ANCHO] });
+    const anchoUtil = ANCHO - 10;
 
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, ANCHO, ALTO, 'F');
+
+    // Encabezado
+    doc.setFillColor(rDanger, gDanger, bDanger);
+    doc.rect(0, 0, ANCHO, 15, 'F');
+    doc.setFillColor(rAvatar, gAvatar, bAvatar);
+    doc.circle(10, 7.5, 5, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text('TARJETA DE EMERGENCIA', 5, y);
-    y += 6;
+    doc.setFontSize(8);
+    doc.text(iniciales(nombreCompleto), 10, 8.7, { align: 'center' });
+    doc.setFontSize(9);
+    doc.text('TARJETA DE EMERGENCIA', 19, 6.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text('Saurix · Directorio familiar', 19, 11);
 
-    doc.setFontSize(10);
-    doc.text([m.nombre, m.apellidoPaterno, m.apellidoMaterno].filter(Boolean).join(' '), 5, y);
-    y += 5.5;
+    // Cuerpo
+    doc.setTextColor(90, 90, 90);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text('NOMBRE COMPLETO', 5, 20);
+
+    doc.setTextColor(20, 20, 20);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    const lineasNombre = doc.splitTextToSize(
+      [m.nombre, m.apellidoPaterno, m.apellidoMaterno].filter(Boolean).join(' '),
+      anchoUtil,
+    );
+    doc.text(lineasNombre, 5, 25);
+    let y = 25 + 4.6 * lineasNombre.length + 1.5;
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     const edad = calcularEdad(m.fechaNacimiento);
-    doc.text(`Edad: ${edad === null ? '—' : edad + ' años'}    Tipo de sangre: ${m.tipoSangre || '—'}`, 5, y);
+    doc.text(`Edad: ${edad === null ? '—' : edad + ' años'}`, 5, y);
+    if (m.tipoSangre) {
+      const anchoBadge = doc.getTextWidth(m.tipoSangre) + 7;
+      const xBadge = ANCHO - 5 - anchoBadge;
+      doc.setFillColor(rDanger, gDanger, bDanger);
+      doc.roundedRect(xBadge, y - 3.3, anchoBadge, 4.6, 2, 2, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`🩸 ${m.tipoSangre}`, xBadge + anchoBadge / 2, y, { align: 'center' });
+      doc.setTextColor(20, 20, 20);
+      doc.setFont('helvetica', 'normal');
+    }
     y += 5;
 
     const lineaLarga = (etiqueta: string, valor: string): void => {
@@ -460,8 +516,8 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     lineaLarga('Medicamentos', m.medicamentos);
 
     y += 1;
-    doc.setDrawColor(255, 255, 255);
-    doc.line(5, y, 85.6 - 5, y);
+    doc.setDrawColor(210, 210, 210);
+    doc.line(5, y, ANCHO - 5, y);
     y += 4;
 
     doc.setFont('helvetica', 'bold');
@@ -478,6 +534,14 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
       y += 4.2;
       doc.text(`Seguro: ${m.aseguradora || '—'}${m.numeroPoliza ? ' · Póliza ' + m.numeroPoliza : ''}`, 5, y);
     }
+
+    // Pie
+    doc.setFillColor(rDanger, gDanger, bDanger);
+    doc.rect(0, ALTO - 6, ANCHO, 6, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text(m.curp ? `CURP ${m.curp}` : 'Saurix · Tarjeta de emergencia', ANCHO / 2, ALTO - 2.3, { align: 'center' });
 
     const nombreArchivo = `tarjeta-emergencia-${(m.nombre + ' ' + m.apellidoPaterno).trim().replace(/\s+/g, '-').toLowerCase()}.pdf`;
     doc.save(nombreArchivo);

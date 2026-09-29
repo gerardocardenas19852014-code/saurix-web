@@ -1,14 +1,41 @@
 /* Tarjeta de emergencia en pantalla — mismo contenido y proporción (más
  * ancha que alta, tamaño credencial) que el PDF que genera descargarTarjeta()
  * en miembros.component.ts, para que lo que se ve coincida con lo que se
- * descarga. */
+ * descarga. Inspirada en el formato de una credencial física (franja de
+ * color arriba/abajo, avatar circular, nombre en grande) — sin ningún
+ * escudo, logotipo ni texto oficial: es una tarjeta propia de Saurix, no
+ * un documento gubernamental.
+ */
 .tarjeta-emergencia {
   max-width: 420px;
-  padding: 18px 20px;
   border-radius: 14px;
-  background: var(--ink);
-  color: #fff;
+  overflow: hidden;
+  background: #fff;
+  color: var(--ink);
   box-shadow: 0 16px 30px -14px rgba(0, 0, 0, .45);
+}
+
+.tarjeta-emergencia-encabezado {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, var(--danger), #7a2c1d);
+  color: #fff;
+}
+
+.tarjeta-emergencia-avatar {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 15px;
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, .6);
 }
 
 .tarjeta-emergencia-titulo {
@@ -16,31 +43,74 @@
   font-size: 11px;
   letter-spacing: .08em;
   text-transform: uppercase;
-  opacity: .75;
-  margin-bottom: 6px;
+  opacity: .92;
 }
 
-.tarjeta-emergencia-nombre {
-  font-size: 19px;
-  font-weight: 700;
+.tarjeta-emergencia-marca {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: .85;
+  margin-top: 2px;
+}
+
+.tarjeta-emergencia-cuerpo {
+  padding: 14px 18px;
+}
+
+.tarjeta-emergencia-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   margin-bottom: 8px;
+}
+
+.tarjeta-emergencia-etiqueta {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  opacity: .55;
+}
+
+.tarjeta-emergencia-valor-grande {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .tarjeta-emergencia-fila {
   font-size: 13px;
   display: flex;
-  gap: 6px;
+  gap: 10px;
+  align-items: center;
   flex-wrap: wrap;
   margin: 4px 0;
-  opacity: .92;
 }
 
 .tarjeta-emergencia-fila span:first-child {
   opacity: .7;
 }
 
+.tarjeta-emergencia-badge-sangre {
+  background: var(--danger);
+  color: #fff;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
 .tarjeta-emergencia-separador {
   height: 1px;
-  background: rgba(255, 255, 255, .25);
+  background: rgba(0, 0, 0, .1);
   margin: 10px 0;
+}
+
+.tarjeta-emergencia-pie {
+  background: var(--danger);
+  color: #fff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: .05em;
+  padding: 6px 18px;
+  text-align: center;
 }
