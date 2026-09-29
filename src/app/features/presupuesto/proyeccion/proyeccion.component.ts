@@ -443,16 +443,26 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
     return cuenta ? `${nombre} · ${cuenta.nombre}` : nombre;
   }
 
-  /** Renglón(es) de una categoría hoja: el renglón normal (editable, como
-   *  antes) y, si junta más de una cuenta, un sub-renglón informativo por
-   *  cuenta debajo — así se ve de dónde sale sin duplicar el total. */
+  /** Renglón(es) de una categoría hoja: el renglón normal y, si junta más
+   *  de una cuenta, un sub-renglón informativo por cuenta debajo — así se
+   *  ve de dónde sale sin duplicar el total.
+   *
+   *  El renglón de la categoría solo es editable a mano cuando NO tiene
+   *  desglose (una sola cuenta o ninguna): en cuanto junta 2+ cuentas es
+   *  pura sumatoria de sus propios sub-renglones (igual que un Subtotal o
+   *  un Total), así que se le ignora cualquier ajuste manual que pudiera
+   *  tener guardado de antes — de lo contrario el número de arriba dejaría
+   *  de cuadrar con la suma de las cuentas de abajo. */
   private filasHoja(clave: string, nombre: string, grupoId: string | null = null): RenglonProyeccion[] {
     const quincenas = this.quincenas();
-    const celdas = quincenas.map((q) => this.celda(clave, q.clave));
-    const nombreFinal = this.nombreConCuentaUnica(clave, nombre);
     const cuentas = this.cuentasDeCategoria(clave);
+    const tieneDetalle = cuentas.length > 0;
+    const celdas = tieneDetalle
+      ? quincenas.map((q) => ({ valor: this.valoresAuto().mapa.get(clave)?.get(q.clave) ?? 0, manual: false, editable: false }))
+      : quincenas.map((q) => this.celda(clave, q.clave));
+    const nombreFinal = this.nombreConCuentaUnica(clave, nombre);
     const filas: RenglonProyeccion[] = [
-      { id: `hoja:${clave}`, tipo: 'hoja', clave, nombre: nombreFinal, celdas, sumable: true, grupoId, tieneDetalle: cuentas.length > 0 },
+      { id: `hoja:${clave}`, tipo: 'hoja', clave, nombre: nombreFinal, celdas, sumable: true, grupoId, tieneDetalle },
     ];
 
     for (const cuenta of cuentas) {
