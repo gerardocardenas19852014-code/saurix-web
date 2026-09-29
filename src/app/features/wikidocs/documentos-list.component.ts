@@ -5,6 +5,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { marked } from 'marked';
 import { DataClientService } from '../../core/services/data-client.service';
 import { AdjuntosPanelComponent } from '../../shared/components/adjuntos-panel/adjuntos-panel.component';
+import { EditorTextoComponent } from '../../shared/components/editor-texto/editor-texto.component';
 import { ColumnaTabla, DataTableComponent } from '../../shared/components/data-table/data-table.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../shared/services/toast.service';
@@ -38,7 +39,14 @@ interface Migaja {
 @Component({
   selector: 'app-documentos-list',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, DataTableComponent, ConfirmDialogComponent, AdjuntosPanelComponent],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    DataTableComponent,
+    ConfirmDialogComponent,
+    AdjuntosPanelComponent,
+    EditorTextoComponent,
+  ],
   templateUrl: './documentos-list.component.html',
   styleUrl: './documentos-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -53,15 +61,32 @@ export class DocumentosListComponent implements OnInit {
   protected seccionFijaId: number | null = null;
   protected seccionFijaNombre = '';
 
-  protected readonly documentos = signal<Documento[]>([]);
+  private readonly documentosTodos = signal<Documento[]>([]);
   protected readonly cargando = signal(false);
   protected readonly busqueda = signal('');
+
+  /** Búsqueda por título Y por el texto del contenido, todo en cliente (mismo
+   *  criterio ya usado en Usuarios) — así encuentra un documento aunque la
+   *  palabra buscada no esté en el título, solo en la redacción. */
+  protected readonly documentos = computed(() => {
+    const texto = this.busqueda().trim().toLowerCase();
+    const todos = this.documentosTodos();
+    if (!texto) return todos;
+    return todos.filter(
+      (doc) => doc.titulo.toLowerCase().includes(texto) || this.textoPlano(doc.contenido).toLowerCase().includes(texto),
+    );
+  });
 
   protected readonly migajas = signal<Migaja[]>([]);
 
   protected readonly tiposSistema = signal<TipoSistemaOpcion[]>([]);
   protected readonly categorias = signal<CategoriaOpcion[]>([]);
   protected readonly secciones = signal<SeccionOpcion[]>([]);
+
+  /** Todas las secciones (sin filtrar), solo para mostrar el nombre de la
+   *  sección de cada documento en la columna del listado en vez de su Id. */
+  private readonly todasLasSecciones = signal<SeccionOpcion[]>([]);
+  private readonly mapaSecciones = computed(() => new Map(this.todasLasSecciones().map((s) => [s.id, s])));
 
   /** null = listado; 'ver'/'editar'/'adjuntos' = documento abierto en esa pestaña. */
   protected readonly vista = signal<'lista' | 'ver' | 'editar' | 'adjuntos'>('lista');
@@ -72,13 +97,17 @@ export class DocumentosListComponent implements OnInit {
 
   protected readonly columnas: ColumnaTabla<Documento>[] = [
     { campo: 'titulo', etiqueta: 'Título' },
-    { campo: 'seccionId', etiqueta: 'Sección Id' },
+    {
+      campo: 'seccionId',
+      etiqueta: 'Sección',
+      formatear: (fila) => this.mapaSecciones().get(fila.seccionId)?.nombre ?? '—',
+    },
     { campo: 'activo', etiqueta: 'Activo', formatear: (fila) => (fila.activo ? 'Sí' : 'No') },
   ];
 
   protected readonly contenidoRenderizado = computed<SafeHtml>(() => {
     const doc = this.documentoActual();
-    const html = doc ? marked.parse(doc.contenido || '', { async: false }) : '';
+    const html = doc ? this.aHtml(doc.contenido) : '';
     return this.sanitizer.bypassSecurityTrustHtml(insertarEmbeds(html));
   });
 
@@ -104,6 +133,8 @@ export class DocumentosListComponent implements OnInit {
       this.cargarMigajas(this.seccionFijaId);
     }
 
+    this.data.list<SeccionOpcion>('Seccion').subscribe((secciones) => this.todasLasSecciones.set(secciones));
+
     this.cargar();
   }
 
@@ -120,12 +151,11 @@ export class DocumentosListComponent implements OnInit {
   cargar(): void {
     this.cargando.set(true);
     const filtro: Record<string, unknown> = {};
-    if (this.busqueda()) filtro['titulo'] = this.busqueda();
     if (this.seccionFijaId) filtro['seccionId'] = this.seccionFijaId;
 
     this.data.list<Documento>('Documento', filtro).subscribe({
       next: (documentos) => {
-        this.documentos.set(documentos);
+        this.documentosTodos.set(documentos);
         this.cargando.set(false);
       },
       error: () => this.cargando.set(false),
@@ -214,13 +244,19 @@ export class DocumentosListComponent implements OnInit {
   }
 
   guardar(): void {
-    if (this.form.invalid || !this.form.getRawValue().seccionId) {
+    const valorBruto = this.form.getRawValue();
+    const seccionValida = !!valorBruto.seccionId;
+    const contenidoValido = !this.contenidoEstaVacio(valorBruto.contenido);
+
+    if (this.form.get('titulo')!.invalid || !seccionValida || !contenidoValido) {
       this.form.markAllAsTouched();
-      this.toast.advertencia('Selecciona tipo de sistema, categoría y sección.');
+      if (!seccionValida) this.toast.advertencia('Selecciona tipo de sistema, categoría y sección.');
+      else if (!contenidoValido) this.toast.advertencia('Escribe el contenido del documento.');
+      else this.toast.advertencia('Revisa el título del documento.');
       return;
     }
 
-    const { tipoSistemaId: _tipoSistemaId, categoriaId: _categoriaId, ...valor } = this.form.getRawValue();
+    const { tipoSistemaId: _tipoSistemaId, categoriaId: _categoriaId, ...valor } = valorBruto;
     const activo = this.documentoActual()?.activo ?? true;
     const dto = { ...valor, activo };
     const esEdicion = this.documentoActual() !== null;
@@ -240,7 +276,24 @@ export class DocumentosListComponent implements OnInit {
   }
 
   private renderParaDescarga(documento: Documento): string {
-    return insertarEmbeds(marked.parse(documento.contenido || '', { async: false }) as string);
+    return insertarEmbeds(this.aHtml(documento.contenido));
+  }
+
+  /** Los documentos creados con el editor visual ya guardan HTML; los
+   *  creados antes (Markdown puro) se siguen renderizando con `marked`,
+   *  detectado por la presencia de etiquetas HTML típicas. */
+  private aHtml(contenido: string): string {
+    const crudo = contenido || '';
+    if (/<\/?(p|div|h[1-6]|ul|ol|li|img|a\s|strong|em|table|br)[ >]/i.test(crudo)) return crudo;
+    return marked.parse(crudo, { async: false }) as string;
+  }
+
+  private textoPlano(html: string): string {
+    return (html || '').replace(/<[^>]*>/g, ' ');
+  }
+
+  private contenidoEstaVacio(html: string): boolean {
+    return this.textoPlano(html).trim().length === 0;
   }
 
   descargar(documento: Documento): void {

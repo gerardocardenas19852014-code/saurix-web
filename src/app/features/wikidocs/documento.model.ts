@@ -2,7 +2,14 @@ export interface Documento {
   id: number;
   seccionId: number;
   titulo: string;
-  /** Contenido en Markdown; se renderiza con `marked` en la vista y se busca en texto plano desde el asistente de IA del shell. */
+  /**
+   * Contenido del documento, generado por el editor visual `app-editor-texto`
+   * (HTML — títulos, negritas, listas, imágenes y archivos incrustados como
+   * data URL, enlaces, etc.). Los documentos creados antes de este editor
+   * quedaron guardados en Markdown; la vista detecta automáticamente cuál es
+   * cuál (busca etiquetas HTML típicas) y usa `marked` solo para los antiguos,
+   * así que ambos formatos se siguen viendo bien sin necesidad de migrarlos.
+   */
   contenido: string;
   activo: boolean;
   /** Estampadas automáticamente por IndexedDbDataClientService en Alta/Modificación. */

@@ -28,9 +28,9 @@
     <div class="grid-filter">
       <input
         type="search"
-        placeholder="Buscar por título…"
+        placeholder="Buscar por título o contenido…"
         [value]="busqueda()"
-        (input)="busqueda.set($any($event.target).value); cargar()"
+        (input)="busqueda.set($any($event.target).value)"
       />
     </div>
   </div>
@@ -114,8 +114,8 @@
         </label>
 
         <label>
-          Contenido (Markdown)
-          <textarea rows="16" formControlName="contenido"></textarea>
+          Contenido
+          <app-editor-texto formControlName="contenido" />
         </label>
 
         <div class="form-actions">

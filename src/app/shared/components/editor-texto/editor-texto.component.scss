@@ -1,0 +1,13 @@
+/* El look del editor (toolbar, tipografía, colores por tema) se define en
+ * src/styles.scss junto con el resto de overrides de librerías externas
+ * (mismo criterio ya usado para Bootstrap) — Quill inserta su DOM interno
+ * en tiempo de ejecución y los estilos con encapsulación de componente no
+ * le llegan. Aquí solo va el acomodo del wrapper. */
+.editor-texto-wrap {
+  display: block;
+}
+
+.editor-texto-wrap.is-disabled {
+  opacity: 0.65;
+  pointer-events: none;
+}

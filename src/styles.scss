@@ -1221,3 +1221,63 @@ button { font-family: inherit; }
 .table-active > * { background-color: var(--accent-soft); }
 
 .alert-light { background: var(--paper); border-color: var(--line); color: var(--text-strong); }
+
+/* ====================================================================
+   Editor de texto enriquecido (WikiDocs) — overrides de Quill
+   ====================================================================
+   Igual que Bootstrap arriba: Quill inyecta su propio DOM en tiempo de
+   ejecución (barra de herramientas, área editable), así que los estilos
+   con encapsulación de componente de Angular no le llegan — se
+   remapean sus clases .ql-* aquí, una sola vez, a nuestros tokens de
+   tema (--paper/--ink/--line/--accent/...) para que respete los 6 temas
+   igual que el resto de la app, y se le da el mismo tamaño que tenía el
+   textarea de Markdown que reemplaza (rows="16" ≈ 320px). */
+.editor-texto-wrap .ql-toolbar.ql-snow {
+  background: var(--paper);
+  border-color: var(--line);
+  border-radius: 10px 10px 0 0;
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+.editor-texto-wrap .ql-container.ql-snow {
+  background: var(--paper-raised);
+  border-color: var(--line);
+  border-radius: 0 0 10px 10px;
+  min-height: 320px;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 14px;
+}
+.editor-texto-wrap .ql-editor {
+  min-height: 320px;
+  color: var(--text-strong);
+}
+.editor-texto-wrap .ql-editor.ql-blank::before {
+  color: var(--ink-soft);
+  font-style: normal;
+}
+.editor-texto-wrap .ql-snow .ql-stroke { stroke: var(--ink-soft); }
+.editor-texto-wrap .ql-snow .ql-fill { fill: var(--ink-soft); }
+.editor-texto-wrap .ql-snow .ql-picker { color: var(--ink-soft); }
+.editor-texto-wrap .ql-toolbar.ql-snow button:hover .ql-stroke,
+.editor-texto-wrap .ql-toolbar.ql-snow button.ql-active .ql-stroke {
+  stroke: var(--accent);
+}
+.editor-texto-wrap .ql-toolbar.ql-snow button:hover .ql-fill,
+.editor-texto-wrap .ql-toolbar.ql-snow button.ql-active .ql-fill {
+  fill: var(--accent);
+}
+.editor-texto-wrap .ql-snow .ql-picker-options {
+  background: var(--paper-raised);
+  border-color: var(--line);
+}
+/* Botón propio "Insertar archivo" (📎) — Quill no trae ícono para formatos
+   que no reconoce, así que se dibuja con un emoji, igual que el resto de
+   la app usa emojis como iconografía (⬇️ Descargar, 📎 Adjuntos, etc.). */
+.editor-texto-wrap .ql-toolbar.ql-snow button.ql-archivo {
+  width: auto;
+  padding: 3px 5px;
+}
+.editor-texto-wrap .ql-toolbar.ql-snow button.ql-archivo::before {
+  content: '📎';
+  font-size: 14px;
+  line-height: 1;
+}
