@@ -55,8 +55,8 @@
 
   @if (tabFicha() === 'datos') {
     <form [formGroup]="form" (ngSubmit)="guardarMiembro()">
-      <h3 class="catalog-group-title">Datos personales</h3>
-      <div class="edit-form">
+      <div class="edit-form form-grid-5col">
+        <h3 class="catalog-group-title full-span">Datos personales</h3>
         <label class="floating-field">
           <span>Nombre(s) <b>*</b></span>
           <input type="text" class="form-control pill-control" formControlName="nombre" placeholder=" " />
@@ -108,29 +108,25 @@
           <input type="checkbox" formControlName="activo" />
           Activo
         </label>
-      </div>
 
-      <h3 class="catalog-group-title">
-        RFC y CURP
-        <button type="button" class="btn-secondary small" style="margin-left:10px;" (click)="generarRfcCurp()">🔄 Generar RFC y CURP</button>
-      </h3>
-      <p class="hint" style="margin:-6px 0 12px;">
-        Se calculan a partir de los datos de arriba (misma calculadora que Panel de Control → Generación de RFC y CURP) — son una
-        pre-validación, no el documento oficial: revísalos y corrígelos a mano si no coinciden.
-      </p>
-      <div class="edit-form">
-        <label class="floating-field">
+        <h3 class="catalog-group-title full-span">
+          RFC y CURP
+          <button type="button" class="btn-secondary small" style="margin-left:10px;" (click)="generarRfcCurp()">🔄 Generar RFC y CURP</button>
+        </h3>
+        <p class="hint full-span" style="margin:-6px 0 0;">
+          Se calculan a partir de los datos de arriba (misma calculadora que Panel de Control → Generación de RFC y CURP) — son una
+          pre-validación, no el documento oficial: revísalos y corrígelos a mano si no coinciden.
+        </p>
+        <label class="floating-field half-span">
           <span>RFC</span>
           <input type="text" class="form-control pill-control" formControlName="rfc" placeholder=" " style="text-transform:uppercase;" />
         </label>
-        <label class="floating-field">
+        <label class="floating-field half-span">
           <span>CURP</span>
           <input type="text" class="form-control pill-control" formControlName="curp" placeholder=" " style="text-transform:uppercase;" />
         </label>
-      </div>
 
-      <h3 class="catalog-group-title">Información médica de emergencia</h3>
-      <div class="edit-form">
+        <h3 class="catalog-group-title full-span">Información médica de emergencia</h3>
         <label class="floating-field">
           <span>Tipo de sangre</span>
           <select class="form-control pill-control" formControlName="tipoSangre">
@@ -140,22 +136,20 @@
             }
           </select>
         </label>
-        <label class="floating-field">
+        <label class="floating-field half-span">
           <span>Alergias</span>
           <input type="text" class="form-control pill-control" formControlName="alergias" placeholder=" " />
         </label>
-        <label class="floating-field">
+        <label class="floating-field half-span">
           <span>Condiciones crónicas</span>
           <input type="text" class="form-control pill-control" formControlName="condicionesCronicas" placeholder=" " />
         </label>
-        <label class="floating-field">
+        <label class="floating-field full-span">
           <span>Medicamentos</span>
           <input type="text" class="form-control pill-control" formControlName="medicamentos" placeholder=" " />
         </label>
-      </div>
 
-      <h3 class="catalog-group-title">Contacto de emergencia y seguro</h3>
-      <div class="edit-form">
+        <h3 class="catalog-group-title full-span">Contacto de emergencia y seguro</h3>
         <label class="floating-field">
           <span>Nombre de contacto</span>
           <input type="text" class="form-control pill-control" formControlName="contactoEmergenciaNombre" placeholder=" " />
