@@ -2,9 +2,45 @@
   <div class="page-header">
     <h1>Miembros de familia</h1>
     <div class="page-actions">
+      @if (miembros().length > 0) {
+        <button type="button" class="btn-secondary small" [disabled]="generandoTarjetas()" (click)="descargarTodasLasTarjetas()">
+          {{ generandoTarjetas() ? 'Generando…' : '⇩ Descargar todas las tarjetas' }}
+        </button>
+      }
       <button type="button" class="toolbar-btn" (click)="nuevoMiembro()">+ Nuevo miembro</button>
     </div>
   </div>
+
+  @if (documentosPorVencer().length > 0) {
+    <div class="wallet-alert-block">
+      <strong>
+        ⚠ {{ documentosPorVencer().length }} documento{{ documentosPorVencer().length === 1 ? '' : 's' }}
+        por vencer o vencido{{ documentosPorVencer().length === 1 ? '' : 's' }}
+      </strong>
+      <ul>
+        @for (item of documentosPorVencer(); track item.documento.id) {
+          <li>
+            {{ item.miembro.nombre }} {{ item.miembro.apellidoPaterno }} — {{ etiquetaTipoDocumento(item.documento.tipoDocumentoClave) }}:
+            {{ item.estado === 'vencido' ? 'vencido' : 'vence en ' + item.dias + (item.dias === 1 ? ' día' : ' días') }}
+          </li>
+        }
+      </ul>
+    </div>
+  }
+
+  @if (cumpleanosProximos().length > 0) {
+    <div class="wallet-alert-block">
+      <strong>🎂 Cumpleaños próximos</strong>
+      <ul>
+        @for (item of cumpleanosProximos(); track item.miembro.id) {
+          <li>
+            {{ item.miembro.nombre }} {{ item.miembro.apellidoPaterno }} — cumple {{ item.edad ?? '—' }} años {{ textoDiasCumpleanos(item.dias) }}
+            ({{ item.fechaTexto }})
+          </li>
+        }
+      </ul>
+    </div>
+  }
 
   <div class="grid-toolbar">
     <label class="board-filter-field board-filter-checkbox" style="margin:0;">

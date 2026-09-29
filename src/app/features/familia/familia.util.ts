@@ -49,6 +49,56 @@ export const CLASE_ESTADO_VENCIMIENTO: Record<EstadoVencimientoDocumento, string
   vencido: 'grid-badge-danger',
 };
 
+// ── Cumpleaños próximos ────────────────────────────────────────────────
+
+/** Días de antelación para avisar de un cumpleaños próximo en el inicio de
+ *  Familia/Miembros — más corto que DIAS_AVISO_VENCIMIENTO porque un
+ *  cumpleaños es un recordatorio de "esta quincena", no de todo un mes. */
+export const DIAS_AVISO_CUMPLEANOS = 14;
+
+/** Próxima fecha en que cumple años (este año si todavía no pasó, o el que
+ *  sigue si ya pasó) — null si no hay fecha de nacimiento capturada. */
+export function proximoCumpleanos(fechaNacimiento: string): Date | null {
+  if (!fechaNacimiento) return null;
+  const nacimiento = fechaLocalDeTexto(fechaNacimiento);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  let proximo = new Date(hoy.getFullYear(), nacimiento.getMonth(), nacimiento.getDate());
+  if (proximo.getTime() < hoy.getTime()) {
+    proximo = new Date(hoy.getFullYear() + 1, nacimiento.getMonth(), nacimiento.getDate());
+  }
+  return proximo;
+}
+
+/** Días que faltan para el próximo cumpleaños (0 = es hoy) — null si no hay
+ *  fecha de nacimiento capturada. */
+export function diasHastaCumpleanos(fechaNacimiento: string): number | null {
+  const proximo = proximoCumpleanos(fechaNacimiento);
+  if (!proximo) return null;
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  return Math.round((proximo.getTime() - hoy.getTime()) / 86_400_000);
+}
+
+/** Edad que va a cumplir en esa próxima fecha (no la edad actual: si su
+ *  cumpleaños todavía no llega este año, es la edad actual + 1; si es
+ *  justo hoy, calcularEdad() ya la refleja porque el día ya se cumplió). */
+export function edadEnProximoCumpleanos(fechaNacimiento: string): number | null {
+  const edadActual = calcularEdad(fechaNacimiento);
+  if (edadActual === null) return null;
+  const dias = diasHastaCumpleanos(fechaNacimiento);
+  return dias === 0 ? edadActual : edadActual + 1;
+}
+
+/** Texto legible de la próxima fecha de cumpleaños, p.ej. "15 de septiembre"
+ *  — mismo criterio que el pie de la tarjeta de emergencia (toLocaleDateString
+ *  'es-MX'), sin el año porque siempre es "este año o el que sigue". */
+export function proximoCumpleanosTexto(fechaNacimiento: string): string {
+  const proximo = proximoCumpleanos(fechaNacimiento);
+  if (!proximo) return '';
+  return proximo.toLocaleDateString('es-MX', { day: 'numeric', month: 'long' });
+}
+
 // ── Semilla de catálogos ValorLista que necesitan datos de fábrica ────────
 // A diferencia de Parentesco/Tipo de documento (catálogos libres que el
 // usuario llena desde cero), Sexo, Entidad de nacimiento y Tipo de sangre

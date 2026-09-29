@@ -17,10 +17,15 @@ import { colorAvatar, iniciales } from '../../proyectos/kanban/avatar.util';
 import { DocumentoFamilia } from '../documento-familia.model';
 import {
   CLASE_ESTADO_VENCIMIENTO,
+  DIAS_AVISO_CUMPLEANOS,
   ETIQUETA_ESTADO_VENCIMIENTO,
   calcularEdad,
+  diasHastaCumpleanos,
+  edadEnProximoCumpleanos,
   estadoVencimiento,
+  fechaLocalDeTexto,
   obtenerOSembrarValorLista,
+  proximoCumpleanosTexto,
 } from '../familia.util';
 import {
   GRUPO_ENTIDAD_NACIMIENTO,
@@ -88,11 +93,61 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     this.miembros().filter((m) => this.mostrarInactivos() || m.activo !== false),
   );
 
+  /** Documentos vencidos o por vencer de miembros ACTIVOS, sin importar si
+   *  "Mostrar inactivos" está prendido o no en este momento — un miembro
+   *  dado de baja ya no necesita avisos. Se muestra como banner arriba de
+   *  la tabla (ver miembros.component.html) para no tener que entrar a la
+   *  ficha de cada quien a revisar su pestaña Documentos una por una. */
+  protected readonly documentosPorVencer = computed(() => {
+    const miembrosPorId = new Map(this.miembros().filter((m) => m.activo !== false).map((m) => [Number(m.id), m]));
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    return this.documentos()
+      .filter((d) => miembrosPorId.has(Number(d.miembroFamiliaId)))
+      .map((d) => {
+        const estado = estadoVencimiento(d);
+        const dias = d.fechaVencimiento
+          ? Math.round((fechaLocalDeTexto(d.fechaVencimiento).getTime() - hoy.getTime()) / 86_400_000)
+          : null;
+        return { documento: d, miembro: miembrosPorId.get(Number(d.miembroFamiliaId))!, estado, dias };
+      })
+      .filter((x) => x.estado === 'vencido' || x.estado === 'por-vencer')
+      .sort((a, b) => (a.dias ?? 0) - (b.dias ?? 0));
+  });
+
+  /** Cumpleaños de miembros activos dentro de los próximos DIAS_AVISO_CUMPLEANOS
+   *  días (0 = hoy) — mismo criterio de solo-activos que documentosPorVencer. */
+  protected readonly cumpleanosProximos = computed(() =>
+    this.miembros()
+      .filter((m) => m.activo !== false)
+      .map((m) => ({
+        miembro: m,
+        dias: diasHastaCumpleanos(m.fechaNacimiento),
+        edad: edadEnProximoCumpleanos(m.fechaNacimiento),
+        fechaTexto: proximoCumpleanosTexto(m.fechaNacimiento),
+      }))
+      .filter((x): x is { miembro: MiembroFamilia; dias: number; edad: number | null; fechaTexto: string } => x.dias !== null && x.dias <= DIAS_AVISO_CUMPLEANOS)
+      .sort((a, b) => a.dias - b.dias),
+  );
+
+  protected textoDiasCumpleanos(dias: number): string {
+    if (dias === 0) return 'hoy';
+    if (dias === 1) return 'mañana';
+    return `en ${dias} días`;
+  }
+
   protected readonly columnas: ColumnaTabla<MiembroFamilia>[] = [
     {
       campo: 'nombre',
       etiqueta: 'Nombre',
       formatear: (m) => [m.nombre, m.apellidoPaterno, m.apellidoMaterno].filter(Boolean).join(' '),
+    },
+    {
+      campo: 'id',
+      etiqueta: 'Alertas',
+      formatear: (m) => this.alertaMiembro(m)?.texto ?? '—',
+      claseValor: (m) => this.alertaMiembro(m)?.clase ?? 'grid-badge-muted',
+      titulo: (m) => this.alertaMiembro(m)?.titulo ?? 'Sin pendientes.',
     },
     { campo: 'parentescoClave', etiqueta: 'Parentesco', formatear: (m) => this.etiquetaParentesco(m.parentescoClave) },
     {
@@ -119,6 +174,44 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
 
   protected etiquetaTipoDocumento(clave: string): string {
     return this.tiposDocumento().find((t) => t.clave === clave)?.etiqueta ?? clave ?? '—';
+  }
+
+  /** Resumen de pendientes de un miembro para la columna "Alertas" de la
+   *  lista — mismos criterios que la tarjeta de emergencia (tipo de sangre,
+   *  contacto de emergencia) más el estado de sus documentos, para poder
+   *  detectar una ficha incompleta sin tener que abrirla. null = sin
+   *  pendientes (la celda muestra "—"). */
+  protected alertaMiembro(m: MiembroFamilia): { texto: string; clase: string; titulo: string } | null {
+    const docsDelMiembro = this.documentos().filter((d) => Number(d.miembroFamiliaId) === Number(m.id));
+    const peorDocumento = docsDelMiembro.reduce<'vencido' | 'por-vencer' | null>((peor, d) => {
+      if (peor === 'vencido') return peor;
+      const estado = estadoVencimiento(d);
+      return estado === 'vencido' || estado === 'por-vencer' ? estado : peor;
+    }, null);
+
+    const partes: string[] = [];
+    const detalles: string[] = [];
+    if (peorDocumento === 'vencido') {
+      partes.push('📄 Doc. vencido');
+      detalles.push('Tiene al menos un documento vencido.');
+    } else if (peorDocumento === 'por-vencer') {
+      partes.push('📄 Doc. por vencer');
+      detalles.push('Tiene un documento por vencer pronto.');
+    }
+    if (!m.tipoSangre) {
+      partes.push('🩸 Sin tipo de sangre');
+      detalles.push('Falta capturar el tipo de sangre.');
+    }
+    if (!m.contactoEmergenciaNombre && !m.contactoEmergenciaTelefono) {
+      partes.push('📵 Sin contacto de emergencia');
+      detalles.push('Falta capturar un contacto de emergencia.');
+    }
+    if (!partes.length) return null;
+    return {
+      texto: partes.join(' · '),
+      clase: peorDocumento === 'vencido' ? 'grid-badge-danger' : 'grid-badge-warning',
+      titulo: detalles.join(' '),
+    };
   }
 
   // ── Ficha (Datos/Documentos/Tarjeta) ────────────────────────────────
@@ -557,7 +650,46 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
   async descargarTarjeta(): Promise<void> {
     const m = this.miembroActivo();
     if (!m) return;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
+    await this.dibujarTarjetaEnPagina(doc, m);
+    const nombreArchivo = `tarjeta-emergencia-${(m.nombre + ' ' + m.apellidoPaterno).trim().replace(/\s+/g, '-').toLowerCase()}.pdf`;
+    doc.save(nombreArchivo);
+  }
 
+  /** Genera en un solo PDF las tarjetas de emergencia de todos los miembros
+   *  ACTIVOS (sin importar si "Mostrar inactivos" está prendido ahorita en
+   *  la lista) — una por página, en el mismo orden alfabético de la tabla.
+   *  Pensado para imprimir de un jalón el "librito" de emergencia de toda
+   *  la familia en vez de descargar una tarjeta a la vez. */
+  protected readonly generandoTarjetas = signal(false);
+
+  async descargarTodasLasTarjetas(): Promise<void> {
+    const activos = this.miembros()
+      .filter((m) => m.activo !== false)
+      .sort((a, b) => (a.nombre + a.apellidoPaterno).localeCompare(b.nombre + b.apellidoPaterno, 'es-MX'));
+    if (!activos.length) {
+      this.toast.advertencia('No hay miembros activos para incluir.');
+      return;
+    }
+    this.generandoTarjetas.set(true);
+    try {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
+      for (let i = 0; i < activos.length; i++) {
+        if (i > 0) doc.addPage();
+        await this.dibujarTarjetaEnPagina(doc, activos[i]);
+      }
+      doc.save('tarjetas-emergencia-familia.pdf');
+      this.toast.exito(`${activos.length} tarjeta${activos.length === 1 ? '' : 's'} incluida${activos.length === 1 ? '' : 's'} en el PDF.`);
+    } finally {
+      this.generandoTarjetas.set(false);
+    }
+  }
+
+  /** Dibuja la tarjeta de emergencia de un miembro en la página ACTUAL de
+   *  `doc` (quien llama decide cuándo abrir una página nueva con
+   *  doc.addPage() — así se reutiliza igual para una tarjeta suelta que
+   *  para el PDF combinado de toda la familia). */
+  private async dibujarTarjetaEnPagina(doc: jsPDF, m: MiembroFamilia): Promise<void> {
     // A diferencia de una credencial física de bolsillo (85.6x54mm), el PDF
     // se genera en tamaño carta para que SIEMPRE quepa toda la información
     // sin recortarse al imprimir, y para que el QR se pueda dibujar lo
@@ -566,7 +698,6 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     // Mismo estilo visual (franjas de color, avatar/foto, QR) nada más que
     // en una página normal en vez de una tarjetita — sin ningún escudo,
     // logotipo ni texto oficial: sigue siendo una tarjeta propia de Saurix.
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
     const ANCHO = doc.internal.pageSize.getWidth();
     const ALTO = doc.internal.pageSize.getHeight();
     const MARGEN = 18;
@@ -740,7 +871,5 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
       align: 'center',
     });
 
-    const nombreArchivo = `tarjeta-emergencia-${(m.nombre + ' ' + m.apellidoPaterno).trim().replace(/\s+/g, '-').toLowerCase()}.pdf`;
-    doc.save(nombreArchivo);
   }
 }
