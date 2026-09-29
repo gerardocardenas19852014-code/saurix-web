@@ -1296,7 +1296,14 @@ button { font-family: inherit; }
  * Se usan los mismos tokens de color del tema (--indigo/--client/--amber/...)
  * en vez de un tema de highlight.js con colores fijos, para que la
  * coloración respete los 6 temas de la app igual que el resto del editor. */
-.editor-texto-wrap pre.ql-syntax {
+.editor-texto-wrap .ql-editor .ql-code-block-container {
+  position: relative;
+  /* padding-top ampliado para reservar espacio al selector de lenguaje
+   * (select.ql-ui, posicionado absolute top/right por Quill) y que no
+   * quede encima del código — ver select.ql-ui más abajo. */
+  padding: 30px 10px 10px;
+  margin-top: 8px;
+  margin-bottom: 8px;
   background: var(--paper);
   color: var(--text-strong);
   font-family: 'JetBrains Mono', monospace;
@@ -1304,28 +1311,37 @@ button { font-family: inherit; }
   border: 1px solid var(--line);
   border-radius: 8px;
 }
-.editor-texto-wrap .ql-syntax .hljs-keyword,
-.editor-texto-wrap .ql-syntax .hljs-selector-tag,
-.editor-texto-wrap .ql-syntax .hljs-title,
-.editor-texto-wrap .ql-syntax .hljs-name,
-.editor-texto-wrap .ql-syntax .hljs-tag { color: var(--indigo); font-weight: 600; }
-.editor-texto-wrap .ql-syntax .hljs-string,
-.editor-texto-wrap .ql-syntax .hljs-attr { color: var(--client); }
-.editor-texto-wrap .ql-syntax .hljs-number,
-.editor-texto-wrap .ql-syntax .hljs-literal { color: var(--amber); }
-.editor-texto-wrap .ql-syntax .hljs-built_in,
-.editor-texto-wrap .ql-syntax .hljs-type,
-.editor-texto-wrap .ql-syntax .hljs-class { color: var(--teal); }
-.editor-texto-wrap .ql-syntax .hljs-comment { color: var(--ink-soft); font-style: italic; }
-.editor-texto-wrap .ql-syntax .hljs-meta,
-.editor-texto-wrap .ql-syntax .hljs-variable,
-.editor-texto-wrap .ql-syntax .hljs-template-variable { color: var(--danger); }
-/* Selector de lenguaje que Quill agrega arriba de cada bloque de código. */
+.editor-texto-wrap .ql-code-block-container .hljs-keyword,
+.editor-texto-wrap .ql-code-block-container .hljs-selector-tag,
+.editor-texto-wrap .ql-code-block-container .hljs-title,
+.editor-texto-wrap .ql-code-block-container .hljs-name,
+.editor-texto-wrap .ql-code-block-container .hljs-tag { color: var(--indigo); font-weight: 600; }
+.editor-texto-wrap .ql-code-block-container .hljs-string,
+.editor-texto-wrap .ql-code-block-container .hljs-attr { color: var(--client); }
+.editor-texto-wrap .ql-code-block-container .hljs-number,
+.editor-texto-wrap .ql-code-block-container .hljs-literal { color: var(--amber); }
+.editor-texto-wrap .ql-code-block-container .hljs-built_in,
+.editor-texto-wrap .ql-code-block-container .hljs-type,
+.editor-texto-wrap .ql-code-block-container .hljs-class { color: var(--teal); }
+.editor-texto-wrap .ql-code-block-container .hljs-comment { color: var(--ink-soft); font-style: italic; }
+.editor-texto-wrap .ql-code-block-container .hljs-meta,
+.editor-texto-wrap .ql-code-block-container .hljs-variable,
+.editor-texto-wrap .ql-code-block-container .hljs-template-variable { color: var(--danger); }
+/* Selector de lenguaje que Quill agrega arriba de cada bloque de código.
+ * Con position:absolute (fijado por Quill) + el padding-top de arriba,
+ * queda flotando en su propia franja superior sin tapar el código. */
 .editor-texto-wrap .ql-code-block-container select.ql-ui {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  max-width: calc(100% - 12px);
   background: var(--paper-raised);
   color: var(--ink-soft);
   border: 1px solid var(--line);
   border-radius: 6px;
   font-family: 'IBM Plex Sans', sans-serif;
   font-size: 12px;
+  line-height: 1.4;
+  padding: 2px 4px;
 }
