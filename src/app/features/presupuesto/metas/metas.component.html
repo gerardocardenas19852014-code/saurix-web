@@ -77,7 +77,11 @@
             }
           }
           @if (aportacionMensualNecesaria(meta); as mensual) {
-            · necesitas {{ formatMoneda(mensual) }}/mes para llegar a tiempo
+            · necesitas {{ formatMoneda(mensual) }}/mes
+            @if (aportacionDiariaNecesaria(meta); as diaria) {
+              ({{ formatMoneda(diaria) }}/día)
+            }
+            para llegar a tiempo
           }
         </span>
         <span>

@@ -192,6 +192,19 @@ export class MetasComponent implements OnInit, OnDestroy {
     return restante / meses;
   }
 
+  /** Lo mismo que aportacionMensualNecesaria pero por día en vez de por mes
+   *  — mismas condiciones (no aplica si ya se cumplió, no tiene fecha
+   *  límite, ya venció, o venciera hoy/mañana no aporta nada útil dividir).
+   *  Útil cuando falta poco tiempo y pensar "por mes" no ayuda a planear el
+   *  día a día. */
+  aportacionDiariaNecesaria(meta: MetaPresupuesto): number | null {
+    if (this.cumplida(meta) || this.atrasada(meta)) return null;
+    const dias = this.diasRestantes(meta);
+    if (dias === null || dias <= 0) return null;
+    const restante = meta.montoObjetivo - meta.montoActual;
+    return restante / dias;
+  }
+
   nuevo(): void {
     this.enEdicion.set(null);
     this.form.reset({ id: 0, nombre: '', montoObjetivo: 0, montoActual: 0, fechaLimite: new Date().toISOString().slice(0, 10) });
