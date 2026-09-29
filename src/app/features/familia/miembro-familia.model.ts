@@ -18,11 +18,11 @@ export interface MiembroFamilia {
   parentescoClave: string;
   /** Formato 'YYYY-MM-DD'. */
   fechaNacimiento: string;
-  /** 'H'/'M' — mismo catálogo que usa el cálculo de RFC/CURP (ver OPCIONES_SEXO en rfc-curp.util.ts). */
+  /** Clave de ValorLista grupo GRUPO_SEXO (ver sexo.component.ts) — mismas claves que exige la librería "curp" para calcularRfcYCurp(). */
   sexo: string;
-  /** Código de 2 letras de la entidad de nacimiento (ver OPCIONES_ENTIDAD) o 'NE' si nació en el extranjero — se necesita para calcular RFC/CURP. */
+  /** Clave de ValorLista grupo GRUPO_ENTIDAD_NACIMIENTO (ver entidad-nacimiento.component.ts), o 'NE' si nació en el extranjero — se necesita para calcular RFC/CURP. */
   entidadNacimiento: string;
-  /** Uno de TIPOS_SANGRE, o '' si no se ha capturado. */
+  /** Clave de ValorLista grupo GRUPO_TIPO_SANGRE (ver tipo-sangre.component.ts), o '' si no se ha capturado. */
   tipoSangre: string;
   telefono: string;
   /** RFC con homoclave (13 caracteres) — autogenerado, editable. */
@@ -45,7 +45,22 @@ export interface MiembroFamilia {
   fechaModificacion?: string;
 }
 
-/** Catálogo fijo (no ValorLista): los 8 tipos de sangre humanos no cambian
- *  ni se personalizan por familia, así que va como un arreglo simple, igual
- *  que OPCIONES_SEXO/OPCIONES_ENTIDAD en rfc-curp.util.ts. */
-export const TIPOS_SANGRE: string[] = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
+// ── Sexo, Entidad de nacimiento y Tipo de sangre ahora son catálogos
+// ValorLista propios (pantallas dedicadas bajo Familia → Catálogos), no
+// arreglos fijos en código — a pedido explícito, para que se vean/editen
+// igual que Parentesco y Tipo de documento. Sexo y Entidad de nacimiento
+// SÍ necesitan sembrarse con datos de fábrica desde el primer uso (ver
+// obtenerOSembrarValorLista en familia.util.ts) porque sus claves las exige
+// la librería "curp" para calcularRfcYCurp(): por eso cada pantalla marca
+// esas claves como clavesProtegidas (no se pueden borrar ni renombrar, solo
+// cambiar su Etiqueta). Tipo de sangre no tiene esa dependencia, así que
+// su catálogo es 100% libre.
+
+export const GRUPO_SEXO = 'FamiliaSexo';
+export const GRUPO_ENTIDAD_NACIMIENTO = 'FamiliaEntidadNacimiento';
+export const GRUPO_TIPO_SANGRE = 'FamiliaTipoSangre';
+
+/** Semilla de fábrica para GRUPO_TIPO_SANGRE — sin claves protegidas, el usuario puede agregar/quitar/renombrar libremente. */
+export const SEMILLA_TIPO_SANGRE: { clave: string; etiqueta: string }[] = [
+  'O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-',
+].map((t) => ({ clave: t, etiqueta: t }));

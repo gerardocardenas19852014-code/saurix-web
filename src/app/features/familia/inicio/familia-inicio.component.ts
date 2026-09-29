@@ -48,6 +48,27 @@ const GRUPOS: GrupoModulo[] = [
         titulo: 'Tipo de documento',
         descripcion: 'Catálogo de tipos de documento (INE, pasaporte, póliza de seguro, etc.).',
       },
+      {
+        ruta: 'sexo',
+        icono: '🚻',
+        color: 'amber',
+        titulo: 'Sexo',
+        descripcion: 'Catálogo de sexo — mismas claves que usa el cálculo de RFC/CURP.',
+      },
+      {
+        ruta: 'entidad-nacimiento',
+        icono: '🗺️',
+        color: 'amber',
+        titulo: 'Entidad de nacimiento',
+        descripcion: 'Catálogo de entidades federativas — mismas claves que usa el cálculo de RFC/CURP.',
+      },
+      {
+        ruta: 'tipo-sangre',
+        icono: '🩸',
+        color: 'amber',
+        titulo: 'Tipo de sangre',
+        descripcion: 'Catálogo de tipos de sangre para la tarjeta de emergencia.',
+      },
     ],
   },
 ];

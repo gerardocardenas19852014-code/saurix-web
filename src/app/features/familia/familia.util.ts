@@ -48,3 +48,39 @@ export const CLASE_ESTADO_VENCIMIENTO: Record<EstadoVencimientoDocumento, string
   'por-vencer': 'grid-badge-warning',
   vencido: 'grid-badge-danger',
 };
+
+// ── Semilla de catálogos ValorLista que necesitan datos de fábrica ────────
+// A diferencia de Parentesco/Tipo de documento (catálogos libres que el
+// usuario llena desde cero), Sexo, Entidad de nacimiento y Tipo de sangre
+// necesitan traer sus valores desde el primer momento: Sexo/Entidad
+// alimentan directamente a calcularRfcYCurp() (ver rfc-curp.util.ts) con
+// las claves exactas que exige la librería "curp" — si el catálogo
+// arrancara vacío, el usuario tendría que adivinar esas claves a mano y
+// cualquier error ahí rompería el cálculo en silencio.
+import { forkJoin, map, of, switchMap, type Observable } from 'rxjs';
+import type { DataClientService } from '../../core/services/data-client.service';
+import type { ValorLista } from '../../shared/valor-lista/valor-lista.model';
+
+/**
+ * Si el grupo ya tiene registros, los devuelve tal cual. Si está vacío (primera
+ * vez que se usa en este navegador), da de alta `semilla` en orden y devuelve
+ * los registros recién creados. Idempotente: una vez sembrado, las llamadas
+ * siguientes solo leen.
+ */
+export function obtenerOSembrarValorLista(
+  data: DataClientService,
+  grupo: string,
+  semilla: { clave: string; etiqueta: string }[],
+): Observable<ValorLista[]> {
+  return data.list<ValorLista>('ValorLista', { grupo }).pipe(
+    switchMap((existentes) => {
+      const propios = existentes.filter((r) => r.grupo === grupo);
+      if (propios.length) return of(propios);
+      if (!semilla.length) return of(propios);
+      const altas = semilla.map((fila, i) =>
+        data.alta<ValorLista>('ValorLista', { ...fila, grupo, orden: i + 1, activo: true }),
+      );
+      return forkJoin(altas);
+    }),
+  );
+}

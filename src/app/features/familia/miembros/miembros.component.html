@@ -25,7 +25,13 @@
   <div class="page-header">
     <h1>{{ miembroActivo() ? (miembroActivo()!.nombre + ' ' + miembroActivo()!.apellidoPaterno) : 'Nuevo miembro' }}</h1>
     <div class="page-actions">
-      <button type="button" class="btn-secondary" (click)="volverALista()">← Volver</button>
+      @if (tabFicha() === 'datos') {
+        <button type="button" class="btn-primary small" (click)="guardarMiembro()">Guardar cambios</button>
+      }
+      @if (miembroActivo(); as miembro) {
+        <button type="button" class="btn-danger small" (click)="pedirEliminarMiembro(miembro)">Eliminar miembro</button>
+      }
+      <button type="button" class="btn-secondary small" (click)="volverALista()">← Volver</button>
     </div>
   </div>
 
@@ -55,122 +61,144 @@
 
   @if (tabFicha() === 'datos') {
     <form [formGroup]="form" (ngSubmit)="guardarMiembro()">
-      <div class="edit-form form-grid-5col">
-        <h3 class="catalog-group-title full-span">Datos personales</h3>
-        <label class="floating-field">
-          <span>Nombre(s) <b>*</b></span>
-          <input type="text" class="form-control pill-control" formControlName="nombre" placeholder=" " />
-        </label>
-        <label class="floating-field">
-          <span>Apellido paterno <b>*</b></span>
-          <input type="text" class="form-control pill-control" formControlName="apellidoPaterno" placeholder=" " />
-        </label>
-        <label class="floating-field">
-          <span>Apellido materno</span>
-          <input type="text" class="form-control pill-control" formControlName="apellidoMaterno" placeholder=" " />
-        </label>
-        <label class="floating-field">
-          <span>Parentesco <b>*</b></span>
-          <select class="form-control pill-control" formControlName="parentescoClave">
-            <option value="">Selecciona...</option>
-            @for (p of parentescos(); track p.id) {
-              <option [value]="p.clave">{{ p.etiqueta }}</option>
-            }
-          </select>
-        </label>
-        <label class="floating-field">
-          <span>Fecha de nacimiento <b>*</b></span>
-          <input type="date" class="form-control pill-control" formControlName="fechaNacimiento" placeholder=" " />
-        </label>
-        <label class="floating-field">
-          <span>Sexo <b>*</b></span>
-          <select class="form-control pill-control" formControlName="sexo">
-            <option value="">Selecciona...</option>
-            @for (s of opcionesSexo; track s.valor) {
-              <option [value]="s.valor">{{ s.etiqueta }}</option>
-            }
-          </select>
-        </label>
-        <label class="floating-field">
-          <span>Entidad de nacimiento <b>*</b></span>
-          <select class="form-control pill-control" formControlName="entidadNacimiento">
-            <option value="">Selecciona...</option>
-            @for (e of opcionesEntidad; track e.valor) {
-              <option [value]="e.valor">{{ e.etiqueta }}</option>
-            }
-          </select>
-        </label>
-        <label class="floating-field">
-          <span>Teléfono</span>
-          <input type="text" class="form-control pill-control" formControlName="telefono" placeholder=" " />
-        </label>
-        <label class="checkbox-inline">
-          <input type="checkbox" formControlName="activo" />
-          Activo
-        </label>
-
-        <h3 class="catalog-group-title full-span">
-          RFC y CURP
-          <button type="button" class="btn-secondary small" style="margin-left:10px;" (click)="generarRfcCurp()">🔄 Generar RFC y CURP</button>
-        </h3>
-        <p class="hint full-span" style="margin:-6px 0 0;">
-          Se calculan a partir de los datos de arriba (misma calculadora que Panel de Control → Generación de RFC y CURP) — son una
-          pre-validación, no el documento oficial: revísalos y corrígelos a mano si no coinciden.
-        </p>
-        <label class="floating-field half-span">
-          <span>RFC</span>
-          <input type="text" class="form-control pill-control" formControlName="rfc" placeholder=" " style="text-transform:uppercase;" />
-        </label>
-        <label class="floating-field half-span">
-          <span>CURP</span>
-          <input type="text" class="form-control pill-control" formControlName="curp" placeholder=" " style="text-transform:uppercase;" />
-        </label>
-
-        <h3 class="catalog-group-title full-span">Información médica de emergencia</h3>
-        <label class="floating-field">
-          <span>Tipo de sangre</span>
-          <select class="form-control pill-control" formControlName="tipoSangre">
-            <option value="">Selecciona...</option>
-            @for (t of tiposSangre; track t) {
-              <option [value]="t">{{ t }}</option>
-            }
-          </select>
-        </label>
-        <label class="floating-field half-span">
-          <span>Alergias</span>
-          <input type="text" class="form-control pill-control" formControlName="alergias" placeholder=" " />
-        </label>
-        <label class="floating-field half-span">
-          <span>Condiciones crónicas</span>
-          <input type="text" class="form-control pill-control" formControlName="condicionesCronicas" placeholder=" " />
-        </label>
-        <label class="floating-field full-span">
-          <span>Medicamentos</span>
-          <input type="text" class="form-control pill-control" formControlName="medicamentos" placeholder=" " />
-        </label>
-
-        <h3 class="catalog-group-title full-span">Contacto de emergencia y seguro</h3>
-        <label class="floating-field">
-          <span>Nombre de contacto</span>
-          <input type="text" class="form-control pill-control" formControlName="contactoEmergenciaNombre" placeholder=" " />
-        </label>
-        <label class="floating-field">
-          <span>Teléfono de contacto</span>
-          <input type="text" class="form-control pill-control" formControlName="contactoEmergenciaTelefono" placeholder=" " />
-        </label>
-        <label class="floating-field">
-          <span>Aseguradora</span>
-          <input type="text" class="form-control pill-control" formControlName="aseguradora" placeholder=" " />
-        </label>
-        <label class="floating-field">
-          <span>Número de póliza</span>
-          <input type="text" class="form-control pill-control" formControlName="numeroPoliza" placeholder=" " />
-        </label>
+      <div class="tab-bar">
+        <button type="button" class="tab-btn" [class.is-active]="subTabDatos() === 'personales'" (click)="subTabDatos.set('personales')">
+          🧍 Datos personales
+        </button>
+        <button type="button" class="tab-btn" [class.is-active]="subTabDatos() === 'rfc'" (click)="subTabDatos.set('rfc')">
+          🧾 RFC y CURP
+        </button>
+        <button type="button" class="tab-btn" [class.is-active]="subTabDatos() === 'medica'" (click)="subTabDatos.set('medica')">
+          ⚕️ Información médica
+        </button>
+        <button type="button" class="tab-btn" [class.is-active]="subTabDatos() === 'contacto'" (click)="subTabDatos.set('contacto')">
+          📞 Contacto y seguro
+        </button>
       </div>
 
-      <div class="modal-actions" style="justify-content:flex-start;">
-        <button type="submit" class="btn-primary">Guardar</button>
-      </div>
+      @if (subTabDatos() === 'personales') {
+        <div class="edit-form form-grid-5col">
+          <label>
+            <span>Nombre(s) <b>*</b></span>
+            <input type="text" formControlName="nombre" />
+          </label>
+          <label>
+            <span>Apellido paterno <b>*</b></span>
+            <input type="text" formControlName="apellidoPaterno" />
+          </label>
+          <label>
+            Apellido materno
+            <input type="text" formControlName="apellidoMaterno" />
+          </label>
+          <label>
+            <span>Parentesco <b>*</b></span>
+            <select formControlName="parentescoClave">
+              <option value="">Selecciona...</option>
+              @for (p of parentescos(); track p.id) {
+                <option [value]="p.clave">{{ p.etiqueta }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            <span>Fecha de nacimiento <b>*</b></span>
+            <input type="date" formControlName="fechaNacimiento" />
+          </label>
+          <label>
+            <span>Sexo <b>*</b></span>
+            <select formControlName="sexo">
+              <option value="">Selecciona...</option>
+              @for (s of sexos(); track s.clave) {
+                <option [value]="s.clave">{{ s.etiqueta }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            <span>Entidad de nacimiento <b>*</b></span>
+            <select formControlName="entidadNacimiento">
+              <option value="">Selecciona...</option>
+              @for (e of entidadesNacimiento(); track e.clave) {
+                <option [value]="e.clave">{{ e.etiqueta }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            Teléfono
+            <input type="text" formControlName="telefono" />
+          </label>
+          <label class="checkbox-inline">
+            <input type="checkbox" formControlName="activo" />
+            Activo
+          </label>
+        </div>
+      }
+
+      @if (subTabDatos() === 'rfc') {
+        <div class="edit-form form-grid-5col">
+          <div class="full-span">
+            <button type="button" class="btn-secondary small" (click)="generarRfcCurp()">🔄 Generar RFC y CURP</button>
+          </div>
+          <p class="hint full-span" style="margin:-6px 0 0;">
+            Se calculan a partir de los datos de arriba (misma calculadora que Panel de Control → Generación de RFC y CURP) — son una
+            pre-validación, no el documento oficial: revísalos y corrígelos a mano si no coinciden.
+          </p>
+          <label class="half-span">
+            RFC
+            <input type="text" formControlName="rfc" style="text-transform:uppercase;" />
+          </label>
+          <label class="half-span">
+            CURP
+            <input type="text" formControlName="curp" style="text-transform:uppercase;" />
+          </label>
+        </div>
+      }
+
+      @if (subTabDatos() === 'medica') {
+        <div class="edit-form form-grid-5col">
+          <label>
+            Tipo de sangre
+            <select formControlName="tipoSangre">
+              <option value="">Selecciona...</option>
+              @for (t of tiposSangre(); track t.clave) {
+                <option [value]="t.clave">{{ t.etiqueta }}</option>
+              }
+            </select>
+          </label>
+          <label class="half-span">
+            Alergias
+            <input type="text" formControlName="alergias" />
+          </label>
+          <label class="half-span">
+            Condiciones crónicas
+            <input type="text" formControlName="condicionesCronicas" />
+          </label>
+          <label class="full-span">
+            Medicamentos
+            <input type="text" formControlName="medicamentos" />
+          </label>
+        </div>
+      }
+
+      @if (subTabDatos() === 'contacto') {
+        <div class="edit-form form-grid-5col">
+          <label>
+            Nombre de contacto
+            <input type="text" formControlName="contactoEmergenciaNombre" />
+          </label>
+          <label>
+            Teléfono de contacto
+            <input type="text" formControlName="contactoEmergenciaTelefono" />
+          </label>
+          <label>
+            Aseguradora
+            <input type="text" formControlName="aseguradora" />
+          </label>
+          <label>
+            Número de póliza
+            <input type="text" formControlName="numeroPoliza" />
+          </label>
+        </div>
+      }
+
     </form>
   } @else if (tabFicha() === 'documentos') {
     <div class="grid-toolbar">

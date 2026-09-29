@@ -11,14 +11,22 @@ import { BitacoraComponent } from '../../../shared/components/bitacora/bitacora.
 import { BitacoraService } from '../../../shared/services/bitacora.service';
 import { ToastService } from '../../../shared/services/toast.service';
 import { ValorLista } from '../../../shared/valor-lista/valor-lista.model';
-import {
-  calcularRfcYCurp,
-  OPCIONES_ENTIDAD,
-  OPCIONES_SEXO,
-} from '../../panel-control/rfc-curp/rfc-curp.util';
+import { calcularRfcYCurp, OPCIONES_ENTIDAD, OPCIONES_SEXO } from '../../panel-control/rfc-curp/rfc-curp.util';
 import { DocumentoFamilia } from '../documento-familia.model';
-import { CLASE_ESTADO_VENCIMIENTO, ETIQUETA_ESTADO_VENCIMIENTO, calcularEdad, estadoVencimiento } from '../familia.util';
-import { MiembroFamilia, TIPOS_SANGRE } from '../miembro-familia.model';
+import {
+  CLASE_ESTADO_VENCIMIENTO,
+  ETIQUETA_ESTADO_VENCIMIENTO,
+  calcularEdad,
+  estadoVencimiento,
+  obtenerOSembrarValorLista,
+} from '../familia.util';
+import {
+  GRUPO_ENTIDAD_NACIMIENTO,
+  GRUPO_SEXO,
+  GRUPO_TIPO_SANGRE,
+  MiembroFamilia,
+  SEMILLA_TIPO_SANGRE,
+} from '../miembro-familia.model';
 
 const ENTIDAD_MIEMBRO = 'MiembroFamilia';
 const ENTIDAD_DOCUMENTO = 'DocumentoFamilia';
@@ -50,9 +58,6 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
   private readonly bitacora = inject(BitacoraService);
 
   protected readonly moduloBitacora = MODULO_BITACORA;
-  protected readonly opcionesEntidad = OPCIONES_ENTIDAD;
-  protected readonly opcionesSexo = OPCIONES_SEXO;
-  protected readonly tiposSangre = TIPOS_SANGRE;
   protected readonly calcularEdad = calcularEdad;
   protected readonly estadoVencimiento = estadoVencimiento;
   protected readonly etiquetaEstadoVencimiento = ETIQUETA_ESTADO_VENCIMIENTO;
@@ -62,6 +67,11 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
   protected readonly miembros = signal<MiembroFamilia[]>([]);
   protected readonly parentescos = signal<ValorLista[]>([]);
   protected readonly tiposDocumento = signal<ValorLista[]>([]);
+  /** Sexo, Entidad de nacimiento y Tipo de sangre ahora son catálogos ValorLista
+   *  propios (Familia → Catálogos) en vez de arreglos fijos — ver miembro-familia.model.ts. */
+  protected readonly sexos = signal<ValorLista[]>([]);
+  protected readonly entidadesNacimiento = signal<ValorLista[]>([]);
+  protected readonly tiposSangre = signal<ValorLista[]>([]);
   protected readonly documentos = signal<DocumentoFamilia[]>([]);
   protected readonly cargando = signal(false);
   protected readonly mostrarInactivos = signal(false);
@@ -107,6 +117,10 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
   // ── Ficha (Datos/Documentos/Tarjeta) ────────────────────────────────
   protected readonly vista = signal<'lista' | 'ficha'>('lista');
   protected readonly tabFicha = signal<'datos' | 'documentos' | 'tarjeta'>('datos');
+  /** Sub-pestañas dentro de "Datos" — mismo patrón que las pestañas de
+   *  Detalles/Fechas/... del detalle de ticket en Gestión de Proyectos
+   *  (kanban.component.ts → tabActiva/seleccionarTab). */
+  protected readonly subTabDatos = signal<'personales' | 'rfc' | 'medica' | 'contacto'>('personales');
   protected readonly miembroActivo = signal<MiembroFamilia | null>(null);
 
   protected readonly documentosDelMiembro = computed(() => {
@@ -149,6 +163,23 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     );
     this.data.list<ValorLista>('ValorLista', { grupo: 'DocumentoFamiliaTipo' }).subscribe((v) =>
       this.tiposDocumento.set(v.filter((r) => r.grupo === 'DocumentoFamiliaTipo' && r.activo !== false).sort((a, b) => a.orden - b.orden)),
+    );
+    // Sexo/Entidad de nacimiento/Tipo de sangre se siembran solos la primera vez
+    // que se usan en este navegador (ver obtenerOSembrarValorLista) — así el
+    // combo nunca aparece vacío aunque el usuario nunca haya abierto esos
+    // catálogos desde Familia → Catálogos.
+    obtenerOSembrarValorLista(
+      this.data,
+      GRUPO_SEXO,
+      OPCIONES_SEXO.map((o) => ({ clave: o.valor, etiqueta: o.etiqueta })),
+    ).subscribe((v) => this.sexos.set(v.filter((r) => r.activo !== false).sort((a, b) => a.orden - b.orden)));
+    obtenerOSembrarValorLista(
+      this.data,
+      GRUPO_ENTIDAD_NACIMIENTO,
+      OPCIONES_ENTIDAD.map((o) => ({ clave: o.valor, etiqueta: o.etiqueta })),
+    ).subscribe((v) => this.entidadesNacimiento.set(v.filter((r) => r.activo !== false).sort((a, b) => a.orden - b.orden)));
+    obtenerOSembrarValorLista(this.data, GRUPO_TIPO_SANGRE, SEMILLA_TIPO_SANGRE).subscribe((v) =>
+      this.tiposSangre.set(v.filter((r) => r.activo !== false).sort((a, b) => a.orden - b.orden)),
     );
     this.data.list<DocumentoFamilia>(ENTIDAD_DOCUMENTO).subscribe((d) => this.documentos.set(d));
     this.cargar();
@@ -199,6 +230,7 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
       activo: true,
     });
     this.tabFicha.set('datos');
+    this.subTabDatos.set('personales');
     this.vista.set('ficha');
   }
 
@@ -206,6 +238,7 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     this.miembroActivo.set(miembro);
     this.form.reset({ ...miembro, apellidoMaterno: miembro.apellidoMaterno ?? '' });
     this.tabFicha.set('datos');
+    this.subTabDatos.set('personales');
     this.vista.set('ficha');
   }
 
