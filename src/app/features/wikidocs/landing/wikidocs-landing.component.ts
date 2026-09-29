@@ -53,6 +53,13 @@ const GRUPOS: GrupoModulo[] = [
         titulo: 'Secciones',
         descripcion: 'Secciones de cada categoría — de aquí cuelgan los documentos.',
       },
+      {
+        ruta: 'plantillas',
+        icono: '🧩',
+        color: 'generic',
+        titulo: 'Plantillas',
+        descripcion: 'Contenido de partida reutilizable al crear un documento nuevo.',
+      },
     ],
   },
 ];

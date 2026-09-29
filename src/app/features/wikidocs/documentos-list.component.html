@@ -161,6 +161,18 @@
           <input type="text" formControlName="titulo" />
         </label>
 
+        @if (esNuevo() && plantillas().length > 0) {
+          <label>
+            Usar plantilla (opcional)
+            <select (change)="onPlantillaCambia($any($event.target).value)">
+              <option value="0">Empezar en blanco...</option>
+              @for (plantilla of plantillas(); track plantilla.id) {
+                <option [value]="plantilla.id">{{ plantilla.nombre }}</option>
+              }
+            </select>
+          </label>
+        }
+
         <label>
           Contenido
           <app-editor-texto formControlName="contenido" />

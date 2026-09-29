@@ -1,0 +1,5 @@
+/* Ensancha el modal solo aquí (mismo criterio que Usuarios en Seguridad):
+ * el resto de estilos vive en src/styles.scss (.page-header, .grid-table,
+ * .modal-box, .edit-form). El editor visual (app-editor-texto) necesita
+ * más ancho que un catálogo simple de un solo campo. */
+.modal-box.plantilla-modal { max-width: 720px; }

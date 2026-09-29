@@ -29,4 +29,8 @@ export const WIKIDOCS_ROUTES: Routes = [
     path: 'secciones',
     loadComponent: () => import('./secciones/secciones-list.component').then((m) => m.SeccionesListComponent),
   },
+  {
+    path: 'plantillas',
+    loadComponent: () => import('./plantillas/plantillas-list.component').then((m) => m.PlantillasListComponent),
+  },
 ];

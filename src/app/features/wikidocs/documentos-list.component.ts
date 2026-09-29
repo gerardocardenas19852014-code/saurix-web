@@ -15,6 +15,7 @@ import { insertarEmbeds } from '../../shared/utils/embeds.util';
 import { generarTablaContenido } from '../../shared/utils/tabla-contenido.util';
 import { truncarTexto } from '../../shared/utils/texto.util';
 import { CategoriaOpcion, Documento, DocumentoFavorito, DocumentoVersion, SeccionOpcion, TipoSistemaOpcion } from './documento.model';
+import { PlantillaDocumento } from './plantillas/plantilla.model';
 
 interface Migaja {
   etiqueta: string;
@@ -95,6 +96,10 @@ export class DocumentosListComponent implements OnInit {
   protected readonly tiposSistema = signal<TipoSistemaOpcion[]>([]);
   protected readonly categorias = signal<CategoriaOpcion[]>([]);
   protected readonly secciones = signal<SeccionOpcion[]>([]);
+
+  /** Plantillas activas, para el selector "Usar plantilla" al crear un
+   *  documento nuevo (no aplica al editar uno ya existente). */
+  protected readonly plantillas = signal<PlantillaDocumento[]>([]);
 
   /** Todas las secciones (sin filtrar), solo para mostrar el nombre de la
    *  sección de cada documento en la columna del listado en vez de su Id. */
@@ -182,6 +187,10 @@ export class DocumentosListComponent implements OnInit {
     }
 
     this.data.list<SeccionOpcion>('Seccion').subscribe((secciones) => this.todasLasSecciones.set(secciones));
+
+    this.data
+      .list<PlantillaDocumento>('PlantillaDocumento', { activo: true })
+      .subscribe((plantillas) => this.plantillas.set(plantillas));
 
     this.cargarFavoritos();
     this.cargar();
@@ -296,6 +305,17 @@ export class DocumentosListComponent implements OnInit {
     this.categorias.set([]);
     this.secciones.set([]);
     this.vista.set('editar');
+  }
+
+  /** Precarga el contenido del formulario con el de la plantilla elegida —
+   *  solo tiene sentido al crear (esNuevo()), nunca sobrescribe un
+   *  documento ya existente. Vuelve a dejar "Selecciona..." después, para
+   *  poder aplicar otra plantilla distinta sin recargar la pantalla. */
+  onPlantillaCambia(idTexto: string): void {
+    const id = Number(idTexto);
+    if (!id) return;
+    const plantilla = this.plantillas().find((p) => p.id === id);
+    if (plantilla) this.form.patchValue({ contenido: plantilla.contenido });
   }
 
   verDocumento(documento: Documento): void {
