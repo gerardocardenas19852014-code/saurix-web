@@ -38,6 +38,74 @@
   border: 2px solid rgba(255, 255, 255, .6);
 }
 
+.tarjeta-emergencia-avatar-foto {
+  object-fit: cover;
+  background: #fff;
+}
+
+.tarjeta-emergencia-pie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tarjeta-emergencia-qr {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
+  background: #fff;
+  padding: 2px;
+}
+
+/* Foto de la persona, capturada en la sub-pestaña "Datos personales" —
+ * mismo avatar con iniciales de respaldo que ya usa la tarjeta cuando
+ * todavía no se ha subido ninguna foto. */
+.foto-miembro-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.foto-miembro-etiqueta {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.foto-miembro-fila {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.foto-miembro-preview {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(0, 0, 0, .12);
+}
+
+.foto-miembro-preview-vacia {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 20px;
+}
+
+.foto-miembro-acciones {
+  display: flex;
+  gap: 8px;
+}
+
+.foto-miembro-boton {
+  cursor: pointer;
+}
+
 .tarjeta-emergencia-titulo {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;

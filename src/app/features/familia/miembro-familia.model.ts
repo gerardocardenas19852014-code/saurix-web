@@ -25,6 +25,8 @@ export interface MiembroFamilia {
   /** Clave de ValorLista grupo GRUPO_TIPO_SANGRE (ver tipo-sangre.component.ts), o '' si no se ha capturado. */
   tipoSangre: string;
   telefono: string;
+  /** Foto de la persona en base64 (data URL), ya redimensionada/comprimida en el navegador antes de guardarse. Opcional: sin foto se muestra un avatar con iniciales. */
+  foto?: string;
   /** RFC con homoclave (13 caracteres) — autogenerado, editable. */
   rfc: string;
   /** CURP (18 caracteres) — autogenerado, editable. */

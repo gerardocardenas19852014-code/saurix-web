@@ -1,7 +1,8 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { jsPDF } from 'jspdf';
+import QRCode from 'qrcode';
 import { AuthService } from '../../../core/services/auth.service';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { AdjuntosPanelComponent } from '../../../shared/components/adjuntos-panel/adjuntos-panel.component';
@@ -128,6 +129,14 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
    *  (kanban.component.ts → tabActiva/seleccionarTab). */
   protected readonly subTabDatos = signal<'personales' | 'rfc' | 'medica' | 'contacto'>('personales');
   protected readonly miembroActivo = signal<MiembroFamilia | null>(null);
+  /** Foto de la persona en edición (base64, ya redimensionada) — aparte del
+   *  form reactivo porque es un valor grande que no tiene <input> con
+   *  formControlName; se manda a mano dentro de guardarMiembro(). */
+  protected readonly fotoActual = signal<string>('');
+  /** QR con el resumen de la tarjeta de emergencia, para "ver la información"
+   *  escaneándolo — se regenera solo cuando se abre la pestaña Tarjeta o
+   *  cambia el miembro activo (ver el effect() en el constructor). */
+  protected readonly qrDataUrl = signal<string>('');
 
   protected readonly documentosDelMiembro = computed(() => {
     const id = this.miembroActivo()?.id;
@@ -158,6 +167,21 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     aseguradora: [''],
     numeroPoliza: [''],
     activo: [true],
+  });
+
+  /** Genera (o limpia) el QR de la tarjeta de emergencia cada vez que se
+   *  abre la pestaña "Tarjeta" o cambia el miembro activo — así siempre
+   *  refleja los datos ya guardados (los mismos que ve descargarTarjeta()). */
+  private readonly regenerarQr = effect(() => {
+    const m = this.miembroActivo();
+    const enTarjeta = this.tabFicha() === 'tarjeta';
+    if (!m || !enTarjeta) {
+      this.qrDataUrl.set('');
+      return;
+    }
+    QRCode.toDataURL(this.textoQr(m), { width: 240, margin: 1 })
+      .then((url) => this.qrDataUrl.set(url))
+      .catch(() => this.qrDataUrl.set(''));
   });
 
   ngOnInit(): void {
@@ -235,6 +259,7 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
       numeroPoliza: '',
       activo: true,
     });
+    this.fotoActual.set('');
     this.tabFicha.set('datos');
     this.subTabDatos.set('personales');
     this.vista.set('ficha');
@@ -243,6 +268,7 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
   abrirMiembro(miembro: MiembroFamilia): void {
     this.miembroActivo.set(miembro);
     this.form.reset({ ...miembro, apellidoMaterno: miembro.apellidoMaterno ?? '' });
+    this.fotoActual.set(miembro.foto ?? '');
     this.tabFicha.set('datos');
     this.subTabDatos.set('personales');
     this.vista.set('ficha');
@@ -287,7 +313,7 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const valor = this.form.getRawValue();
+    const valor = { ...this.form.getRawValue(), foto: this.fotoActual() };
     const previo = this.miembroActivo();
     const esEdicion = previo !== null;
 
@@ -422,11 +448,103 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     });
   }
 
+  // ── Foto de la persona ───────────────────────────────────────────────
+  /** Igual que adjuntos-panel.component.ts (FileReader → base64), más un
+   *  paso de redimensionado en <canvas> para no guardar fotos de cámara de
+   *  varios MB tal cual en IndexedDB — se guarda ya comprimida a JPEG. */
+  private redimensionarFoto(archivo: File): Promise<string> {
+    const MAX_LADO = 480;
+    return new Promise((resolve, reject) => {
+      const lector = new FileReader();
+      lector.onload = () => {
+        const imagen = new Image();
+        imagen.onload = () => {
+          let { width, height } = imagen;
+          if (width > height && width > MAX_LADO) {
+            height = Math.round((height * MAX_LADO) / width);
+            width = MAX_LADO;
+          } else if (height >= width && height > MAX_LADO) {
+            width = Math.round((width * MAX_LADO) / height);
+            height = MAX_LADO;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const contexto = canvas.getContext('2d');
+          if (!contexto) {
+            reject(new Error('Sin contexto de canvas.'));
+            return;
+          }
+          contexto.drawImage(imagen, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
+        };
+        imagen.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+        imagen.src = lector.result as string;
+      };
+      lector.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+      lector.readAsDataURL(archivo);
+    });
+  }
+
+  onFotoSeleccionada(evento: Event): void {
+    const input = evento.target as HTMLInputElement;
+    const archivo = input.files?.[0];
+    if (!archivo) return;
+
+    if (!archivo.type.startsWith('image/')) {
+      this.toast.advertencia('Elige un archivo de imagen (JPG, PNG, etc.).');
+      input.value = '';
+      return;
+    }
+    if (archivo.size > 8 * 1024 * 1024) {
+      this.toast.advertencia('La imagen no puede pesar más de 8 MB.');
+      input.value = '';
+      return;
+    }
+
+    this.redimensionarFoto(archivo)
+      .then((dataUrl) => this.fotoActual.set(dataUrl))
+      .catch(() => this.toast.error('No se pudo procesar la imagen. Intenta con otra.'))
+      .finally(() => {
+        input.value = '';
+      });
+  }
+
+  quitarFoto(input: HTMLInputElement): void {
+    this.fotoActual.set('');
+    input.value = '';
+  }
+
   // ── Tarjeta de emergencia ────────────────────────────────────────────
   /** Descarga una tarjeta tamaño credencial (85.6mm x 54mm, mismo tamaño
    *  que una tarjeta bancaria/INE) en PDF, dibujada con jsPDF (ya es
    *  dependencia del proyecto — ver Comercio/Cotizaciones), no una captura
    *  de pantalla: así el texto sale nítido y seleccionable en el PDF. */
+  /** Texto plano (sin URL: la app es 100% local/IndexedDB, no hay dónde
+   *  alojar una página "ver registro") que codifica el QR — mismo resumen
+   *  que ya se ve en pantalla y en el PDF, para que escanearlo sirva de
+   *  verdad en una emergencia aunque el celular no tenga la app. */
+  private textoQr(m: MiembroFamilia): string {
+    const edad = calcularEdad(m.fechaNacimiento);
+    const lineas = [
+      'Tarjeta de emergencia — Saurix',
+      `Nombre: ${[m.nombre, m.apellidoPaterno, m.apellidoMaterno].filter(Boolean).join(' ')}`,
+      `Edad: ${edad === null ? '—' : edad + ' años'}`,
+      `Tipo de sangre: ${m.tipoSangre || '—'}`,
+    ];
+    if (m.alergias) lineas.push(`Alergias: ${m.alergias}`);
+    if (m.condicionesCronicas) lineas.push(`Condiciones: ${m.condicionesCronicas}`);
+    if (m.medicamentos) lineas.push(`Medicamentos: ${m.medicamentos}`);
+    lineas.push(
+      `Contacto de emergencia: ${m.contactoEmergenciaNombre || '—'}${m.contactoEmergenciaTelefono ? ' · ' + m.contactoEmergenciaTelefono : ''}`,
+    );
+    if (m.aseguradora || m.numeroPoliza) {
+      lineas.push(`Seguro: ${m.aseguradora || '—'}${m.numeroPoliza ? ' · Póliza ' + m.numeroPoliza : ''}`);
+    }
+    if (m.curp) lineas.push(`CURP: ${m.curp}`);
+    return lineas.join('\n');
+  }
+
   private hexARgbTarjeta(hex: string): [number, number, number] {
     const limpio = hex.replace('#', '');
     return [
@@ -436,19 +554,23 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     ];
   }
 
-  descargarTarjeta(): void {
+  async descargarTarjeta(): Promise<void> {
     const m = this.miembroActivo();
     if (!m) return;
 
     // Mismo formato "credencial física" que se ve en pantalla (ver
-    // .tarjeta-emergencia en el .scss): franja de color arriba con avatar +
-    // franja de color abajo con el CURP, cuerpo blanco en medio — sin
-    // ningún escudo/logotipo oficial, es una tarjeta propia de Saurix.
+    // .tarjeta-emergencia en el .scss): franja de color arriba con foto/avatar
+    // + franja de color abajo con el CURP y el QR, cuerpo blanco en medio —
+    // sin ningún escudo/logotipo oficial, es una tarjeta propia de Saurix.
     const ANCHO = 85.6;
     const ALTO = 54;
+    const ALTO_PIE = 9;
     const [rDanger, gDanger, bDanger] = this.hexARgbTarjeta('#b3432f');
     const nombreCompleto = [m.nombre, m.apellidoPaterno].filter(Boolean).join(' ');
     const [rAvatar, gAvatar, bAvatar] = this.hexARgbTarjeta(colorAvatar(nombreCompleto));
+    // El QR se genera aparte del que ya vive en pantalla (qrDataUrl) para no
+    // depender de que la pestaña Tarjeta ya lo haya calculado.
+    const qrPdf = await QRCode.toDataURL(this.textoQr(m), { width: 240, margin: 1 }).catch(() => '');
 
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [ALTO, ANCHO] });
     const anchoUtil = ANCHO - 10;
@@ -459,12 +581,29 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     // Encabezado
     doc.setFillColor(rDanger, gDanger, bDanger);
     doc.rect(0, 0, ANCHO, 15, 'F');
-    doc.setFillColor(rAvatar, gAvatar, bAvatar);
-    doc.circle(10, 7.5, 5, 'F');
+    if (m.foto) {
+      doc.setFillColor(255, 255, 255);
+      doc.rect(3.5, 2, 11, 11, 'F');
+      try {
+        doc.addImage(m.foto, 'JPEG', 4, 2.5, 10, 10);
+      } catch {
+        doc.setFillColor(rAvatar, gAvatar, bAvatar);
+        doc.circle(10, 7.5, 5, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.text(iniciales(nombreCompleto), 10, 8.7, { align: 'center' });
+      }
+    } else {
+      doc.setFillColor(rAvatar, gAvatar, bAvatar);
+      doc.circle(10, 7.5, 5, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.text(iniciales(nombreCompleto), 10, 8.7, { align: 'center' });
+    }
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.text(iniciales(nombreCompleto), 10, 8.7, { align: 'center' });
     doc.setFontSize(9);
     doc.text('TARJETA DE EMERGENCIA', 19, 6.5);
     doc.setFont('helvetica', 'normal');
@@ -535,13 +674,26 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
       doc.text(`Seguro: ${m.aseguradora || '—'}${m.numeroPoliza ? ' · Póliza ' + m.numeroPoliza : ''}`, 5, y);
     }
 
-    // Pie
+    // Pie: texto (CURP o marca) a la izquierda + QR a la derecha para "ver
+    // la información" escaneando, dentro de la misma franja de color.
     doc.setFillColor(rDanger, gDanger, bDanger);
-    doc.rect(0, ALTO - 6, ANCHO, 6, 'F');
+    doc.rect(0, ALTO - ALTO_PIE, ANCHO, ALTO_PIE, 'F');
+    const ladoQr = 7;
+    const xQr = ANCHO - ladoQr - 2.5;
+    const yQr = ALTO - ALTO_PIE + (ALTO_PIE - ladoQr) / 2;
+    if (qrPdf) {
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(xQr - 0.7, yQr - 0.7, ladoQr + 1.4, ladoQr + 1.4, 0.8, 0.8, 'F');
+      try {
+        doc.addImage(qrPdf, 'PNG', xQr, yQr, ladoQr, ladoQr);
+      } catch {
+        /* Si el QR no se pudo generar, el pie se queda solo con el texto. */
+      }
+    }
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
-    doc.text(m.curp ? `CURP ${m.curp}` : 'Saurix · Tarjeta de emergencia', ANCHO / 2, ALTO - 2.3, { align: 'center' });
+    doc.text(m.curp ? `CURP ${m.curp}` : 'Saurix · Tarjeta de emergencia', 4, ALTO - ALTO_PIE / 2 + 1.2);
 
     const nombreArchivo = `tarjeta-emergencia-${(m.nombre + ' ' + m.apellidoPaterno).trim().replace(/\s+/g, '-').toLowerCase()}.pdf`;
     doc.save(nombreArchivo);

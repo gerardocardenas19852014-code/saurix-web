@@ -78,6 +78,27 @@
 
       @if (subTabDatos() === 'personales') {
         <div class="edit-form form-grid-5col">
+          <div class="full-span foto-miembro-campo">
+            <span class="foto-miembro-etiqueta">Foto</span>
+            <div class="foto-miembro-fila">
+              @if (fotoActual()) {
+                <img class="foto-miembro-preview" [src]="fotoActual()" alt="Foto de la persona" />
+              } @else {
+                <div class="foto-miembro-preview foto-miembro-preview-vacia" [style.background]="colorAvatar(form.value.nombre + ' ' + form.value.apellidoPaterno)">
+                  {{ iniciales((form.value.nombre || '') + ' ' + (form.value.apellidoPaterno || '')) }}
+                </div>
+              }
+              <div class="foto-miembro-acciones">
+                <label class="btn-secondary small foto-miembro-boton">
+                  {{ fotoActual() ? 'Cambiar foto' : 'Subir foto' }}
+                  <input #fotoInput type="file" accept="image/*" hidden (change)="onFotoSeleccionada($event)" />
+                </label>
+                @if (fotoActual()) {
+                  <button type="button" class="btn-secondary small" (click)="quitarFoto(fotoInput)">Quitar foto</button>
+                }
+              </div>
+            </div>
+          </div>
           <label>
             <span>Nombre(s) <b>*</b></span>
             <input type="text" formControlName="nombre" />
@@ -299,9 +320,13 @@
 
     <div class="tarjeta-emergencia">
       <div class="tarjeta-emergencia-encabezado">
-        <div class="tarjeta-emergencia-avatar" [style.background]="colorAvatar(m.nombre + ' ' + m.apellidoPaterno)">
-          {{ iniciales(m.nombre + ' ' + m.apellidoPaterno) }}
-        </div>
+        @if (m.foto) {
+          <img class="tarjeta-emergencia-avatar tarjeta-emergencia-avatar-foto" [src]="m.foto" alt="Foto de {{ m.nombre }}" />
+        } @else {
+          <div class="tarjeta-emergencia-avatar" [style.background]="colorAvatar(m.nombre + ' ' + m.apellidoPaterno)">
+            {{ iniciales(m.nombre + ' ' + m.apellidoPaterno) }}
+          </div>
+        }
         <div>
           <div class="tarjeta-emergencia-titulo">🚑 Tarjeta de emergencia</div>
           <div class="tarjeta-emergencia-marca">Saurix · Directorio familiar</div>
@@ -340,7 +365,12 @@
       </div>
 
       <div class="tarjeta-emergencia-pie">
-        @if (m.curp) { CURP {{ m.curp }} } @else { Saurix · Tarjeta de emergencia }
+        <span>
+          @if (m.curp) { CURP {{ m.curp }} } @else { Saurix · Tarjeta de emergencia }
+        </span>
+        @if (qrDataUrl()) {
+          <img class="tarjeta-emergencia-qr" [src]="qrDataUrl()" alt="Código QR con la información de emergencia" title="Escanea para ver la información de emergencia" />
+        }
       </div>
     </div>
   }
