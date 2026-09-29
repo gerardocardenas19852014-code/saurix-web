@@ -43,20 +43,13 @@
   background: #fff;
 }
 
-.tarjeta-emergencia-pie {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
 .tarjeta-emergencia-qr {
   flex-shrink: 0;
-  width: 30px;
-  height: 30px;
+  width: 64px;
+  height: 64px;
   border-radius: 4px;
   background: #fff;
-  padding: 2px;
+  padding: 3px;
 }
 
 /* Foto de la persona, capturada en la sub-pestaña "Datos personales" —
@@ -174,11 +167,15 @@
 }
 
 .tarjeta-emergencia-pie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   background: var(--danger);
   color: #fff;
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
   letter-spacing: .05em;
-  padding: 6px 18px;
-  text-align: center;
+  padding: 10px 18px;
+  text-align: left;
 }

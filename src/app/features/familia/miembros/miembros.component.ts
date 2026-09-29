@@ -558,142 +558,187 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     const m = this.miembroActivo();
     if (!m) return;
 
-    // Mismo formato "credencial física" que se ve en pantalla (ver
-    // .tarjeta-emergencia en el .scss): franja de color arriba con foto/avatar
-    // + franja de color abajo con el CURP y el QR, cuerpo blanco en medio —
-    // sin ningún escudo/logotipo oficial, es una tarjeta propia de Saurix.
-    const ANCHO = 85.6;
-    const ALTO = 54;
-    const ALTO_PIE = 9;
+    // A diferencia de una credencial física de bolsillo (85.6x54mm), el PDF
+    // se genera en tamaño carta para que SIEMPRE quepa toda la información
+    // sin recortarse al imprimir, y para que el QR se pueda dibujar lo
+    // bastante grande como para escanearse bien con la cámara de un celular
+    // — ambos problemas reportados con el diseño "credencial" anterior.
+    // Mismo estilo visual (franjas de color, avatar/foto, QR) nada más que
+    // en una página normal en vez de una tarjetita — sin ningún escudo,
+    // logotipo ni texto oficial: sigue siendo una tarjeta propia de Saurix.
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
+    const ANCHO = doc.internal.pageSize.getWidth();
+    const ALTO = doc.internal.pageSize.getHeight();
+    const MARGEN = 18;
+    const anchoUtil = ANCHO - MARGEN * 2;
+
     const [rDanger, gDanger, bDanger] = this.hexARgbTarjeta('#b3432f');
     const nombreCompleto = [m.nombre, m.apellidoPaterno].filter(Boolean).join(' ');
     const [rAvatar, gAvatar, bAvatar] = this.hexARgbTarjeta(colorAvatar(nombreCompleto));
-    // El QR se genera aparte del que ya vive en pantalla (qrDataUrl) para no
-    // depender de que la pestaña Tarjeta ya lo haya calculado.
-    const qrPdf = await QRCode.toDataURL(this.textoQr(m), { width: 240, margin: 1 }).catch(() => '');
-
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [ALTO, ANCHO] });
-    const anchoUtil = ANCHO - 10;
+    // Se genera a mayor resolución que el QR de pantalla (qrDataUrl) para que
+    // no se vea pixelado al imprimirse en un tamaño físico más grande.
+    const qrPdf = await QRCode.toDataURL(this.textoQr(m), { width: 600, margin: 1 }).catch(() => '');
 
     doc.setFillColor(255, 255, 255);
     doc.rect(0, 0, ANCHO, ALTO, 'F');
 
-    // Encabezado
+    // ── Encabezado ────────────────────────────────────────────────────
+    const altoEncabezado = 34;
     doc.setFillColor(rDanger, gDanger, bDanger);
-    doc.rect(0, 0, ANCHO, 15, 'F');
+    doc.rect(0, 0, ANCHO, altoEncabezado, 'F');
+
+    const ladoAvatar = 22;
+    const yAvatar = (altoEncabezado - ladoAvatar) / 2;
+    let fotoDibujada = false;
     if (m.foto) {
       doc.setFillColor(255, 255, 255);
-      doc.rect(3.5, 2, 11, 11, 'F');
+      doc.rect(MARGEN - 1, yAvatar - 1, ladoAvatar + 2, ladoAvatar + 2, 'F');
       try {
-        doc.addImage(m.foto, 'JPEG', 4, 2.5, 10, 10);
+        doc.addImage(m.foto, 'JPEG', MARGEN, yAvatar, ladoAvatar, ladoAvatar);
+        fotoDibujada = true;
       } catch {
-        doc.setFillColor(rAvatar, gAvatar, bAvatar);
-        doc.circle(10, 7.5, 5, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.text(iniciales(nombreCompleto), 10, 8.7, { align: 'center' });
+        fotoDibujada = false;
       }
-    } else {
+    }
+    if (!fotoDibujada) {
       doc.setFillColor(rAvatar, gAvatar, bAvatar);
-      doc.circle(10, 7.5, 5, 'F');
+      doc.circle(MARGEN + ladoAvatar / 2, altoEncabezado / 2, ladoAvatar / 2, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.text(iniciales(nombreCompleto), 10, 8.7, { align: 'center' });
+      doc.setFontSize(16);
+      doc.text(iniciales(nombreCompleto), MARGEN + ladoAvatar / 2, altoEncabezado / 2 + 2.2, { align: 'center' });
     }
+
+    const xTitulo = MARGEN + ladoAvatar + 10;
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.text('TARJETA DE EMERGENCIA', 19, 6.5);
+    doc.setFontSize(19);
+    doc.text('TARJETA DE EMERGENCIA', xTitulo, altoEncabezado / 2 - 2);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.text('Saurix · Directorio familiar', 19, 11);
+    doc.setFontSize(12);
+    doc.text('Saurix · Directorio familiar', xTitulo, altoEncabezado / 2 + 6);
 
-    // Cuerpo
-    doc.setTextColor(90, 90, 90);
+    // ── Cuerpo ────────────────────────────────────────────────────────
+    let y = altoEncabezado + 14;
+
+    doc.setTextColor(120, 120, 120);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.text('NOMBRE COMPLETO', 5, 20);
+    doc.setFontSize(10);
+    doc.text('NOMBRE COMPLETO', MARGEN, y);
+    y += 9;
 
     doc.setTextColor(20, 20, 20);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
+    doc.setFontSize(20);
     const lineasNombre = doc.splitTextToSize(
       [m.nombre, m.apellidoPaterno, m.apellidoMaterno].filter(Boolean).join(' '),
       anchoUtil,
     );
-    doc.text(lineasNombre, 5, 25);
-    let y = 25 + 4.6 * lineasNombre.length + 1.5;
+    doc.text(lineasNombre, MARGEN, y);
+    y += 8.5 * lineasNombre.length + 6;
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
+    doc.setFontSize(13);
     const edad = calcularEdad(m.fechaNacimiento);
-    doc.text(`Edad: ${edad === null ? '—' : edad + ' años'}`, 5, y);
-    if (m.tipoSangre) {
-      const anchoBadge = doc.getTextWidth(m.tipoSangre) + 7;
-      const xBadge = ANCHO - 5 - anchoBadge;
-      doc.setFillColor(rDanger, gDanger, bDanger);
-      doc.roundedRect(xBadge, y - 3.3, anchoBadge, 4.6, 2, 2, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`🩸 ${m.tipoSangre}`, xBadge + anchoBadge / 2, y, { align: 'center' });
-      doc.setTextColor(20, 20, 20);
-      doc.setFont('helvetica', 'normal');
-    }
-    y += 5;
+    doc.text(`Edad: ${edad === null ? '—' : edad + ' años'}`, MARGEN, y);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Tipo de sangre: ${m.tipoSangre || '—'}`, MARGEN + 70, y);
+    doc.setFont('helvetica', 'normal');
+    y += 10;
 
     const lineaLarga = (etiqueta: string, valor: string): void => {
       if (!valor) return;
-      const texto = doc.splitTextToSize(`${etiqueta}: ${valor}`, anchoUtil);
-      doc.text(texto, 5, y);
-      y += 4.2 * texto.length;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text(`${etiqueta}:`, MARGEN, y);
+      const anchoEtiqueta = doc.getTextWidth(`${etiqueta}: `);
+      doc.setFont('helvetica', 'normal');
+      const texto = doc.splitTextToSize(valor, anchoUtil - anchoEtiqueta);
+      doc.text(texto, MARGEN + anchoEtiqueta, y);
+      y += 6.2 * texto.length + 3;
     };
 
     lineaLarga('Alergias', m.alergias);
-    lineaLarga('Condiciones', m.condicionesCronicas);
+    lineaLarga('Condiciones crónicas', m.condicionesCronicas);
     lineaLarga('Medicamentos', m.medicamentos);
 
-    y += 1;
+    y += 3;
     doc.setDrawColor(210, 210, 210);
-    doc.line(5, y, ANCHO - 5, y);
-    y += 4;
+    doc.line(MARGEN, y, ANCHO - MARGEN, y);
+    y += 9;
 
     doc.setFont('helvetica', 'bold');
-    doc.text('Contacto de emergencia', 5, y);
-    y += 4.2;
+    doc.setFontSize(13);
+    doc.text('Contacto de emergencia', MARGEN, y);
+    y += 7;
     doc.setFont('helvetica', 'normal');
+    doc.setFontSize(12);
     doc.text(
-      `${m.contactoEmergenciaNombre || '—'}  ${m.contactoEmergenciaTelefono ? '· ' + m.contactoEmergenciaTelefono : ''}`,
-      5,
+      `${m.contactoEmergenciaNombre || '—'}${m.contactoEmergenciaTelefono ? '  ·  ' + m.contactoEmergenciaTelefono : ''}`,
+      MARGEN,
       y,
     );
+    y += 8;
 
     if (m.aseguradora || m.numeroPoliza) {
-      y += 4.2;
-      doc.text(`Seguro: ${m.aseguradora || '—'}${m.numeroPoliza ? ' · Póliza ' + m.numeroPoliza : ''}`, 5, y);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Seguro', MARGEN, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(
+        `${m.aseguradora || '—'}${m.numeroPoliza ? '  ·  Póliza ' + m.numeroPoliza : ''}`,
+        MARGEN + doc.getTextWidth('Seguro  '),
+        y,
+      );
+      y += 10;
+    } else {
+      y += 2;
     }
 
-    // Pie: texto (CURP o marca) a la izquierda + QR a la derecha para "ver
-    // la información" escaneando, dentro de la misma franja de color.
-    doc.setFillColor(rDanger, gDanger, bDanger);
-    doc.rect(0, ALTO - ALTO_PIE, ANCHO, ALTO_PIE, 'F');
-    const ladoQr = 7;
-    const xQr = ANCHO - ladoQr - 2.5;
-    const yQr = ALTO - ALTO_PIE + (ALTO_PIE - ladoQr) / 2;
+    // ── QR: en su propio recuadro, con tamaño real para poder escanearse
+    // (no metido a fuerzas en una franja delgada como en la versión anterior). ──
+    const ladoQr = 40;
+    const cajaAlto = ladoQr + 14;
+    doc.setFillColor(248, 246, 244);
+    doc.roundedRect(MARGEN, y, anchoUtil, cajaAlto, 3, 3, 'F');
     if (qrPdf) {
+      const xQr = MARGEN + anchoUtil - ladoQr - 8;
+      const yQr = y + (cajaAlto - ladoQr) / 2;
       doc.setFillColor(255, 255, 255);
-      doc.roundedRect(xQr - 0.7, yQr - 0.7, ladoQr + 1.4, ladoQr + 1.4, 0.8, 0.8, 'F');
+      doc.rect(xQr - 1.5, yQr - 1.5, ladoQr + 3, ladoQr + 3, 'F');
       try {
         doc.addImage(qrPdf, 'PNG', xQr, yQr, ladoQr, ladoQr);
       } catch {
-        /* Si el QR no se pudo generar, el pie se queda solo con el texto. */
+        /* Si el QR no se pudo generar, el recuadro se queda solo con el texto. */
       }
     }
+    doc.setTextColor(60, 60, 60);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('Escanea el código para ver esta información', MARGEN + 8, y + 14, {
+      maxWidth: anchoUtil - ladoQr - 26,
+    });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text('Funciona sin conexión ni la app instalada: solo lee el texto del QR.', MARGEN + 8, y + 22, {
+      maxWidth: anchoUtil - ladoQr - 26,
+    });
+    if (m.curp) {
+      doc.setFontSize(10);
+      doc.text(`CURP ${m.curp}`, MARGEN + 8, y + cajaAlto - 6);
+    }
+    y += cajaAlto;
+
+    // ── Pie ───────────────────────────────────────────────────────────
+    const altoPie = 12;
+    doc.setFillColor(rDanger, gDanger, bDanger);
+    doc.rect(0, ALTO - altoPie, ANCHO, altoPie, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.text(m.curp ? `CURP ${m.curp}` : 'Saurix · Tarjeta de emergencia', 4, ALTO - ALTO_PIE / 2 + 1.2);
+    doc.setFontSize(9);
+    const fecha = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+    doc.text(`Saurix · Directorio familiar — generado el ${fecha}`, ANCHO / 2, ALTO - altoPie / 2 + 1.2, {
+      align: 'center',
+    });
 
     const nombreArchivo = `tarjeta-emergencia-${(m.nombre + ' ' + m.apellidoPaterno).trim().replace(/\s+/g, '-').toLowerCase()}.pdf`;
     doc.save(nombreArchivo);
