@@ -11,7 +11,41 @@ import {
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import Quill from 'quill';
+import hljs from 'highlight.js/lib/core';
+import bash from 'highlight.js/lib/languages/bash';
+import cpp from 'highlight.js/lib/languages/cpp';
+import csharp from 'highlight.js/lib/languages/csharp';
+import css from 'highlight.js/lib/languages/css';
+import diff from 'highlight.js/lib/languages/diff';
+import java from 'highlight.js/lib/languages/java';
+import javascript from 'highlight.js/lib/languages/javascript';
+import markdown from 'highlight.js/lib/languages/markdown';
+import php from 'highlight.js/lib/languages/php';
+import plaintext from 'highlight.js/lib/languages/plaintext';
+import python from 'highlight.js/lib/languages/python';
+import ruby from 'highlight.js/lib/languages/ruby';
+import sql from 'highlight.js/lib/languages/sql';
+import xml from 'highlight.js/lib/languages/xml';
 import { ToastService } from '../../services/toast.service';
+
+// Los nombres registrados deben coincidir con las `key` que Quill usa en
+// modules/syntax.js (Syntax.DEFAULTS.languages) para su selector de lenguaje
+// dentro de cada bloque de código — 'cs' y 'plain' son las claves de Quill,
+// no los nombres internos de highlight.js ('csharp'/'plaintext').
+hljs.registerLanguage('bash', bash);
+hljs.registerLanguage('cpp', cpp);
+hljs.registerLanguage('cs', csharp);
+hljs.registerLanguage('css', css);
+hljs.registerLanguage('diff', diff);
+hljs.registerLanguage('xml', xml);
+hljs.registerLanguage('java', java);
+hljs.registerLanguage('javascript', javascript);
+hljs.registerLanguage('markdown', markdown);
+hljs.registerLanguage('php', php);
+hljs.registerLanguage('plain', plaintext);
+hljs.registerLanguage('python', python);
+hljs.registerLanguage('ruby', ruby);
+hljs.registerLanguage('sql', sql);
 
 const PESO_MAXIMO_ARCHIVO = 4 * 1024 * 1024; // 4 MB — mismo límite que app-adjuntos-panel.
 
@@ -97,6 +131,10 @@ export class EditorTextoComponent implements ControlValueAccessor, AfterViewInit
             archivo: () => this.insertarArchivo(),
           },
         },
+        // Colorea los bloques de código (botón </> de la barra) según el
+        // lenguaje — cada bloque trae su propio selector de lenguaje (incluye
+        // SQL) y se recolorea solo mientras se escribe.
+        syntax: { hljs },
       },
     });
 

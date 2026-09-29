@@ -14,6 +14,7 @@ import { NotificacionesService } from '../../../shared/services/notificaciones.s
 import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { ToastService } from '../../../shared/services/toast.service';
 import { exportarCsv } from '../../../shared/utils/csv.util';
+import { truncarTexto } from '../../../shared/utils/texto.util';
 import {
   ProyectoOpcion,
   TableroColumna,
@@ -413,7 +414,16 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly columnasLista: ColumnaTabla<Ticket>[] = [
     { campo: 'numeroTicket', etiqueta: 'Folio' },
     { campo: 'folioInterno', etiqueta: 'Folio interno', formatear: (fila) => fila.folioInterno || '—' },
-    { campo: 'titulo', etiqueta: 'Título' },
+    {
+      campo: 'titulo',
+      etiqueta: 'Título',
+      // Mismo criterio ya usado en la columna Sprint de esta tabla: se recorta
+      // para que un título largo no estire el renglón entero y tape/empuje los
+      // botones de Acciones — el texto completo sigue disponible al pasar el
+      // mouse (columna.titulo, ver data-table.component.html).
+      formatear: (fila) => truncarTexto(fila.titulo, 70),
+      titulo: (fila) => fila.titulo,
+    },
     {
       campo: 'ticketTipoId',
       etiqueta: 'Tipo',
