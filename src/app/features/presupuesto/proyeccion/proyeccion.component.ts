@@ -582,8 +582,16 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
 
       let inicial: Celda;
       if (i === 0) {
-        inicial = this.celda('saldoInicial', quincenas[0].clave, true);
-        if (!inicial.manual) inicial = { valor: this.saldoActualReal(), manual: false, editable: true };
+        // El Saldo inicial de la PRIMERA quincena no es una suposición de
+        // proyección como las demás (que encadenan el Saldo final de la
+        // quincena anterior, algo que sí tiene sentido corregir a mano si
+        // la proyección va a cambiar): es el saldo real y actual de las
+        // cuentas ahora mismo. Editarlo a mano lo desconectaría de la
+        // realidad -- mismo motivo por el que una categoría con desglose
+        // de cuentas tampoco se edita directamente. Se ignora cualquier
+        // ajuste manual que hubiera quedado guardado de antes de este
+        // cambio (cuando sí se permitía).
+        inicial = { valor: this.saldoActualReal(), manual: false, editable: false };
       } else {
         // Antes esta rama nunca llamaba a celda(): el Saldo inicial de la
         // quincena 2 en adelante quedaba SIEMPRE fijo al Saldo final de la
