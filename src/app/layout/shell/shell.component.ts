@@ -311,6 +311,7 @@ export class ShellComponent implements OnDestroy {
       'presupuesto:Reportes',
       'presupuesto:Catálogos',
       'familia:Catálogos',
+      'wikidocs:Catálogos',
     ]),
   );
 

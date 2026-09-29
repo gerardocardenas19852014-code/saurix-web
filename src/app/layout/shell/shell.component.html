@@ -29,9 +29,15 @@
       <nav class="sidebar-nav" aria-label="Menú de WikiDocs">
         <a routerLink="/wikidocs" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
         <a routerLink="/wikidocs/documentos" routerLinkActive="active">📚 Documentos</a>
-        <a routerLink="/wikidocs/tipos-sistema" routerLinkActive="active">🗂️ Tipo de sistema</a>
-        <a routerLink="/wikidocs/categorias" routerLinkActive="active">📖 Categoría</a>
-        <a routerLink="/wikidocs/secciones" routerLinkActive="active">📑 Secciones</a>
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('wikidocs', 'Catálogos')">
+          <span>{{ grupoAbierto('wikidocs', 'Catálogos') ? '▾' : '▸' }} Catálogos</span>
+        </button>
+        @if (grupoAbierto('wikidocs', 'Catálogos')) {
+          <a routerLink="/wikidocs/tipos-sistema" routerLinkActive="active">🗂️ Tipo de sistema</a>
+          <a routerLink="/wikidocs/categorias" routerLinkActive="active">📖 Categoría</a>
+          <a routerLink="/wikidocs/secciones" routerLinkActive="active">📑 Secciones</a>
+        }
       </nav>
     }
 
