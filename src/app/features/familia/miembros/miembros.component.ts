@@ -255,6 +255,7 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     alergias: [''],
     condicionesCronicas: [''],
     medicamentos: [''],
+    numeroSeguroSocial: [''],
     contactoEmergenciaNombre: [''],
     contactoEmergenciaTelefono: [''],
     aseguradora: [''],
@@ -346,6 +347,7 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
       alergias: '',
       condicionesCronicas: '',
       medicamentos: '',
+      numeroSeguroSocial: '',
       contactoEmergenciaNombre: '',
       contactoEmergenciaTelefono: '',
       aseguradora: '',
@@ -628,6 +630,7 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     if (m.alergias) lineas.push(`Alergias: ${m.alergias}`);
     if (m.condicionesCronicas) lineas.push(`Condiciones: ${m.condicionesCronicas}`);
     if (m.medicamentos) lineas.push(`Medicamentos: ${m.medicamentos}`);
+    if (m.numeroSeguroSocial) lineas.push(`NSS: ${m.numeroSeguroSocial}`);
     lineas.push(
       `Contacto de emergencia: ${m.contactoEmergenciaNombre || '—'}${m.contactoEmergenciaTelefono ? ' · ' + m.contactoEmergenciaTelefono : ''}`,
     );
@@ -792,6 +795,7 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     lineaLarga('Alergias', m.alergias);
     lineaLarga('Condiciones crónicas', m.condicionesCronicas);
     lineaLarga('Medicamentos', m.medicamentos);
+    lineaLarga('NSS', m.numeroSeguroSocial);
 
     y += 3;
     doc.setDrawColor(210, 210, 210);

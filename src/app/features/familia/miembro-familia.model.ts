@@ -37,6 +37,10 @@ export interface MiembroFamilia {
   condicionesCronicas: string;
   /** Medicamentos que toma de forma regular. */
   medicamentos: string;
+  /** Número de Seguro Social (IMSS/ISSSTE u otra institución) — útil para
+   *  que el personal médico ubique el expediente en una emergencia. Texto
+   *  libre (no se valida formato), igual que RFC/CURP. */
+  numeroSeguroSocial: string;
   contactoEmergenciaNombre: string;
   contactoEmergenciaTelefono: string;
   aseguradora: string;

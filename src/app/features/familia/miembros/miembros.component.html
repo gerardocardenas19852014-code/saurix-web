@@ -232,6 +232,10 @@
             Medicamentos
             <input type="text" formControlName="medicamentos" />
           </label>
+          <label class="half-span">
+            Número de Seguro Social (NSS)
+            <input type="text" formControlName="numeroSeguroSocial" />
+          </label>
         </div>
       }
 
@@ -387,6 +391,9 @@
         }
         @if (m.medicamentos) {
           <div class="tarjeta-emergencia-fila"><span>Medicamentos:</span> {{ m.medicamentos }}</div>
+        }
+        @if (m.numeroSeguroSocial) {
+          <div class="tarjeta-emergencia-fila"><span>NSS:</span> {{ m.numeroSeguroSocial }}</div>
         }
         <div class="tarjeta-emergencia-separador"></div>
         <div class="tarjeta-emergencia-fila">
