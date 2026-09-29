@@ -583,11 +583,11 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     doc.rect(0, 0, ANCHO, ALTO, 'F');
 
     // ── Encabezado ────────────────────────────────────────────────────
-    const altoEncabezado = 34;
+    const altoEncabezado = 42;
     doc.setFillColor(rDanger, gDanger, bDanger);
     doc.rect(0, 0, ANCHO, altoEncabezado, 'F');
 
-    const ladoAvatar = 22;
+    const ladoAvatar = 30;
     const yAvatar = (altoEncabezado - ladoAvatar) / 2;
     let fotoDibujada = false;
     if (m.foto) {
@@ -605,8 +605,8 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
       doc.circle(MARGEN + ladoAvatar / 2, altoEncabezado / 2, ladoAvatar / 2, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(16);
-      doc.text(iniciales(nombreCompleto), MARGEN + ladoAvatar / 2, altoEncabezado / 2 + 2.2, { align: 'center' });
+      doc.setFontSize(20);
+      doc.text(iniciales(nombreCompleto), MARGEN + ladoAvatar / 2, altoEncabezado / 2 + 2.6, { align: 'center' });
     }
 
     const xTitulo = MARGEN + ladoAvatar + 10;
@@ -696,7 +696,7 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
 
     // ── QR: en su propio recuadro, con tamaño real para poder escanearse
     // (no metido a fuerzas en una franja delgada como en la versión anterior). ──
-    const ladoQr = 40;
+    const ladoQr = 55;
     const cajaAlto = ladoQr + 14;
     doc.setFillColor(248, 246, 244);
     doc.roundedRect(MARGEN, y, anchoUtil, cajaAlto, 3, 3, 'F');

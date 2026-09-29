@@ -26,16 +26,16 @@
 
 .tarjeta-emergencia-avatar {
   flex-shrink: 0;
-  width: 42px;
-  height: 42px;
+  width: 68px;
+  height: 68px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 22px;
   color: #fff;
-  border: 2px solid rgba(255, 255, 255, .6);
+  border: 3px solid rgba(255, 255, 255, .6);
 }
 
 .tarjeta-emergencia-avatar-foto {
@@ -45,11 +45,38 @@
 
 .tarjeta-emergencia-qr {
   flex-shrink: 0;
-  width: 64px;
-  height: 64px;
-  border-radius: 4px;
+  width: 130px;
+  height: 130px;
+  border-radius: 6px;
   background: #fff;
-  padding: 3px;
+  padding: 4px;
+  border: 1px solid rgba(0, 0, 0, .08);
+}
+
+.tarjeta-emergencia-qr-caja {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 18px 14px;
+  padding: 14px;
+  border-radius: 10px;
+  background: #f8f6f4;
+}
+
+.tarjeta-emergencia-qr-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.tarjeta-emergencia-qr-texto strong {
+  font-size: 13px;
+}
+
+.tarjeta-emergencia-qr-texto span {
+  color: #767676;
 }
 
 /* Foto de la persona, capturada en la sub-pestaña "Datos personales" —

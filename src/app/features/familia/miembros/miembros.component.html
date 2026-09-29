@@ -364,13 +364,20 @@
         }
       </div>
 
+      @if (qrDataUrl()) {
+        <div class="tarjeta-emergencia-qr-caja">
+          <img class="tarjeta-emergencia-qr" [src]="qrDataUrl()" alt="Código QR con la información de emergencia" title="Escanea para ver la información de emergencia" />
+          <div class="tarjeta-emergencia-qr-texto">
+            <strong>Escanea el código para ver esta información</strong>
+            <span>Funciona sin conexión ni la app instalada: solo lee el texto del QR.</span>
+          </div>
+        </div>
+      }
+
       <div class="tarjeta-emergencia-pie">
         <span>
           @if (m.curp) { CURP {{ m.curp }} } @else { Saurix · Tarjeta de emergencia }
         </span>
-        @if (qrDataUrl()) {
-          <img class="tarjeta-emergencia-qr" [src]="qrDataUrl()" alt="Código QR con la información de emergencia" title="Escanea para ver la información de emergencia" />
-        }
       </div>
     </div>
   }
