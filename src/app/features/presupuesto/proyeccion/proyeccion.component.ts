@@ -575,7 +575,16 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
         inicial = this.celda('saldoInicial', quincenas[0].clave, true);
         if (!inicial.manual) inicial = { valor: this.saldoActualReal(), manual: false, editable: true };
       } else {
-        inicial = { valor: saldoPrevio, manual: false, editable: false };
+        // Antes esta rama nunca llamaba a celda(): el Saldo inicial de la
+        // quincena 2 en adelante quedaba SIEMPRE fijo al Saldo final de la
+        // quincena anterior, sin poder ajustarlo a mano (a diferencia de
+        // cualquier otro renglón de la tabla). Ahora se sigue el mismo
+        // patrón que la quincena 0: si hay un ajuste manual guardado para
+        // esta quincena se respeta, y si no, se sigue encadenando el saldo
+        // previo mientras se deja editable (mismo "clic para escribir un
+        // valor a mano" que ya tienen categorías/cuentas).
+        inicial = this.celda('saldoInicial', quincenas[i].clave, true);
+        if (!inicial.manual) inicial = { valor: saldoPrevio, manual: false, editable: true };
       }
       saldoInicial.push(inicial);
       saldoPrevio = inicial.valor + netoValor;
