@@ -97,7 +97,7 @@
         }
       </nav>
     }
-    <article class="page-body" [innerHTML]="contenidoRenderizado()"></article>
+    <article class="page-body" [innerHTML]="contenidoRenderizado()" (click)="onClickContenido($event)"></article>
     <div class="page-meta">Última modificación: {{ formatearFecha(documentoActual()!) }}</div>
   } @else if (vista() === 'adjuntos') {
     <app-adjuntos-panel
@@ -175,7 +175,7 @@
 
         <label>
           Contenido
-          <app-editor-texto formControlName="contenido" />
+          <app-editor-texto formControlName="contenido" [documentosEnlace]="documentosParaEnlazar()" />
         </label>
 
         <div class="form-actions">

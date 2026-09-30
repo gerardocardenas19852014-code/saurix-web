@@ -2,7 +2,9 @@
  * src/styles.scss junto con el resto de overrides de librerías externas
  * (mismo criterio ya usado para Bootstrap) — Quill inserta su DOM interno
  * en tiempo de ejecución y los estilos con encapsulación de componente no
- * le llegan. Aquí solo va el acomodo del wrapper. */
+ * le llegan. Aquí solo va el acomodo del wrapper y del picker de "Enlazar
+ * documento" (ese sí es un template propio, no de Quill, así que sí le
+ * llegan los estilos con encapsulación normal). */
 .editor-texto-wrap {
   display: block;
 }
@@ -10,4 +12,62 @@
 .editor-texto-wrap.is-disabled {
   opacity: 0.65;
   pointer-events: none;
+}
+
+/* .modal-overlay/.modal-box ya definen el fondo oscuro y la tarjeta —
+ * aquí solo el contenido propio del picker (buscador + lista). */
+.modal-box.picker-enlace-modal {
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+}
+
+.picker-enlace-buscar {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  margin-bottom: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--text-strong);
+  font-size: 14px;
+}
+
+.picker-enlace-lista {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.picker-enlace-lista li + li {
+  border-top: 1px solid var(--line);
+}
+
+.picker-enlace-lista li button {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  padding: 8px 10px;
+  background: none;
+  border: none;
+  color: var(--text-strong);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.picker-enlace-lista li button:hover {
+  background: var(--paper-raised);
+  color: var(--accent);
+}
+
+.picker-enlace-vacio {
+  padding: 10px;
+  color: var(--ink-soft);
+  font-size: 13px;
 }

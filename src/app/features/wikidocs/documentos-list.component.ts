@@ -159,9 +159,40 @@ export class DocumentosListComponent implements OnInit {
     return this.sanitizer.bypassSecurityTrustHtml(this.tocYContenido().html);
   });
 
+  /** Documentos que el editor puede ofrecer para "Enlazar documento" — los
+   *  ya cargados en esta ventana (mismo alcance que la búsqueda/listado),
+   *  sin el documento que se está editando (enlazarse a sí mismo no tiene
+   *  caso). Solo id/título, para no acoplar el editor compartido al
+   *  modelo `Documento`. */
+  protected readonly documentosParaEnlazar = computed(() => {
+    const actualId = this.documentoActual()?.id ?? 0;
+    return this.documentosTodos()
+      .filter((doc) => doc.id !== actualId)
+      .map((doc) => ({ id: doc.id, titulo: doc.titulo }));
+  });
+
   /** Salta suavemente al encabezado elegido del índice de contenido. */
   irASeccion(id: string): void {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /** Intercepta los clicks sobre los enlaces "#wikidoc-<id>" insertados por
+   *  el botón 🔖 del editor (ver EditorTextoComponent) dentro del HTML ya
+   *  renderizado de la vista "Ver" — evita que el navegador intente
+   *  navegar al fragmento y en su lugar carga y muestra ese documento. */
+  onClickContenido(evento: MouseEvent): void {
+    const objetivo = (evento.target as HTMLElement)?.closest('a');
+    if (!objetivo) return;
+    const href = objetivo.getAttribute('href') ?? '';
+    const coincide = href.match(/^#wikidoc-(\d+)$/);
+    if (!coincide) return;
+
+    evento.preventDefault();
+    const id = Number(coincide[1]);
+    this.data.getById<Documento>('Documento', id).subscribe({
+      next: (documento) => this.verDocumento(documento),
+      error: () => this.toast.error('No se encontró el documento enlazado (puede haber sido eliminado).'),
+    });
   }
 
   protected readonly form = this.fb.nonNullable.group({

@@ -1,3 +1,30 @@
 <div class="editor-texto-wrap" [class.is-disabled]="deshabilitado()">
   <div #contenedor></div>
+
+  @if (mostrarPickerEnlace()) {
+    <div class="modal-overlay show" (click)="cerrarPickerEnlace()">
+      <div class="modal-box picker-enlace-modal" (click)="$event.stopPropagation()">
+        <h3>Enlazar a un documento</h3>
+        <input
+          type="text"
+          class="picker-enlace-buscar"
+          placeholder="Buscar documento…"
+          [value]="filtroEnlace()"
+          (input)="filtroEnlace.set($any($event.target).value)"
+        />
+        <ul class="picker-enlace-lista">
+          @for (documento of documentosFiltrados(); track documento.id) {
+            <li>
+              <button type="button" (click)="elegirDocumentoEnlace(documento)">{{ documento.titulo }}</button>
+            </li>
+          } @empty {
+            <li class="picker-enlace-vacio">Sin resultados.</li>
+          }
+        </ul>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="cerrarPickerEnlace()">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  }
 </div>

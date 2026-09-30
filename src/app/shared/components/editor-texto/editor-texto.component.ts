@@ -5,8 +5,10 @@ import {
   ElementRef,
   OnDestroy,
   ViewChild,
+  computed,
   forwardRef,
   inject,
+  input,
   signal,
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
@@ -49,6 +51,15 @@ hljs.registerLanguage('sql', sql);
 
 const PESO_MAXIMO_ARCHIVO = 4 * 1024 * 1024; // 4 MB — mismo límite que app-adjuntos-panel.
 
+/** Documento enlazable desde el botón "🔖 Enlazar documento" del editor —
+ *  a propósito solo trae id/título (no el modelo `Documento` completo) para
+ *  que este componente compartido no dependa de WikiDocs ni de
+ *  `DataClientService`; quien lo usa decide qué lista de documentos pasar. */
+export interface EnlaceDocumentoOpcion {
+  id: number;
+  titulo: string;
+}
+
 function leerComoDataUrl(archivo: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const lector = new FileReader();
@@ -83,6 +94,15 @@ function abrirSelectorArchivo(accept: string): Promise<File | null> {
  *    documentos directo dentro de la redacción (no solo en la pestaña de
  *    Adjuntos aparte). Mismo tope de 4 MB.
  *  - Enlace: es el botón nativo de Quill (ya pide la URL solo).
+ *  - Enlazar documento (🔖): solo aparece con utilidad si el consumidor pasa
+ *    `[documentosEnlace]`; abre un buscador y arma un enlace interno tipo
+ *    `#wikidoc-<id>` (a propósito un simple fragmento, no un esquema
+ *    inventado — el formato `link` de Quill solo acepta
+ *    http/https/mailto/tel/sms y sanea cualquier otro esquema a
+ *    "about:blank", así que un `wikidoc:5` se perdería silenciosamente).
+ *    Quien muestra el documento (`DocumentosListComponent`) intercepta el
+ *    click sobre ese enlace y navega al documento en vez de dejar que el
+ *    navegador intente resolver el fragmento.
  */
 @Component({
   selector: 'app-editor-texto',
@@ -103,13 +123,31 @@ export class EditorTextoComponent implements ControlValueAccessor, AfterViewInit
 
   @ViewChild('contenedor', { static: true }) private contenedorRef!: ElementRef<HTMLDivElement>;
 
+  /** Documentos disponibles para el botón "Enlazar documento" — vacío por
+   *  default, así que en cualquier otro uso del editor (Comercio, etc.) el
+   *  botón simplemente avisa que no hay nada que enlazar en vez de fallar. */
+  readonly documentosEnlace = input<EnlaceDocumentoOpcion[]>([]);
+
   protected readonly deshabilitado = signal(false);
+
+  protected readonly mostrarPickerEnlace = signal(false);
+  protected readonly filtroEnlace = signal('');
+  protected readonly documentosFiltrados = computed(() => {
+    const texto = this.filtroEnlace().trim().toLowerCase();
+    const lista = this.documentosEnlace();
+    if (!texto) return lista;
+    return lista.filter((documento) => documento.titulo.toLowerCase().includes(texto));
+  });
 
   private quill?: Quill;
   private valorPendiente = '';
   private aplicandoValorInterno = false;
   private onChange: (valor: string) => void = () => {};
   private onTouched: () => void = () => {};
+
+  /** Selección guardada al abrir el picker (Quill la pierde al perder foco
+   *  el editor mientras se escribe en el buscador del modal). */
+  private rangoEnlaceGuardado: { index: number; length: number } | null = null;
 
   ngAfterViewInit(): void {
     this.quill = new Quill(this.contenedorRef.nativeElement, {
@@ -123,12 +161,13 @@ export class EditorTextoComponent implements ControlValueAccessor, AfterViewInit
             [{ color: [] }, { background: [] }],
             [{ list: 'ordered' }, { list: 'bullet' }],
             ['blockquote', 'code-block'],
-            ['link', 'image', 'archivo'],
+            ['link', 'image', 'archivo', 'wikidoc'],
             ['clean'],
           ],
           handlers: {
             image: () => this.insertarImagen(),
             archivo: () => this.insertarArchivo(),
+            wikidoc: () => this.abrirPickerEnlace(),
           },
         },
         // Colorea los bloques de código (botón </> de la barra) según el
@@ -213,5 +252,42 @@ export class EditorTextoComponent implements ControlValueAccessor, AfterViewInit
     } catch {
       this.toast.error('No se pudo leer el archivo.');
     }
+  }
+
+  protected abrirPickerEnlace(): void {
+    if (!this.quill) return;
+    if (this.documentosEnlace().length === 0) {
+      this.toast.advertencia('No hay otros documentos para enlazar todavía.');
+      return;
+    }
+    this.rangoEnlaceGuardado = this.quill.getSelection(true);
+    this.filtroEnlace.set('');
+    this.mostrarPickerEnlace.set(true);
+  }
+
+  protected elegirDocumentoEnlace(documento: EnlaceDocumentoOpcion): void {
+    const rango = this.rangoEnlaceGuardado;
+    if (!this.quill || !rango) {
+      this.cerrarPickerEnlace();
+      return;
+    }
+    // Fragmento simple (no un esquema propio) — ver el comentario de la
+    // clase sobre por qué el sanitizador de Quill exige esto.
+    const href = `#wikidoc-${documento.id}`;
+    if (rango.length > 0) {
+      // Ya había texto seleccionado al abrir el picker: se conserva tal
+      // cual y solo se le agrega el enlace.
+      this.quill.formatText(rango.index, rango.length, 'link', href, 'user');
+      this.quill.setSelection(rango.index + rango.length, 0, 'user');
+    } else {
+      this.quill.insertText(rango.index, documento.titulo, { link: href }, 'user');
+      this.quill.setSelection(rango.index + documento.titulo.length, 0, 'user');
+    }
+    this.cerrarPickerEnlace();
+  }
+
+  protected cerrarPickerEnlace(): void {
+    this.mostrarPickerEnlace.set(false);
+    this.rangoEnlaceGuardado = null;
   }
 }
