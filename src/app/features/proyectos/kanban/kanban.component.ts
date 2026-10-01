@@ -14,7 +14,6 @@ import { NotificacionesService } from '../../../shared/services/notificaciones.s
 import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { ToastService } from '../../../shared/services/toast.service';
 import { exportarCsv } from '../../../shared/utils/csv.util';
-import { truncarTexto } from '../../../shared/utils/texto.util';
 import {
   ProyectoOpcion,
   TableroColumna,
@@ -417,11 +416,13 @@ export class KanbanComponent implements OnInit, OnDestroy {
     {
       campo: 'titulo',
       etiqueta: 'Título',
-      // Mismo criterio ya usado en la columna Sprint de esta tabla: se recorta
-      // para que un título largo no estire el renglón entero y tape/empuje los
-      // botones de Acciones — el texto completo sigue disponible al pasar el
-      // mouse (columna.titulo, ver data-table.component.html).
-      formatear: (fila) => truncarTexto(fila.titulo, 70),
+      // Antes se recortaba a 70 caracteres en una sola línea — un título
+      // normal quedaba escondido de entrada y solo se veía completo al pasar
+      // el mouse. Ahora se envuelve hasta 2 renglones (igual que ya se ve en
+      // Mi Dashboard) y solo un título realmente largo se recorta ahí, sin
+      // estirar el renglón ni tapar/empujar los botones de Acciones — el
+      // texto completo sigue disponible al pasar el mouse.
+      multilinea: true,
       titulo: (fila) => fila.titulo,
     },
     {

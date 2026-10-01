@@ -27,7 +27,12 @@
               @if (columna.claseValor) {
                 <span class="grid-badge {{ columna.claseValor(fila) }}" [title]="columna.titulo ? columna.titulo(fila) : ''">{{ valorCelda(fila, columna) }}</span>
               } @else if (columna.titulo) {
-                <span class="grid-cell-truncada" [title]="columna.titulo(fila)">{{ valorCelda(fila, columna) }}</span>
+                <span
+                  class="grid-cell-truncada"
+                  [class.grid-cell-truncada-multilinea]="columna.multilinea"
+                  [title]="columna.titulo(fila)"
+                  >{{ valorCelda(fila, columna) }}</span
+                >
               } @else {
                 {{ valorCelda(fila, columna) }}
               }

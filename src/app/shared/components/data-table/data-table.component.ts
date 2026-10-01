@@ -17,6 +17,16 @@ export interface ColumnaTabla<T> {
    *  corto de un sprint) y se quiere poder ver el valor completo al pasar el
    *  mouse, sin ocupar espacio extra en el renglón. */
   titulo?: (fila: T) => string;
+  /**
+   * Opcional (requiere `titulo`): en vez de recortar el valor a una sola línea
+   * (grid-cell-truncada), lo envuelve en hasta 2 renglones y solo ahí lo
+   * recorta con elipsis — pensado para texto libre más largo (p.ej. el
+   * Título de un ticket) donde una sola línea esconde demasiado, pero
+   * tampoco se quiere que el renglón de la tabla crezca sin límite. El
+   * texto completo sigue disponible al pasar el mouse. Ver
+   * grid-cell-truncada-multilinea en styles.scss.
+   */
+  multilinea?: boolean;
 }
 
 /**
