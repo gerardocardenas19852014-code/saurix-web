@@ -22,9 +22,9 @@ interface GrupoModulo {
  * en features/comercio/, solo reubicados bajo esta landing y estas rutas —
  * ver crm.routes.ts). El resto de los grupos son nuevos.
  *
- * Grupos pendientes de agregar conforme se construyan (no se listan
- * todavía para no dejar tarjetas rotas apuntando a rutas que no existen):
- * Campañas de marketing.
+ * Con Campañas de marketing se completaron las 4 piezas pedidas (Leads,
+ * Pipeline de oportunidades, Casos de servicio, Campañas) además del
+ * Pipeline/Servicio ya listados — no quedan grupos pendientes.
  */
 const GRUPOS: GrupoModulo[] = [
   {
@@ -74,6 +74,18 @@ const GRUPOS: GrupoModulo[] = [
         color: 'generic',
         titulo: 'Casos de servicio',
         descripcion: 'Soporte post-venta por cliente, con prioridad, estado y actividades.',
+      },
+    ],
+  },
+  {
+    titulo: 'Campañas',
+    enlaces: [
+      {
+        ruta: 'campanas',
+        icono: '📣',
+        color: 'generic',
+        titulo: 'Campañas de marketing',
+        descripcion: 'Campañas por tipo y estado, con los leads que generaron.',
       },
     ],
   },

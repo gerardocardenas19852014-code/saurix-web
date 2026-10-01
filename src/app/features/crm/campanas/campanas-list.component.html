@@ -1,0 +1,130 @@
+<div class="page-header">
+  <h1>Campañas de marketing</h1>
+  <div class="page-actions">
+    <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nueva</button>
+  </div>
+</div>
+
+<div class="grid-toolbar">
+  <div class="grid-filter">
+    <input
+      type="search"
+      placeholder="Buscar por nombre…"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value); cargar()"
+    />
+  </div>
+</div>
+
+<app-data-table
+  [columnas]="columnas"
+  [filas]="campanas()"
+  [cargando]="cargando()"
+  (editar)="editar($event)"
+  (eliminar)="pedirEliminar($event)"
+/>
+
+@if (modalAbierto()) {
+  <div class="modal-overlay show" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <h3>{{ campanaEnEdicion() ? 'Editar campaña' : 'Nueva campaña' }}</h3>
+
+      <form [formGroup]="form" (ngSubmit)="guardar()">
+        <div class="edit-form form-grid-2col" style="margin-bottom: 18px;">
+          <label class="full-span">
+            Nombre
+            <input type="text" formControlName="nombre" />
+          </label>
+
+          <label>
+            Tipo
+            <select formControlName="tipo">
+              @for (tipo of tipos; track tipo) {
+                <option [value]="tipo">{{ tipo }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            Estado
+            <select formControlName="estado">
+              @for (estado of estados; track estado) {
+                <option [value]="estado">{{ estado }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            Fecha de inicio
+            <input type="date" formControlName="fechaInicio" />
+          </label>
+
+          <label>
+            Fecha de fin
+            <input type="date" formControlName="fechaFin" />
+          </label>
+
+          <label class="full-span">
+            Descripción
+            <textarea rows="3" formControlName="descripcion"></textarea>
+          </label>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">Cancelar</button>
+          <button type="submit" class="btn-primary">Guardar</button>
+        </div>
+      </form>
+
+      @if (campanaEnEdicion(); as campana) {
+        <h4 style="margin: 18px 0 10px;">Leads asociados</h4>
+
+        @if (leadsAsociadosDe(campana.id).length === 0) {
+          <p class="empty">Todavía no hay leads asociados a esta campaña.</p>
+        } @else {
+          <ul class="actividades-list">
+            @for (item of leadsAsociadosDe(campana.id); track item.asociacion.id) {
+              <li class="actividad-item">
+                <div class="actividad-item-head">
+                  <span class="actividad-item-texto">{{ item.lead?.nombre ?? 'Lead eliminado' }}</span>
+                  <button
+                    type="button"
+                    class="btn-danger small"
+                    aria-label="Quitar lead de la campaña"
+                    title="Quitar lead de la campaña"
+                    (click)="quitarAsociacion(item.asociacion)"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </li>
+            }
+          </ul>
+        }
+
+        <div class="edit-form" style="margin-top: 14px;">
+          <label>
+            Asociar un lead
+            <select [value]="leadAAsociarId()" (change)="leadAAsociarId.set(+$any($event.target).value)">
+              <option [value]="0">Selecciona...</option>
+              @for (lead of leadsDisponiblesPara(campana.id); track lead.id) {
+                <option [value]="lead.id">{{ lead.nombre }}</option>
+              }
+            </select>
+          </label>
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" (click)="asociarLead(campana)">+ Asociar</button>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="campanaAEliminar() !== null"
+  titulo="Eliminar campaña"
+  [mensaje]="'¿Eliminar ' + (campanaAEliminar()?.nombre ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="campanaAEliminar.set(null)"
+/>

@@ -56,6 +56,12 @@ export const CRM_ROUTES: Routes = [
     loadComponent: () => import('./casos/casos-list.component').then((m) => m.CasosListComponent),
   },
 
+  // Campañas de marketing
+  {
+    path: 'campanas',
+    loadComponent: () => import('./campanas/campanas-list.component').then((m) => m.CampanasListComponent),
+  },
+
   // Ventas (ex-Comercio)
   rutaCatalogoSimple('categorias-producto', {
     entidad: 'CategoriaProducto',
