@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DataClientService } from '../../../core/services/data-client.service';
@@ -29,7 +29,7 @@ import { CatalogoSimpleConfig, CatalogoSimpleItem } from './catalogo-simple.mode
   styleUrl: './catalogo-simple.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class CatalogoSimpleComponent implements OnInit {
+export class CatalogoSimpleComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
@@ -57,7 +57,16 @@ export class CatalogoSimpleComponent implements OnInit {
 
   ngOnInit(): void {
     this.config = this.route.snapshot.data['config'] as CatalogoSimpleConfig;
+    // Catálogo atrapado en el ancho de lectura de 980px — usa el ancho
+    // "wide" del layout para aprovechar mejor el espacio (ver
+    // html[data-wide='grid'] en styles.scss, mismo patrón que los demás
+    // catálogos de la app, p. ej. Categorías de presupuesto).
+    document.documentElement.setAttribute('data-wide', 'grid');
     this.cargar();
+  }
+
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
   }
 
   cargar(): void {

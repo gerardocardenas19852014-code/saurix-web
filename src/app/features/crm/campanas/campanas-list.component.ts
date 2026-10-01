@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
@@ -22,7 +22,7 @@ import { CAMPANA_ESTADOS, CAMPANA_TIPOS, Campana, CampanaEstado, CampanaLead, Ca
   styleUrl: './campanas-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class CampanasListComponent implements OnInit {
+export class CampanasListComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
@@ -70,6 +70,11 @@ export class CampanasListComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    // Catálogo/listado atrapado en el ancho de lectura de 980px — usa el
+    // ancho "wide" del layout para aprovechar mejor el espacio (ver
+    // html[data-wide='grid'] en styles.scss, mismo patrón que Movimientos /
+    // Categorías de presupuesto).
+    document.documentElement.setAttribute('data-wide', 'grid');
     this.data.list<Lead>('Lead').subscribe((leads) => this.leads.set(leads));
     this.cargarAsociaciones();
     this.cargar();
@@ -199,5 +204,9 @@ export class CampanasListComponent implements OnInit {
     this.data.baja('CampanaLead', asociacion.id).subscribe({
       next: () => this.cargarAsociaciones(),
     });
+  }
+
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
   }
 }

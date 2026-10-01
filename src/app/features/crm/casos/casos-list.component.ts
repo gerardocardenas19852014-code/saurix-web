@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
@@ -27,7 +27,7 @@ function hoyISO(): string {
   styleUrl: './casos-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class CasosListComponent implements OnInit {
+export class CasosListComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
@@ -71,6 +71,11 @@ export class CasosListComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    // Catálogo/listado atrapado en el ancho de lectura de 980px — usa el
+    // ancho "wide" del layout para aprovechar mejor el espacio (ver
+    // html[data-wide='grid'] en styles.scss, mismo patrón que Movimientos /
+    // Categorías de presupuesto).
+    document.documentElement.setAttribute('data-wide', 'grid');
     this.data.list<Cliente>('Cliente').subscribe((clientes) => this.clientes.set(clientes));
     this.cargar();
   }
@@ -187,5 +192,9 @@ export class CasosListComponent implements OnInit {
         this.cargar();
       },
     });
+  }
+
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
   }
 }

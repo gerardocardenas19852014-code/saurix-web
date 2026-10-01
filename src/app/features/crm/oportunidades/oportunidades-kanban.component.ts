@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -34,7 +34,7 @@ import {
   styleUrl: './oportunidades-kanban.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class OportunidadesKanbanComponent implements OnInit {
+export class OportunidadesKanbanComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
@@ -81,6 +81,11 @@ export class OportunidadesKanbanComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    // Catálogo/listado atrapado en el ancho de lectura de 980px — usa el
+    // ancho "wide" del layout para aprovechar mejor el espacio (ver
+    // html[data-wide='grid'] en styles.scss, mismo patrón que Movimientos /
+    // Categorías de presupuesto).
+    document.documentElement.setAttribute('data-wide', 'grid');
     this.data.list<Cliente>('Cliente').subscribe((clientes) => this.clientes.set(clientes));
     this.data.list<MotivoPerdida>('MotivoPerdida').subscribe((motivos) => this.motivos.set(motivos));
     this.cargar();
@@ -220,5 +225,9 @@ export class OportunidadesKanbanComponent implements OnInit {
     this.data.modificacion<Oportunidad>('Oportunidad', { ...oportunidad, etapa: etapaDestino }).subscribe({
       next: () => this.cargar(),
     });
+  }
+
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
   }
 }

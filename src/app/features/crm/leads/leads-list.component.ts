@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
@@ -26,7 +26,7 @@ import { LEAD_ESTADOS, Lead, LeadEstado, LeadOrigen } from './lead.model';
   styleUrl: './leads-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class LeadsListComponent implements OnInit {
+export class LeadsListComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
@@ -72,6 +72,11 @@ export class LeadsListComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    // Catálogo/listado atrapado en el ancho de lectura de 980px — usa el
+    // ancho "wide" del layout para aprovechar mejor el espacio (ver
+    // html[data-wide='grid'] en styles.scss, mismo patrón que Movimientos /
+    // Categorías de presupuesto).
+    document.documentElement.setAttribute('data-wide', 'grid');
     this.data.list<LeadOrigen>('LeadOrigen').subscribe((origenes) => this.origenes.set(origenes));
     this.cargar();
   }
@@ -213,5 +218,9 @@ export class LeadsListComponent implements OnInit {
         },
         error: () => this.toast.error('No se pudo crear el cliente a partir de este lead.'),
       });
+  }
+
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
   }
 }
