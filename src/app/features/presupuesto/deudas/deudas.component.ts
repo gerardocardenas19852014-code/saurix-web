@@ -103,11 +103,11 @@ export class DeudasComponent implements OnInit, OnDestroy {
 
   cargar(): void {
     this.cargando.set(true);
-    this.data.list<DeudaPresupuesto>('DeudaPresupuesto', { creadoPorUsuarioId: this.usuarioActualId }).subscribe({
+    this.data.list<DeudaPresupuesto>('DeudaPresupuesto').subscribe({
       next: (d) => {
         this.deudas.set(d);
         this.cargando.set(false);
-        this.data.list<DeudaPresupuestoAbono>('DeudaPresupuestoAbono', { creadoPorUsuarioId: this.usuarioActualId }).subscribe((a) => this.abonos.set(a));
+        this.data.list<DeudaPresupuestoAbono>('DeudaPresupuestoAbono').subscribe((a) => this.abonos.set(a));
       },
       error: () => this.cargando.set(false),
     });

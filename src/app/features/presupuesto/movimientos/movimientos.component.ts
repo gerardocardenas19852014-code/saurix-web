@@ -61,11 +61,15 @@ type TabMovimientos = 'movimientos' | 'cuentas' | 'grafica';
  * TransferenciaId (GUID) — aquí se resuelve como "tipo Transferencia" en
  * el formulario, que dispara las dos peticiones Alta.
  *
- * Cuentas y categorías son catálogos compartidos (módulo Catálogos); los
- * movimientos en sí son personales — cada usuario solo ve y administra los
- * suyos (creadoPorUsuarioId). Como CuentaPresupuesto no tiene "saldoInicial",
- * el saldo de cada cuenta se calcula 100% a partir de sus movimientos
- * (ingresos suman, gastos restan).
+ * Presupuesto Personal es COMPARTIDO entre todos los usuarios (como
+ * Proyectos/Comercio, no personal por usuario): cuentas y categorías ya eran
+ * catálogos compartidos (módulo Catálogos), y ahora movimientos/deudas/
+ * metas/límites/recurrentes también se ven y se administran entre todos —
+ * creadoPorUsuarioId se sigue guardando (quién lo capturó), pero ya NO se
+ * usa para filtrar qué se ve, solo como dato de auditoría, igual que
+ * VendedorUsuarioId en Comercio. Como CuentaPresupuesto no tiene
+ * "saldoInicial", el saldo de cada cuenta se calcula 100% a partir de TODOS
+ * los movimientos de todos los usuarios (ingresos suman, gastos restan).
  */
 @Component({
   selector: 'app-movimientos',
@@ -477,7 +481,7 @@ export class MovimientosComponent implements OnInit, OnDestroy {
 
   cargar(): void {
     this.cargando.set(true);
-    this.data.list<MovimientoPresupuesto>('MovimientoPresupuesto', { creadoPorUsuarioId: this.usuarioActualId }).subscribe({
+    this.data.list<MovimientoPresupuesto>('MovimientoPresupuesto').subscribe({
       next: (movimientos) => {
         this.movimientos.set(movimientos);
         this.cargando.set(false);

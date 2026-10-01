@@ -177,13 +177,13 @@ export class RecurrentesComponent implements OnInit, OnDestroy {
   cargar(): void {
     this.cargando.set(true);
     this.data
-      .list<MovimientoRecurrentePresupuesto>('MovimientoRecurrentePresupuesto', { creadoPorUsuarioId: this.usuarioActualId })
+      .list<MovimientoRecurrentePresupuesto>('MovimientoRecurrentePresupuesto')
       .subscribe({
         next: (r) => {
           this.recurrentes.set(r);
           this.cargando.set(false);
           this.data
-            .list<MovimientoPresupuesto>('MovimientoPresupuesto', { creadoPorUsuarioId: this.usuarioActualId })
+            .list<MovimientoPresupuesto>('MovimientoPresupuesto')
             .subscribe((movimientos) => {
               this.movimientosOrigen.set(movimientos.filter((m) => m.origenRecurrenteId !== null));
               this.avisarPendientes();

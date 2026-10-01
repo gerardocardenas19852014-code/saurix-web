@@ -1,5 +1,6 @@
 /**
- * Metas de ahorro — personal (por usuario, vía creadoPorUsuarioId).
+ * Metas de ahorro — compartidas entre todos los usuarios (creadoPorUsuarioId
+ * se guarda solo como auditoría de quién la creó, no filtra la lista).
  * montoActual sigue siendo el campo que se muestra y edita directo (igual
  * que siempre): "+ Aportar" lo incrementa, y el formulario permite
  * corregirlo a mano si hace falta. Desde que existe MetaPresupuestoAporte,

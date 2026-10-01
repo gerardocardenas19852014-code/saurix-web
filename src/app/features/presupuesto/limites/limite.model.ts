@@ -1,5 +1,6 @@
 /**
- * Límite de gasto mensual — personal (por usuario, vía creadoPorUsuarioId).
+ * Límite de gasto mensual — compartido entre todos los usuarios
+ * (creadoPorUsuarioId se guarda solo como auditoría, no filtra la lista).
  * Por categoría, o general (todas) si categoriaPresupuestoId es NULL.
  */
 export interface LimitePresupuesto {

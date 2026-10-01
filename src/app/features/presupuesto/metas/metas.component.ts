@@ -100,11 +100,11 @@ export class MetasComponent implements OnInit, OnDestroy {
 
   cargar(): void {
     this.cargando.set(true);
-    this.data.list<MetaPresupuesto>('MetaPresupuesto', { creadoPorUsuarioId: this.usuarioActualId }).subscribe({
+    this.data.list<MetaPresupuesto>('MetaPresupuesto').subscribe({
       next: (m) => {
         this.metas.set(m);
         this.cargando.set(false);
-        this.data.list<MetaPresupuestoAporte>('MetaPresupuestoAporte', { creadoPorUsuarioId: this.usuarioActualId }).subscribe((a) => this.aportes.set(a));
+        this.data.list<MetaPresupuestoAporte>('MetaPresupuestoAporte').subscribe((a) => this.aportes.set(a));
       },
       error: () => this.cargando.set(false),
     });

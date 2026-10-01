@@ -164,11 +164,9 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
     forkJoin({
       categorias: this.data.list<CategoriaPresupuesto>('CategoriaPresupuesto'),
       cuentas: this.data.list<CuentaPresupuesto>('CuentaPresupuesto'),
-      movimientos: this.data.list<MovimientoPresupuesto>('MovimientoPresupuesto', { creadoPorUsuarioId: this.usuarioActualId }),
-      recurrentes: this.data.list<MovimientoRecurrentePresupuesto>('MovimientoRecurrentePresupuesto', {
-        creadoPorUsuarioId: this.usuarioActualId,
-      }),
-      ajustes: this.data.list<ProyeccionAjuste>('ProyeccionAjuste', { creadoPorUsuarioId: this.usuarioActualId }),
+      movimientos: this.data.list<MovimientoPresupuesto>('MovimientoPresupuesto'),
+      recurrentes: this.data.list<MovimientoRecurrentePresupuesto>('MovimientoRecurrentePresupuesto'),
+      ajustes: this.data.list<ProyeccionAjuste>('ProyeccionAjuste'),
       presupuestosAnuales: this.data.list<PresupuestoAnual>('PresupuestoAnual'),
     }).subscribe({
       next: ({ categorias, cuentas, movimientos, recurrentes, ajustes, presupuestosAnuales }) => {

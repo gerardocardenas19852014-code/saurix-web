@@ -77,11 +77,11 @@ export class CalendarioComponent implements OnInit, OnDestroy {
     this.cargando.set(true);
     this.data.list<CuentaPresupuesto>('CuentaPresupuesto').subscribe((c) => this.cuentas.set(c));
     this.data
-      .list<MovimientoRecurrentePresupuesto>('MovimientoRecurrentePresupuesto', { creadoPorUsuarioId: this.usuarioActualId })
+      .list<MovimientoRecurrentePresupuesto>('MovimientoRecurrentePresupuesto')
       .subscribe((r) => this.recurrentes.set(r));
-    this.data.list<DeudaPresupuesto>('DeudaPresupuesto', { creadoPorUsuarioId: this.usuarioActualId }).subscribe((d) => this.deudas.set(d));
-    this.data.list<MetaPresupuesto>('MetaPresupuesto', { creadoPorUsuarioId: this.usuarioActualId }).subscribe((m) => this.metas.set(m));
-    this.data.list<MovimientoPresupuesto>('MovimientoPresupuesto', { creadoPorUsuarioId: this.usuarioActualId }).subscribe({
+    this.data.list<DeudaPresupuesto>('DeudaPresupuesto').subscribe((d) => this.deudas.set(d));
+    this.data.list<MetaPresupuesto>('MetaPresupuesto').subscribe((m) => this.metas.set(m));
+    this.data.list<MovimientoPresupuesto>('MovimientoPresupuesto').subscribe({
       next: (m) => {
         this.movimientos.set(m);
         this.cargando.set(false);

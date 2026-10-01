@@ -3,7 +3,8 @@
 export type FrecuenciaRecurrente = string;
 
 /**
- * "Fijos y Proyección" — personal (por usuario, vía creadoPorUsuarioId).
+ * "Fijos y Proyección" — compartido entre todos los usuarios
+ * (creadoPorUsuarioId se guarda solo como auditoría, no filtra la lista).
  * Un "Anual" usa como mes de referencia el mes en que se creó el fijo
  * (fechaCreacion) — p.ej. una póliza de seguro dada de alta en marzo se
  * considera "del ciclo" cada marzo.

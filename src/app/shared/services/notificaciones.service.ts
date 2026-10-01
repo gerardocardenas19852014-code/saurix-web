@@ -213,7 +213,7 @@ export class NotificacionesService {
     try {
       const [cuentas, movimientos, avisos] = await Promise.all([
         firstValueFrom(this.data.list<CuentaPresupuesto>('CuentaPresupuesto')),
-        firstValueFrom(this.data.list<MovimientoPresupuesto>('MovimientoPresupuesto', { creadoPorUsuarioId: usuarioId })),
+        firstValueFrom(this.data.list<MovimientoPresupuesto>('MovimientoPresupuesto')),
         firstValueFrom(this.data.list<AvisoTarjetaCiclo>('AvisoTarjetaCiclo', { usuarioId })),
       ]);
 

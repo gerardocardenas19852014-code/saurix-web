@@ -1,5 +1,6 @@
 /**
- * Deudas (préstamos) — personal (por usuario, vía creadoPorUsuarioId).
+ * Deudas (préstamos) — compartido entre todos los usuarios (creadoPorUsuarioId
+ * se guarda solo como auditoría de quién lo capturó, no filtra la lista).
  * saldoActual es un campo "caché" que siempre se recalcula a partir del
  * historial real de abonos (DeudaPresupuestoAbono) — nunca se edita a mano
  * en el formulario, para que el saldo nunca se desincronice de sus abonos.

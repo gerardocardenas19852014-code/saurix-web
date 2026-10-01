@@ -96,9 +96,9 @@ export class ReportesComponent implements OnInit, OnDestroy {
     this.cargando.set(true);
     this.data.list<CategoriaPresupuesto>('CategoriaPresupuesto').subscribe((c) => this.categorias.set(c));
     this.data
-      .list<MovimientoRecurrentePresupuesto>('MovimientoRecurrentePresupuesto', { creadoPorUsuarioId: this.usuarioActualId })
+      .list<MovimientoRecurrentePresupuesto>('MovimientoRecurrentePresupuesto')
       .subscribe((r) => this.recurrentes.set(r));
-    this.data.list<MovimientoPresupuesto>('MovimientoPresupuesto', { creadoPorUsuarioId: this.usuarioActualId }).subscribe({
+    this.data.list<MovimientoPresupuesto>('MovimientoPresupuesto').subscribe({
       next: (m) => {
         this.movimientos.set(m);
         this.cargando.set(false);

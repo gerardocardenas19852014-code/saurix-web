@@ -2,7 +2,9 @@
  *  MovimientoPresupuestoTipo) en vez de un enum fijo. */
 export type TipoMovimiento = string;
 
-/** Personal (por usuario, vía creadoPorUsuarioId) — nunca visible entre usuarios. */
+/** Compartido entre todos los usuarios — creadoPorUsuarioId se guarda solo
+ *  como auditoría de quién lo capturó, no filtra qué se ve (igual que
+ *  VendedorUsuarioId en Comercio). */
 export interface MovimientoPresupuesto {
   id: number;
   fecha: string;

@@ -291,13 +291,13 @@ export class PresupuestoLandingComponent implements OnInit, OnDestroy {
     this.data.list<CategoriaPresupuesto>('CategoriaPresupuesto').subscribe((c) => this.categorias.set(c));
     this.data.list<PresupuestoAnual>('PresupuestoAnual').subscribe((p) => this.presupuestosAnuales.set(p));
     this.data
-      .list<MovimientoPresupuesto>('MovimientoPresupuesto', { creadoPorUsuarioId: this.auth.usuarioActual()?.id ?? 0 })
+      .list<MovimientoPresupuesto>('MovimientoPresupuesto')
       .subscribe((m) => this.movimientos.set(m));
     this.data
-      .list<DeudaPresupuesto>('DeudaPresupuesto', { creadoPorUsuarioId: this.auth.usuarioActual()?.id ?? 0 })
+      .list<DeudaPresupuesto>('DeudaPresupuesto')
       .subscribe((d) => this.deudas.set(d));
     this.data
-      .list<MetaPresupuesto>('MetaPresupuesto', { creadoPorUsuarioId: this.auth.usuarioActual()?.id ?? 0 })
+      .list<MetaPresupuesto>('MetaPresupuesto')
       .subscribe((m) => this.metas.set(m));
   }
 

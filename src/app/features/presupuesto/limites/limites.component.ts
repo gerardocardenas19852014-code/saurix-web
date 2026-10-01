@@ -64,7 +64,7 @@ export class LimitesComponent implements OnInit, OnDestroy {
     // en styles.scss, mismo patrón que Movimientos).
     document.documentElement.setAttribute('data-wide', 'grid');
     this.data.list<CategoriaPresupuesto>('CategoriaPresupuesto').subscribe((c) => this.categorias.set(c));
-    this.data.list<MovimientoPresupuesto>('MovimientoPresupuesto', { creadoPorUsuarioId: this.usuarioActualId }).subscribe((m) => this.movimientos.set(m));
+    this.data.list<MovimientoPresupuesto>('MovimientoPresupuesto').subscribe((m) => this.movimientos.set(m));
     this.cargar();
   }
 
@@ -125,7 +125,7 @@ export class LimitesComponent implements OnInit, OnDestroy {
 
   cargar(): void {
     this.cargando.set(true);
-    this.data.list<LimitePresupuesto>('LimitePresupuesto', { creadoPorUsuarioId: this.usuarioActualId }).subscribe({
+    this.data.list<LimitePresupuesto>('LimitePresupuesto').subscribe({
       next: (l) => {
         this.limites.set(l);
         this.cargando.set(false);
