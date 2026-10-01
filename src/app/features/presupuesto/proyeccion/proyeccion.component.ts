@@ -13,6 +13,14 @@ import { PresupuestoAnual } from '../presupuesto-anual/presupuesto-anual.model';
 import { ProyeccionAjuste } from './proyeccion-ajuste.model';
 import { ColumnaCsv, exportarCsv } from '../../../shared/utils/csv.util';
 
+/** Meses ANTES de hoy que también se muestran en la ventana (contexto
+ *  histórico — además de los 12 meses hacia adelante que ya existían), para
+ *  poder comparar cómo quedó realmente un mes pasado contra lo proyectado
+ *  entonces. Cada mes son 2 quincenas. */
+const MESES_ATRAS = 3;
+const MESES_ADELANTE = 12;
+const TOTAL_QUINCENAS = (MESES_ATRAS + MESES_ADELANTE) * 2;
+
 /** Una quincena (1-15 / 16-fin de mes) de la ventana de proyección. */
 interface Quincena {
   anio: number;
@@ -177,17 +185,25 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
   }
 
   // ---------------------------------------------------------------------
-  // Quincenas de la ventana mostrada (24 = 1 año, empezando en la quincena
-  // de hoy).
+  // Quincenas de la ventana mostrada: MESES_ATRAS meses de contexto
+  // histórico (arrancando el día 1 de ese mes) + MESES_ADELANTE meses hacia
+  // el futuro desde hoy — antes la ventana arrancaba siempre EN hoy, sin
+  // nada anterior (no se podía "jalar" más a la izquierda); ver
+  // indiceHoy() para ubicar la columna de hoy dentro de este arreglo más
+  // ancho.
   // ---------------------------------------------------------------------
 
   protected readonly quincenas = computed<Quincena[]>(() => {
     const hoy = new Date();
     const resultado: Quincena[] = [];
     let anio = hoy.getFullYear();
-    let mes = hoy.getMonth();
-    let mitad: 1 | 2 = hoy.getDate() <= 15 ? 1 : 2;
-    for (let i = 0; i < 24; i++) {
+    let mes = hoy.getMonth() - MESES_ATRAS;
+    while (mes < 0) {
+      mes += 12;
+      anio--;
+    }
+    let mitad: 1 | 2 = 1;
+    for (let i = 0; i < TOTAL_QUINCENAS; i++) {
       resultado.push({ anio, mes, mitad, clave: `${anio}-${mes}-${mitad}` });
       if (mitad === 1) {
         mitad = 2;
@@ -201,6 +217,18 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       }
     }
     return resultado;
+  });
+
+  /** Índice (dentro de `quincenas()`) de la quincena de HOY — ya no es
+   *  siempre 0 ahora que la ventana incluye meses anteriores (ver
+   *  MESES_ATRAS). Se usa para resaltar esa columna y para que "Ir a hoy"
+   *  sepa a dónde desplazarse. */
+  protected readonly indiceHoy = computed<number>(() => {
+    const hoy = new Date();
+    const mitadHoy: 1 | 2 = hoy.getDate() <= 15 ? 1 : 2;
+    const claveHoy = `${hoy.getFullYear()}-${hoy.getMonth()}-${mitadHoy}`;
+    const indice = this.quincenas().findIndex((q) => q.clave === claveHoy);
+    return indice === -1 ? 0 : indice;
   });
 
   /** "todos" = las 24 quincenas de la ventana; un año = solo sus quincenas
@@ -487,12 +515,23 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
     return filas;
   }
 
-  /** Saldo real (hoy) de todas las cuentas, sin proyectar nada — punto de
-   *  partida de la primera quincena mostrada (igual que saldoTotal del
-   *  Dashboard). */
-  private saldoActualReal(): number {
+  /** Saldo real de todas las cuentas justo ANTES del inicio de la ventana
+   *  mostrada — punto de partida de la primera quincena. Antes la ventana
+   *  siempre arrancaba HOY y este cálculo era simplemente "el saldo de
+   *  todos los movimientos reales" (igual que saldoTotal del Dashboard);
+   *  ahora que la ventana puede empezar unos meses antes de hoy (ver
+   *  MESES_ATRAS), hay que cortar la suma en la fecha de esa primera
+   *  quincena para no arrastrar también los movimientos reales que ya
+   *  pertenecen a quincenas visibles más adelante en la propia tabla (esos
+   *  los suma la cadena de Saldo inicial/Saldo final quincena por
+   *  quincena, no este punto de partida). */
+  private saldoRealAlInicioDeVentana(): number {
+    const primera = this.quincenas()[0];
+    if (!primera) return 0;
+    const dia = primera.mitad === 1 ? 1 : 16;
+    const fechaInicio = `${primera.anio}-${String(primera.mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
     return this.movimientos()
-      .filter((m) => !m.proyectado)
+      .filter((m) => !m.proyectado && m.fecha < fechaInicio)
       .reduce((s, m) => s + (m.tipo === 'Ingreso' ? m.monto : -m.monto), 0);
   }
 
@@ -583,7 +622,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       let inicial: Celda;
       if (i === 0) {
         inicial = this.celda('saldoInicial', quincenas[0].clave, true);
-        if (!inicial.manual) inicial = { valor: this.saldoActualReal(), manual: false, editable: true };
+        if (!inicial.manual) inicial = { valor: this.saldoRealAlInicioDeVentana(), manual: false, editable: true };
       } else {
         // Antes esta rama nunca llamaba a celda(): el Saldo inicial de la
         // quincena 2 en adelante quedaba SIEMPRE fijo al Saldo final de la
@@ -838,8 +877,28 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
   /** Regresa el scroll horizontal de la tabla al principio (columna de
    *  "hoy") de un salto — solo tiene sentido mostrar el botón cuando esa
    *  columna sigue visible con el filtro de Año actual (ver el html). */
+  /** Ancho de la columna fija de etiquetas (.proy-esquina/.proy-etiqueta en
+   *  proyeccion.component.scss, min-width/max-width: 190px) — la columna de
+   *  "hoy" (.proy-col-hoy) tiene su propio position:sticky con ese mismo
+   *  "left: 190px" para quedarse pegada justo después de las etiquetas; acá
+   *  se reutiliza el mismo número para saber a dónde scrollear. */
+  private static readonly ANCHO_COLUMNA_ETIQUETA_PX = 190;
+
   protected irAHoy(): void {
-    this.scrollContenedor()?.nativeElement.scrollTo({ left: 0, behavior: 'smooth' });
+    const contenedor = this.scrollContenedor()?.nativeElement;
+    if (!contenedor) return;
+    // La columna de hoy ya no es siempre la primera (puede haber meses
+    // anteriores a la izquierda, ver MESES_ATRAS): se calcula cuánto le
+    // falta para llegar a su posición "pegada" (sticky) de siempre, en vez
+    // de asumir siempre left:0 como antes (cuando hoy SÍ era la primera).
+    const columnaHoy = contenedor.querySelector<HTMLElement>('.proy-col-hoy');
+    if (columnaHoy) {
+      const distanciaActual = columnaHoy.getBoundingClientRect().left - contenedor.getBoundingClientRect().left;
+      const faltante = distanciaActual - ProyeccionComponent.ANCHO_COLUMNA_ETIQUETA_PX;
+      contenedor.scrollTo({ left: contenedor.scrollLeft + faltante, behavior: 'smooth' });
+    } else {
+      contenedor.scrollTo({ left: 0, behavior: 'smooth' });
+    }
   }
 
   /** Todos los renglones de la tabla, en el orden en que se pintan — sin las
@@ -956,7 +1015,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
       y: y(saldoFinal.celdas[indice]?.valor ?? 0),
       valor: saldoFinal.celdas[indice]?.valor ?? 0,
       etiqueta: this.etiquetaQuincena(q),
-      esHoy: indice === 0,
+      esHoy: indice === this.indiceHoy(),
     }));
     const puntosSvg = puntos.map((p) => `${p.x},${p.y}`).join(' ');
     const areaSvg = `${puntos[0].x},${alto} ${puntosSvg} ${puntos[puntos.length - 1].x},${alto}`;
