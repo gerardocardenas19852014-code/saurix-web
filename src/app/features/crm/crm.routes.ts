@@ -50,6 +50,12 @@ export const CRM_ROUTES: Routes = [
     tituloSingular: 'Motivo de pérdida',
   }),
 
+  // Casos de servicio
+  {
+    path: 'casos',
+    loadComponent: () => import('./casos/casos-list.component').then((m) => m.CasosListComponent),
+  },
+
   // Ventas (ex-Comercio)
   rutaCatalogoSimple('categorias-producto', {
     entidad: 'CategoriaProducto',

@@ -1,0 +1,98 @@
+<div class="page-header">
+  <h1>Casos de servicio</h1>
+  <div class="page-actions">
+    @if (totalAbiertos() > 0) {
+      <span class="kanban-column-count" title="Casos todavía no resueltos ni cerrados">
+        {{ totalAbiertos() }} abierto{{ totalAbiertos() === 1 ? '' : 's' }}
+      </span>
+    }
+    <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo</button>
+  </div>
+</div>
+
+<div class="grid-toolbar">
+  <div class="grid-filter">
+    <input
+      type="search"
+      placeholder="Buscar por asunto…"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value); cargar()"
+    />
+  </div>
+</div>
+
+<app-data-table
+  [columnas]="columnas"
+  [filas]="casos()"
+  [cargando]="cargando()"
+  (editar)="editar($event)"
+  (eliminar)="pedirEliminar($event)"
+/>
+
+@if (modalAbierto()) {
+  <div class="modal-overlay show" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <h3>{{ casoEnEdicion() ? 'Editar caso' : 'Nuevo caso' }}</h3>
+
+      <form [formGroup]="form" (ngSubmit)="guardar()">
+        <div class="edit-form form-grid-2col" style="margin-bottom: 18px;">
+          <label class="full-span">
+            Asunto
+            <input type="text" formControlName="asunto" />
+          </label>
+
+          <label>
+            Cliente
+            <select formControlName="clienteId">
+              <option [value]="0">Sin cliente asignado</option>
+              @for (cliente of clientes(); track cliente.id) {
+                <option [value]="cliente.id">{{ cliente.nombre }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            Prioridad
+            <select formControlName="prioridad">
+              @for (prioridad of prioridades; track prioridad) {
+                <option [value]="prioridad">{{ prioridad }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            Estado
+            <select formControlName="estado">
+              @for (estado of estados; track estado) {
+                <option [value]="estado">{{ estado }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="full-span">
+            Descripción
+            <textarea rows="3" formControlName="descripcion"></textarea>
+          </label>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">Cancelar</button>
+          <button type="submit" class="btn-primary">Guardar</button>
+        </div>
+      </form>
+
+      @if (casoEnEdicion(); as caso) {
+        <h4 style="margin: 18px 0 10px;">Actividades</h4>
+        <app-actividades-crm relacionadoTipo="Caso" [relacionadoId]="caso.id" />
+      }
+    </div>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="casoAEliminar() !== null"
+  titulo="Eliminar caso"
+  [mensaje]="'¿Eliminar ' + (casoAEliminar()?.asunto ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="casoAEliminar.set(null)"
+/>

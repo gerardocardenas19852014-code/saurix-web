@@ -24,7 +24,7 @@ interface GrupoModulo {
  *
  * Grupos pendientes de agregar conforme se construyan (no se listan
  * todavía para no dejar tarjetas rotas apuntando a rutas que no existen):
- * Casos de servicio, Campañas de marketing.
+ * Campañas de marketing.
  */
 const GRUPOS: GrupoModulo[] = [
   {
@@ -62,6 +62,18 @@ const GRUPOS: GrupoModulo[] = [
         color: 'generic',
         titulo: 'Motivos de pérdida',
         descripcion: 'Catálogo de motivos para marcar una oportunidad como perdida.',
+      },
+    ],
+  },
+  {
+    titulo: 'Servicio',
+    enlaces: [
+      {
+        ruta: 'casos',
+        icono: '🛠️',
+        color: 'generic',
+        titulo: 'Casos de servicio',
+        descripcion: 'Soporte post-venta por cliente, con prioridad, estado y actividades.',
       },
     ],
   },
