@@ -73,9 +73,10 @@
 
 @if (modalAbierto()) {
   <div class="modal-overlay show" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
-    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
       <h3>{{ oportunidadEnEdicion() ? 'Editar oportunidad' : 'Nueva oportunidad' }}</h3>
 
+      <form [formGroup]="form" (ngSubmit)="guardar()">
       <div class="edit-form form-grid-2col" style="margin-bottom: 18px;">
         <label class="full-span">
           Nombre
@@ -133,7 +134,13 @@
         <button type="button" class="btn-secondary" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">Cancelar</button>
         <button type="submit" class="btn-primary">Guardar</button>
       </div>
-    </form>
+      </form>
+
+      @if (oportunidadEnEdicion(); as oportunidad) {
+        <h4 style="margin: 18px 0 10px;">Actividades</h4>
+        <app-actividades-crm relacionadoTipo="Oportunidad" [relacionadoId]="oportunidad.id" />
+      }
+    </div>
   </div>
 }
 

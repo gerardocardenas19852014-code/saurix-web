@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } 
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
+import { ActividadesCrmComponent } from '../../../shared/components/actividades-crm/actividades-crm.component';
 import { ToastService } from '../../../shared/services/toast.service';
 import { Cliente } from '../../comercio/clientes/cliente.model';
 import {
@@ -28,7 +29,7 @@ import {
 @Component({
   selector: 'app-oportunidades-kanban',
   standalone: true,
-  imports: [ReactiveFormsModule, ConfirmDialogComponent],
+  imports: [ReactiveFormsModule, ConfirmDialogComponent, ActividadesCrmComponent],
   templateUrl: './oportunidades-kanban.component.html',
   styleUrl: './oportunidades-kanban.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

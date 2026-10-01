@@ -29,60 +29,67 @@
 
 @if (modalAbierto()) {
   <div class="modal-overlay show" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
-    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
       <h3>{{ leadEnEdicion() ? 'Editar lead' : 'Nuevo lead' }}</h3>
 
-      <div class="edit-form form-grid-2col" style="margin-bottom: 18px;">
-        <label>
-          Nombre
-          <input type="text" formControlName="nombre" />
-        </label>
+      <form [formGroup]="form" (ngSubmit)="guardar()">
+        <div class="edit-form form-grid-2col" style="margin-bottom: 18px;">
+          <label>
+            Nombre
+            <input type="text" formControlName="nombre" />
+          </label>
 
-        <label>
-          Empresa
-          <input type="text" formControlName="empresa" />
-        </label>
+          <label>
+            Empresa
+            <input type="text" formControlName="empresa" />
+          </label>
 
-        <label>
-          Teléfono
-          <input type="text" formControlName="telefono" />
-        </label>
+          <label>
+            Teléfono
+            <input type="text" formControlName="telefono" />
+          </label>
 
-        <label>
-          Email
-          <input type="email" formControlName="email" />
-        </label>
+          <label>
+            Email
+            <input type="email" formControlName="email" />
+          </label>
 
-        <label>
-          Origen
-          <select formControlName="origenId">
-            <option [value]="0">Selecciona...</option>
-            @for (origen of origenes(); track origen.id) {
-              <option [value]="origen.id">{{ origen.nombre }}</option>
-            }
-          </select>
-        </label>
+          <label>
+            Origen
+            <select formControlName="origenId">
+              <option [value]="0">Selecciona...</option>
+              @for (origen of origenes(); track origen.id) {
+                <option [value]="origen.id">{{ origen.nombre }}</option>
+              }
+            </select>
+          </label>
 
-        <label>
-          Estado
-          <select formControlName="estado">
-            @for (estado of estados; track estado) {
-              <option [value]="estado">{{ estado }}</option>
-            }
-          </select>
-        </label>
+          <label>
+            Estado
+            <select formControlName="estado">
+              @for (estado of estados; track estado) {
+                <option [value]="estado">{{ estado }}</option>
+              }
+            </select>
+          </label>
 
-        <label class="full-span">
-          Notas
-          <textarea rows="3" formControlName="notas"></textarea>
-        </label>
-      </div>
+          <label class="full-span">
+            Notas
+            <textarea rows="3" formControlName="notas"></textarea>
+          </label>
+        </div>
 
-      <div class="modal-actions">
-        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">Cancelar</button>
-        <button type="submit" class="btn-primary">Guardar</button>
-      </div>
-    </form>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">Cancelar</button>
+          <button type="submit" class="btn-primary">Guardar</button>
+        </div>
+      </form>
+
+      @if (leadEnEdicion(); as lead) {
+        <h4 style="margin: 18px 0 10px;">Actividades</h4>
+        <app-actividades-crm relacionadoTipo="Lead" [relacionadoId]="lead.id" />
+      }
+    </div>
   </div>
 }
 

@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
+import { ActividadesCrmComponent } from '../../../shared/components/actividades-crm/actividades-crm.component';
 import { ToastService } from '../../../shared/services/toast.service';
 import { Cliente } from '../../comercio/clientes/cliente.model';
 import { LEAD_ESTADOS, Lead, LeadEstado, LeadOrigen } from './lead.model';
@@ -20,7 +21,7 @@ import { LEAD_ESTADOS, Lead, LeadEstado, LeadOrigen } from './lead.model';
 @Component({
   selector: 'app-leads-list',
   standalone: true,
-  imports: [ReactiveFormsModule, DataTableComponent, ConfirmDialogComponent],
+  imports: [ReactiveFormsModule, DataTableComponent, ConfirmDialogComponent, ActividadesCrmComponent],
   templateUrl: './leads-list.component.html',
   styleUrl: './leads-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
