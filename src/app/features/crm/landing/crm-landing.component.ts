@@ -24,7 +24,7 @@ interface GrupoModulo {
  *
  * Grupos pendientes de agregar conforme se construyan (no se listan
  * todavía para no dejar tarjetas rotas apuntando a rutas que no existen):
- * Pipeline de oportunidades, Casos de servicio, Campañas de marketing.
+ * Casos de servicio, Campañas de marketing.
  */
 const GRUPOS: GrupoModulo[] = [
   {
@@ -43,6 +43,25 @@ const GRUPOS: GrupoModulo[] = [
         color: 'generic',
         titulo: 'Orígenes de lead',
         descripcion: 'Catálogo de de dónde llegan los prospectos (web, referido, feria, etc.).',
+      },
+    ],
+  },
+  {
+    titulo: 'Pipeline',
+    enlaces: [
+      {
+        ruta: 'oportunidades',
+        icono: '📈',
+        color: 'generic',
+        titulo: 'Oportunidades',
+        descripcion: 'Tablero de oportunidades de venta por etapa, de prospección a ganada/perdida.',
+      },
+      {
+        ruta: 'oportunidades/motivos-perdida',
+        icono: '🗂️',
+        color: 'generic',
+        titulo: 'Motivos de pérdida',
+        descripcion: 'Catálogo de motivos para marcar una oportunidad como perdida.',
       },
     ],
   },

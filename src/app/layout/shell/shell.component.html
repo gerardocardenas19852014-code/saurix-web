@@ -142,6 +142,7 @@
       <nav class="sidebar-nav" aria-label="Menú de CRM">
         <a routerLink="/crm" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
         <a routerLink="/crm/leads" routerLinkActive="active">🧲 Leads</a>
+        <a routerLink="/crm/oportunidades" routerLinkActive="active">📈 Oportunidades</a>
 
         <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('crm', 'Ventas')">
           <span>{{ grupoAbierto('crm', 'Ventas') ? '▾' : '▸' }} Ventas</span>
@@ -158,6 +159,7 @@
         </button>
         @if (grupoAbierto('crm', 'Catálogos')) {
           <a routerLink="/crm/leads/origenes" routerLinkActive="active">📡 Orígenes de lead</a>
+          <a routerLink="/crm/oportunidades/motivos-perdida" routerLinkActive="active">🗂️ Motivos de pérdida</a>
           <a routerLink="/crm/categorias-producto" routerLinkActive="active">🏷️ Categorías de Producto</a>
         }
       </nav>

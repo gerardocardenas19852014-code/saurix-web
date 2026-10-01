@@ -38,6 +38,18 @@ export const CRM_ROUTES: Routes = [
     tituloSingular: 'Origen de lead',
   }),
 
+  // Pipeline de oportunidades
+  {
+    path: 'oportunidades',
+    loadComponent: () =>
+      import('./oportunidades/oportunidades-kanban.component').then((m) => m.OportunidadesKanbanComponent),
+  },
+  rutaCatalogoSimple('oportunidades/motivos-perdida', {
+    entidad: 'MotivoPerdida',
+    tituloPlural: 'Motivos de pérdida',
+    tituloSingular: 'Motivo de pérdida',
+  }),
+
   // Ventas (ex-Comercio)
   rutaCatalogoSimple('categorias-producto', {
     entidad: 'CategoriaProducto',

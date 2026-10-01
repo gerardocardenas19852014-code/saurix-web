@@ -65,6 +65,8 @@ export const DESTINOS: DestinoPaleta[] = [
   { label: 'Inicio', grupo: 'CRM', ruta: '/crm', icono: '⌂' },
   { label: 'Leads', grupo: 'CRM', ruta: '/crm/leads', icono: '🧲' },
   { label: 'Orígenes de lead', grupo: 'CRM', ruta: '/crm/leads/origenes', icono: '📡' },
+  { label: 'Oportunidades', grupo: 'CRM', ruta: '/crm/oportunidades', icono: '📈' },
+  { label: 'Motivos de pérdida', grupo: 'CRM', ruta: '/crm/oportunidades/motivos-perdida', icono: '🗂️' },
   { label: 'Clientes', grupo: 'CRM', ruta: '/crm/clientes', icono: '👥' },
   { label: 'Cotizaciones', grupo: 'CRM', ruta: '/crm/cotizaciones', icono: '📝' },
   { label: 'Ventas', grupo: 'CRM', ruta: '/crm/ventas', icono: '💰' },
