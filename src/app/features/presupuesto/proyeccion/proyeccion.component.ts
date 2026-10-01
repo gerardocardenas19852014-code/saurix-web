@@ -258,14 +258,26 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
    *  elegido (ver AnioTrabajoService.asegurarSeleccion). */
   private readonly _asegurarAnioTrabajo = effect(() => this.anioTrabajo.asegurarSeleccion(this.aniosDisponibles()));
 
-  /** Quincenas a pintar como columnas, ya filtradas por año — cada una trae
-   *  el índice que le corresponde dentro de `quincenas()`/`celdas`, porque el
-   *  cálculo (saldo en cadena, etc.) siempre corre sobre las 24 completas. */
+  /** "Ver meses anteriores" (checkbox) — oculta/muestra las quincenas de
+   *  antes de hoy (ver MESES_ATRAS) sin dejar de calcularlas: el Saldo
+   *  inicial/final sigue encadenando sobre la ventana completa
+   *  (quincenas()), esto solo decide cuáles de esas columnas se pintan.
+   *  Arranca en true (mostrarlas) — recién agregadas, tiene sentido que se
+   *  vean por default; igual que "Comparar con el año anterior", no se
+   *  recuerda entre sesiones (ver ese otro checkbox, mismo patrón). */
+  protected readonly mostrarMesesAnteriores = signal(true);
+
+  /** Quincenas a pintar como columnas, ya filtradas por año y por
+   *  "Ver meses anteriores" — cada una trae el índice que le corresponde
+   *  dentro de `quincenas()`/`celdas`, porque el cálculo (saldo en cadena,
+   *  etc.) siempre corre sobre la ventana completa. */
   protected readonly quincenasVisibles = computed<{ q: Quincena; indice: number }[]>(() => {
     const anio = this.filtroAnio();
+    const ocultarAnteriores = !this.mostrarMesesAnteriores();
+    const indiceHoy = this.indiceHoy();
     return this.quincenas()
       .map((q, indice) => ({ q, indice }))
-      .filter(({ q }) => anio === 'todos' || q.anio === anio);
+      .filter(({ q, indice }) => (anio === 'todos' || q.anio === anio) && (!ocultarAnteriores || indice >= indiceHoy));
   });
 
   /** Índice de color cíclico por mes (6 tonos, dan la vuelta y se

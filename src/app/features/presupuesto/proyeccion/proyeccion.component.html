@@ -54,6 +54,10 @@
     <input type="checkbox" [checked]="compararAnioAnterior()" (change)="compararAnioAnterior.set($any($event.target).checked)" style="width:auto;" />
     Comparar con el año anterior
   </label>
+  <label class="board-filter-field" style="flex-direction:row; align-items:center; gap:6px;">
+    <input type="checkbox" [checked]="mostrarMesesAnteriores()" (change)="mostrarMesesAnteriores.set($any($event.target).checked)" style="width:auto;" />
+    Ver meses anteriores
+  </label>
   @if (quincenasVisibles().some((v) => v.indice === indiceHoy())) {
     <button type="button" class="btn-secondary small" style="align-self:flex-end;" (click)="irAHoy()">📍 Ir a hoy</button>
   }
