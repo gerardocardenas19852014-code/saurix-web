@@ -137,6 +137,32 @@
       </nav>
     }
 
+    @if (moduloActivo() === 'crm') {
+      <span class="sidebar-label">CRM</span>
+      <nav class="sidebar-nav" aria-label="Menú de CRM">
+        <a routerLink="/crm" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
+        <a routerLink="/crm/leads" routerLinkActive="active">🧲 Leads</a>
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('crm', 'Ventas')">
+          <span>{{ grupoAbierto('crm', 'Ventas') ? '▾' : '▸' }} Ventas</span>
+        </button>
+        @if (grupoAbierto('crm', 'Ventas')) {
+          <a routerLink="/crm/clientes" routerLinkActive="active">👥 Clientes</a>
+          <a routerLink="/crm/cotizaciones" routerLinkActive="active">📝 Cotizaciones</a>
+          <a routerLink="/crm/ventas" routerLinkActive="active">💰 Ventas</a>
+          <a routerLink="/crm/productos" routerLinkActive="active">📦 Productos</a>
+        }
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('crm', 'Catálogos')">
+          <span>{{ grupoAbierto('crm', 'Catálogos') ? '▾' : '▸' }} Catálogos</span>
+        </button>
+        @if (grupoAbierto('crm', 'Catálogos')) {
+          <a routerLink="/crm/leads/origenes" routerLinkActive="active">📡 Orígenes de lead</a>
+          <a routerLink="/crm/categorias-producto" routerLinkActive="active">🏷️ Categorías de Producto</a>
+        }
+      </nav>
+    }
+
     @if (moduloActivo() === 'familia') {
       <span class="sidebar-label">Familia</span>
       <nav class="sidebar-nav" aria-label="Menú de familia">

@@ -48,14 +48,10 @@ export const routes: Routes = [
         loadChildren: () => import('./features/familia/familia.routes').then((m) => m.FAMILIA_ROUTES),
       },
 
-      // Deshabilitado temporalmente mientras se termina de trabajar en los demás
-      // módulos. El código sigue aquí, solo se quitó del router: entrar a esta
-      // ruta cae en el '**' de abajo y redirige a /modulos. Para reactivarlo,
-      // solo descomenta su entrada.
-      // {
-      //   path: 'comercio',
-      //   loadChildren: () => import('./features/comercio/comercio.routes').then((m) => m.COMERCIO_ROUTES),
-      // },
+      {
+        path: 'crm',
+        loadChildren: () => import('./features/crm/crm.routes').then((m) => m.CRM_ROUTES),
+      },
     ],
   },
   { path: '**', redirectTo: 'modulos' },

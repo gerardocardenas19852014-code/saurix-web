@@ -312,6 +312,8 @@ export class ShellComponent implements OnDestroy {
       'presupuesto:Catálogos',
       'familia:Catálogos',
       'wikidocs:Catálogos',
+      'crm:Ventas',
+      'crm:Catálogos',
     ]),
   );
 
@@ -364,7 +366,7 @@ export class ShellComponent implements OnDestroy {
   }
 
   protected readonly moduloActivo = computed<
-    'seguridad' | 'wikidocs' | 'presupuesto' | 'proyectos' | 'panel-control' | 'familia' | null
+    'seguridad' | 'wikidocs' | 'presupuesto' | 'proyectos' | 'panel-control' | 'familia' | 'crm' | null
   >(() => {
     const url = this.urlActual();
     if (url.startsWith('/seguridad')) return 'seguridad';
@@ -373,6 +375,7 @@ export class ShellComponent implements OnDestroy {
     if (url.startsWith('/proyectos')) return 'proyectos';
     if (url.startsWith('/panel-control')) return 'panel-control';
     if (url.startsWith('/familia')) return 'familia';
+    if (url.startsWith('/crm')) return 'crm';
     return null;
   });
 

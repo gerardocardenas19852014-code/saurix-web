@@ -1,0 +1,95 @@
+<div class="page-header">
+  <h1>Leads</h1>
+  <div class="page-actions">
+    <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo</button>
+  </div>
+</div>
+
+<div class="grid-toolbar">
+  <div class="grid-filter">
+    <input
+      type="search"
+      placeholder="Buscar por nombre…"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value); cargar()"
+    />
+  </div>
+</div>
+
+<app-data-table
+  [columnas]="columnas"
+  [filas]="leads()"
+  [cargando]="cargando()"
+  accionExtraEtiqueta="👤 Convertir a cliente"
+  accionExtraTitulo="Crear un Cliente a partir de este lead"
+  (accionExtra)="convertirACliente($event)"
+  (editar)="editar($event)"
+  (eliminar)="pedirEliminar($event)"
+/>
+
+@if (modalAbierto()) {
+  <div class="modal-overlay show" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
+    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3>{{ leadEnEdicion() ? 'Editar lead' : 'Nuevo lead' }}</h3>
+
+      <div class="edit-form form-grid-2col" style="margin-bottom: 18px;">
+        <label>
+          Nombre
+          <input type="text" formControlName="nombre" />
+        </label>
+
+        <label>
+          Empresa
+          <input type="text" formControlName="empresa" />
+        </label>
+
+        <label>
+          Teléfono
+          <input type="text" formControlName="telefono" />
+        </label>
+
+        <label>
+          Email
+          <input type="email" formControlName="email" />
+        </label>
+
+        <label>
+          Origen
+          <select formControlName="origenId">
+            <option [value]="0">Selecciona...</option>
+            @for (origen of origenes(); track origen.id) {
+              <option [value]="origen.id">{{ origen.nombre }}</option>
+            }
+          </select>
+        </label>
+
+        <label>
+          Estado
+          <select formControlName="estado">
+            @for (estado of estados; track estado) {
+              <option [value]="estado">{{ estado }}</option>
+            }
+          </select>
+        </label>
+
+        <label class="full-span">
+          Notas
+          <textarea rows="3" formControlName="notas"></textarea>
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="leadAEliminar() !== null"
+  titulo="Eliminar lead"
+  [mensaje]="'¿Eliminar ' + (leadAEliminar()?.nombre ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="leadAEliminar.set(null)"
+/>

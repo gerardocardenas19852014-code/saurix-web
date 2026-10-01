@@ -297,7 +297,7 @@ export class CotizacionesComponent implements OnInit {
       return;
     }
 
-    this.router.navigate(['/comercio/ventas'], { state: { cotizacionOrigen: activa, items: this.items() } });
+    this.router.navigate(['/crm/ventas'], { state: { cotizacionOrigen: activa, items: this.items() } });
   }
 
   /** Genera un PDF simple de la cotización activa con los datos ya cargados en memoria. */
