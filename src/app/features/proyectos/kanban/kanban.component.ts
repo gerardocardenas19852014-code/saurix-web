@@ -451,7 +451,16 @@ export class KanbanComponent implements OnInit, OnDestroy {
       formatear: (fila) => this.nombreColumna(fila.tableroColumnaId),
       claseValor: () => 'grid-badge-neutral',
     },
-    { campo: 'asignadoUsuarioId', etiqueta: 'Asignado a', formatear: (fila) => this.nombreUsuario(fila.asignadoUsuarioId) },
+    {
+      campo: 'asignadoUsuarioId',
+      etiqueta: 'Asignado a',
+      // Mismo criterio que Título/Sprint en esta tabla: un nombre largo no
+      // debe estirar el renglón ni cortarse a la mitad — se recorta con
+      // elipsis (grid-cell-truncada) y el nombre completo queda disponible
+      // al pasar el mouse (columna.titulo, ver data-table.component.html).
+      formatear: (fila) => this.nombreUsuario(fila.asignadoUsuarioId),
+      titulo: (fila) => this.nombreUsuario(fila.asignadoUsuarioId),
+    },
     {
       campo: 'planeado',
       etiqueta: 'Planeado',
