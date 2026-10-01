@@ -262,10 +262,10 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
    *  antes de hoy (ver MESES_ATRAS) sin dejar de calcularlas: el Saldo
    *  inicial/final sigue encadenando sobre la ventana completa
    *  (quincenas()), esto solo decide cuáles de esas columnas se pintan.
-   *  Arranca en true (mostrarlas) — recién agregadas, tiene sentido que se
-   *  vean por default; igual que "Comparar con el año anterior", no se
-   *  recuerda entre sesiones (ver ese otro checkbox, mismo patrón). */
-  protected readonly mostrarMesesAnteriores = signal(true);
+   *  Arranca en false (sin marcar, igual que la pantalla se veía antes de
+   *  agregar meses anteriores); igual que "Comparar con el año anterior",
+   *  no se recuerda entre sesiones (ver ese otro checkbox, mismo patrón). */
+  protected readonly mostrarMesesAnteriores = signal(false);
 
   /** Quincenas a pintar como columnas, ya filtradas por año y por
    *  "Ver meses anteriores" — cada una trae el índice que le corresponde
