@@ -2,7 +2,7 @@
   <table class="grid-table" [attr.data-cargando]="cargando()">
     <thead>
       <tr>
-        @for (columna of columnas(); track columna.campo) {
+        @for (columna of columnasFila(); track columna.campo) {
           <th>
             <button
               type="button"
@@ -21,8 +21,8 @@
     </thead>
     <tbody>
       @for (fila of filasPagina(); track fila.id) {
-        <tr>
-          @for (columna of columnas(); track columna.campo) {
+        <tr [class.grid-fila-con-subfila]="columnaSubfila()">
+          @for (columna of columnasFila(); track columna.campo) {
             <td [attr.data-label]="columna.etiqueta">
               @if (columna.claseValor) {
                 <span class="grid-badge {{ columna.claseValor(fila) }}" [title]="columna.titulo ? columna.titulo(fila) : ''">{{ valorCelda(fila, columna) }}</span>
@@ -87,9 +87,21 @@
             </td>
           }
         </tr>
+        @if (columnaSubfila(); as subfila) {
+          <tr class="grid-subfila-fila">
+            <td [attr.colspan]="soloLectura() ? columnasFila().length : columnasFila().length + 1" class="grid-subfila-celda">
+              <strong>{{ subfila.etiqueta }}:</strong>
+              <span
+                class="grid-subfila-valor"
+                [title]="subfila.titulo ? subfila.titulo(fila) : ''"
+                >{{ valorCelda(fila, subfila) }}</span
+              >
+            </td>
+          </tr>
+        }
       } @empty {
         <tr>
-          <td [attr.colspan]="soloLectura() ? columnas().length : columnas().length + 1">
+          <td [attr.colspan]="soloLectura() ? columnasFila().length : columnasFila().length + 1">
             <div class="empty-state-block">
               <p>Sin registros para mostrar.</p>
             </div>

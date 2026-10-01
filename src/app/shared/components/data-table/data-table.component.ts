@@ -27,6 +27,17 @@ export interface ColumnaTabla<T> {
    * grid-cell-truncada-multilinea en styles.scss.
    */
   multilinea?: boolean;
+  /**
+   * Opcional: en vez de mostrarse como una columna más (compitiendo por
+   * ancho horizontal con el resto), el valor se muestra en un renglón
+   * propio, de ancho completo, debajo de la fila principal — con la
+   * etiqueta de la columna como prefijo (p.ej. "Título: ..."). Pensado
+   * para texto libre largo (el Título de un ticket) que de otra forma
+   * aprieta demasiado a las demás columnas. Solo se usa la PRIMERA
+   * columna marcada así — no está pensado para más de una por tabla. Ver
+   * columnasFila/columnaSubfila más abajo y grid-subfila-* en styles.scss.
+   */
+  subfila?: boolean;
 }
 
 /**
@@ -103,6 +114,14 @@ export class DataTableComponent<T extends { id: number }> {
     const inicio = (this.paginaActual() - 1) * this.tamanoPagina();
     return this.filasOrdenadas().slice(inicio, inicio + this.tamanoPagina());
   });
+
+  /** Columnas que se muestran de forma normal (encabezado + celda propia) —
+   *  todas excepto la marcada con `subfila`, ver columnaSubfila. */
+  readonly columnasFila = computed(() => this.columnas().filter((c) => !c.subfila));
+
+  /** La columna (si hay una) que en vez de celda propia se muestra en un
+   *  renglón de ancho completo debajo de cada fila — ver ColumnaTabla.subfila. */
+  readonly columnaSubfila = computed(() => this.columnas().find((c) => c.subfila) ?? null);
 
   ordenarPor(columna: ColumnaTabla<T>): void {
     if (this.campoOrden() === columna.campo) {

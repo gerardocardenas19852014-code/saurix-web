@@ -416,13 +416,14 @@ export class KanbanComponent implements OnInit, OnDestroy {
     {
       campo: 'titulo',
       etiqueta: 'Título',
-      // Antes se recortaba a 70 caracteres en una sola línea — un título
-      // normal quedaba escondido de entrada y solo se veía completo al pasar
-      // el mouse. Ahora se envuelve hasta 2 renglones (igual que ya se ve en
-      // Mi Dashboard) y solo un título realmente largo se recorta ahí, sin
-      // estirar el renglón ni tapar/empujar los botones de Acciones — el
-      // texto completo sigue disponible al pasar el mouse.
-      multilinea: true,
+      // El título competía por ancho con el resto de columnas (Proyecto,
+      // Módulo, Sprint, Asignado a, etc.) — por angosto que quedara ese
+      // espacio, siempre se sentía apretado. Ahora se muestra en su propio
+      // renglón de ANCHO COMPLETO debajo de la fila (ColumnaTabla.subfila),
+      // sin competir por espacio horizontal — con un tope de 3 renglones por
+      // si acaso (grid-subfila-valor en styles.scss) y el texto completo
+      // disponible al pasar el mouse.
+      subfila: true,
       titulo: (fila) => fila.titulo,
     },
     {

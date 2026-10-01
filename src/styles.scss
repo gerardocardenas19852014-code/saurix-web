@@ -1017,6 +1017,29 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
   vertical-align: top;
 }
 
+/* Renglón de ancho completo debajo de la fila principal, para una columna
+   de texto libre largo que de otra forma apretaría al resto (p.ej. el
+   Título de un ticket) — ver ColumnaTabla.subfila. La fila principal pierde
+   su borde inferior (grid-fila-con-subfila) para que ambas se lean como
+   una sola fila visual, y el borde + hover se mueven a este renglón. */
+.grid-table tr.grid-fila-con-subfila td { border-bottom: none; }
+.grid-subfila-celda {
+  padding: 0 16px 11px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.grid-subfila-celda strong { color: var(--text-strong); font-weight: 600; margin-right: 5px; }
+.grid-table tbody tr.grid-fila-con-subfila:hover + tr.grid-subfila-fila td,
+.grid-table tbody tr.grid-subfila-fila:hover td { background-color: var(--accent-soft); }
+.grid-subfila-valor {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Celdas de estado (Activo, Vigencia, Rol...) mostradas como píldora en vez
    de texto plano — ver ColumnaTabla.claseValor en data-table.component.ts. */
 .grid-badge {
@@ -1067,6 +1090,10 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
      límite de 2 líneas tampoco aplica — se ve completo, igual que el resto
      de columnas recortadas. */
   .grid-cell-truncada-multilinea { display: block; -webkit-line-clamp: unset; text-align: right; }
+  /* El renglón de subfila ya es de ancho completo (td[colspan] se vuelve
+     display:block arriba) — solo falta alinear a la izquierda, igual que
+     el resto de contenido con colspan en móvil. */
+  .grid-subfila-celda { text-align: left; }
 }
 
 .grid-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-top: 16px; padding: 12px 16px; background: var(--paper-raised); border: 1px solid var(--line); border-radius: 10px; }
