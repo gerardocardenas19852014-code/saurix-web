@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
@@ -14,7 +14,7 @@ import { CategoriaProductoOpcion, Producto } from './producto.model';
   styleUrl: './productos.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ProductosComponent implements OnInit {
+export class ProductosComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
@@ -58,6 +58,14 @@ export class ProductosComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // Catálogo/listado atrapado en el ancho de lectura de 980px — usa el
+    // ancho "wide" del layout para aprovechar mejor el espacio (ver
+    // html[data-wide='grid'] en styles.scss, mismo patrón que Movimientos /
+    // Categorías de presupuesto / Leads, Oportunidades, Casos y Campañas
+    // del CRM). Este componente vive físicamente en features/comercio/ pero
+    // hoy solo se usa reenrutado desde el CRM (Ventas) — Comercio como
+    // módulo propio está deshabilitado desde 2026-09-18.
+    document.documentElement.setAttribute('data-wide', 'grid');
     this.cargarCategorias();
     this.cargar();
   }
@@ -149,5 +157,9 @@ export class ProductosComponent implements OnInit {
         this.cargar();
       },
     });
+  }
+
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
   }
 }
