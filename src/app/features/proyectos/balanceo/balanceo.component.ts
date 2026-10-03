@@ -187,6 +187,29 @@ export class BalanceoComponent implements OnInit {
       porPrioridad: porUsuario.get(u.id) ?? new Map<number, number>(),
     }));
 
+    // Usuarios INACTIVOS que de todos modos tienen tickets pendientes asignados
+    // (p. ej. alguien dado de baja antes de que le reasignaran su trabajo) — sin
+    // esto, esos tickets sumaban al total de arriba (totalPendientes cuenta TODOS
+    // los tickets filtrados, sin importar si quien los tiene sigue activo) pero su
+    // fila entera desaparecía del desglose por persona, así que nadie se enteraba
+    // de que había que reasignarlos. A diferencia de los activos, que siempre
+    // aparecen aunque sea con 0, estos solo se agregan si de verdad tienen carga —
+    // mismo criterio "(inactivo)" que ya usa opcionesUsuarioPara() para el <select>
+    // de un ticket individual.
+    const idsActivos = new Set(this.usuariosActivos().map((u) => u.id));
+    for (const [usuarioId, total] of totalPorUsuario) {
+      if (usuarioId === 0 || idsActivos.has(usuarioId)) continue;
+      const usuario = this.usuarios().find((u) => Number(u.id) === usuarioId);
+      const nombre = usuario ? `${nombreCompletoUsuario(usuario)} (inactivo)` : `Usuario #${usuarioId} (inactivo)`;
+      filas.push({
+        usuarioId,
+        nombre,
+        color: colorAvatar(nombre),
+        total,
+        porPrioridad: porUsuario.get(usuarioId) ?? new Map<number, number>(),
+      });
+    }
+
     if (totalPorUsuario.has(0)) {
       filas.push({
         usuarioId: 0,
