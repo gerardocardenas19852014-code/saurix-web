@@ -61,17 +61,4 @@ export const DESTINOS: DestinoPaleta[] = [
   { label: 'Inicio', grupo: 'Panel de Control', ruta: '/panel-control', icono: '⌂' },
   { label: 'Apariencia', grupo: 'Panel de Control', ruta: '/panel-control/apariencia', icono: '🎨' },
   { label: 'Respaldo y restauración', grupo: 'Panel de Control', ruta: '/panel-control/respaldo', icono: '💾' },
-
-  { label: 'Inicio', grupo: 'CRM', ruta: '/crm', icono: '⌂' },
-  { label: 'Leads', grupo: 'CRM', ruta: '/crm/leads', icono: '🧲' },
-  { label: 'Orígenes de lead', grupo: 'CRM', ruta: '/crm/leads/origenes', icono: '📡' },
-  { label: 'Oportunidades', grupo: 'CRM', ruta: '/crm/oportunidades', icono: '📈' },
-  { label: 'Motivos de pérdida', grupo: 'CRM', ruta: '/crm/oportunidades/motivos-perdida', icono: '🗂️' },
-  { label: 'Casos de servicio', grupo: 'CRM', ruta: '/crm/casos', icono: '🛠️' },
-  { label: 'Campañas de marketing', grupo: 'CRM', ruta: '/crm/campanas', icono: '📣' },
-  { label: 'Clientes', grupo: 'CRM', ruta: '/crm/clientes', icono: '👥' },
-  { label: 'Cotizaciones', grupo: 'CRM', ruta: '/crm/cotizaciones', icono: '📝' },
-  { label: 'Ventas', grupo: 'CRM', ruta: '/crm/ventas', icono: '💰' },
-  { label: 'Productos', grupo: 'CRM', ruta: '/crm/productos', icono: '📦' },
-  { label: 'Categorías de Producto', grupo: 'CRM', ruta: '/crm/categorias-producto', icono: '🏷️' },
 ];

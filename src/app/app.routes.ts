@@ -47,11 +47,6 @@ export const routes: Routes = [
         path: 'familia',
         loadChildren: () => import('./features/familia/familia.routes').then((m) => m.FAMILIA_ROUTES),
       },
-
-      {
-        path: 'crm',
-        loadChildren: () => import('./features/crm/crm.routes').then((m) => m.CRM_ROUTES),
-      },
     ],
   },
   { path: '**', redirectTo: 'modulos' },
