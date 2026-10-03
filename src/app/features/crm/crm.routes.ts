@@ -44,6 +44,11 @@ export const CRM_ROUTES: Routes = [
     loadComponent: () =>
       import('./oportunidades/oportunidades-kanban.component').then((m) => m.OportunidadesKanbanComponent),
   },
+  {
+    path: 'oportunidades/etapas',
+    loadComponent: () =>
+      import('./oportunidades/gestor-etapas/gestor-etapas.component').then((m) => m.GestorEtapasComponent),
+  },
   rutaCatalogoSimple('oportunidades/motivos-perdida', {
     entidad: 'MotivoPerdida',
     tituloPlural: 'Motivos de pérdida',

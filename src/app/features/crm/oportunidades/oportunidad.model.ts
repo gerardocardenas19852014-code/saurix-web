@@ -1,29 +1,3 @@
-export type OportunidadEtapa =
-  | 'Prospección'
-  | 'Calificación'
-  | 'Propuesta'
-  | 'Negociación'
-  | 'Ganada'
-  | 'Perdida';
-
-export const OPORTUNIDAD_ETAPAS: OportunidadEtapa[] = [
-  'Prospección',
-  'Calificación',
-  'Propuesta',
-  'Negociación',
-  'Ganada',
-  'Perdida',
-];
-
-/** Etapas en las que la oportunidad sigue "viva" — se usan para separar el total
- *  del pipeline abierto (p.ej. en un resumen) de lo ya cerrado (Ganada/Perdida). */
-export const OPORTUNIDAD_ETAPAS_ABIERTAS: OportunidadEtapa[] = [
-  'Prospección',
-  'Calificación',
-  'Propuesta',
-  'Negociación',
-];
-
 export interface Oportunidad {
   id: number;
   nombre: string;
@@ -31,9 +5,13 @@ export interface Oportunidad {
    *  Cliente formal (Comercio.Cliente); se deja sin dueño hasta que se decida. */
   clienteId: number | null;
   valorEstimado: number | null;
-  etapa: OportunidadEtapa;
+  /** FK a OportunidadEtapaConfig (ver oportunidad-etapa.model.ts) — hasta
+   *  2026-10-02 esto era un enum fijo de 6 valores (OportunidadEtapa); ahora
+   *  las etapas son un catálogo editable desde CRM → Oportunidades → Gestor
+   *  de Etapas, igual que TableroColumna en Gestión de Proyectos. */
+  etapaId: number;
   fechaCierreEstimada: string | null;
-  /** Solo aplica (y se exige) cuando `etapa === 'Perdida'`. */
+  /** Solo aplica (y se exige) cuando la etapa tiene `esPerdida === true`. */
   motivoPerdidaId: number | null;
   notas: string | null;
   fechaCreacion?: string;

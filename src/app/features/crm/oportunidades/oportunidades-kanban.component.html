@@ -6,25 +6,28 @@
         Pipeline abierto: {{ formatearMoneda(totalPipelineAbierto()) }}
       </span>
     }
+    <a routerLink="/crm/oportunidades/etapas" class="btn-secondary small" title="Configurar las etapas de este pipeline">
+      ⚙️ Gestor de Etapas
+    </a>
     <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nueva oportunidad</button>
   </div>
 </div>
 
 <div class="kanban-board">
-  @for (etapa of etapas; track etapa) {
+  @for (etapa of etapas(); track etapa.id) {
     <div
       class="kanban-column"
-      [class.is-drop-target]="oportunidadArrastrando() !== null && oportunidadArrastrando()!.etapa !== etapa"
+      [class.is-drop-target]="esDestinoValido(etapa)"
       (dragover)="onDragOver($event)"
       (drop)="onDrop($event, etapa)"
     >
       <div class="kanban-column-header">
-        <span>{{ etapa }}</span>
-        <span class="kanban-column-count">{{ (columnasPorEtapa().get(etapa) ?? []).length }}</span>
+        <span>{{ etapa.nombre }}</span>
+        <span class="kanban-column-count">{{ (columnasPorEtapa().get(etapa.id) ?? []).length }}</span>
       </div>
 
       <div class="kanban-column-body">
-        @for (oportunidad of columnasPorEtapa().get(etapa) ?? []; track oportunidad.id) {
+        @for (oportunidad of columnasPorEtapa().get(etapa.id) ?? []; track oportunidad.id) {
           <div
             class="kanban-card"
             [class.is-dragging]="oportunidadArrastrando()?.id === oportunidad.id"
@@ -54,7 +57,7 @@
               @if (oportunidad.fechaCierreEstimada) {
                 <span class="kanban-tag" title="Cierre estimado">📅 {{ oportunidad.fechaCierreEstimada }}</span>
               }
-              @if (oportunidad.etapa === 'Perdida' && oportunidad.motivoPerdidaId) {
+              @if (etapa.esPerdida && oportunidad.motivoPerdidaId) {
                 <span class="kanban-tag" title="Motivo de la pérdida">
                   ❌ {{ mapaMotivos().get(oportunidad.motivoPerdidaId)?.nombre ?? '—' }}
                 </span>
@@ -100,9 +103,9 @@
 
         <label>
           Etapa
-          <select formControlName="etapa">
-            @for (etapa of etapas; track etapa) {
-              <option [value]="etapa">{{ etapa }}</option>
+          <select formControlName="etapaId">
+            @for (etapa of etapas(); track etapa.id) {
+              <option [value]="etapa.id">{{ etapa.nombre }}</option>
             }
           </select>
         </label>
@@ -112,7 +115,7 @@
           <input type="date" formControlName="fechaCierreEstimada" />
         </label>
 
-        @if (form.value.etapa === 'Perdida') {
+        @if (etapaSeleccionada()?.esPerdida) {
           <label class="full-span">
             Motivo de la pérdida
             <select formControlName="motivoPerdidaId">
