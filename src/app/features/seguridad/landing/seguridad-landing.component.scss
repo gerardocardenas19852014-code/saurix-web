@@ -1,1 +1,8 @@
-/* Estilos en src/styles.scss (.page-header, .catalog-list, .catalog-list-item). */
+// Ver presupuesto-inicio.component.scss / familia-inicio.component.scss:
+// el sistema visual (tiles-grid, module-tile-*, page-header) vive en
+// src/styles.scss; aquí solo se realinea a la izquierda.
+.tiles-grid-landing {
+  justify-content: flex-start;
+  max-width: none;
+  margin: 4px 0 28px;
+}

@@ -1,9 +1,12 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-type ColorIcono = 'siif' | 'personal' | 'generic';
+/** Mismo criterio de color que Presupuesto/Proyectos/Familia (ver
+ *  presupuesto-inicio.component.ts): una de las clases .module-tile-*
+ *  definidas en styles.scss, una por grupo. */
+type ColorIcono = 'indigo';
 
-interface EnlaceSeguridad {
+interface EnlaceModulo {
   ruta: string;
   icono: string;
   color: ColorIcono;
@@ -11,22 +14,34 @@ interface EnlaceSeguridad {
   descripcion: string;
 }
 
-const ENLACES: EnlaceSeguridad[] = [
+interface GrupoModulo {
+  titulo: string;
+  enlaces: EnlaceModulo[];
+}
+
+/**
+ * Landing de Seguridad con el mismo esquema visual de tiles agrupados que
+ * Presupuesto/Proyectos/Familia (tiles-grid + module-tile-*), en vez de la
+ * lista compacta anterior (.catalog-list), a pedido del usuario. Por ahora
+ * solo hay un grupo con una sola pantalla (Usuarios) — mismo caso que el
+ * grupo "Miembros" de familia-inicio.component.ts, que también arranca con
+ * una sola tile.
+ */
+const GRUPOS: GrupoModulo[] = [
   {
-    ruta: 'usuarios',
-    icono: '👤',
-    color: 'personal',
     titulo: 'Usuarios',
-    descripcion: 'Alta, edición y baja de usuarios del sistema.',
+    enlaces: [
+      {
+        ruta: 'usuarios',
+        icono: '👤',
+        color: 'indigo',
+        titulo: 'Usuarios',
+        descripcion: 'Alta, edición y baja de usuarios del sistema.',
+      },
+    ],
   },
 ];
 
-/**
- * Landing de Seguridad: misma lista compacta que la landing de Catálogos
- * (.catalog-list / .catalog-list-item), para que ambos módulos luzcan
- * consistentes. No lleva buscador ni grupos porque, a diferencia de
- * Catálogos, Seguridad solo tiene una entrada (Usuarios) por ahora.
- */
 @Component({
   selector: 'app-seguridad-landing',
   standalone: true,
@@ -36,5 +51,5 @@ const ENLACES: EnlaceSeguridad[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SeguridadLandingComponent {
-  protected readonly enlaces = ENLACES;
+  protected readonly grupos = GRUPOS;
 }
