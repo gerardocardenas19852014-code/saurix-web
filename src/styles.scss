@@ -215,7 +215,17 @@ h1, h2 { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(
 .sidebar-menu-toggle.is-open .hamburger-icon::after { top: 0; transform: rotate(-45deg); }
 
 @media (max-width: 860px) {
-  .app-shell { flex-direction: column; }
+  /* align-items: flex-start del bloque base (fila: sidebar + main-area) se
+     queda sin cambiar aquí, y en columna provoca que .main-area deje de
+     estirarse al ancho completo (vuelve "shrink-to-fit"): cualquier
+     contenido con un ancho mínimo propio (ej. .wallet-report-cards,
+     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr))) podía
+     entonces ensanchar .main-area más allá del viewport y desbordar la
+     página (detectado en Presupuesto → Reportes, con 2 tarjetas de
+     180px mínimo cada una). align-items: stretch fuerza a .main-area (y
+     .sidebar) a ocupar siempre el 100% del ancho disponible, como ya se
+     ve visualmente en todos lados. */
+  .app-shell { flex-direction: column; align-items: stretch; }
   .sidebar { width: 100%; min-height: auto; position: static; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 14px 16px; }
   .sidebar-label { display: none; }
   .sidebar-group-toggle { display: none; }
@@ -911,6 +921,19 @@ html[data-theme='dark'] .edit-form input[type=date], html[data-theme='ocean'] .e
 .wallet-networth-label-col { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .wallet-networth-label-valor { font-size: 10.5px; color: var(--text-strong); font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
 .wallet-networth-label-mes { font-size: 11px; color: var(--ink-soft); font-family: 'JetBrains Mono', monospace; text-transform: capitalize; }
+/* Patrimonio neto histórico (Reportes) siempre dibuja 12 columnas de mes,
+   cada una con su valor (ej. "-$51.2k", sin poder partirse por el
+   white-space: nowrap de arriba) y el mes abreviado debajo. 12 columnas
+   de ~38-44px no entran en el ancho disponible en móvil (~343px), lo que
+   desbordaba la página horizontalmente (detectado en Reportes a 375px:
+   document.body.scrollWidth llegaba a 482 incluso con el resto del
+   layout ya arreglado). En vez de permitir scroll horizontal se ocultan
+   los meses intermedios en pantallas angostas, dejando 1 de cada 2 y
+   forzando que el último (el mes más reciente) siempre se vea. */
+@media (max-width: 480px) {
+  .wallet-networth-label-col:nth-child(even) { display: none; }
+  .wallet-networth-label-col:last-child { display: flex; }
+}
 /* Aviso de gasto inusual (Dashboard de Presupuesto) — mes actual vs. promedio de los últimos 3 meses por categoría. */
 .wallet-alert-block { background: var(--amber-soft); border: 1px solid var(--amber); border-radius: 12px; padding: 14px 18px; margin-bottom: 24px; }
 .wallet-alert-block strong { color: var(--amber); }
