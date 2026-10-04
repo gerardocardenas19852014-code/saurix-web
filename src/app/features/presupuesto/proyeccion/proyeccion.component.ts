@@ -620,64 +620,48 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
     const totalGasto = this.renglonesGasto().find((r) => r.tipo === 'total')!.celdas;
     const totalAhorro = this.renglonesAhorro().find((r) => r.tipo === 'total')!.celdas;
 
-    const saldoInicial: Celda[] = [];
     const saldoFinal: Celda[] = [];
-    let saldoPrevio = 0;
+    // El "Saldo inicial" dejó de mostrarse como renglón propio de la tabla:
+    // a diferencia de cualquier otro valor, era editable a mano (vía
+    // ProyeccionAjuste) y una vez escrito quedaba CONGELADO — no se volvía
+    // a mover aunque se capturaran movimientos nuevos, así que con el
+    // tiempo dejaba de reflejar lo que el usuario realmente tenía en sus
+    // cuentas. Ahora el punto de partida de "Saldo final proyectado" se
+    // calcula SIEMPRE a partir del saldo real (Ingreso - Gasto de los
+    // movimientos ya capturados antes de la ventana, ver
+    // saldoRealAlInicioDeVentana) y se sigue encadenando quincena a
+    // quincena, pero ya no admite sobreescritura manual — así se mantiene
+    // fiel a las cuentas reales en vez de poder quedarse pegado en un
+    // valor viejo.
+    let saldoPrevio = this.saldoRealAlInicioDeVentana();
 
     for (let i = 0; i < quincenas.length; i++) {
       // Ingreso neto ya no se muestra como renglón aparte, pero se sigue
       // calculando: el saldo final proyectado depende de él.
       const netoValor = totalIngreso[i].valor - totalGasto[i].valor;
-
-      let inicial: Celda;
-      if (i === 0) {
-        inicial = this.celda('saldoInicial', quincenas[0].clave, true);
-        if (!inicial.manual) inicial = { valor: this.saldoRealAlInicioDeVentana(), manual: false, editable: true };
-      } else {
-        // Antes esta rama nunca llamaba a celda(): el Saldo inicial de la
-        // quincena 2 en adelante quedaba SIEMPRE fijo al Saldo final de la
-        // quincena anterior, sin poder ajustarlo a mano (a diferencia de
-        // cualquier otro renglón de la tabla). Ahora se sigue el mismo
-        // patrón que la quincena 0: si hay un ajuste manual guardado para
-        // esta quincena se respeta, y si no, se sigue encadenando el saldo
-        // previo mientras se deja editable (mismo "clic para escribir un
-        // valor a mano" que ya tienen categorías/cuentas).
-        inicial = this.celda('saldoInicial', quincenas[i].clave, true);
-        if (!inicial.manual) inicial = { valor: saldoPrevio, manual: false, editable: true };
-      }
-      saldoInicial.push(inicial);
-      saldoPrevio = inicial.valor + netoValor;
+      saldoPrevio = saldoPrevio + netoValor;
       saldoFinal.push({ valor: saldoPrevio, manual: false, editable: false });
     }
 
-    // "Saldo inicial" hace de renglón-cabecera colapsable de todo el bloque
-    // resumen (mismo patrón que una hoja con >1 cuenta, ej. SALARIO): se
-    // reutiliza su propia clave ('saldoInicial') como llave de toggle, y los
-    // demás renglones del bloque cuelgan de ella vía hojaId — así el usuario
-    // puede contraer Total ingresos/Total gastos/Ahorro/Saldo final para
-    // ganar espacio vertical sin perder de vista el saldo inicial.
+    // "Total ingresos" hace ahora de renglón-cabecera colapsable de todo el
+    // bloque resumen (antes era "Saldo inicial", antes de quitarlo — mismo
+    // patrón que una hoja con >1 cuenta, ej. SALARIO): se reutiliza su
+    // propia clave ('resumenTotales') como llave de toggle, y los demás renglones
+    // del bloque cuelgan de ella vía hojaId — así el usuario puede contraer
+    // Total gastos/Ahorro/Saldo final para ganar espacio vertical sin
+    // perder de vista el total de ingresos.
     const comparacion = this.compararAnioAnterior() ? this.comparacionAnioAnterior() : null;
 
     const filas: RenglonProyeccion[] = [
       {
-        id: 'resumen:saldoInicial',
-        tipo: 'resumen',
-        clave: 'saldoInicial',
-        nombre: 'Saldo inicial',
-        celdas: saldoInicial,
-        sumable: false,
-        grupoId: null,
-        tieneDetalle: true,
-      },
-      {
         id: 'resumen:totalIngreso',
         tipo: 'resumen',
-        clave: null,
+        clave: 'resumenTotales',
         nombre: 'Total ingresos',
         celdas: totalIngreso,
         sumable: true,
         grupoId: null,
-        hojaId: 'saldoInicial',
+        tieneDetalle: true,
       },
       ...(comparacion
         ? [
@@ -689,7 +673,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
               celdas: comparacion.map((c) => ({ valor: c.ingreso, manual: false, editable: false, sinDatos: !c.hayDatos })),
               sumable: true,
               grupoId: null,
-              hojaId: 'saldoInicial',
+              hojaId: 'resumenTotales',
               esComparacion: true,
             },
           ]
@@ -702,7 +686,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
         celdas: totalGasto,
         sumable: true,
         grupoId: null,
-        hojaId: 'saldoInicial',
+        hojaId: 'resumenTotales',
       },
       ...(comparacion
         ? [
@@ -714,7 +698,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
               celdas: comparacion.map((c) => ({ valor: c.gasto, manual: false, editable: false, sinDatos: !c.hayDatos })),
               sumable: true,
               grupoId: null,
-              hojaId: 'saldoInicial',
+              hojaId: 'resumenTotales',
               esComparacion: true,
             },
           ]
@@ -727,7 +711,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
         celdas: totalAhorro,
         sumable: true,
         grupoId: null,
-        hojaId: 'saldoInicial',
+        hojaId: 'resumenTotales',
       },
       {
         id: 'resumen:saldoFinal',
@@ -737,7 +721,7 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
         celdas: saldoFinal,
         sumable: false,
         grupoId: null,
-        hojaId: 'saldoInicial',
+        hojaId: 'resumenTotales',
       },
     ];
     filas.forEach((r) => (r.seccion = 'resumen'));
