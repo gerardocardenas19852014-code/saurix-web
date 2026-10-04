@@ -620,48 +620,62 @@ export class ProyeccionComponent implements OnInit, OnDestroy {
     const totalGasto = this.renglonesGasto().find((r) => r.tipo === 'total')!.celdas;
     const totalAhorro = this.renglonesAhorro().find((r) => r.tipo === 'total')!.celdas;
 
+    // El "Saldo inicial" de cada quincena ya NO es editable a mano: antes
+    // se podía sobreescribir vía ProyeccionAjuste y, una vez escrito,
+    // quedaba CONGELADO — no se volvía a mover aunque se capturaran
+    // movimientos nuevos, así que con el tiempo dejaba de reflejar lo que
+    // el usuario realmente tenía en sus cuentas. Ahora SIEMPRE se calcula:
+    // la primera quincena visible parte del saldo real de las cuentas (ver
+    // saldoRealAlInicioDeVentana) y cada quincena siguiente hereda el
+    // Saldo final de la anterior — así el sobrante o faltante de hoy se ve
+    // reflejado automáticamente en la quincena siguiente, sin poder
+    // quedarse pegado en un valor viejo. Sigue siendo su propio renglón
+    // (visible, no solo "Saldo final"), igual que antes.
+    const saldoInicial: Celda[] = [];
     const saldoFinal: Celda[] = [];
-    // El "Saldo inicial" dejó de mostrarse como renglón propio de la tabla:
-    // a diferencia de cualquier otro valor, era editable a mano (vía
-    // ProyeccionAjuste) y una vez escrito quedaba CONGELADO — no se volvía
-    // a mover aunque se capturaran movimientos nuevos, así que con el
-    // tiempo dejaba de reflejar lo que el usuario realmente tenía en sus
-    // cuentas. Ahora el punto de partida de "Saldo final proyectado" se
-    // calcula SIEMPRE a partir del saldo real (Ingreso - Gasto de los
-    // movimientos ya capturados antes de la ventana, ver
-    // saldoRealAlInicioDeVentana) y se sigue encadenando quincena a
-    // quincena, pero ya no admite sobreescritura manual — así se mantiene
-    // fiel a las cuentas reales en vez de poder quedarse pegado en un
-    // valor viejo.
     let saldoPrevio = this.saldoRealAlInicioDeVentana();
 
     for (let i = 0; i < quincenas.length; i++) {
       // Ingreso neto ya no se muestra como renglón aparte, pero se sigue
       // calculando: el saldo final proyectado depende de él.
       const netoValor = totalIngreso[i].valor - totalGasto[i].valor;
+      saldoInicial.push({ valor: saldoPrevio, manual: false, editable: false });
       saldoPrevio = saldoPrevio + netoValor;
       saldoFinal.push({ valor: saldoPrevio, manual: false, editable: false });
     }
 
-    // "Total ingresos" hace ahora de renglón-cabecera colapsable de todo el
-    // bloque resumen (antes era "Saldo inicial", antes de quitarlo — mismo
-    // patrón que una hoja con >1 cuenta, ej. SALARIO): se reutiliza su
-    // propia clave ('resumenTotales') como llave de toggle, y los demás renglones
-    // del bloque cuelgan de ella vía hojaId — así el usuario puede contraer
-    // Total gastos/Ahorro/Saldo final para ganar espacio vertical sin
-    // perder de vista el total de ingresos.
+    // "Saldo inicial" hace de renglón-cabecera colapsable de todo el bloque
+    // resumen (mismo patrón que una hoja con >1 cuenta, ej. SALARIO): se
+    // reutiliza su propia clave ('resumenTotales') como llave de toggle, y
+    // los demás renglones del bloque cuelgan de ella vía hojaId — así el
+    // usuario puede contraer Total ingresos/Total gastos/Ahorro/Saldo final
+    // para ganar espacio vertical sin perder de vista el saldo inicial. OJO:
+    // la llave NO puede ser 'resumen' a secas — choca con el valor fijo
+    // r.seccion='resumen' de estas filas (ver abajo) y el filtro de
+    // filasTabla() terminaría ocultando el bloque completo (encabezado
+    // incluido) en cuanto se colapsara.
     const comparacion = this.compararAnioAnterior() ? this.comparacionAnioAnterior() : null;
 
     const filas: RenglonProyeccion[] = [
       {
-        id: 'resumen:totalIngreso',
+        id: 'resumen:saldoInicial',
         tipo: 'resumen',
         clave: 'resumenTotales',
+        nombre: 'Saldo inicial',
+        celdas: saldoInicial,
+        sumable: false,
+        grupoId: null,
+        tieneDetalle: true,
+      },
+      {
+        id: 'resumen:totalIngreso',
+        tipo: 'resumen',
+        clave: null,
         nombre: 'Total ingresos',
         celdas: totalIngreso,
         sumable: true,
         grupoId: null,
-        tieneDetalle: true,
+        hojaId: 'resumenTotales',
       },
       ...(comparacion
         ? [
