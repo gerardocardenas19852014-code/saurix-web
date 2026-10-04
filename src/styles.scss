@@ -627,7 +627,16 @@ html[data-theme='dark'] .edit-form input[type=date], html[data-theme='ocean'] .e
    reinventarlo. Los selectores con el prefijo ".edit-form" empatan a
    propósito la especificidad de las reglas de arriba (".edit-form
    input[type=...]"), para poder ganarles dentro de un .edit-form. */
-.edit-form .floating-field { position: relative; display: block; min-width: 0; }
+.edit-form .floating-field { display: block; min-width: 0; }
+/* .floating-field necesita "position: relative" SIEMPRE, con o sin
+   .edit-form alrededor: su <span> (ver regla de abajo) es
+   "position: absolute" y, sin un ancestro posicionado cerca, se escapa
+   hasta el ancestro posicionado más cercano en todo el árbol — en
+   categoria-list/secciones-list.component.html (filtro "Tipo de
+   sistema"/"Categoría" en .grid-toolbar, fuera de cualquier .edit-form)
+   terminaba flotando hasta arriba del todo, encima del header. Detectado
+   probando la app en móvil. */
+.floating-field { position: relative; }
 .floating-field > span {
   position: absolute; z-index: 1; top: 12px; left: 13px; padding: 0 3px;
   color: var(--ink-soft); background: var(--paper-raised); pointer-events: none;

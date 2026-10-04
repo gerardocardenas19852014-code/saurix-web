@@ -2,11 +2,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   padding: 10px 0;
   border-bottom: 1px solid var(--line);
 }
-
+/* El valor (RFC/CURP, 13-18 caracteres monoespaciados sin espacios, a 22px)
+   más el botón "Copiar" no caben uno junto al otro en una pantalla angosta
+   (~375px): sin flex-wrap se salían del card y provocaban scroll horizontal. */
 .rfccurp-resultado-row:last-of-type {
   border-bottom: none;
 }
