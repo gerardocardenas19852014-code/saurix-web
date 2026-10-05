@@ -1252,7 +1252,8 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
 a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ---------------- Asistente de IA (chat flotante) ---------------- */
-.ai-fab { position: fixed; right: 24px; bottom: 24px; width: 54px; height: 54px; border-radius: 50%; background: var(--ink); color: #fff; border: none; font-size: 22px; cursor: pointer; box-shadow: 0 14px 30px -10px rgba(13, 27, 42, .5); z-index: 250; display: flex; align-items: center; justify-content: center; transition: transform .15s ease; }
+.ai-fab { position: fixed; right: 24px; bottom: 24px; width: 54px; height: 54px; border-radius: 50%; background: var(--ink); color: #fff; border: none; font-size: 22px; cursor: grab; touch-action: none; box-shadow: 0 14px 30px -10px rgba(13, 27, 42, .5); z-index: 250; display: flex; align-items: center; justify-content: center; transition: transform .15s ease; }
+.ai-fab:active { cursor: grabbing; }
 .ai-fab:hover { transform: translateY(-2px); }
 .ai-fab.is-open { background: var(--amber); }
 .ai-panel { position: fixed; right: 24px; bottom: 90px; width: 360px; max-width: calc(100vw - 32px); height: 480px; max-height: calc(100vh - 130px); background: var(--paper-raised); border-radius: 16px; box-shadow: 0 24px 60px -18px rgba(13, 27, 42, .45); display: flex; flex-direction: column; overflow: hidden; z-index: 250; opacity: 0; pointer-events: none; transform: translateY(12px); transition: opacity .16s ease, transform .16s ease; }

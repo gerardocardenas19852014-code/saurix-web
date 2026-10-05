@@ -237,13 +237,25 @@
     type="button"
     class="ai-fab"
     [class.is-open]="aiAbierto()"
+    [style.left.px]="aiFabPos()?.left"
+    [style.top.px]="aiFabPos()?.top"
+    [style.right]="aiFabPos() ? 'auto' : null"
+    [style.bottom]="aiFabPos() ? 'auto' : null"
+    (pointerdown)="iniciarArrastreAi($event)"
     (click)="toggleAiChat()"
-    title="Preguntarle al asistente"
+    title="Clic para preguntar · mantén presionado y arrastra para moverlo"
   >
     💬
   </button>
 
-  <div class="ai-panel" [class.is-open]="aiAbierto()">
+  <div
+    class="ai-panel"
+    [class.is-open]="aiAbierto()"
+    [style.left.px]="aiPanelPos()?.left"
+    [style.top.px]="aiPanelPos()?.top"
+    [style.right]="aiPanelPos() ? 'auto' : null"
+    [style.bottom]="aiPanelPos() ? 'auto' : null"
+  >
     <div class="ai-panel-header">
       <div>
         <strong>Asistente Saurix</strong>

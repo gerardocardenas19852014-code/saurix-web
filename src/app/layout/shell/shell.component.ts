@@ -202,6 +202,10 @@ export class ShellComponent implements OnDestroy {
   private intervaloRevisionSla?: ReturnType<typeof setInterval>;
 
   constructor() {
+    // Restaura la posición del botón del asistente si el usuario ya lo
+    // había arrastrado antes en este navegador (ver aiFabPos arriba).
+    this.cargarPosicionAiGuardada();
+
     // Trae y aplica Tema/Asistente IA/Tamaño de página guardados en la
     // "base de datos" del usuario actual cada vez que se entra al shell
     // (login fresco o sesión restaurada) — no solo lo que había en
@@ -422,7 +426,120 @@ export class ShellComponent implements OnDestroy {
   protected readonly aiPregunta = signal('');
   protected readonly aiOcupado = signal(false);
 
+  /** Posición del botón flotante (en px, viewport). null = sin arrastrar
+   *  todavía: usa la posición fija de siempre (esquina inferior derecha,
+   *  definida en styles.scss). Se guarda en localStorage de este navegador
+   *  (es solo una conveniencia visual de este dispositivo, no un dato de
+   *  negocio) para que no "se le olvide" dónde la dejó el usuario. */
+  private static readonly CLAVE_POSICION_AI = 'saurix.ai.fab.pos';
+  private static readonly AI_FAB_PX = 54;
+  private static readonly AI_MARGEN_PX = 8;
+  protected readonly aiFabPos = signal<{ left: number; top: number } | null>(null);
+
+  /** Dónde debe abrir el panel del chat dada la posición actual del botón:
+   *  se recalcula sola (es un computed) cada vez que aiFabPos cambia, y
+   *  "voltea" hacia el lado con espacio (arriba/abajo, izquierda/derecha)
+   *  para que el panel nunca quede cortado fuera de la pantalla. */
+  protected readonly aiPanelPos = computed(() => {
+    const fab = this.aiFabPos();
+    if (!fab) return null;
+
+    const gap = 12;
+    const anchoPanel = Math.min(360, window.innerWidth - 32);
+    const altoPanel = Math.min(480, window.innerHeight - 32);
+
+    const espacioAbajo = window.innerHeight - (fab.top + ShellComponent.AI_FAB_PX);
+    const top =
+      espacioAbajo >= altoPanel + gap
+        ? fab.top + ShellComponent.AI_FAB_PX + gap // cabe abajo del botón
+        : fab.top - gap - altoPanel; // no cabe: se abre hacia arriba
+
+    let left = fab.left + ShellComponent.AI_FAB_PX - anchoPanel; // alinea el borde derecho del panel con el del botón
+    left = Math.min(Math.max(left, ShellComponent.AI_MARGEN_PX), window.innerWidth - anchoPanel - ShellComponent.AI_MARGEN_PX);
+    const topClamp = Math.min(
+      Math.max(top, ShellComponent.AI_MARGEN_PX),
+      window.innerHeight - altoPanel - ShellComponent.AI_MARGEN_PX,
+    );
+
+    return { left, top: topClamp };
+  });
+
+  private arrastrandoAi = false;
+  private aiSeArrastro = false;
+  private arrastreAiInicio = { x: 0, y: 0, left: 0, top: 0 };
+
+  private cargarPosicionAiGuardada(): void {
+    try {
+      const guardada = localStorage.getItem(ShellComponent.CLAVE_POSICION_AI);
+      if (!guardada) return;
+      const pos = JSON.parse(guardada) as { left: number; top: number };
+      if (typeof pos?.left === 'number' && typeof pos?.top === 'number') {
+        this.aiFabPos.set(this.clampPosicionAi(pos.left, pos.top));
+      }
+    } catch {
+      // Posición guardada corrupta o localStorage no disponible: se usa la posición por defecto.
+    }
+  }
+
+  /** Limita una posición propuesta para que el botón (54x54) quede siempre
+   *  completo dentro de la ventana actual, con un pequeño margen. */
+  private clampPosicionAi(left: number, top: number): { left: number; top: number } {
+    const maxLeft = window.innerWidth - ShellComponent.AI_FAB_PX - ShellComponent.AI_MARGEN_PX;
+    const maxTop = window.innerHeight - ShellComponent.AI_FAB_PX - ShellComponent.AI_MARGEN_PX;
+    return {
+      left: Math.min(Math.max(left, ShellComponent.AI_MARGEN_PX), Math.max(maxLeft, ShellComponent.AI_MARGEN_PX)),
+      top: Math.min(Math.max(top, ShellComponent.AI_MARGEN_PX), Math.max(maxTop, ShellComponent.AI_MARGEN_PX)),
+    };
+  }
+
+  /** Mantener presionado el botón y arrastrar lo mueve a cualquier parte de
+   *  la pantalla (para sacarlo de encima de algo que tape); un clic normal
+   *  (sin moverse) lo sigue abriendo/cerrando como siempre — ver
+   *  aiSeArrastro en toggleAiChat(). */
+  protected iniciarArrastreAi(evento: PointerEvent): void {
+    const boton = evento.currentTarget as HTMLElement;
+    const rect = boton.getBoundingClientRect();
+    this.arrastrandoAi = true;
+    this.aiSeArrastro = false;
+    this.arrastreAiInicio = { x: evento.clientX, y: evento.clientY, left: rect.left, top: rect.top };
+  }
+
+  @HostListener('document:pointermove', ['$event'])
+  protected onArrastreAiMover(evento: PointerEvent): void {
+    if (!this.arrastrandoAi) return;
+    const dx = evento.clientX - this.arrastreAiInicio.x;
+    const dy = evento.clientY - this.arrastreAiInicio.y;
+    if (!this.aiSeArrastro && Math.hypot(dx, dy) < 4) return; // umbral: todavía podría ser un clic
+    this.aiSeArrastro = true;
+    this.aiFabPos.set(this.clampPosicionAi(this.arrastreAiInicio.left + dx, this.arrastreAiInicio.top + dy));
+  }
+
+  @HostListener('document:pointerup')
+  protected onArrastreAiSoltar(): void {
+    if (!this.arrastrandoAi) return;
+    this.arrastrandoAi = false;
+    const pos = this.aiFabPos();
+    if (this.aiSeArrastro && pos) {
+      try {
+        localStorage.setItem(ShellComponent.CLAVE_POSICION_AI, JSON.stringify(pos));
+      } catch {
+        // localStorage puede fallar (modo privado, cuota llena, etc.) — no es crítico, solo no se recuerda la posición.
+      }
+    }
+  }
+
+  @HostListener('window:resize')
+  protected onResizeReclampAi(): void {
+    const pos = this.aiFabPos();
+    if (pos) this.aiFabPos.set(this.clampPosicionAi(pos.left, pos.top));
+  }
+
   toggleAiChat(): void {
+    if (this.aiSeArrastro) {
+      // El clic que sigue a un arrastre no debe abrir/cerrar el panel.
+      this.aiSeArrastro = false;
+      return;
+    }
     this.aiAbierto.update((v) => !v);
   }
 
@@ -469,8 +586,16 @@ export class ShellComponent implements OnDestroy {
       miembros: MiembroFamilia[];
     },
   ): string {
-    const palabras = pregunta
-      .toLowerCase()
+    // Insensible a acentos (busca "sotano" y encuentra "sótano", y viceversa)
+    // y por coincidencia parcial: "Indri" encuentra "InDriver" porque se
+    // revisa con includes(), no con igualdad exacta de palabra completa.
+    const normalizar = (valor: string | null | undefined): string =>
+      (valor ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+
+    const palabras = normalizar(pregunta)
       .split(/\s+/)
       .filter((p) => p.length > 3);
 
@@ -479,7 +604,7 @@ export class ShellComponent implements OnDestroy {
     }
 
     const coincideTexto = (...valores: (string | null | undefined)[]): boolean =>
-      palabras.some((p) => valores.some((v) => v?.toLowerCase().includes(p)));
+      palabras.some((p) => valores.some((v) => normalizar(v).includes(p)));
 
     const documentosEncontrados = fuentes.documentos.filter((d) => coincideTexto(d.titulo, d.contenido));
     const ticketsEncontrados = fuentes.tickets.filter((t) =>
