@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -84,6 +85,7 @@ export class MovimientosComponent implements OnInit, OnDestroy {
   protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
+  private readonly route = inject(ActivatedRoute);
   private readonly pagoTarjeta = inject(PagoTarjetaService);
 
   protected readonly presupuestosAnuales = signal<PresupuestoAnual[]>([]);
@@ -444,6 +446,18 @@ export class MovimientosComponent implements OnInit, OnDestroy {
     this.data.list<PresupuestoAnual>('PresupuestoAnual').subscribe((p) => this.presupuestosAnuales.set(p));
     this.cargar();
     this.abrirSolicitudPagoTarjetaSiExiste();
+
+    // Deep link (p.ej. desde el Asistente Saurix): ?movimiento=123 abre
+    // directo ese movimiento en edición, mismo patrón que ?ticket= en el
+    // tablero de Proyectos.
+    this.route.queryParamMap.subscribe((params) => {
+      const movimientoIdParam = Number(params.get('movimiento')) || 0;
+      if (!movimientoIdParam) return;
+      this.data.getById<MovimientoPresupuesto>('MovimientoPresupuesto', movimientoIdParam).subscribe({
+        next: (movimiento) => this.editar(movimiento),
+        error: () => {},
+      });
+    });
   }
 
   ngOnDestroy(): void {

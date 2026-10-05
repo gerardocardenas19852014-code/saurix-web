@@ -268,10 +268,29 @@
         @if (m.rol === 'pending') {
           <div class="ai-msg-pending">Pensando…</div>
         } @else {
-          <div class="ai-msg" [class.ai-msg-user]="m.rol === 'user'" [class.ai-msg-bot]="m.rol === 'bot'">{{ m.texto }}</div>
+          <div class="ai-msg" [class.ai-msg-user]="m.rol === 'user'" [class.ai-msg-bot]="m.rol === 'bot'">
+            <div>{{ m.texto }}</div>
+            @for (seccion of m.secciones; track seccion.titulo) {
+              <div class="ai-msg-seccion">
+                <div class="ai-msg-seccion-titulo">{{ seccion.titulo }}</div>
+                @for (enlace of seccion.enlaces; track enlace.texto) {
+                  @if (enlace.ruta) {
+                    <a
+                      class="ai-msg-enlace"
+                      [routerLink]="enlace.ruta"
+                      [queryParams]="enlace.queryParams ?? null"
+                      (click)="toggleAiChat()"
+                    >{{ enlace.texto }}</a>
+                  } @else {
+                    <span class="ai-msg-enlace ai-msg-enlace-sin-ruta">{{ enlace.texto }}</span>
+                  }
+                }
+              </div>
+            }
+          </div>
         }
       } @empty {
-        <div class="ai-msg-pending">Pregúntame algo sobre WikiDocs, tickets, movimientos o la familia.</div>
+        <div class="ai-msg-pending">Pregúntame algo sobre WikiDocs, tickets, movimientos o la familia — o cuánto llevas gastado, cuántos tickets tienes abiertos, etc.</div>
       }
     </div>
     <form class="ai-panel-inputrow" (submit)="enviarPreguntaAi(); $event.preventDefault()">

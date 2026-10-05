@@ -15,16 +15,39 @@ import { NotificacionesService } from '../../shared/services/notificaciones.serv
 import { Ticket } from '../../features/proyectos/kanban/ticket.model';
 import { MovimientoPresupuesto } from '../../features/presupuesto/movimientos/movimiento.model';
 import { MiembroFamilia } from '../../features/familia/miembro-familia.model';
+import { TableroColumna } from '../../features/proyectos/tableros/tablero-columna.model';
+import { CuentaPresupuesto } from '../../features/presupuesto/cuenta-presupuesto/cuenta-presupuesto.model';
+import { CategoriaPresupuesto } from '../../features/presupuesto/categoria-presupuesto/categoria-presupuesto.model';
+import { DeudaPresupuesto } from '../../features/presupuesto/deudas/deuda.model';
+
+/** Un resultado de búsqueda del asistente, clicable: navega directo a esa
+ *  pantalla con el registro ya abierto (mismo patrón de deep link que
+ *  Kanban ya usaba con ?ticket=, extendido ahora a Movimientos/Documentos/
+ *  Miembros — ver cada *.component.ts). Sin queryParams, el enlace solo
+ *  lleva a la pantalla del catálogo (caso de Cuentas/Categorías). */
+interface AiEnlace {
+  texto: string;
+  ruta: string;
+  queryParams?: Record<string, number | string>;
+}
+
+interface AiSeccion {
+  titulo: string;
+  enlaces: AiEnlace[];
+}
 
 interface AiMensaje {
   rol: 'user' | 'bot' | 'pending';
   texto: string;
+  /** Presente solo en resultados de búsqueda con coincidencias (ver buscarRespuesta). */
+  secciones?: AiSeccion[];
 }
 
 interface DocumentoBuscable {
   id: number;
   titulo?: string;
   contenido?: string;
+  activo?: boolean;
 }
 
 @Component({
@@ -540,7 +563,53 @@ export class ShellComponent implements OnDestroy {
       this.aiSeArrastro = false;
       return;
     }
+    const seVaAAbrir = !this.aiAbierto();
     this.aiAbierto.update((v) => !v);
+    if (seVaAAbrir && this.aiMensajes().length === 0) {
+      this.mostrarAvisoProactivoAi();
+    }
+  }
+
+  /** Al abrir el chat por primera vez (todavía sin mensajes), adelanta sin
+   *  que se pregunte nada lo mismo que ya avisa la campanita 🔔 (SLA de
+   *  tickets por vencer, alertas de tarjeta — ver NotificacionesService):
+   *  reutiliza esas notificaciones ya calculadas, no vuelve a calcular nada. */
+  private mostrarAvisoProactivoAi(): void {
+    const pendientes = this.notificacionesService.notificaciones().filter((n) => !n.leida);
+    if (pendientes.length === 0) return;
+    const lista = pendientes
+      .slice(0, 3)
+      .map((n) => ({ texto: n.titulo, ruta: n.link } as { texto: string; ruta?: string }));
+    const extra = pendientes.length > 3 ? ` y ${pendientes.length - 3} más (revisa la campanita 🔔)` : '';
+    this.aiMensajes.update((m) => [
+      ...m,
+      {
+        rol: 'bot',
+        texto: `Antes de que preguntes algo, esto tienes pendiente${extra}:`,
+        secciones: [
+          {
+            titulo: '🔔 Pendientes',
+            enlaces: lista.map((l) => this.enlaceDesdeRutaCompleta(l.texto, l.ruta)),
+          },
+        ],
+      },
+    ]);
+  }
+
+  /** Notificacion.link viene como string completo tipo '/proyectos/tablero?ticket=123'
+   *  (ver NotificacionesService) — se separa en ruta+queryParams para usarlo
+   *  como [routerLink]/[queryParams], igual que el resto de enlaces del asistente. */
+  private enlaceDesdeRutaCompleta(texto: string, rutaCompleta?: string): AiEnlace {
+    if (!rutaCompleta) return { texto, ruta: '' };
+    const [ruta, query] = rutaCompleta.split('?');
+    const queryParams: Record<string, string> = {};
+    if (query) {
+      for (const par of query.split('&')) {
+        const [clave, valor] = par.split('=');
+        if (clave) queryParams[decodeURIComponent(clave)] = decodeURIComponent(valor ?? '');
+      }
+    }
+    return { texto, ruta, queryParams: query ? queryParams : undefined };
   }
 
   enviarPreguntaAi(): void {
@@ -551,20 +620,29 @@ export class ShellComponent implements OnDestroy {
     this.aiPregunta.set('');
     this.aiOcupado.set(true);
 
-    // Busca en paralelo en las cuatro fuentes con las que hoy puede ayudar el
-    // asistente: documentación (WikiDocs), tickets (Gestión de Proyectos),
-    // movimientos (Presupuesto Personal) y directorio (Familia). Sigue siendo
-    // una búsqueda por palabra clave (no un modelo de lenguaje real), pero ya
-    // no se limita a WikiDocs.
+    // Busca/calcula en paralelo sobre las fuentes con las que hoy puede ayudar
+    // el asistente: documentación (WikiDocs), tickets+columnas (Gestión de
+    // Proyectos), movimientos+cuentas+categorías+deudas (Presupuesto Personal)
+    // y directorio (Familia). Sigue sin ser un modelo de lenguaje real: primero
+    // intenta reconocer una pregunta de cálculo (calcularRespuestaAi) y, si no
+    // reconoce ninguna, cae a la búsqueda por palabra clave de siempre.
     forkJoin({
       documentos: this.data.list<DocumentoBuscable>('Documento'),
       tickets: this.data.list<Ticket>('Ticket'),
+      columnas: this.data.list<TableroColumna>('TableroColumna'),
       movimientos: this.data.list<MovimientoPresupuesto>('MovimientoPresupuesto'),
+      cuentas: this.data.list<CuentaPresupuesto>('CuentaPresupuesto'),
+      categorias: this.data.list<CategoriaPresupuesto>('CategoriaPresupuesto'),
+      deudas: this.data.list<DeudaPresupuesto>('DeudaPresupuesto'),
       miembros: this.data.list<MiembroFamilia>('MiembroFamilia'),
     }).subscribe({
-      next: ({ documentos, tickets, movimientos, miembros }) => {
-        const respuesta = this.buscarRespuesta(pregunta, { documentos, tickets, movimientos, miembros });
-        this.aiMensajes.update((m) => [...m.slice(0, -1), { rol: 'bot', texto: respuesta }]);
+      next: (fuentes) => {
+        const calculo = this.calcularRespuestaAi(pregunta, fuentes);
+        const respuesta = calculo ?? this.buscarRespuesta(pregunta, fuentes);
+        this.aiMensajes.update((m) => [
+          ...m.slice(0, -1),
+          { rol: 'bot', texto: respuesta.texto, secciones: respuesta.secciones },
+        ]);
         this.aiOcupado.set(false);
       },
       error: () => {
@@ -577,22 +655,98 @@ export class ShellComponent implements OnDestroy {
     });
   }
 
+  /** Reconoce un pequeño número de preguntas de cálculo (no es un modelo de
+   *  lenguaje: son patrones fijos) y devuelve la respuesta ya calculada sobre
+   *  datos reales; null si la pregunta no encaja en ninguno, para que
+   *  enviarPreguntaAi() caiga a la búsqueda por palabra clave normal. Todas
+   *  requieren una palabra interrogativa ("cuant...") para no dispararse con
+   *  una búsqueda de texto normal que simplemente contenga "gasto"/"deuda". */
+  private calcularRespuestaAi(
+    pregunta: string,
+    fuentes: {
+      tickets: Ticket[];
+      columnas: TableroColumna[];
+      movimientos: MovimientoPresupuesto[];
+      deudas: DeudaPresupuesto[];
+    },
+  ): { texto: string; secciones?: AiSeccion[] } | null {
+    const normalizar = (valor: string | null | undefined): string =>
+      (valor ?? '')
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .toLowerCase();
+    const p = normalizar(pregunta);
+    const esInterrogativa = /\bcuant|\bcual\b|\bque tanto/.test(p);
+    if (!esInterrogativa) return null;
+
+    const mesActual = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+    const movimientosDelMes = fuentes.movimientos.filter(
+      (m) => (m.activo ?? true) && !m.proyectado && m.fecha?.startsWith(mesActual),
+    );
+    const sumaPorTipo = (contiene: string): number =>
+      movimientosDelMes
+        .filter((m) => normalizar(m.tipo).includes(contiene))
+        .reduce((total, m) => total + m.monto, 0);
+    const moneda = (valor: number): string =>
+      valor.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
+
+    if (/gast/.test(p)) {
+      const total = sumaPorTipo('gasto');
+      return { texto: `Llevas ${moneda(total)} en gastos este mes (${movimientosDelMes.filter((m) => normalizar(m.tipo).includes('gasto')).length} movimientos).` };
+    }
+    if (/ingres/.test(p)) {
+      const total = sumaPorTipo('ingreso');
+      return { texto: `Llevas ${moneda(total)} en ingresos este mes.` };
+    }
+    if (/saldo|balance/.test(p)) {
+      const balance = sumaPorTipo('ingreso') - sumaPorTipo('gasto');
+      return { texto: `Tu balance de este mes (ingresos − gastos) es ${moneda(balance)}.` };
+    }
+    if (/ticket/.test(p) && /abiert|pendient|hay/.test(p)) {
+      const ultimaColumnaPorProyecto = new Map<number, number>();
+      const porProyecto = new Map<number, TableroColumna[]>();
+      for (const c of fuentes.columnas) {
+        const arr = porProyecto.get(Number(c.proyectoId)) ?? [];
+        arr.push(c);
+        porProyecto.set(Number(c.proyectoId), arr);
+      }
+      for (const [proyectoId, cols] of porProyecto) {
+        const ultima = [...cols].sort((a, b) => a.orden - b.orden).at(-1);
+        if (ultima) ultimaColumnaPorProyecto.set(proyectoId, Number(ultima.id));
+      }
+      const abiertos = fuentes.tickets.filter(
+        (t) => t.activo && ultimaColumnaPorProyecto.get(Number(t.proyectoId)) !== Number(t.tableroColumnaId),
+      );
+      return { texto: `Tienes ${abiertos.length} ticket${abiertos.length === 1 ? '' : 's'} abierto${abiertos.length === 1 ? '' : 's'} (sin contar los que ya llegaron a la última columna del tablero).` };
+    }
+    if (/deb|deuda/.test(p)) {
+      const activas = fuentes.deudas.filter((d) => d.activo && d.saldoActual > 0);
+      const total = activas.reduce((suma, d) => suma + d.saldoActual, 0);
+      if (activas.length === 0) return { texto: 'No tienes deudas con saldo pendiente registradas.' };
+      return { texto: `Debes ${moneda(total)} en total, en ${activas.length} deuda${activas.length === 1 ? '' : 's'} pendiente${activas.length === 1 ? '' : 's'}.` };
+    }
+
+    return null;
+  }
+
   private buscarRespuesta(
     pregunta: string,
     fuentes: {
       documentos: DocumentoBuscable[];
       tickets: Ticket[];
       movimientos: MovimientoPresupuesto[];
+      cuentas: CuentaPresupuesto[];
+      categorias: CategoriaPresupuesto[];
       miembros: MiembroFamilia[];
     },
-  ): string {
+  ): { texto: string; secciones?: AiSeccion[] } {
     // Insensible a acentos (busca "sotano" y encuentra "sótano", y viceversa)
     // y por coincidencia parcial: "Indri" encuentra "InDriver" porque se
     // revisa con includes(), no con igualdad exacta de palabra completa.
     const normalizar = (valor: string | null | undefined): string =>
       (valor ?? '')
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[̀-ͯ]/g, '')
         .toLowerCase();
 
     const palabras = normalizar(pregunta)
@@ -600,57 +754,111 @@ export class ShellComponent implements OnDestroy {
       .filter((p) => p.length > 3);
 
     if (palabras.length === 0) {
-      return 'Cuéntame un poco más para poder buscar en el sistema.';
+      return { texto: 'Cuéntame un poco más para poder buscar en el sistema.' };
     }
 
-    const coincideTexto = (...valores: (string | null | undefined)[]): boolean =>
-      palabras.some((p) => valores.some((v) => normalizar(v).includes(p)));
+    // Cuenta cuántas palabras de la pregunta coinciden (no solo si coincide
+    // alguna) — sirve para ordenar los resultados por relevancia antes de
+    // quedarnos solo con los 3 primeros de cada sección.
+    const puntuar = (...valores: (string | null | undefined)[]): number =>
+      palabras.filter((p) => valores.some((v) => normalizar(v).includes(p))).length;
 
-    const documentosEncontrados = fuentes.documentos.filter((d) => coincideTexto(d.titulo, d.contenido));
-    const ticketsEncontrados = fuentes.tickets.filter((t) =>
-      coincideTexto(t.titulo, t.descripcion, t.numeroTicket),
-    );
-    const movimientosEncontrados = fuentes.movimientos.filter((m) => coincideTexto(m.descripcion));
-    const miembrosEncontrados = fuentes.miembros.filter((m) =>
-      coincideTexto(m.nombre, m.apellidoPaterno, m.apellidoMaterno),
-    );
+    const estaActivo = (activo?: boolean): boolean => activo !== false;
 
-    const secciones: string[] = [];
-    if (documentosEncontrados.length > 0) {
-      const lista = documentosEncontrados
+    function top3<T>(registros: T[], puntuarRegistro: (r: T) => number): T[] {
+      return registros
+        .map((r) => ({ r, puntos: puntuarRegistro(r) }))
+        .filter((x) => x.puntos > 0)
+        .sort((a, b) => b.puntos - a.puntos)
         .slice(0, 3)
-        .map((d) => `• ${d.titulo ?? 'Documento sin título'}`)
-        .join('\n');
-      secciones.push(`📚 WikiDocs\n${lista}`);
+        .map((x) => x.r);
+    }
+
+    const documentosEncontrados = top3(
+      fuentes.documentos.filter((d) => estaActivo(d.activo)),
+      (d) => puntuar(d.titulo, d.contenido),
+    );
+    const ticketsEncontrados = top3(
+      fuentes.tickets.filter((t) => estaActivo(t.activo)),
+      (t) => puntuar(t.titulo, t.descripcion, t.numeroTicket),
+    );
+    const movimientosEncontrados = top3(
+      fuentes.movimientos.filter((m) => estaActivo(m.activo)),
+      (m) => puntuar(m.descripcion),
+    );
+    const cuentasEncontradas = top3(
+      fuentes.cuentas.filter((c) => estaActivo(c.activo)),
+      (c) => puntuar(c.nombre),
+    );
+    const categoriasEncontradas = top3(
+      fuentes.categorias.filter((c) => estaActivo(c.activo)),
+      (c) => puntuar(c.nombre),
+    );
+    const miembrosEncontrados = top3(
+      fuentes.miembros.filter((m) => estaActivo(m.activo)),
+      (m) => puntuar(m.nombre, m.apellidoPaterno, m.apellidoMaterno),
+    );
+
+    const secciones: AiSeccion[] = [];
+    if (documentosEncontrados.length > 0) {
+      secciones.push({
+        titulo: '📚 WikiDocs',
+        enlaces: documentosEncontrados.map((d) => ({
+          texto: d.titulo ?? 'Documento sin título',
+          ruta: '/wikidocs/documentos',
+          queryParams: { documento: d.id },
+        })),
+      });
     }
     if (ticketsEncontrados.length > 0) {
-      const lista = ticketsEncontrados
-        .slice(0, 3)
-        .map((t) => `• ${t.numeroTicket} — ${t.titulo}`)
-        .join('\n');
-      secciones.push(`🎫 Proyectos\n${lista}`);
+      secciones.push({
+        titulo: '🎫 Proyectos',
+        enlaces: ticketsEncontrados.map((t) => ({
+          texto: `${t.numeroTicket} — ${t.titulo}`,
+          ruta: '/proyectos/tablero',
+          queryParams: { ticket: t.id },
+        })),
+      });
     }
     if (movimientosEncontrados.length > 0) {
-      const lista = movimientosEncontrados
-        .slice(0, 3)
-        .map(
-          (m) =>
-            `• ${m.descripcion} (${m.monto.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })})`,
-        )
-        .join('\n');
-      secciones.push(`💰 Presupuesto\n${lista}`);
+      secciones.push({
+        titulo: '💰 Presupuesto — movimientos',
+        enlaces: movimientosEncontrados.map((m) => ({
+          texto: `${m.descripcion} (${m.monto.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })})`,
+          ruta: '/presupuesto/movimientos',
+          queryParams: { movimiento: m.id },
+        })),
+      });
+    }
+    if (cuentasEncontradas.length > 0) {
+      secciones.push({
+        titulo: '💳 Presupuesto — cuentas',
+        enlaces: cuentasEncontradas.map((c) => ({ texto: c.nombre, ruta: '/presupuesto/cuentas-presupuesto' })),
+      });
+    }
+    if (categoriasEncontradas.length > 0) {
+      secciones.push({
+        titulo: '🏷️ Presupuesto — categorías',
+        enlaces: categoriasEncontradas.map((c) => ({ texto: c.nombre, ruta: '/presupuesto/categorias-presupuesto' })),
+      });
     }
     if (miembrosEncontrados.length > 0) {
-      const lista = miembrosEncontrados
-        .slice(0, 3)
-        .map((m) => `• ${[m.nombre, m.apellidoPaterno, m.apellidoMaterno].filter(Boolean).join(' ')}`)
-        .join('\n');
-      secciones.push(`👪 Familia\n${lista}`);
+      secciones.push({
+        titulo: '👪 Familia',
+        enlaces: miembrosEncontrados.map((m) => ({
+          texto: [m.nombre, m.apellidoPaterno, m.apellidoMaterno].filter(Boolean).join(' '),
+          ruta: '/familia/miembros',
+          queryParams: { miembro: m.id },
+        })),
+      });
     }
 
     if (secciones.length === 0) {
-      return 'No encontré nada relacionado en WikiDocs, Proyectos, Presupuesto ni Familia. Prueba con otras palabras.';
+      return {
+        texto:
+          'No encontré nada relacionado en WikiDocs, Proyectos, Presupuesto (movimientos/cuentas/categorías) ni Familia. Prueba con otras palabras.',
+      };
     }
-    return `Encontré esto:\n\n${secciones.join('\n\n')}`;
+    return { texto: 'Encontré esto:', secciones };
   }
 }

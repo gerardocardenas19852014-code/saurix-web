@@ -1271,6 +1271,12 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .ai-msg-bot p:last-child { margin-bottom: 0; }
 .ai-msg-error { align-self: flex-start; background: rgba(179, 67, 47, .12); border: 1px solid rgba(179, 67, 47, .35); color: var(--danger); }
 .ai-msg-pending { align-self: flex-start; color: var(--ink-soft); font-size: 12px; font-family: 'JetBrains Mono', monospace; }
+.ai-msg-seccion { margin-top: 8px; }
+.ai-msg-seccion-titulo { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; opacity: .7; margin-bottom: 4px; }
+.ai-msg-enlace { display: block; padding: 4px 0; font-size: 13px; text-decoration: none; color: inherit; border-bottom: 1px dashed transparent; }
+.ai-msg-enlace[href] { cursor: pointer; }
+.ai-msg-enlace[href]:hover { border-bottom-color: currentColor; }
+.ai-msg-enlace-sin-ruta { cursor: default; }
 .ai-panel-inputrow { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); background: var(--paper-raised); }
 .ai-panel-inputrow input { flex: 1; padding: 9px 12px; border: 1px solid var(--line); border-radius: 20px; font-family: inherit; font-size: 13px; }
 .ai-panel-inputrow input:focus { outline: 2px solid var(--amber); outline-offset: 1px; }

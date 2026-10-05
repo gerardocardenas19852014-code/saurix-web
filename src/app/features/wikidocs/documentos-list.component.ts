@@ -233,6 +233,18 @@ export class DocumentosListComponent implements OnInit, OnDestroy {
 
     this.cargarFavoritos();
     this.cargar();
+
+    // Deep link (p.ej. desde el Asistente Saurix): ?documento=123 abre
+    // directo ese documento, mismo patrón que ?ticket= en el tablero de
+    // Proyectos.
+    this.route.queryParamMap.subscribe((params) => {
+      const documentoIdParam = Number(params.get('documento')) || 0;
+      if (!documentoIdParam) return;
+      this.data.getById<Documento>('Documento', documentoIdParam).subscribe({
+        next: (documento) => this.verDocumento(documento),
+        error: () => {},
+      });
+    });
   }
 
   ngOnDestroy(): void {

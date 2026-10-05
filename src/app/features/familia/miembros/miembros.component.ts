@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
@@ -62,6 +63,7 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
   protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
+  private readonly route = inject(ActivatedRoute);
   private readonly bitacora = inject(BitacoraService);
 
   protected readonly moduloBitacora = MODULO_BITACORA;
@@ -307,6 +309,18 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     );
     this.data.list<DocumentoFamilia>(ENTIDAD_DOCUMENTO).subscribe((d) => this.documentos.set(d));
     this.cargar();
+
+    // Deep link (p.ej. desde el Asistente Saurix): ?miembro=123 abre
+    // directo la ficha de ese miembro, mismo patrón que ?ticket= en el
+    // tablero de Proyectos.
+    this.route.queryParamMap.subscribe((params) => {
+      const miembroIdParam = Number(params.get('miembro')) || 0;
+      if (!miembroIdParam) return;
+      this.data.getById<MiembroFamilia>(ENTIDAD_MIEMBRO, miembroIdParam).subscribe({
+        next: (miembro) => this.abrirMiembro(miembro),
+        error: () => {},
+      });
+    });
   }
 
   ngOnDestroy(): void {
