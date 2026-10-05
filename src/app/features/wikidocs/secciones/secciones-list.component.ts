@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
@@ -34,7 +34,7 @@ const ENTIDAD = 'Seccion';
   styleUrl: './secciones-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SeccionesListComponent implements OnInit {
+export class SeccionesListComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
@@ -74,6 +74,14 @@ export class SeccionesListComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    // Pantallas de WikiDocs (menos "Inicio", que es la cuadrícula de
+    // iconos): por defecto .content tiene max-width: 980px y queda
+    // centrada, dejando franjas vacías grandes a los lados en pantallas
+    // anchas. Se pide aquí el mismo ancho ampliado que ya usan
+    // Movimientos/Deudas/Proyección/Familia/Panel de Control (ver
+    // html[data-wide='grid'] en styles.scss) para que el contenido
+    // aproveche ese espacio.
+    document.documentElement.setAttribute('data-wide', 'grid');
     this.data.list<TipoSistema>('TipoSistema').subscribe({
       next: (tipos) => {
         this.tiposSistema.set(tipos);
@@ -92,6 +100,10 @@ export class SeccionesListComponent implements OnInit {
       },
       error: () => this.toast.error('No se pudieron cargar las categorías.'),
     });
+  }
+
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
   }
 
   cambiarTipoSistema(idTexto: string): void {

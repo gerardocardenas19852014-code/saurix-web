@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
@@ -56,7 +56,7 @@ interface Migaja {
   styleUrl: './documentos-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class DocumentosListComponent implements OnInit {
+export class DocumentosListComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly data = inject(DataClientService);
   private readonly auth = inject(AuthService);
@@ -205,6 +205,14 @@ export class DocumentosListComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    // Pantallas de WikiDocs (menos "Inicio", que es la cuadrícula de
+    // iconos): por defecto .content tiene max-width: 980px y queda
+    // centrada, dejando franjas vacías grandes a los lados en pantallas
+    // anchas. Se pide aquí el mismo ancho ampliado que ya usan
+    // Movimientos/Deudas/Proyección/Familia/Panel de Control (ver
+    // html[data-wide='grid'] en styles.scss) para que el contenido
+    // aproveche ese espacio.
+    document.documentElement.setAttribute('data-wide', 'grid');
     const param = this.route.snapshot.paramMap.get('seccionId');
     this.seccionFijaId = param ? Number(param) : null;
 
@@ -225,6 +233,10 @@ export class DocumentosListComponent implements OnInit {
 
     this.cargarFavoritos();
     this.cargar();
+  }
+
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
   }
 
   private cargarFavoritos(): void {
