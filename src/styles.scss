@@ -268,6 +268,13 @@ h1, h2 { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(
 .module-tile-indigo { background: var(--indigo); }
 .module-tile-teal { background: var(--teal); }
 .module-tile-accent { background: var(--accent); }
+// Mismos colores que .catalog-list-icon-siif/-personal/-generic (misma
+// paleta semántica), para las landings que antes usaban catalog-list y
+// ahora usan .module-tile-* (WikiDocs, Panel de Control): Gestión de
+// Proyectos ya usaba module-tile con otra paleta (indigo/slate/teal).
+.module-tile-siif { background: var(--technical); }
+.module-tile-personal { background: var(--client); }
+.module-tile-generic { background: var(--amber); }
 
 .workspace-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
 @media (max-width: 720px) { .workspace-grid { grid-template-columns: 1fr; } }

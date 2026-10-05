@@ -1,2 +1,13 @@
-// El sistema visual global (page-header, catalog-group, catalog-list, etc.)
-// vive en src/styles.scss — este componente no necesita estilos propios.
+// El sistema visual global (workspace-grid, workspace-card, page-header,
+// tiles-grid, module-tile-*, etc.) vive en src/styles.scss. Lo único propio de
+// este componente es reacomodar el .tiles-grid (pensado originalmente para el
+// selector de módulos, centrado y de ancho fijo) para que quede alineado a la
+// izquierda y ocupe el ancho disponible dentro de cada grupo — mismo patrón
+// pedido explícitamente por el usuario para Gestión de Proyectos ("en la
+// ventana de inicio lo quiero como iconos, como en el menú de selección de
+// módulos"), ahora también aquí.
+.tiles-grid-landing {
+  justify-content: flex-start;
+  max-width: none;
+  margin: 4px 0 28px;
+}
