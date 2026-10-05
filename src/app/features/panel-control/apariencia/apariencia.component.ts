@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnDestroy, OnInit } from '@angular/core';
 import { ConfiguracionAparienciaService } from '../../../shared/services/configuracion-apariencia.service';
 import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { TEMAS, Tema, ThemeService } from '../../../shared/services/theme.service';
@@ -18,7 +18,21 @@ import { TEMAS, Tema, ThemeService } from '../../../shared/services/theme.servic
   styleUrl: './apariencia.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AparienciaComponent {
+export class AparienciaComponent implements OnInit, OnDestroy {
+  // Pantallas de Panel de Control (menos "Inicio", que es la cuadrícula de
+  // iconos): por defecto .content tiene max-width: 980px y queda centrada,
+  // dejando franjas vacías grandes a los lados en pantallas anchas. Se pide
+  // aquí el mismo ancho ampliado que ya usan Movimientos/Deudas/Proyección/
+  // Familia (ver html[data-wide='grid'] en styles.scss) para que el
+  // contenido aproveche ese espacio.
+  ngOnInit(): void {
+    document.documentElement.setAttribute('data-wide', 'grid');
+  }
+
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
+  }
+
   protected readonly themeService = inject(ThemeService);
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
   private readonly configuracionApariencia = inject(ConfiguracionAparienciaService);

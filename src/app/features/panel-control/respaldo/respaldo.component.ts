@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { IndexedDbEngineService } from '../../../core/services/indexeddb-engine.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../../shared/services/toast.service';
@@ -36,7 +36,21 @@ function esRespaldoValido(valor: unknown): valor is RespaldoSaurix {
   styleUrl: './respaldo.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class RespaldoComponent {
+export class RespaldoComponent implements OnInit, OnDestroy {
+  // Pantallas de Panel de Control (menos "Inicio", que es la cuadrícula de
+  // iconos): por defecto .content tiene max-width: 980px y queda centrada,
+  // dejando franjas vacías grandes a los lados en pantallas anchas. Se pide
+  // aquí el mismo ancho ampliado que ya usan Movimientos/Deudas/Proyección/
+  // Familia (ver html[data-wide='grid'] en styles.scss) para que el
+  // contenido aproveche ese espacio.
+  ngOnInit(): void {
+    document.documentElement.setAttribute('data-wide', 'grid');
+  }
+
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
+  }
+
   private readonly engine = inject(IndexedDbEngineService);
   protected readonly toast = inject(ToastService);
 
