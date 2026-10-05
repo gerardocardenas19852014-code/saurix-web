@@ -2,7 +2,7 @@ import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, HostListener, OnDestroy, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { filter, map } from 'rxjs';
+import { filter, forkJoin, map } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { ComandoPaletaComponent } from '../../shared/components/comando-paleta/comando-paleta.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -12,6 +12,9 @@ import { MiPerfilComponent } from '../../shared/components/mi-perfil/mi-perfil.c
 import { ToastComponent } from '../../shared/components/toast/toast.component';
 import { ConfiguracionAparienciaService } from '../../shared/services/configuracion-apariencia.service';
 import { NotificacionesService } from '../../shared/services/notificaciones.service';
+import { Ticket } from '../../features/proyectos/kanban/ticket.model';
+import { MovimientoPresupuesto } from '../../features/presupuesto/movimientos/movimiento.model';
+import { MiembroFamilia } from '../../features/familia/miembro-familia.model';
 
 interface AiMensaje {
   rol: 'user' | 'bot' | 'pending';
@@ -187,6 +190,9 @@ export class ShellComponent implements OnDestroy {
   protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly configuracionApariencia = inject(ConfiguracionAparienciaService);
+  /** Gatea el botón flotante del Asistente IA (ver ai-fab/ai-panel en la plantilla):
+   *  si está apagado en Apariencia, el asistente no se muestra en ningún módulo. */
+  protected readonly asistenteIaActivo = this.configuracionApariencia.asistenteIaActivo;
   protected readonly notificacionesService = inject(NotificacionesService);
 
   /** Revisión periódica de SLA (ver NotificacionesService.revisarSlaTickets) — cada
@@ -211,6 +217,11 @@ export class ShellComponent implements OnDestroy {
     effect(() => {
       this.urlActual();
       this.menuMovilAbierto.set(false);
+    });
+    effect(() => {
+      if (!this.asistenteIaActivo() && this.aiAbierto()) {
+        this.aiAbierto.set(false);
+      }
     });
 
     // Aviso de cambios sin guardar (ver comentario largo junto a
@@ -423,44 +434,98 @@ export class ShellComponent implements OnDestroy {
     this.aiPregunta.set('');
     this.aiOcupado.set(true);
 
-    this.data.list<DocumentoBuscable>('Documento').subscribe({
-      next: (documentos) => {
-        const respuesta = this.buscarRespuesta(pregunta, documentos);
+    // Busca en paralelo en las cuatro fuentes con las que hoy puede ayudar el
+    // asistente: documentación (WikiDocs), tickets (Gestión de Proyectos),
+    // movimientos (Presupuesto Personal) y directorio (Familia). Sigue siendo
+    // una búsqueda por palabra clave (no un modelo de lenguaje real), pero ya
+    // no se limita a WikiDocs.
+    forkJoin({
+      documentos: this.data.list<DocumentoBuscable>('Documento'),
+      tickets: this.data.list<Ticket>('Ticket'),
+      movimientos: this.data.list<MovimientoPresupuesto>('MovimientoPresupuesto'),
+      miembros: this.data.list<MiembroFamilia>('MiembroFamilia'),
+    }).subscribe({
+      next: ({ documentos, tickets, movimientos, miembros }) => {
+        const respuesta = this.buscarRespuesta(pregunta, { documentos, tickets, movimientos, miembros });
         this.aiMensajes.update((m) => [...m.slice(0, -1), { rol: 'bot', texto: respuesta }]);
         this.aiOcupado.set(false);
       },
       error: () => {
         this.aiMensajes.update((m) => [
           ...m.slice(0, -1),
-          { rol: 'bot', texto: 'No pude buscar en la documentación en este momento.' },
+          { rol: 'bot', texto: 'No pude buscar en el sistema en este momento.' },
         ]);
         this.aiOcupado.set(false);
       },
     });
   }
 
-  private buscarRespuesta(pregunta: string, documentos: DocumentoBuscable[]): string {
+  private buscarRespuesta(
+    pregunta: string,
+    fuentes: {
+      documentos: DocumentoBuscable[];
+      tickets: Ticket[];
+      movimientos: MovimientoPresupuesto[];
+      miembros: MiembroFamilia[];
+    },
+  ): string {
     const palabras = pregunta
       .toLowerCase()
       .split(/\s+/)
       .filter((p) => p.length > 3);
 
-    const coincidencias = documentos.filter((d) =>
-      palabras.some(
-        (p) => d.titulo?.toLowerCase().includes(p) || d.contenido?.toLowerCase().includes(p),
-      ),
+    if (palabras.length === 0) {
+      return 'Cuéntame un poco más para poder buscar en el sistema.';
+    }
+
+    const coincideTexto = (...valores: (string | null | undefined)[]): boolean =>
+      palabras.some((p) => valores.some((v) => v?.toLowerCase().includes(p)));
+
+    const documentosEncontrados = fuentes.documentos.filter((d) => coincideTexto(d.titulo, d.contenido));
+    const ticketsEncontrados = fuentes.tickets.filter((t) =>
+      coincideTexto(t.titulo, t.descripcion, t.numeroTicket),
+    );
+    const movimientosEncontrados = fuentes.movimientos.filter((m) => coincideTexto(m.descripcion));
+    const miembrosEncontrados = fuentes.miembros.filter((m) =>
+      coincideTexto(m.nombre, m.apellidoPaterno, m.apellidoMaterno),
     );
 
-    if (palabras.length === 0) {
-      return 'Cuéntame un poco más para poder buscar en WikiDocs.';
+    const secciones: string[] = [];
+    if (documentosEncontrados.length > 0) {
+      const lista = documentosEncontrados
+        .slice(0, 3)
+        .map((d) => `• ${d.titulo ?? 'Documento sin título'}`)
+        .join('\n');
+      secciones.push(`📚 WikiDocs\n${lista}`);
     }
-    if (coincidencias.length === 0) {
-      return 'No encontré nada relacionado en WikiDocs todavía. Prueba con otras palabras, o crea un documento sobre este tema.';
+    if (ticketsEncontrados.length > 0) {
+      const lista = ticketsEncontrados
+        .slice(0, 3)
+        .map((t) => `• ${t.numeroTicket} — ${t.titulo}`)
+        .join('\n');
+      secciones.push(`🎫 Proyectos\n${lista}`);
     }
-    const lista = coincidencias
-      .slice(0, 3)
-      .map((d) => `• ${d.titulo ?? 'Documento sin título'}`)
-      .join('\n');
-    return `Encontré esto en WikiDocs:\n${lista}`;
+    if (movimientosEncontrados.length > 0) {
+      const lista = movimientosEncontrados
+        .slice(0, 3)
+        .map(
+          (m) =>
+            `• ${m.descripcion} (${m.monto.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })})`,
+        )
+        .join('\n');
+      secciones.push(`💰 Presupuesto\n${lista}`);
+    }
+    if (miembrosEncontrados.length > 0) {
+      const lista = miembrosEncontrados
+        .slice(0, 3)
+        .map((m) => `• ${[m.nombre, m.apellidoPaterno, m.apellidoMaterno].filter(Boolean).join(' ')}`)
+        .join('\n');
+      secciones.push(`👪 Familia\n${lista}`);
+    }
+
+    if (secciones.length === 0) {
+      return 'No encontré nada relacionado en WikiDocs, Proyectos, Presupuesto ni Familia. Prueba con otras palabras.';
+    }
+    return `Encontré esto:\n\n${secciones.join('\n\n')}`;
   }
 }

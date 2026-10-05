@@ -229,43 +229,48 @@
   (cancelar)="cancelarCierrePendiente()"
 />
 
-<button
-  type="button"
-  class="ai-fab"
-  [class.is-open]="aiAbierto()"
-  (click)="toggleAiChat()"
-  title="Preguntarle al asistente"
->
-  💬
-</button>
+<!-- El asistente completo (botón flotante + panel) solo se renderiza si
+     "Asistente IA" está activo en Panel de Control → Apariencia; antes de
+     este cambio aparecía siempre sin importar el interruptor. -->
+@if (asistenteIaActivo()) {
+  <button
+    type="button"
+    class="ai-fab"
+    [class.is-open]="aiAbierto()"
+    (click)="toggleAiChat()"
+    title="Preguntarle al asistente"
+  >
+    💬
+  </button>
 
-<div class="ai-panel" [class.is-open]="aiAbierto()">
-  <div class="ai-panel-header">
-    <div>
-      <strong>Asistente Saurix</strong>
-      <span class="ai-panel-sub">Responde con base en la documentación cargada</span>
+  <div class="ai-panel" [class.is-open]="aiAbierto()">
+    <div class="ai-panel-header">
+      <div>
+        <strong>Asistente Saurix</strong>
+        <span class="ai-panel-sub">Busca en WikiDocs, Proyectos, Presupuesto y Familia</span>
+      </div>
+      <button type="button" class="ai-panel-close" (click)="toggleAiChat()" aria-label="Cerrar asistente">✕</button>
     </div>
-    <button type="button" class="ai-panel-close" (click)="toggleAiChat()" aria-label="Cerrar asistente">✕</button>
-  </div>
-  <div class="ai-panel-messages">
-    @for (m of aiMensajes(); track $index) {
-      @if (m.rol === 'pending') {
-        <div class="ai-msg-pending">Pensando…</div>
-      } @else {
-        <div class="ai-msg" [class.ai-msg-user]="m.rol === 'user'" [class.ai-msg-bot]="m.rol === 'bot'">{{ m.texto }}</div>
+    <div class="ai-panel-messages">
+      @for (m of aiMensajes(); track $index) {
+        @if (m.rol === 'pending') {
+          <div class="ai-msg-pending">Pensando…</div>
+        } @else {
+          <div class="ai-msg" [class.ai-msg-user]="m.rol === 'user'" [class.ai-msg-bot]="m.rol === 'bot'">{{ m.texto }}</div>
+        }
+      } @empty {
+        <div class="ai-msg-pending">Pregúntame algo sobre WikiDocs, tickets, movimientos o la familia.</div>
       }
-    } @empty {
-      <div class="ai-msg-pending">Pregúntame algo sobre la documentación cargada en WikiDocs.</div>
-    }
+    </div>
+    <form class="ai-panel-inputrow" (submit)="enviarPreguntaAi(); $event.preventDefault()">
+      <input
+        type="text"
+        [value]="aiPregunta()"
+        (input)="aiPregunta.set($any($event.target).value)"
+        placeholder="Escribe tu pregunta…"
+        autocomplete="off"
+      />
+      <button type="submit" class="btn-primary small">Enviar</button>
+    </form>
   </div>
-  <form class="ai-panel-inputrow" (submit)="enviarPreguntaAi(); $event.preventDefault()">
-    <input
-      type="text"
-      [value]="aiPregunta()"
-      (input)="aiPregunta.set($any($event.target).value)"
-      placeholder="Escribe tu pregunta…"
-      autocomplete="off"
-    />
-    <button type="submit" class="btn-primary small">Enviar</button>
-  </form>
-</div>
+}
