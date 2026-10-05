@@ -1,1 +1,110 @@
-/* Estilos en src/styles.scss (.modules-header-row, .session-inline, .tiles-grid, .module-tile-*). */
+// Esta pantalla (selector de módulos, primera vista tras iniciar sesión)
+// pidió explícitamente verse "más dinámico y atractivo". Las clases
+// .tiles-grid/.module-tile-* son compartidas con otros selectores de
+// iconos (Proyectos/WikiDocs/Panel de Control → sus "Inicio"), así que en
+// vez de tocar src/styles.scss (lo que cambiaría también esas otras
+// pantallas, no pedido aquí) se sobreescriben aquí mismo: gracias al view
+// encapsulation de Angular, estas reglas solo aplican a lo que renderiza
+// ModulosComponent — el resto de selectores de módulo quedan intactos con
+// el estilo plano de siempre.
+
+@keyframes modulo-header-entrada {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes modulo-tile-entrada {
+  from { opacity: 0; transform: translateY(18px) scale(.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modules-header-row, .hint {
+  animation: modulo-header-entrada .4s ease backwards;
+}
+.hint { animation-delay: .05s; }
+
+.tiles-grid {
+  max-width: 780px;
+  gap: 22px;
+}
+
+.module-tile {
+  position: relative;
+  width: 172px;
+  height: 172px;
+  border-radius: 20px;
+  overflow: hidden;
+  gap: 14px;
+  box-shadow: 0 14px 28px -16px rgba(0, 0, 0, .5);
+  animation: modulo-tile-entrada .5s cubic-bezier(.22, 1, .36, 1) backwards;
+  transition: transform .25s cubic-bezier(.22, 1, .36, 1), box-shadow .25s ease;
+}
+
+// Brillo superior tipo "glossy" (fijo) + halo radial que aparece en hover —
+// puramente decorativos, nunca interceptan el click.
+.module-tile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(165deg, rgba(255, 255, 255, .3) 0%, rgba(255, 255, 255, 0) 45%);
+  pointer-events: none;
+}
+.module-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 30% 22%, rgba(255, 255, 255, .38), transparent 60%);
+  opacity: 0;
+  transition: opacity .25s ease;
+  pointer-events: none;
+}
+
+.module-tile:hover {
+  transform: translateY(-6px) scale(1.035);
+  box-shadow: 0 22px 38px -16px rgba(0, 0, 0, .55);
+}
+.module-tile:hover::after { opacity: 1; }
+.module-tile:hover .module-tile-icon { transform: scale(1.12) rotate(-4deg); }
+.module-tile:active { transform: translateY(-2px) scale(1.01); }
+
+.module-tile-icon {
+  position: relative;
+  font-size: 44px;
+  width: 68px;
+  height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .18);
+  transition: transform .25s cubic-bezier(.22, 1, .36, 1);
+}
+
+.module-tile-label {
+  position: relative;
+  font-size: 15px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+}
+
+// Entrada escalonada: cada tile aparece un poco después que el anterior.
+.tiles-grid .module-tile:nth-child(1) { animation-delay: .04s; }
+.tiles-grid .module-tile:nth-child(2) { animation-delay: .1s; }
+.tiles-grid .module-tile:nth-child(3) { animation-delay: .16s; }
+.tiles-grid .module-tile:nth-child(4) { animation-delay: .22s; }
+.tiles-grid .module-tile:nth-child(5) { animation-delay: .28s; }
+.tiles-grid .module-tile:nth-child(6) { animation-delay: .34s; }
+.tiles-grid .module-tile:nth-child(n+7) { animation-delay: .38s; }
+
+// Degradados propios por color (en vez del relleno plano de styles.scss),
+// mezclando el color base de cada módulo con blanco/negro vía color-mix()
+// para que se vea bien en los 6 temas de Apariencia sin colores fijos.
+.module-tile-green  { background: linear-gradient(150deg, color-mix(in srgb, var(--client) 88%, white) 0%, var(--client) 55%, color-mix(in srgb, var(--client) 78%, black) 100%); }
+.module-tile-slate  { background: linear-gradient(150deg, color-mix(in srgb, var(--technical) 88%, white) 0%, var(--technical) 55%, color-mix(in srgb, var(--technical) 78%, black) 100%); }
+.module-tile-navy   { background: linear-gradient(150deg, color-mix(in srgb, var(--ink) 88%, white) 0%, var(--ink) 55%, color-mix(in srgb, var(--ink) 78%, black) 100%); }
+.module-tile-amber  { background: linear-gradient(150deg, color-mix(in srgb, var(--amber) 88%, white) 0%, var(--amber) 55%, color-mix(in srgb, var(--amber) 78%, black) 100%); }
+.module-tile-indigo { background: linear-gradient(150deg, color-mix(in srgb, var(--indigo) 88%, white) 0%, var(--indigo) 55%, color-mix(in srgb, var(--indigo) 78%, black) 100%); }
+.module-tile-teal   { background: linear-gradient(150deg, color-mix(in srgb, var(--teal) 88%, white) 0%, var(--teal) 55%, color-mix(in srgb, var(--teal) 78%, black) 100%); }
+
+@media (prefers-reduced-motion: reduce) {
+  .modules-header-row, .hint, .module-tile { animation: none; }
+}
