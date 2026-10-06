@@ -1,0 +1,141 @@
+<div class="page-header">
+  <h1>Trámites familiares</h1>
+  <div class="page-actions">
+    <button type="button" class="btn-secondary small" (click)="abrirConfigColumnas()">⚙ Configurar columnas</button>
+    <button type="button" class="toolbar-btn" (click)="nuevoTramite()">+ Nuevo trámite</button>
+  </div>
+</div>
+<p class="hint" style="margin:-10px 0 24px;">
+  Pasaportes, inscripciones escolares, trámites de gobierno — arrastra cada tarjeta a la columna que corresponda.
+</p>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else {
+  <div class="tramites-tablero">
+    @for (estado of estadosOrdenados(); track estado.id) {
+      <div class="tramites-columna" (dragover)="$event.preventDefault()" (drop)="onDrop(estado.id)">
+        <div class="tramites-columna-titulo">
+          {{ estado.nombre }}
+          <span class="tramites-columna-conteo">{{ (tramitesPorEstado().get(estado.id) ?? []).length }}</span>
+        </div>
+        <div class="tramites-columna-cuerpo">
+          @for (t of tramitesPorEstado().get(estado.id) ?? []; track t.id) {
+            <button
+              type="button"
+              class="tramites-tarjeta"
+              draggable="true"
+              (dragstart)="onDragStart(t)"
+              (dragend)="onDragEnd()"
+              (click)="editarTramite(t)"
+            >
+              <strong>{{ t.titulo }}</strong>
+              <span class="hint" style="margin:4px 0 0; display:block;">{{ nombreMiembro(t.miembroFamiliaId) }}</span>
+              @if (t.fechaLimite) {
+                <span class="tramites-tarjeta-fecha">📅 {{ t.fechaLimite | date: 'dd/MM/yyyy' }}</span>
+              }
+            </button>
+          }
+          <button type="button" class="tramites-columna-agregar" (click)="nuevoTramite(estado.id)">+ Agregar</button>
+        </div>
+      </div>
+    }
+  </div>
+}
+
+@if (modalAbierto()) {
+  <div class="modal-overlay modal show d-block" (click)="cerrarModal()">
+    <form class="modal-box modal-dialog modal-content" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3 class="modal-title mb-3">{{ tramiteEnEdicion() ? 'Editar trámite' : 'Nuevo trámite' }}</h3>
+      <div class="edit-form">
+        <label class="floating-field">
+          <span>Título <b>*</b></span>
+          <input type="text" class="form-control pill-control" formControlName="titulo" placeholder=" " />
+        </label>
+        <label class="floating-field">
+          <span>Miembro relacionado</span>
+          <select class="form-control pill-control" formControlName="miembroFamiliaId">
+            <option [ngValue]="0">Toda la familia</option>
+            @for (m of miembros(); track m.id) {
+              <option [ngValue]="m.id">{{ m.nombre }} {{ m.apellidoPaterno }}</option>
+            }
+          </select>
+        </label>
+        <label class="floating-field">
+          <span>Columna</span>
+          <select class="form-control pill-control" formControlName="tramiteEstadoId">
+            @for (e of estadosOrdenados(); track e.id) {
+              <option [ngValue]="e.id">{{ e.nombre }}</option>
+            }
+          </select>
+        </label>
+        <label class="floating-field">
+          <span>Fecha límite</span>
+          <input type="date" class="form-control pill-control" formControlName="fechaLimite" placeholder=" " />
+        </label>
+        <label class="floating-field">
+          <span>Notas</span>
+          <input type="text" class="form-control pill-control" formControlName="notas" placeholder=" " />
+        </label>
+      </div>
+      <div class="modal-actions">
+        @if (tramiteEnEdicion()) {
+          <button type="button" class="btn-danger" (click)="pedirEliminarTramite(tramiteEnEdicion()!); cerrarModal()">Eliminar</button>
+        }
+        <button type="button" class="btn-secondary" (click)="cerrarModal()">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+<app-confirm-dialog
+  [visible]="tramiteAEliminar() !== null"
+  titulo="Eliminar trámite"
+  mensaje="¿Eliminar este trámite?"
+  (confirmar)="confirmarEliminarTramite()"
+  (cancelar)="tramiteAEliminar.set(null)"
+/>
+
+@if (modalColumnasAbierto()) {
+  <div class="modal-overlay modal show d-block" (click)="cerrarConfigColumnas()">
+    <div class="modal-box modal-dialog modal-content" (click)="$event.stopPropagation()">
+      <h3 class="modal-title mb-3">Configurar columnas</h3>
+      <p class="hint">Agrega, renombra, reordena o elimina las columnas del tablero.</p>
+      <div class="tramites-config-lista">
+        @for (estado of estadosOrdenados(); track estado.id; let i = $index; let total = $count) {
+          <div class="tramites-config-fila">
+            <input
+              type="text"
+              class="form-control pill-control"
+              [value]="estado.nombre"
+              (change)="renombrarColumna(estado, $any($event.target).value)"
+            />
+            <button type="button" class="btn-secondary small" [disabled]="i === 0" (click)="moverColumna(estado, -1)" title="Mover antes">▲</button>
+            <button type="button" class="btn-secondary small" [disabled]="i === total - 1" (click)="moverColumna(estado, 1)" title="Mover después">▼</button>
+            <button type="button" class="btn-danger small" (click)="pedirEliminarColumna(estado)" title="Eliminar">🗑</button>
+          </div>
+        }
+      </div>
+      <div class="tramites-config-nueva">
+        <input
+          type="text"
+          class="form-control pill-control"
+          placeholder="Nombre de la nueva columna"
+          [value]="nombreColumnaNueva()"
+          (input)="nombreColumnaNueva.set($any($event.target).value)"
+        />
+        <button type="button" class="btn-secondary small" (click)="agregarColumna()">+ Agregar columna</button>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-primary" (click)="cerrarConfigColumnas()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+}
+<app-confirm-dialog
+  [visible]="columnaAEliminar() !== null"
+  titulo="Eliminar columna"
+  mensaje="¿Eliminar esta columna del tablero?"
+  (confirmar)="confirmarEliminarColumna()"
+  (cancelar)="columnaAEliminar.set(null)"
+/>

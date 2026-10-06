@@ -1,0 +1,100 @@
+.tramites-tablero {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.tramites-columna {
+  flex: 0 0 260px;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+}
+
+.tramites-columna-titulo {
+  padding: 12px 14px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tramites-columna-conteo {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: var(--client-soft);
+  color: var(--client);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.tramites-columna-cuerpo {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.tramites-tarjeta {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: grab;
+  font: inherit;
+  color: inherit;
+}
+
+.tramites-tarjeta:active { cursor: grabbing; }
+
+.tramites-tarjeta-fecha {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.tramites-columna-agregar {
+  background: transparent;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  padding: 8px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.tramites-columna-agregar:hover { border-color: var(--accent); color: var(--accent); }
+
+.tramites-config-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tramites-config-fila {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tramites-config-fila input { flex: 1; }
+
+.tramites-config-nueva {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.tramites-config-nueva input { flex: 1; }

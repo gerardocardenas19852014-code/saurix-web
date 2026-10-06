@@ -8,6 +8,23 @@
   Lo más próximo de toda la familia (cumpleaños, documentos y pólizas por vencer, citas médicas y eventos), ordenado por cercanía — próximos 90 días.
 </p>
 
+@if (!cargando() && resumenPolizas().totalActivas > 0) {
+  <div class="familia-resumen-polizas-box">
+    <div class="familia-resumen-polizas-titulo">🛡️ Pólizas activas de la familia</div>
+    <div class="familia-resumen-polizas-stats">
+      <span><strong>{{ resumenPolizas().totalActivas }}</strong> activas</span>
+      @if (resumenPolizas().sumaTotal > 0) {
+        <span>Suma asegurada total: <strong>{{ formatMoneda(resumenPolizas().sumaTotal) }}</strong></span>
+      }
+    </div>
+    <div class="familia-resumen-polizas-tipos">
+      @for (t of resumenPolizas().porTipo; track t.tipo) {
+        <span class="familia-resumen-polizas-chip">{{ t.tipo }}: {{ t.cantidad }}</span>
+      }
+    </div>
+  </div>
+}
+
 @if (cargando()) {
   <p class="empty">Cargando…</p>
 } @else if (secciones().length === 0) {

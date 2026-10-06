@@ -53,6 +53,25 @@ const GRUPOS: GrupoModulo[] = [
     ],
   },
   {
+    titulo: 'Hogar',
+    enlaces: [
+      {
+        ruta: 'tramites',
+        icono: '🗒️',
+        color: 'indigo',
+        titulo: 'Trámites familiares',
+        descripcion: 'Checklist tipo tablero para pasaportes, inscripciones y trámites de gobierno.',
+      },
+      {
+        ruta: 'tareas',
+        icono: '🧹',
+        color: 'indigo',
+        titulo: 'Tareas del hogar',
+        descripcion: 'Quehaceres con responsable y frecuencia.',
+      },
+    ],
+  },
+  {
     titulo: 'Catálogos',
     enlaces: [
       {
@@ -89,6 +108,13 @@ const GRUPOS: GrupoModulo[] = [
         color: 'amber',
         titulo: 'Tipo de sangre',
         descripcion: 'Catálogo de tipos de sangre para la tarjeta de emergencia.',
+      },
+      {
+        ruta: 'proveedor-salud',
+        icono: '🏥',
+        color: 'amber',
+        titulo: 'Proveedores de salud',
+        descripcion: 'Médicos, clínicas y hospitales que se pueden elegir al capturar una cita médica.',
       },
     ],
   },

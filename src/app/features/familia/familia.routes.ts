@@ -22,6 +22,14 @@ export const FAMILIA_ROUTES: Routes = [
     loadComponent: () => import('./resumen/resumen-familia.component').then((m) => m.ResumenFamiliaComponent),
   },
   {
+    path: 'tramites',
+    loadComponent: () => import('./tramites/tramites-familiares.component').then((m) => m.TramitesFamiliaresComponent),
+  },
+  {
+    path: 'tareas',
+    loadComponent: () => import('./tareas-hogar/tareas-hogar.component').then((m) => m.TareasHogarComponent),
+  },
+  {
     path: 'parentesco',
     loadComponent: () => import('./parentesco/parentesco.component').then((m) => m.ParentescoComponent),
   },
@@ -40,5 +48,9 @@ export const FAMILIA_ROUTES: Routes = [
   {
     path: 'tipo-sangre',
     loadComponent: () => import('./tipo-sangre/tipo-sangre.component').then((m) => m.TipoSangreComponent),
+  },
+  {
+    path: 'proveedor-salud',
+    loadComponent: () => import('./proveedor-salud/proveedor-salud.component').then((m) => m.ProveedorSaludComponent),
   },
 ];

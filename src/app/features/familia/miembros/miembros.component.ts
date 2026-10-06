@@ -15,15 +15,22 @@ import { ToastService } from '../../../shared/services/toast.service';
 import { ValorLista } from '../../../shared/valor-lista/valor-lista.model';
 import { calcularRfcYCurp, OPCIONES_ENTIDAD, OPCIONES_SEXO } from '../../panel-control/rfc-curp/rfc-curp.util';
 import { colorAvatar, iniciales } from '../../proyectos/kanban/avatar.util';
+import { formatMoneda } from '../../presupuesto/shared/wallet.util';
 import { DocumentoFamilia } from '../documento-familia.model';
 import { VacunaMiembro } from '../vacuna-miembro.model';
+import { VacunaReferencia, vacunasSugeridasPendientes } from '../esquema-vacunacion';
 import { CitaMedicaMiembro } from '../cita-medica-miembro.model';
 import { PolizaSeguroMiembro } from '../poliza-seguro-miembro.model';
+import { MedicionCrecimiento } from '../medicion-crecimiento.model';
+import { ContactoEmergenciaMiembro } from '../contacto-emergencia-miembro.model';
 import {
   CLASE_ESTADO_VENCIMIENTO,
   DIAS_AVISO_CUMPLEANOS,
+  DIMENSIONES_GRAFICA_SVG,
   ETIQUETA_ESTADO_VENCIMIENTO,
   calcularEdad,
+  calcularEdadMeses,
+  construirSerieSvg,
   diasHastaCumpleanos,
   edadEnProximoCumpleanos,
   estadoVencimiento,
@@ -44,6 +51,8 @@ const ENTIDAD_DOCUMENTO = 'DocumentoFamilia';
 const ENTIDAD_VACUNA = 'VacunaMiembro';
 const ENTIDAD_CITA = 'CitaMedicaMiembro';
 const ENTIDAD_POLIZA = 'PolizaSeguroMiembro';
+const ENTIDAD_MEDICION = 'MedicionCrecimiento';
+const ENTIDAD_CONTACTO_EMERGENCIA = 'ContactoEmergenciaMiembro';
 
 /** Opciones fijas para el tipo de póliza — ver nota en poliza-seguro-miembro.model.ts. */
 const TIPOS_POLIZA = ['Vida', 'Gastos médicos', 'Auto', 'Hogar', 'Otro'];
@@ -85,11 +94,14 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
   protected readonly estadoVencimiento = estadoVencimiento;
   protected readonly etiquetaEstadoVencimiento = ETIQUETA_ESTADO_VENCIMIENTO;
   protected readonly claseEstadoVencimiento = CLASE_ESTADO_VENCIMIENTO;
+  protected readonly formatMoneda = formatMoneda;
 
   // ── Listado ────────────────────────────────────────────────────────
   protected readonly miembros = signal<MiembroFamilia[]>([]);
   protected readonly parentescos = signal<ValorLista[]>([]);
   protected readonly tiposDocumento = signal<ValorLista[]>([]);
+  /** Catálogo de proveedores de salud (Familia → Catálogos) — ver proveedor-salud.component.ts. */
+  protected readonly proveedoresSalud = signal<ValorLista[]>([]);
   /** Sexo, Entidad de nacimiento y Tipo de sangre ahora son catálogos ValorLista
    *  propios (Familia → Catálogos) en vez de arreglos fijos — ver miembro-familia.model.ts. */
   protected readonly sexos = signal<ValorLista[]>([]);
@@ -99,6 +111,8 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
   protected readonly vacunas = signal<VacunaMiembro[]>([]);
   protected readonly citasMedicas = signal<CitaMedicaMiembro[]>([]);
   protected readonly polizas = signal<PolizaSeguroMiembro[]>([]);
+  protected readonly mediciones = signal<MedicionCrecimiento[]>([]);
+  protected readonly contactosEmergencia = signal<ContactoEmergenciaMiembro[]>([]);
   protected readonly cargando = signal(false);
   protected readonly mostrarInactivos = signal(false);
   protected readonly aEliminar = signal<MiembroFamilia | null>(null);
@@ -262,6 +276,17 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
       .sort((a, b) => (b.fechaAplicacion || '').localeCompare(a.fechaAplicacion || ''));
   });
 
+  /** Vacunas del esquema de referencia que, por edad, ya aplicarían y aún
+   *  no están capturadas — ver esquema-vacunacion.ts. Solo es una
+   *  sugerencia (texto informativo + atajo para capturarla), nunca una
+   *  validación que bloquee nada. */
+  protected readonly vacunasSugeridasDelMiembro = computed<VacunaReferencia[]>(() => {
+    const miembro = this.miembroActivo();
+    if (!miembro) return [];
+    const edadMeses = calcularEdadMeses(miembro.fechaNacimiento);
+    return vacunasSugeridasPendientes(edadMeses, this.vacunasDelMiembro());
+  });
+
   protected readonly citasDelMiembro = computed(() => {
     const id = this.miembroActivo()?.id;
     if (!id) return [];
@@ -269,6 +294,39 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
       .filter((c) => Number(c.miembroFamiliaId) === Number(id))
       .sort((a, b) => (a.fecha || '9999').localeCompare(b.fecha || '9999'));
   });
+
+  // ── Salud: línea de crecimiento ──────────────────────────────────────
+  protected readonly dimensionesGraficaSvg = DIMENSIONES_GRAFICA_SVG;
+
+  protected readonly medicionesDelMiembro = computed(() => {
+    const id = this.miembroActivo()?.id;
+    if (!id) return [];
+    return this.mediciones()
+      .filter((m) => Number(m.miembroFamiliaId) === Number(id))
+      .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+  });
+
+  /** Puntos x=edad en meses (al momento de CADA medición, no hoy — ver
+   *  calcularEdadMeses(fechaNacimiento, fechaReferencia)), y=peso/estatura.
+   *  Se arma como SerieSvg (ver familia.util.ts → construirSerieSvg) para
+   *  dibujar un <polyline> simple, sin agregar ninguna librería de
+   *  gráficas nueva al proyecto. */
+  private serieCrecimiento(campo: (m: MedicionCrecimiento) => number | null | undefined) {
+    const miembro = this.miembroActivo();
+    if (!miembro) return null;
+    const puntos = this.medicionesDelMiembro()
+      .map((m) => {
+        const valor = campo(m);
+        if (valor === null || valor === undefined || !m.fecha) return null;
+        const edadMeses = calcularEdadMeses(miembro.fechaNacimiento, m.fecha);
+        return edadMeses === null ? null : { x: edadMeses, y: valor };
+      })
+      .filter((p): p is { x: number; y: number } => p !== null);
+    return construirSerieSvg(puntos);
+  }
+
+  protected readonly graficaPeso = computed(() => this.serieCrecimiento((m) => m.pesoKg));
+  protected readonly graficaEstatura = computed(() => this.serieCrecimiento((m) => m.estaturaCm));
 
   protected readonly polizasDelMiembro = computed(() => {
     const id = this.miembroActivo()?.id;
@@ -343,6 +401,9 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     this.data.list<ValorLista>('ValorLista', { grupo: 'FamiliaParentesco' }).subscribe((v) =>
       this.parentescos.set(v.filter((r) => r.grupo === 'FamiliaParentesco' && r.activo !== false).sort((a, b) => a.orden - b.orden)),
     );
+    this.data.list<ValorLista>('ValorLista', { grupo: 'FamiliaProveedorSalud' }).subscribe((v) =>
+      this.proveedoresSalud.set(v.filter((r) => r.grupo === 'FamiliaProveedorSalud' && r.activo !== false).sort((a, b) => a.orden - b.orden)),
+    );
     this.data.list<ValorLista>('ValorLista', { grupo: 'DocumentoFamiliaTipo' }).subscribe((v) =>
       this.tiposDocumento.set(v.filter((r) => r.grupo === 'DocumentoFamiliaTipo' && r.activo !== false).sort((a, b) => a.orden - b.orden)),
     );
@@ -367,6 +428,8 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     this.data.list<VacunaMiembro>(ENTIDAD_VACUNA).subscribe((v) => this.vacunas.set(v));
     this.data.list<CitaMedicaMiembro>(ENTIDAD_CITA).subscribe((c) => this.citasMedicas.set(c));
     this.data.list<PolizaSeguroMiembro>(ENTIDAD_POLIZA).subscribe((p) => this.polizas.set(p));
+    this.data.list<MedicionCrecimiento>(ENTIDAD_MEDICION).subscribe((me) => this.mediciones.set(me));
+    this.data.list<ContactoEmergenciaMiembro>(ENTIDAD_CONTACTO_EMERGENCIA).subscribe((c) => this.contactosEmergencia.set(c));
     this.cargar();
 
     // Deep link (p.ej. desde el Asistente Saurix): ?miembro=123 abre
@@ -679,11 +742,30 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     notas: [''],
   });
 
+  /** Select "Proveedor de salud" dentro del modal de cita: solo autocompleta
+   *  el campo Lugar (texto libre) con la etiqueta elegida — no es una FK,
+   *  así que el usuario puede seguir editándolo a mano después. */
+  elegirProveedorSalud(etiqueta: string): void {
+    if (etiqueta) this.formCita.patchValue({ lugar: etiqueta });
+  }
+
   nuevaVacuna(): void {
     const miembro = this.miembroActivo();
     if (!miembro) return;
     this.vacunaEnEdicion.set(null);
     this.formVacuna.reset({ id: 0, miembroFamiliaId: miembro.id, nombre: '', fechaAplicacion: '', dosis: '', notas: '' });
+    this.modalVacunaAbierto.set(true);
+  }
+
+  /** Atajo desde la lista de "Sugeridas" (ver vacunasSugeridasDelMiembro):
+   *  abre el modal de nueva vacuna con el nombre y la dosis ya precargados,
+   *  pero sin fecha — la captura real de cuándo se aplicó la hace la
+   *  persona, esto solo ahorra escribir el nombre. */
+  agregarVacunaSugerida(ref: VacunaReferencia): void {
+    const miembro = this.miembroActivo();
+    if (!miembro) return;
+    this.vacunaEnEdicion.set(null);
+    this.formVacuna.reset({ id: 0, miembroFamiliaId: miembro.id, nombre: ref.nombre, fechaAplicacion: '', dosis: ref.dosis, notas: '' });
     this.modalVacunaAbierto.set(true);
   }
 
@@ -732,6 +814,161 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
         this.toast.exito('Vacuna eliminada.');
         this.vacunaAEliminar.set(null);
         this.data.list<VacunaMiembro>(ENTIDAD_VACUNA).subscribe((v) => this.vacunas.set(v));
+      },
+      error: () => this.toast.error('No se pudo eliminar. Intenta de nuevo.'),
+    });
+  }
+
+  // ── Contacto y seguro: directorio de contactos de emergencia (CRUD) ──
+  protected readonly contactosEmergenciaDelMiembro = computed(() => {
+    const id = this.miembroActivo()?.id;
+    if (!id) return [];
+    return this.contactosEmergencia().filter((c) => Number(c.miembroFamiliaId) === Number(id));
+  });
+
+  protected readonly modalContactoEmergenciaAbierto = signal(false);
+  protected readonly contactoEmergenciaEnEdicion = signal<ContactoEmergenciaMiembro | null>(null);
+  protected readonly contactoEmergenciaAEliminar = signal<ContactoEmergenciaMiembro | null>(null);
+
+  protected readonly formContactoEmergencia = this.fb.nonNullable.group({
+    id: [0],
+    miembroFamiliaId: [0],
+    nombre: ['', Validators.required],
+    relacion: [''],
+    telefono: [''],
+    notas: [''],
+  });
+
+  nuevoContactoEmergencia(): void {
+    const miembro = this.miembroActivo();
+    if (!miembro) return;
+    this.contactoEmergenciaEnEdicion.set(null);
+    this.formContactoEmergencia.reset({ id: 0, miembroFamiliaId: miembro.id, nombre: '', relacion: '', telefono: '', notas: '' });
+    this.modalContactoEmergenciaAbierto.set(true);
+  }
+
+  editarContactoEmergencia(c: ContactoEmergenciaMiembro): void {
+    this.contactoEmergenciaEnEdicion.set(c);
+    this.formContactoEmergencia.reset(c);
+    this.modalContactoEmergenciaAbierto.set(true);
+  }
+
+  cerrarModalContactoEmergencia(): void {
+    this.toast.info('Cambios descartados.');
+    this.modalContactoEmergenciaAbierto.set(false);
+  }
+
+  guardarContactoEmergencia(): void {
+    if (this.formContactoEmergencia.invalid) {
+      this.formContactoEmergencia.markAllAsTouched();
+      this.toast.error('Captura el nombre del contacto.');
+      return;
+    }
+    const valor = this.formContactoEmergencia.getRawValue();
+    const esEdicion = this.contactoEmergenciaEnEdicion() !== null;
+    const peticion = esEdicion
+      ? this.data.modificacion<ContactoEmergenciaMiembro>(ENTIDAD_CONTACTO_EMERGENCIA, valor)
+      : this.data.alta<ContactoEmergenciaMiembro>(ENTIDAD_CONTACTO_EMERGENCIA, valor);
+
+    peticion.subscribe({
+      next: () => {
+        this.toast.exito(esEdicion ? 'Contacto actualizado.' : 'Contacto agregado.');
+        this.modalContactoEmergenciaAbierto.set(false);
+        this.data.list<ContactoEmergenciaMiembro>(ENTIDAD_CONTACTO_EMERGENCIA).subscribe((c) => this.contactosEmergencia.set(c));
+      },
+      error: () => this.toast.error('No se pudo guardar el contacto. Intenta de nuevo.'),
+    });
+  }
+
+  pedirEliminarContactoEmergencia(c: ContactoEmergenciaMiembro): void {
+    this.contactoEmergenciaAEliminar.set(c);
+  }
+
+  confirmarEliminarContactoEmergencia(): void {
+    const c = this.contactoEmergenciaAEliminar();
+    if (!c) return;
+    this.data.baja(ENTIDAD_CONTACTO_EMERGENCIA, c.id).subscribe({
+      next: () => {
+        this.toast.exito('Contacto eliminado.');
+        this.contactoEmergenciaAEliminar.set(null);
+        this.data.list<ContactoEmergenciaMiembro>(ENTIDAD_CONTACTO_EMERGENCIA).subscribe((c2) => this.contactosEmergencia.set(c2));
+      },
+      error: () => this.toast.error('No se pudo eliminar. Intenta de nuevo.'),
+    });
+  }
+
+  // ── Salud: línea de crecimiento (CRUD) ───────────────────────────────
+  protected readonly modalMedicionAbierto = signal(false);
+  protected readonly medicionEnEdicion = signal<MedicionCrecimiento | null>(null);
+  protected readonly medicionAEliminar = signal<MedicionCrecimiento | null>(null);
+
+  protected readonly formMedicion = this.fb.nonNullable.group({
+    id: [0],
+    miembroFamiliaId: [0],
+    fecha: ['', Validators.required],
+    pesoKg: [0],
+    estaturaCm: [0],
+    notas: [''],
+  });
+
+  nuevaMedicion(): void {
+    const miembro = this.miembroActivo();
+    if (!miembro) return;
+    this.medicionEnEdicion.set(null);
+    this.formMedicion.reset({ id: 0, miembroFamiliaId: miembro.id, fecha: '', pesoKg: 0, estaturaCm: 0, notas: '' });
+    this.modalMedicionAbierto.set(true);
+  }
+
+  editarMedicion(m: MedicionCrecimiento): void {
+    this.medicionEnEdicion.set(m);
+    this.formMedicion.reset({ ...m, pesoKg: m.pesoKg ?? 0, estaturaCm: m.estaturaCm ?? 0 });
+    this.modalMedicionAbierto.set(true);
+  }
+
+  cerrarModalMedicion(): void {
+    this.toast.info('Cambios descartados.');
+    this.modalMedicionAbierto.set(false);
+  }
+
+  guardarMedicion(): void {
+    if (this.formMedicion.invalid) {
+      this.formMedicion.markAllAsTouched();
+      this.toast.error('Captura la fecha de la medición.');
+      return;
+    }
+    const bruto = this.formMedicion.getRawValue();
+    const valor = {
+      ...bruto,
+      pesoKg: bruto.pesoKg ? Number(bruto.pesoKg) : null,
+      estaturaCm: bruto.estaturaCm ? Number(bruto.estaturaCm) : null,
+    };
+    const esEdicion = this.medicionEnEdicion() !== null;
+    const peticion = esEdicion
+      ? this.data.modificacion<MedicionCrecimiento>(ENTIDAD_MEDICION, valor)
+      : this.data.alta<MedicionCrecimiento>(ENTIDAD_MEDICION, valor);
+
+    peticion.subscribe({
+      next: () => {
+        this.toast.exito(esEdicion ? 'Medición actualizada.' : 'Medición agregada.');
+        this.modalMedicionAbierto.set(false);
+        this.data.list<MedicionCrecimiento>(ENTIDAD_MEDICION).subscribe((me) => this.mediciones.set(me));
+      },
+      error: () => this.toast.error('No se pudo guardar la medición. Intenta de nuevo.'),
+    });
+  }
+
+  pedirEliminarMedicion(m: MedicionCrecimiento): void {
+    this.medicionAEliminar.set(m);
+  }
+
+  confirmarEliminarMedicion(): void {
+    const m = this.medicionAEliminar();
+    if (!m) return;
+    this.data.baja(ENTIDAD_MEDICION, m.id).subscribe({
+      next: () => {
+        this.toast.exito('Medición eliminada.');
+        this.medicionAEliminar.set(null);
+        this.data.list<MedicionCrecimiento>(ENTIDAD_MEDICION).subscribe((me) => this.mediciones.set(me));
       },
       error: () => this.toast.error('No se pudo eliminar. Intenta de nuevo.'),
     });
@@ -824,6 +1061,7 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     numeroPoliza: [''],
     fechaVigenciaInicio: [''],
     fechaVigenciaFin: [''],
+    sumaAsegurada: [0],
     notas: [''],
     activo: [true],
   });
@@ -840,6 +1078,7 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
       numeroPoliza: '',
       fechaVigenciaInicio: '',
       fechaVigenciaFin: '',
+      sumaAsegurada: 0,
       notas: '',
       activo: true,
     });
@@ -848,7 +1087,7 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
 
   editarPoliza(poliza: PolizaSeguroMiembro): void {
     this.polizaEnEdicion.set(poliza);
-    this.formPoliza.reset(poliza);
+    this.formPoliza.reset({ ...poliza, sumaAsegurada: poliza.sumaAsegurada ?? 0 });
     this.modalPolizaAbierto.set(true);
   }
 
@@ -863,7 +1102,8 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
       this.toast.error('Captura el tipo y la aseguradora.');
       return;
     }
-    const valor = this.formPoliza.getRawValue();
+    const bruto = this.formPoliza.getRawValue();
+    const valor = { ...bruto, sumaAsegurada: bruto.sumaAsegurada ? Number(bruto.sumaAsegurada) : null };
     const esEdicion = this.polizaEnEdicion() !== null;
     const peticion = esEdicion
       ? this.data.modificacion<PolizaSeguroMiembro>(ENTIDAD_POLIZA, valor)

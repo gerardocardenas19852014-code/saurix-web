@@ -23,6 +23,11 @@ export interface PolizaSeguroMiembro {
   fechaVigenciaFin: string;
   notas: string;
   activo: boolean;
+  /** Suma asegurada en pesos — opcional (campos antiguos quedan sin ella),
+   *  solo para el resumen consolidado de Resumen familiar (cuánta cobertura
+   *  total tiene la familia por tipo de póliza). No es el costo/prima, es
+   *  el monto que cubre la póliza. */
+  sumaAsegurada?: number | null;
   fechaCreacion?: string;
   fechaModificacion?: string;
 }

@@ -1,0 +1,91 @@
+<div class="page-header">
+  <h1>Tareas del hogar</h1>
+  <div class="page-actions">
+    <button type="button" class="toolbar-btn" (click)="nuevaTarea()">+ Nueva tarea</button>
+  </div>
+</div>
+<p class="hint" style="margin:-10px 0 16px;">Quehaceres del hogar con responsable y frecuencia.</p>
+
+<label class="checkbox-inline" style="margin-bottom:16px; display:inline-flex;">
+  <input type="checkbox" [checked]="mostrarCompletadas()" (change)="mostrarCompletadas.set($any($event.target).checked)" />
+  Mostrar completadas
+</label>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else if (tareasVisibles().length === 0) {
+  <p class="empty">No hay tareas{{ mostrarCompletadas() ? '' : ' pendientes' }} capturadas.</p>
+} @else {
+  <div class="tareas-hogar-lista">
+    @for (t of tareasVisibles(); track t.id) {
+      <div class="tareas-hogar-fila" [class.tareas-hogar-fila-completada]="t.completada">
+        <input type="checkbox" [checked]="t.completada" (change)="alternarCompletada(t)" />
+        <button type="button" class="tareas-hogar-titulo" (click)="editarTarea(t)">{{ t.titulo }}</button>
+        <span class="hint" style="margin:0;">{{ nombreMiembro(t.miembroFamiliaId) }}</span>
+        <span class="grid-badge grid-badge-muted">{{ etiquetaFrecuencia[t.frecuencia] }}</span>
+        @if (t.fechaLimite) {
+          <span class="hint" style="margin:0;">{{ t.fechaLimite | date: 'dd/MM/yyyy' }}</span>
+        }
+        <button type="button" class="btn-danger small grid-action-icon" title="Eliminar" (click)="pedirEliminar(t)">🗑</button>
+      </div>
+    }
+  </div>
+}
+
+@if (modalAbierto()) {
+  <div class="modal-overlay modal show d-block" (click)="cerrarModal()">
+    <form class="modal-box modal-dialog modal-content" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3 class="modal-title mb-3">{{ tareaEnEdicion() ? 'Editar tarea' : 'Nueva tarea' }}</h3>
+      <div class="edit-form">
+        <label class="floating-field">
+          <span>Título <b>*</b></span>
+          <input type="text" class="form-control pill-control" formControlName="titulo" placeholder=" " />
+        </label>
+        <label class="floating-field">
+          <span>Responsable</span>
+          <select class="form-control pill-control" formControlName="miembroFamiliaId">
+            <option [ngValue]="0">Sin asignar</option>
+            @for (m of miembros(); track m.id) {
+              <option [ngValue]="m.id">{{ m.nombre }} {{ m.apellidoPaterno }}</option>
+            }
+          </select>
+        </label>
+        <label class="floating-field">
+          <span>Frecuencia</span>
+          <select class="form-control pill-control" formControlName="frecuencia">
+            <option value="unica">Única vez</option>
+            <option value="diaria">Diaria</option>
+            <option value="semanal">Semanal</option>
+            <option value="mensual">Mensual</option>
+          </select>
+        </label>
+        <label class="floating-field">
+          <span>Fecha límite</span>
+          <input type="date" class="form-control pill-control" formControlName="fechaLimite" placeholder=" " />
+        </label>
+        <label class="floating-field">
+          <span>Notas</span>
+          <input type="text" class="form-control pill-control" formControlName="notas" placeholder=" " />
+        </label>
+        <label class="checkbox-inline full-span">
+          <input type="checkbox" formControlName="completada" />
+          Ya está hecha
+        </label>
+      </div>
+      <div class="modal-actions">
+        @if (tareaEnEdicion()) {
+          <button type="button" class="btn-danger" (click)="pedirEliminar(tareaEnEdicion()!); cerrarModal()">Eliminar</button>
+        }
+        <button type="button" class="btn-secondary" (click)="cerrarModal()">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+<app-confirm-dialog
+  [visible]="tareaAEliminar() !== null"
+  titulo="Eliminar tarea"
+  mensaje="¿Eliminar esta tarea del hogar?"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="tareaAEliminar.set(null)"
+/>

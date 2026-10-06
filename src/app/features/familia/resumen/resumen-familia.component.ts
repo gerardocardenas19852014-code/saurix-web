@@ -8,6 +8,7 @@ import { PolizaSeguroMiembro } from '../poliza-seguro-miembro.model';
 import { CitaMedicaMiembro } from '../cita-medica-miembro.model';
 import { EventoFamiliar } from '../evento-familiar.model';
 import { EventoAgendaFamiliar, eventosFamiliares } from '../familia.util';
+import { formatMoneda } from '../../presupuesto/shared/wallet.util';
 
 const DIAS_VENTANA = 90;
 
@@ -37,6 +38,7 @@ interface SeccionResumen {
 export class ResumenFamiliaComponent implements OnInit {
   private readonly data = inject(DataClientService);
   private readonly router = inject(Router);
+  protected readonly formatMoneda = formatMoneda;
 
   protected readonly miembros = signal<MiembroFamilia[]>([]);
   protected readonly documentos = signal<DocumentoFamilia[]>([]);
@@ -46,6 +48,22 @@ export class ResumenFamiliaComponent implements OnInit {
   protected readonly cargando = signal(false);
 
   protected readonly totalMiembrosActivos = computed(() => this.miembros().filter((m) => m.activo !== false).length);
+
+  /** Resumen consolidado de pólizas de TODA la familia: cuántas activas,
+   *  suma asegurada total y el desglose por tipo — un vistazo rápido sin
+   *  entrar póliza por póliza a la ficha de cada miembro (ver tarea
+   *  "Resumen consolidado de pólizas"). Solo cuenta pólizas activas. */
+  protected readonly resumenPolizas = computed(() => {
+    const activas = this.polizas().filter((p) => p.activo !== false);
+    const sumaTotal = activas.reduce((acc, p) => acc + (p.sumaAsegurada || 0), 0);
+    const porTipo = new Map<string, number>();
+    for (const p of activas) porTipo.set(p.tipo, (porTipo.get(p.tipo) ?? 0) + 1);
+    return {
+      totalActivas: activas.length,
+      sumaTotal,
+      porTipo: [...porTipo.entries()].map(([tipo, cantidad]) => ({ tipo, cantidad })).sort((a, b) => b.cantidad - a.cantidad),
+    };
+  });
 
   protected readonly secciones = computed<SeccionResumen[]>(() => {
     const hoy = new Date();

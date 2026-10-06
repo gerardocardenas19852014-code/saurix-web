@@ -1,0 +1,29 @@
+.tareas-hogar-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tareas-hogar-fila {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tareas-hogar-fila-completada .tareas-hogar-titulo {
+  text-decoration: line-through;
+  color: var(--ink-soft);
+}
+
+.tareas-hogar-titulo {
+  flex: 1;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}

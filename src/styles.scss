@@ -957,6 +957,18 @@ button.wallet-calgrid-evento { display: block; width: 100%; text-align: left; co
 .anexo-item-body { flex: 1; }
 .form-actions { display: flex; gap: 12px; }
 .familia-salud-subtitulo { font-size: 16px; font-weight: 700; margin: 0 0 10px; }
+.familia-vacunas-sugeridas { margin: 0 0 14px; }
+.familia-vacuna-sugerida-chip {
+  display: inline-block; margin: 0 6px 6px 0; padding: 5px 12px; border-radius: 999px;
+  border: 1px dashed var(--line); background: transparent; color: var(--ink-soft);
+  font-size: 13px; cursor: pointer;
+}
+.familia-vacuna-sugerida-chip:hover { border-style: solid; color: var(--accent); border-color: var(--accent); }
+.familia-crecimiento-graficas { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.familia-grafica-box { flex: 1 1 260px; min-width: 220px; border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--paper-raised); }
+.familia-grafica-titulo { font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--ink-soft); }
+.familia-grafica-svg { width: 100%; height: auto; display: block; }
+.familia-grafica-rango { font-size: 12px; color: var(--ink-soft); margin-top: 4px; text-align: right; }
 .familia-resumen-titulo-vencido { color: var(--danger); }
 .familia-resumen-item {
   display: flex;
@@ -977,6 +989,11 @@ button.wallet-calgrid-evento { display: block; width: 100%; text-align: left; co
 .familia-resumen-icono { font-size: 20px; }
 .familia-resumen-texto { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .familia-resumen-fecha { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; white-space: nowrap; }
+.familia-resumen-polizas-box { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin: 0 0 20px; background: var(--paper-raised); }
+.familia-resumen-polizas-titulo { font-weight: 700; margin-bottom: 8px; }
+.familia-resumen-polizas-stats { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13.5px; color: var(--ink-soft); margin-bottom: 8px; }
+.familia-resumen-polizas-tipos { display: flex; gap: 8px; flex-wrap: wrap; }
+.familia-resumen-polizas-chip { font-size: 12.5px; padding: 3px 10px; border-radius: 999px; background: var(--client-soft); color: var(--client); }
 .form-error { background: var(--danger-soft); color: var(--danger); padding: 10px 14px; border-radius: 8px; font-size: 14px; }
 
 .btn-primary, .btn-secondary, .btn-danger { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 13px; border-radius: 20px; padding: 9px 18px; border: 2px solid transparent; cursor: pointer; text-align: center; display: inline-block; transition: background .15s ease, color .15s ease, transform .1s ease; }

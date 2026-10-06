@@ -25,6 +25,19 @@ export function calcularEdad(fechaNacimiento: string): number | null {
   return edad;
 }
 
+/** Edad en MESES cumplidos a partir de una fecha de nacimiento "YYYY-MM-DD"
+ *  — a diferencia de calcularEdad (años), esta se usa donde un año es
+ *  demasiado grueso: esquema de vacunación sugerido y línea de
+ *  crecimiento de bebés/niños pequeños. */
+export function calcularEdadMeses(fechaNacimiento: string, fechaReferencia?: string): number | null {
+  if (!fechaNacimiento) return null;
+  const nacimiento = fechaLocalDeTexto(fechaNacimiento);
+  const referencia = fechaReferencia ? fechaLocalDeTexto(fechaReferencia) : new Date();
+  let meses = (referencia.getFullYear() - nacimiento.getFullYear()) * 12 + (referencia.getMonth() - nacimiento.getMonth());
+  if (referencia.getDate() < nacimiento.getDate()) meses -= 1;
+  return Math.max(0, meses);
+}
+
 /** Estado de vencimiento de un DocumentoFamilia: 'sin-vencimiento' cuando no
  *  se capturó fecha (p.ej. un acta de nacimiento), o 'vigente'/'por-vencer'
  *  (dentro de DIAS_AVISO_VENCIMIENTO días)/'vencido' según hoy. */
@@ -52,6 +65,49 @@ export const CLASE_ESTADO_VENCIMIENTO: Record<EstadoVencimientoDocumento, string
   'por-vencer': 'grid-badge-warning',
   vencido: 'grid-badge-danger',
 };
+
+// ── Gráfica de línea simple (SVG inline, sin librería nueva) ───────────
+// Usada hoy solo por la línea de crecimiento (peso/estatura vs. edad) en
+// la pestaña Salud de cada miembro — ver miembros.component.ts.
+
+export interface PuntoSerie {
+  x: number;
+  y: number;
+}
+
+export interface SerieSvg {
+  puntosPolyline: string;
+  circulos: { cx: number; cy: number; x: number; y: number }[];
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
+
+export const DIMENSIONES_GRAFICA_SVG = { ancho: 300, alto: 100 } as const;
+const PADDING_GRAFICA_SVG = 12;
+
+/** Normaliza una serie de puntos {x,y} a coordenadas dentro del viewBox de
+ *  DIMENSIONES_GRAFICA_SVG, lista para dibujar con <polyline>/<circle>. Un
+ *  solo punto, o una serie plana (mismo valor repetido), no truena: el
+ *  rango se protege con `|| 1` para no dividir entre cero. */
+export function construirSerieSvg(puntos: PuntoSerie[]): SerieSvg | null {
+  if (puntos.length === 0) return null;
+  const xs = puntos.map((p) => p.x);
+  const ys = puntos.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const rangoX = maxX - minX || 1;
+  const rangoY = maxY - minY || 1;
+  const { ancho, alto } = DIMENSIONES_GRAFICA_SVG;
+  const escalarX = (x: number) => PADDING_GRAFICA_SVG + ((x - minX) / rangoX) * (ancho - 2 * PADDING_GRAFICA_SVG);
+  const escalarY = (y: number) => alto - PADDING_GRAFICA_SVG - ((y - minY) / rangoY) * (alto - 2 * PADDING_GRAFICA_SVG);
+  const circulos = puntos.map((p) => ({ cx: escalarX(p.x), cy: escalarY(p.y), x: p.x, y: p.y }));
+  const puntosPolyline = circulos.map((c) => `${c.cx},${c.cy}`).join(' ');
+  return { puntosPolyline, circulos, minX, maxX, minY, maxY };
+}
 
 // ── Cumpleaños próximos ────────────────────────────────────────────────
 

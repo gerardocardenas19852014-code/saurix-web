@@ -317,6 +317,89 @@
             <input type="text" formControlName="numeroPoliza" />
           </label>
         </div>
+
+        <h2 class="familia-salud-subtitulo" style="margin-top:24px;">📇 Directorio de contactos de emergencia</h2>
+        <p class="hint" style="margin:0 0 12px;">Para cuando hace falta más de un contacto — vecinos, amigos, otros familiares.</p>
+        <div class="grid-toolbar">
+          <button type="button" class="toolbar-btn" (click)="nuevoContactoEmergencia()">+ Agregar contacto</button>
+        </div>
+        @if (contactosEmergenciaDelMiembro().length === 0) {
+          <p class="empty">Todavía no hay contactos adicionales capturados.</p>
+        } @else {
+          <div class="grid-table-scroll">
+            <table class="grid-table">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Relación</th>
+                  <th>Teléfono</th>
+                  <th>Notas</th>
+                  <th class="grid-actions-col">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (c of contactosEmergenciaDelMiembro(); track c.id) {
+                  <tr>
+                    <td>{{ c.nombre }}</td>
+                    <td>{{ c.relacion || '—' }}</td>
+                    <td>{{ c.telefono || '—' }}</td>
+                    <td>{{ c.notas || '—' }}</td>
+                    <td class="grid-actions-col" data-label="Acciones">
+                      <div class="grid-actions-inner">
+                        <button type="button" class="btn-secondary small grid-action-icon" title="Editar" (click)="editarContactoEmergencia(c)">✎</button>
+                        <button type="button" class="btn-danger small grid-action-icon" title="Eliminar" (click)="pedirEliminarContactoEmergencia(c)">🗑</button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        @if (modalContactoEmergenciaAbierto()) {
+          <div class="modal-overlay modal show d-block" (click)="cerrarModalContactoEmergencia()">
+            <!-- div, NO <form>: esto vive anidado dentro del <form [formGroup]="form">
+                 principal de la pestaña Datos (ver línea ~119) y un <form> anidado es
+                 HTML inválido — el navegador cerraría el form principal antes de tiempo.
+                 Por eso [formGroup] va en un <div> y "Guardar" usa (click), no (ngSubmit). -->
+            <div class="modal-box modal-dialog modal-content" [formGroup]="formContactoEmergencia" (click)="$event.stopPropagation()">
+              <h3 class="modal-title mb-3">{{ contactoEmergenciaEnEdicion() ? 'Editar contacto' : 'Nuevo contacto' }}</h3>
+              <div class="edit-form">
+                <label class="floating-field">
+                  <span>Nombre <b>*</b></span>
+                  <input type="text" class="form-control pill-control" formControlName="nombre" placeholder=" " />
+                </label>
+                <label class="floating-field">
+                  <span>Relación</span>
+                  <input type="text" class="form-control pill-control" formControlName="relacion" placeholder=" " />
+                </label>
+                <label class="floating-field">
+                  <span>Teléfono</span>
+                  <input type="text" class="form-control pill-control" formControlName="telefono" placeholder=" " />
+                </label>
+                <label class="floating-field">
+                  <span>Notas</span>
+                  <input type="text" class="form-control pill-control" formControlName="notas" placeholder=" " />
+                </label>
+              </div>
+              <div class="modal-actions">
+                @if (contactoEmergenciaEnEdicion()) {
+                  <button type="button" class="btn-danger" (click)="pedirEliminarContactoEmergencia(contactoEmergenciaEnEdicion()!); cerrarModalContactoEmergencia()">Eliminar</button>
+                }
+                <button type="button" class="btn-secondary" (click)="cerrarModalContactoEmergencia()">Cancelar</button>
+                <button type="button" class="btn-primary" (click)="guardarContactoEmergencia()">Guardar</button>
+              </div>
+            </div>
+          </div>
+        }
+        <app-confirm-dialog
+          [visible]="contactoEmergenciaAEliminar() !== null"
+          titulo="Eliminar contacto"
+          mensaje="¿Eliminar este contacto de emergencia?"
+          (confirmar)="confirmarEliminarContactoEmergencia()"
+          (cancelar)="contactoEmergenciaAEliminar.set(null)"
+        />
       }
 
     </form>
@@ -414,6 +497,18 @@
     />
   } @else if (tabFicha() === 'salud') {
     <h2 class="familia-salud-subtitulo">💉 Vacunas</h2>
+    @if (vacunasSugeridasDelMiembro().length > 0) {
+      <div class="familia-vacunas-sugeridas">
+        <p class="hint" style="margin:0 0 8px;">
+          Sugeridas por edad, según un esquema de referencia general — no sustituye la indicación de tu pediatra:
+        </p>
+        @for (ref of vacunasSugeridasDelMiembro(); track ref.clave) {
+          <button type="button" class="familia-vacuna-sugerida-chip" (click)="agregarVacunaSugerida(ref)" [title]="ref.dosis">
+            + {{ ref.nombre }}
+          </button>
+        }
+      </div>
+    }
     <div class="grid-toolbar">
       <button type="button" class="toolbar-btn" (click)="nuevaVacuna()">+ Nueva vacuna</button>
     </div>
@@ -473,6 +568,9 @@
               <input type="text" class="form-control pill-control" formControlName="notas" placeholder=" " />
             </label>
           </div>
+          @if (vacunaEnEdicion(); as v) {
+            <app-adjuntos-panel entidad="VacunaMiembroAdjunto" campoPadre="vacunaMiembroId" [padreId]="v.id" etiqueta="Comprobantes" />
+          }
           <div class="modal-actions">
             <button type="button" class="btn-secondary" (click)="cerrarModalVacuna()">Cancelar</button>
             <button type="submit" class="btn-primary">Guardar</button>
@@ -550,6 +648,15 @@
               <input type="date" class="form-control pill-control" formControlName="fecha" placeholder=" " />
             </label>
             <label class="floating-field">
+              <span>Proveedor de salud (opcional)</span>
+              <select class="form-control pill-control" (change)="elegirProveedorSalud($any($event.target).value)">
+                <option value="">Elegir del catálogo…</option>
+                @for (p of proveedoresSalud(); track p.id) {
+                  <option [value]="p.etiqueta">{{ p.etiqueta }}</option>
+                }
+              </select>
+            </label>
+            <label class="floating-field">
               <span>Lugar</span>
               <input type="text" class="form-control pill-control" formControlName="lugar" placeholder=" " />
             </label>
@@ -562,6 +669,9 @@
               Ya se atendió
             </label>
           </div>
+          @if (citaEnEdicion(); as c) {
+            <app-adjuntos-panel entidad="CitaMedicaMiembroAdjunto" campoPadre="citaMedicaMiembroId" [padreId]="c.id" etiqueta="Comprobantes" />
+          }
           <div class="modal-actions">
             <button type="button" class="btn-secondary" (click)="cerrarModalCita()">Cancelar</button>
             <button type="submit" class="btn-primary">Guardar</button>
@@ -575,6 +685,116 @@
       mensaje="¿Eliminar esta cita médica?"
       (confirmar)="confirmarEliminarCita()"
       (cancelar)="citaAEliminar.set(null)"
+    />
+
+    <h2 class="familia-salud-subtitulo" style="margin-top:28px;">📏 Crecimiento</h2>
+    @if (graficaPeso() || graficaEstatura()) {
+      <div class="familia-crecimiento-graficas">
+        @if (graficaPeso(); as g) {
+          <div class="familia-grafica-box">
+            <div class="familia-grafica-titulo">Peso (kg) vs. edad</div>
+            <svg [attr.viewBox]="'0 0 ' + dimensionesGraficaSvg.ancho + ' ' + dimensionesGraficaSvg.alto" class="familia-grafica-svg">
+              <polyline [attr.points]="g.puntosPolyline" fill="none" stroke="var(--client)" stroke-width="2" />
+              @for (c of g.circulos; track c.x) {
+                <circle [attr.cx]="c.cx" [attr.cy]="c.cy" r="2.5" fill="var(--client)">
+                  <title>{{ c.y }} kg a los {{ c.x }} meses</title>
+                </circle>
+              }
+            </svg>
+            <div class="familia-grafica-rango">{{ g.minY }}–{{ g.maxY }} kg</div>
+          </div>
+        }
+        @if (graficaEstatura(); as g) {
+          <div class="familia-grafica-box">
+            <div class="familia-grafica-titulo">Estatura (cm) vs. edad</div>
+            <svg [attr.viewBox]="'0 0 ' + dimensionesGraficaSvg.ancho + ' ' + dimensionesGraficaSvg.alto" class="familia-grafica-svg">
+              <polyline [attr.points]="g.puntosPolyline" fill="none" stroke="var(--accent)" stroke-width="2" />
+              @for (c of g.circulos; track c.x) {
+                <circle [attr.cx]="c.cx" [attr.cy]="c.cy" r="2.5" fill="var(--accent)">
+                  <title>{{ c.y }} cm a los {{ c.x }} meses</title>
+                </circle>
+              }
+            </svg>
+            <div class="familia-grafica-rango">{{ g.minY }}–{{ g.maxY }} cm</div>
+          </div>
+        }
+      </div>
+    }
+    <div class="grid-toolbar">
+      <button type="button" class="toolbar-btn" (click)="nuevaMedicion()">+ Nueva medición</button>
+    </div>
+    @if (medicionesDelMiembro().length === 0) {
+      <p class="empty">Todavía no hay mediciones capturadas para este miembro.</p>
+    } @else {
+      <div class="grid-table-scroll">
+        <table class="grid-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Peso</th>
+              <th>Estatura</th>
+              <th>Notas</th>
+              <th class="grid-actions-col">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (m of medicionesDelMiembro(); track m.id) {
+              <tr>
+                <td>{{ m.fecha ? (m.fecha | date: 'dd/MM/yyyy') : '—' }}</td>
+                <td>{{ m.pesoKg ? (m.pesoKg + ' kg') : '—' }}</td>
+                <td>{{ m.estaturaCm ? (m.estaturaCm + ' cm') : '—' }}</td>
+                <td>{{ m.notas || '—' }}</td>
+                <td class="grid-actions-col" data-label="Acciones">
+                  <div class="grid-actions-inner">
+                    <button type="button" class="btn-secondary small grid-action-icon" title="Editar" (click)="editarMedicion(m)">✎</button>
+                    <button type="button" class="btn-danger small grid-action-icon" title="Eliminar" (click)="pedirEliminarMedicion(m)">🗑</button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @if (modalMedicionAbierto()) {
+      <div class="modal-overlay modal show d-block" (click)="cerrarModalMedicion()">
+        <form class="modal-box modal-dialog modal-content" [formGroup]="formMedicion" (click)="$event.stopPropagation()" (ngSubmit)="guardarMedicion()">
+          <h3 class="modal-title mb-3">{{ medicionEnEdicion() ? 'Editar medición' : 'Nueva medición' }}</h3>
+          <div class="edit-form">
+            <label class="floating-field">
+              <span>Fecha <b>*</b></span>
+              <input type="date" class="form-control pill-control" formControlName="fecha" placeholder=" " />
+            </label>
+            <label class="floating-field">
+              <span>Peso (kg)</span>
+              <input type="number" min="0" step="0.1" class="form-control pill-control" formControlName="pesoKg" placeholder=" " />
+            </label>
+            <label class="floating-field">
+              <span>Estatura (cm)</span>
+              <input type="number" min="0" step="0.1" class="form-control pill-control" formControlName="estaturaCm" placeholder=" " />
+            </label>
+            <label class="floating-field">
+              <span>Notas</span>
+              <input type="text" class="form-control pill-control" formControlName="notas" placeholder=" " />
+            </label>
+          </div>
+          <div class="modal-actions">
+            @if (medicionEnEdicion()) {
+              <button type="button" class="btn-danger" (click)="pedirEliminarMedicion(medicionEnEdicion()!); cerrarModalMedicion()">Eliminar</button>
+            }
+            <button type="button" class="btn-secondary" (click)="cerrarModalMedicion()">Cancelar</button>
+            <button type="submit" class="btn-primary">Guardar</button>
+          </div>
+        </form>
+      </div>
+    }
+    <app-confirm-dialog
+      [visible]="medicionAEliminar() !== null"
+      titulo="Eliminar medición"
+      mensaje="¿Eliminar este registro de crecimiento?"
+      (confirmar)="confirmarEliminarMedicion()"
+      (cancelar)="medicionAEliminar.set(null)"
     />
   } @else if (tabFicha() === 'polizas') {
     <div class="grid-toolbar">
@@ -591,6 +811,7 @@
               <th>Aseguradora</th>
               <th>Número</th>
               <th>Vigencia</th>
+              <th>Suma asegurada</th>
               <th>Estado</th>
               <th class="grid-actions-col">Acciones</th>
             </tr>
@@ -602,6 +823,7 @@
                 <td>{{ poliza.aseguradora }}</td>
                 <td>{{ poliza.numeroPoliza || '—' }}</td>
                 <td>{{ poliza.fechaVigenciaFin ? (poliza.fechaVigenciaFin | date: 'dd/MM/yyyy') : '—' }}</td>
+                <td>{{ poliza.sumaAsegurada ? formatMoneda(poliza.sumaAsegurada) : '—' }}</td>
                 <td>
                   <span class="grid-badge {{ claseEstadoVencimiento[estadoVencimientoPoliza(poliza)] }}">
                     {{ etiquetaEstadoVencimiento[estadoVencimientoPoliza(poliza)] }}
@@ -649,6 +871,10 @@
             <label class="floating-field">
               <span>Vigencia hasta</span>
               <input type="date" class="form-control pill-control" formControlName="fechaVigenciaFin" placeholder=" " />
+            </label>
+            <label class="floating-field">
+              <span>Suma asegurada</span>
+              <input type="number" min="0" step="1" class="form-control pill-control" formControlName="sumaAsegurada" placeholder=" " />
             </label>
             <label class="floating-field">
               <span>Notas</span>
