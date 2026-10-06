@@ -19,6 +19,7 @@ import { TableroColumna } from '../../features/proyectos/tableros/tablero-column
 import { CuentaPresupuesto } from '../../features/presupuesto/cuenta-presupuesto/cuenta-presupuesto.model';
 import { CategoriaPresupuesto } from '../../features/presupuesto/categoria-presupuesto/categoria-presupuesto.model';
 import { DeudaPresupuesto } from '../../features/presupuesto/deudas/deuda.model';
+import { Usuario, nombreCompletoUsuario } from '../../features/seguridad/usuarios/usuario.model';
 
 /** Un resultado de búsqueda del asistente, clicable: navega directo a esa
  *  pantalla con el registro ya abierto (mismo patrón de deep link que
@@ -635,6 +636,7 @@ export class ShellComponent implements OnDestroy {
       categorias: this.data.list<CategoriaPresupuesto>('CategoriaPresupuesto'),
       deudas: this.data.list<DeudaPresupuesto>('DeudaPresupuesto'),
       miembros: this.data.list<MiembroFamilia>('MiembroFamilia'),
+      usuarios: this.data.list<Usuario>('Usuario'),
     }).subscribe({
       next: (fuentes) => {
         const calculo = this.calcularRespuestaAi(pregunta, fuentes);
@@ -738,6 +740,7 @@ export class ShellComponent implements OnDestroy {
       cuentas: CuentaPresupuesto[];
       categorias: CategoriaPresupuesto[];
       miembros: MiembroFamilia[];
+      usuarios: Usuario[];
     },
   ): { texto: string; secciones?: AiSeccion[] } {
     // Insensible a acentos (busca "sotano" y encuentra "sótano", y viceversa)
@@ -765,6 +768,15 @@ export class ShellComponent implements OnDestroy {
 
     const estaActivo = (activo?: boolean): boolean => activo !== false;
 
+    // Mapa id -> Usuario, para poder cruzar "asignado a"/"reportado por" de un
+    // ticket contra el texto buscado sin tener que recorrer el arreglo cada vez.
+    const usuariosPorId = new Map(fuentes.usuarios.map((u) => [u.id, u]));
+    const nombreUsuarioPorId = (id: number | null | undefined): string => {
+      if (id == null) return '';
+      const usuario = usuariosPorId.get(id);
+      return usuario ? nombreCompletoUsuario(usuario) : '';
+    };
+
     function top3<T>(registros: T[], puntuarRegistro: (r: T) => number): T[] {
       return registros
         .map((r) => ({ r, puntos: puntuarRegistro(r) }))
@@ -780,7 +792,14 @@ export class ShellComponent implements OnDestroy {
     );
     const ticketsEncontrados = top3(
       fuentes.tickets.filter((t) => estaActivo(t.activo)),
-      (t) => puntuar(t.titulo, t.descripcion, t.numeroTicket),
+      (t) =>
+        puntuar(
+          t.titulo,
+          t.descripcion,
+          t.numeroTicket,
+          nombreUsuarioPorId(t.asignadoUsuarioId),
+          nombreUsuarioPorId(t.reportadoPorUsuarioId),
+        ),
     );
     const movimientosEncontrados = top3(
       fuentes.movimientos.filter((m) => estaActivo(m.activo)),
@@ -797,6 +816,10 @@ export class ShellComponent implements OnDestroy {
     const miembrosEncontrados = top3(
       fuentes.miembros.filter((m) => estaActivo(m.activo)),
       (m) => puntuar(m.nombre, m.apellidoPaterno, m.apellidoMaterno),
+    );
+    const usuariosEncontrados = top3(
+      fuentes.usuarios.filter((u) => estaActivo(u.activo)),
+      (u) => puntuar(u.nombre, u.apellidoPaterno, u.apellidoMaterno, u.nombreUsuario),
     );
 
     const secciones: AiSeccion[] = [];
@@ -852,11 +875,20 @@ export class ShellComponent implements OnDestroy {
         })),
       });
     }
+    if (usuariosEncontrados.length > 0) {
+      secciones.push({
+        titulo: '🧑‍💻 Seguridad — usuarios',
+        enlaces: usuariosEncontrados.map((u) => ({
+          texto: nombreCompletoUsuario(u),
+          ruta: '/seguridad/usuarios',
+        })),
+      });
+    }
 
     if (secciones.length === 0) {
       return {
         texto:
-          'No encontré nada relacionado en WikiDocs, Proyectos, Presupuesto (movimientos/cuentas/categorías) ni Familia. Prueba con otras palabras.',
+          'No encontré nada relacionado en WikiDocs, Proyectos, Presupuesto (movimientos/cuentas/categorías), Familia ni Usuarios. Prueba con otras palabras.',
       };
     }
     return { texto: 'Encontré esto:', secciones };
