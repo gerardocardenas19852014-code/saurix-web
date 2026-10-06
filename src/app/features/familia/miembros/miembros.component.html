@@ -86,6 +86,26 @@
     <button
       type="button"
       class="tab-btn"
+      [class.is-active]="tabFicha() === 'salud'"
+      [disabled]="!miembroActivo()"
+      [title]="!miembroActivo() ? 'Guarda primero los Datos para registrar salud.' : ''"
+      (click)="miembroActivo() && tabFicha.set('salud')"
+    >
+      ⚕️ Salud
+    </button>
+    <button
+      type="button"
+      class="tab-btn"
+      [class.is-active]="tabFicha() === 'polizas'"
+      [disabled]="!miembroActivo()"
+      [title]="!miembroActivo() ? 'Guarda primero los Datos para registrar pólizas.' : ''"
+      (click)="miembroActivo() && tabFicha.set('polizas')"
+    >
+      🛡️ Pólizas
+    </button>
+    <button
+      type="button"
+      class="tab-btn"
       [class.is-active]="tabFicha() === 'tarjeta'"
       [disabled]="!miembroActivo()"
       [title]="!miembroActivo() ? 'Guarda primero los Datos para ver la tarjeta.' : ''"
@@ -100,6 +120,9 @@
       <div class="tab-bar">
         <button type="button" class="tab-btn" [class.is-active]="subTabDatos() === 'personales'" (click)="subTabDatos.set('personales')">
           🧍 Datos personales
+        </button>
+        <button type="button" class="tab-btn" [class.is-active]="subTabDatos() === 'relaciones'" (click)="subTabDatos.set('relaciones')">
+          🌳 Relaciones
         </button>
         <button type="button" class="tab-btn" [class.is-active]="subTabDatos() === 'rfc'" (click)="subTabDatos.set('rfc')">
           🧾 RFC y CURP
@@ -185,6 +208,42 @@
           <label class="checkbox-inline">
             <input type="checkbox" formControlName="activo" />
             Activo
+          </label>
+        </div>
+      }
+
+      @if (subTabDatos() === 'relaciones') {
+        <div class="edit-form form-grid-5col">
+          <p class="hint full-span" style="margin:0 0 4px;">
+            Con esto se arma el <a routerLink="/familia/arbol">árbol genealógico</a>. El cónyuge se sincroniza solo: si
+            capturas aquí quién es tu cónyuge, su ficha quedará apuntando de vuelta a ti.
+          </p>
+          <label>
+            Padre
+            <select formControlName="padreId">
+              <option [ngValue]="0">Sin capturar</option>
+              @for (m of miembrosParaRelacion(); track m.id) {
+                <option [ngValue]="m.id">{{ m.nombre }} {{ m.apellidoPaterno }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            Madre
+            <select formControlName="madreId">
+              <option [ngValue]="0">Sin capturar</option>
+              @for (m of miembrosParaRelacion(); track m.id) {
+                <option [ngValue]="m.id">{{ m.nombre }} {{ m.apellidoPaterno }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            Cónyuge
+            <select formControlName="conyugeId">
+              <option [ngValue]="0">Sin capturar</option>
+              @for (m of miembrosParaRelacion(); track m.id) {
+                <option [ngValue]="m.id">{{ m.nombre }} {{ m.apellidoPaterno }}</option>
+              }
+            </select>
           </label>
         </div>
       }
@@ -352,6 +411,268 @@
       mensaje="¿Eliminar este documento? Sus archivos adjuntos dejarán de mostrarse."
       (confirmar)="confirmarEliminarDocumento()"
       (cancelar)="documentoAEliminar.set(null)"
+    />
+  } @else if (tabFicha() === 'salud') {
+    <h2 class="familia-salud-subtitulo">💉 Vacunas</h2>
+    <div class="grid-toolbar">
+      <button type="button" class="toolbar-btn" (click)="nuevaVacuna()">+ Nueva vacuna</button>
+    </div>
+    @if (vacunasDelMiembro().length === 0) {
+      <p class="empty">Todavía no hay vacunas capturadas para este miembro.</p>
+    } @else {
+      <div class="grid-table-scroll">
+        <table class="grid-table">
+          <thead>
+            <tr>
+              <th>Vacuna</th>
+              <th>Fecha</th>
+              <th>Dosis</th>
+              <th>Notas</th>
+              <th class="grid-actions-col">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (vacuna of vacunasDelMiembro(); track vacuna.id) {
+              <tr>
+                <td>{{ vacuna.nombre }}</td>
+                <td>{{ vacuna.fechaAplicacion ? (vacuna.fechaAplicacion | date: 'dd/MM/yyyy') : '—' }}</td>
+                <td>{{ vacuna.dosis || '—' }}</td>
+                <td>{{ vacuna.notas || '—' }}</td>
+                <td class="grid-actions-col" data-label="Acciones">
+                  <div class="grid-actions-inner">
+                    <button type="button" class="btn-secondary small grid-action-icon" title="Editar" (click)="editarVacuna(vacuna)">✎</button>
+                    <button type="button" class="btn-danger small grid-action-icon" title="Eliminar" (click)="pedirEliminarVacuna(vacuna)">🗑</button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @if (modalVacunaAbierto()) {
+      <div class="modal-overlay modal show d-block" (click)="cerrarModalVacuna()">
+        <form class="modal-box modal-dialog modal-content" [formGroup]="formVacuna" (click)="$event.stopPropagation()" (ngSubmit)="guardarVacuna()">
+          <h3 class="modal-title mb-3">{{ vacunaEnEdicion() ? 'Editar vacuna' : 'Nueva vacuna' }}</h3>
+          <div class="edit-form">
+            <label class="floating-field">
+              <span>Vacuna <b>*</b></span>
+              <input type="text" class="form-control pill-control" formControlName="nombre" placeholder=" " />
+            </label>
+            <label class="floating-field">
+              <span>Fecha de aplicación <b>*</b></span>
+              <input type="date" class="form-control pill-control" formControlName="fechaAplicacion" placeholder=" " />
+            </label>
+            <label class="floating-field">
+              <span>Dosis</span>
+              <input type="text" class="form-control pill-control" formControlName="dosis" placeholder=" " />
+            </label>
+            <label class="floating-field">
+              <span>Notas</span>
+              <input type="text" class="form-control pill-control" formControlName="notas" placeholder=" " />
+            </label>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" (click)="cerrarModalVacuna()">Cancelar</button>
+            <button type="submit" class="btn-primary">Guardar</button>
+          </div>
+        </form>
+      </div>
+    }
+    <app-confirm-dialog
+      [visible]="vacunaAEliminar() !== null"
+      titulo="Eliminar vacuna"
+      mensaje="¿Eliminar este registro de vacuna?"
+      (confirmar)="confirmarEliminarVacuna()"
+      (cancelar)="vacunaAEliminar.set(null)"
+    />
+
+    <h2 class="familia-salud-subtitulo" style="margin-top:28px;">🩺 Citas médicas</h2>
+    <div class="grid-toolbar">
+      <button type="button" class="toolbar-btn" (click)="nuevaCita()">+ Nueva cita</button>
+    </div>
+    @if (citasDelMiembro().length === 0) {
+      <p class="empty">Todavía no hay citas médicas capturadas para este miembro.</p>
+    } @else {
+      <div class="grid-table-scroll">
+        <table class="grid-table">
+          <thead>
+            <tr>
+              <th>Motivo</th>
+              <th>Especialidad</th>
+              <th>Fecha</th>
+              <th>Lugar</th>
+              <th>Estado</th>
+              <th class="grid-actions-col">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (cita of citasDelMiembro(); track cita.id) {
+              <tr>
+                <td>{{ cita.motivo }}</td>
+                <td>{{ cita.especialidad || '—' }}</td>
+                <td>{{ cita.fecha ? (cita.fecha | date: 'dd/MM/yyyy') : '—' }}</td>
+                <td>{{ cita.lugar || '—' }}</td>
+                <td>
+                  <span class="grid-badge" [class.grid-badge-success]="cita.completada" [class.grid-badge-warning]="!cita.completada">
+                    {{ cita.completada ? 'Atendida' : 'Pendiente' }}
+                  </span>
+                </td>
+                <td class="grid-actions-col" data-label="Acciones">
+                  <div class="grid-actions-inner">
+                    <button type="button" class="btn-secondary small grid-action-icon" title="Editar" (click)="editarCita(cita)">✎</button>
+                    <button type="button" class="btn-danger small grid-action-icon" title="Eliminar" (click)="pedirEliminarCita(cita)">🗑</button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @if (modalCitaAbierto()) {
+      <div class="modal-overlay modal show d-block" (click)="cerrarModalCita()">
+        <form class="modal-box modal-dialog modal-content" [formGroup]="formCita" (click)="$event.stopPropagation()" (ngSubmit)="guardarCita()">
+          <h3 class="modal-title mb-3">{{ citaEnEdicion() ? 'Editar cita' : 'Nueva cita' }}</h3>
+          <div class="edit-form">
+            <label class="floating-field">
+              <span>Motivo <b>*</b></span>
+              <input type="text" class="form-control pill-control" formControlName="motivo" placeholder=" " />
+            </label>
+            <label class="floating-field">
+              <span>Especialidad</span>
+              <input type="text" class="form-control pill-control" formControlName="especialidad" placeholder=" " />
+            </label>
+            <label class="floating-field">
+              <span>Fecha <b>*</b></span>
+              <input type="date" class="form-control pill-control" formControlName="fecha" placeholder=" " />
+            </label>
+            <label class="floating-field">
+              <span>Lugar</span>
+              <input type="text" class="form-control pill-control" formControlName="lugar" placeholder=" " />
+            </label>
+            <label class="floating-field">
+              <span>Notas</span>
+              <input type="text" class="form-control pill-control" formControlName="notas" placeholder=" " />
+            </label>
+            <label class="checkbox-inline full-span">
+              <input type="checkbox" formControlName="completada" />
+              Ya se atendió
+            </label>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" (click)="cerrarModalCita()">Cancelar</button>
+            <button type="submit" class="btn-primary">Guardar</button>
+          </div>
+        </form>
+      </div>
+    }
+    <app-confirm-dialog
+      [visible]="citaAEliminar() !== null"
+      titulo="Eliminar cita"
+      mensaje="¿Eliminar esta cita médica?"
+      (confirmar)="confirmarEliminarCita()"
+      (cancelar)="citaAEliminar.set(null)"
+    />
+  } @else if (tabFicha() === 'polizas') {
+    <div class="grid-toolbar">
+      <button type="button" class="toolbar-btn" (click)="nuevaPoliza()">+ Nueva póliza</button>
+    </div>
+    @if (polizasDelMiembro().length === 0) {
+      <p class="empty">Todavía no hay pólizas capturadas para este miembro.</p>
+    } @else {
+      <div class="grid-table-scroll">
+        <table class="grid-table">
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th>Aseguradora</th>
+              <th>Número</th>
+              <th>Vigencia</th>
+              <th>Estado</th>
+              <th class="grid-actions-col">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (poliza of polizasDelMiembro(); track poliza.id) {
+              <tr>
+                <td>{{ poliza.tipo }}</td>
+                <td>{{ poliza.aseguradora }}</td>
+                <td>{{ poliza.numeroPoliza || '—' }}</td>
+                <td>{{ poliza.fechaVigenciaFin ? (poliza.fechaVigenciaFin | date: 'dd/MM/yyyy') : '—' }}</td>
+                <td>
+                  <span class="grid-badge {{ claseEstadoVencimiento[estadoVencimientoPoliza(poliza)] }}">
+                    {{ etiquetaEstadoVencimiento[estadoVencimientoPoliza(poliza)] }}
+                  </span>
+                </td>
+                <td class="grid-actions-col" data-label="Acciones">
+                  <div class="grid-actions-inner">
+                    <button type="button" class="btn-secondary small grid-action-icon" title="Editar" (click)="editarPoliza(poliza)">✎</button>
+                    <button type="button" class="btn-danger small grid-action-icon" title="Eliminar" (click)="pedirEliminarPoliza(poliza)">🗑</button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @if (modalPolizaAbierto()) {
+      <div class="modal-overlay modal show d-block" (click)="cerrarModalPoliza()">
+        <form class="modal-box modal-dialog modal-content" [formGroup]="formPoliza" (click)="$event.stopPropagation()" (ngSubmit)="guardarPoliza()">
+          <h3 class="modal-title mb-3">{{ polizaEnEdicion() ? 'Editar póliza' : 'Nueva póliza' }}</h3>
+          <div class="edit-form">
+            <label class="floating-field">
+              <span>Tipo <b>*</b></span>
+              <select class="form-control pill-control" formControlName="tipo">
+                <option value="">Selecciona...</option>
+                @for (t of tiposPoliza; track t) {
+                  <option [value]="t">{{ t }}</option>
+                }
+              </select>
+            </label>
+            <label class="floating-field">
+              <span>Aseguradora <b>*</b></span>
+              <input type="text" class="form-control pill-control" formControlName="aseguradora" placeholder=" " />
+            </label>
+            <label class="floating-field">
+              <span>Número de póliza</span>
+              <input type="text" class="form-control pill-control" formControlName="numeroPoliza" placeholder=" " />
+            </label>
+            <label class="floating-field">
+              <span>Vigencia desde</span>
+              <input type="date" class="form-control pill-control" formControlName="fechaVigenciaInicio" placeholder=" " />
+            </label>
+            <label class="floating-field">
+              <span>Vigencia hasta</span>
+              <input type="date" class="form-control pill-control" formControlName="fechaVigenciaFin" placeholder=" " />
+            </label>
+            <label class="floating-field">
+              <span>Notas</span>
+              <input type="text" class="form-control pill-control" formControlName="notas" placeholder=" " />
+            </label>
+            <label class="checkbox-inline full-span">
+              <input type="checkbox" formControlName="activo" />
+              Activa
+            </label>
+          </div>
+          <p class="hint" style="margin:-6px 0 0;">Deja la vigencia hasta vacía si la póliza no vence.</p>
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" (click)="cerrarModalPoliza()">Cancelar</button>
+            <button type="submit" class="btn-primary">Guardar</button>
+          </div>
+        </form>
+      </div>
+    }
+    <app-confirm-dialog
+      [visible]="polizaAEliminar() !== null"
+      titulo="Eliminar póliza"
+      mensaje="¿Eliminar esta póliza de seguro?"
+      (confirmar)="confirmarEliminarPoliza()"
+      (cancelar)="polizaAEliminar.set(null)"
     />
   } @else if (tabFicha() === 'tarjeta' && miembroActivo(); as m) {
     <div class="page-actions" style="margin-bottom:16px;">

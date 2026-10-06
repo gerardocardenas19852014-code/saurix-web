@@ -10,6 +10,18 @@ export const FAMILIA_ROUTES: Routes = [
     loadComponent: () => import('./miembros/miembros.component').then((m) => m.MiembrosFamiliaComponent),
   },
   {
+    path: 'arbol',
+    loadComponent: () => import('./arbol/arbol-familiar.component').then((m) => m.ArbolFamiliarComponent),
+  },
+  {
+    path: 'calendario',
+    loadComponent: () => import('./calendario/calendario-familiar.component').then((m) => m.CalendarioFamiliarComponent),
+  },
+  {
+    path: 'resumen',
+    loadComponent: () => import('./resumen/resumen-familia.component').then((m) => m.ResumenFamiliaComponent),
+  },
+  {
     path: 'parentesco',
     loadComponent: () => import('./parentesco/parentesco.component').then((m) => m.ParentescoComponent),
   },

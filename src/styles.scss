@@ -890,6 +890,11 @@ html[data-theme='dark'] .edit-form input[type=date], html[data-theme='ocean'] .e
 }
 .wallet-calgrid-evento-in { border-color: var(--client); }
 .wallet-calgrid-evento-out { border-color: var(--danger); }
+/* Calendario familiar: los eventos son <button> (clicables, llevan a la
+   ficha o editan), no <span> como en Calendario de pagos — reset acotado al
+   elemento button para no afectar ese otro calendario. */
+button.wallet-calgrid-evento { display: block; width: 100%; text-align: left; color: inherit; font-family: inherit; cursor: pointer; }
+.wallet-calgrid-agregar { align-self: flex-start; width: 20px; height: 20px; border-radius: 5px; border: 1px dashed var(--line); background: transparent; color: var(--ink-soft); font-size: 13px; line-height: 1; cursor: pointer; padding: 0; }
 .wallet-limit-card { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; }
 .wallet-limit-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
 .wallet-limit-amounts { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
@@ -951,6 +956,27 @@ html[data-theme='dark'] .edit-form input[type=date], html[data-theme='ocean'] .e
 .anexo-item-icon { font-size: 20px; }
 .anexo-item-body { flex: 1; }
 .form-actions { display: flex; gap: 12px; }
+.familia-salud-subtitulo { font-size: 16px; font-weight: 700; margin: 0 0 10px; }
+.familia-resumen-titulo-vencido { color: var(--danger); }
+.familia-resumen-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  color: inherit;
+  font-family: inherit;
+}
+.familia-resumen-item:disabled { cursor: default; }
+.familia-resumen-icono { font-size: 20px; }
+.familia-resumen-texto { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.familia-resumen-fecha { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; white-space: nowrap; }
 .form-error { background: var(--danger-soft); color: var(--danger); padding: 10px 14px; border-radius: 8px; font-size: 14px; }
 
 .btn-primary, .btn-secondary, .btn-danger { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 13px; border-radius: 20px; padding: 9px 18px; border: 2px solid transparent; cursor: pointer; text-align: center; display: inline-block; transition: background .15s ease, color .15s ease, transform .1s ease; }

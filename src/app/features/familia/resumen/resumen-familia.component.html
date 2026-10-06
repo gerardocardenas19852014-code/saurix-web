@@ -1,0 +1,36 @@
+<div class="page-header">
+  <h1>Resumen de familia</h1>
+  <div class="page-actions">
+    <a routerLink="/familia/calendario" class="btn-secondary small">📅 Ver calendario</a>
+  </div>
+</div>
+<p class="hint" style="margin:-10px 0 24px;">
+  Lo más próximo de toda la familia (cumpleaños, documentos y pólizas por vencer, citas médicas y eventos), ordenado por cercanía — próximos 90 días.
+</p>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else if (secciones().length === 0) {
+  <div class="empty-state-block">
+    <p>No hay nada próximo en los siguientes 90 días. 🎉</p>
+  </div>
+} @else {
+  @for (seccion of secciones(); track seccion.clave) {
+    <h2 class="familia-salud-subtitulo" [class.familia-resumen-titulo-vencido]="seccion.clave === 'vencido'">{{ seccion.titulo }}</h2>
+    <div class="wallet-calendar-day" style="border-bottom:none; flex-direction:column; align-items:stretch; padding-top:0;">
+      @for (item of seccion.items; track item.titulo + item.tipo + item.fecha.getTime()) {
+        <button type="button" class="familia-resumen-item" [disabled]="!item.miembroId" (click)="onEventoClick(item)">
+          <span class="familia-resumen-icono">{{ item.icono }}</span>
+          <span class="familia-resumen-texto">
+            <strong>{{ item.titulo }}</strong>
+            <span class="hint" style="margin:0;">{{ item.detalle }}</span>
+          </span>
+          <span class="familia-resumen-fecha">
+            {{ item.fecha | date: 'dd MMM' }}
+            <span class="hint" style="margin:0;">{{ textoDias(item.dias) }}</span>
+          </span>
+        </button>
+      }
+    </div>
+  }
+}

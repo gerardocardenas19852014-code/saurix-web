@@ -45,6 +45,14 @@ export interface MiembroFamilia {
   contactoEmergenciaTelefono: string;
   aseguradora: string;
   numeroPoliza: string;
+  /** Relaciones familiares, para el árbol genealógico (ver arbol-familiar.component.ts).
+   *  Todas opcionales y apuntan a otro MiembroFamilia.id — null/ausente si no se
+   *  capturó. No hay validación de ciclos a nivel de dato (igual que el resto de
+   *  relaciones del sistema, ver TicketDependencia): la pantalla del árbol se
+   *  protege sola limitando la profundidad al recorrer. */
+  padreId?: number | null;
+  madreId?: number | null;
+  conyugeId?: number | null;
   /** Alta lógica, mismo patrón que otros catálogos con "Mostrar inactivos". */
   activo: boolean;
   fechaCreacion?: string;

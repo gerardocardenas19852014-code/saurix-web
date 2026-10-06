@@ -1,0 +1,144 @@
+/* Árbol genealógico: patrón clásico de "org chart" con <ul>/<li> anidados y
+   líneas dibujadas con border-top/border-left en pseudo-elementos — así no
+   hace falta medir posiciones en JS (ni SVG) para conectar las cajas. */
+
+.arbol-contenedor {
+  overflow-x: auto;
+  padding: 8px 4px 24px;
+}
+
+.arbol-nivel {
+  display: flex;
+  justify-content: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.arbol-nivel:not(.arbol-nivel-raiz) {
+  margin-top: 0;
+}
+
+.arbol-rama {
+  list-style: none;
+  position: relative;
+  padding: 28px 10px 0;
+  margin: 0;
+  text-align: center;
+}
+
+/* Línea vertical que baja de cada nodo hacia sus hijos. */
+.arbol-rama .arbol-nivel {
+  position: relative;
+}
+.arbol-rama > .arbol-nivel::before {
+  content: '';
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  width: 0;
+  height: 18px;
+  border-left: 2px solid var(--line);
+}
+
+/* Línea horizontal que une a los hermanos, y la rama corta hacia cada uno. */
+.arbol-nivel:not(.arbol-nivel-raiz) > .arbol-rama::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 18px;
+  border-top: 2px solid var(--line);
+  border-left: 2px solid var(--line);
+}
+.arbol-nivel:not(.arbol-nivel-raiz) > .arbol-rama::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 50%;
+  height: 18px;
+  border-top: 2px solid var(--line);
+  border-right: 2px solid var(--line);
+}
+.arbol-nivel:not(.arbol-nivel-raiz) > .arbol-rama:first-child::before,
+.arbol-nivel:not(.arbol-nivel-raiz) > .arbol-rama:last-child::after {
+  border: none;
+}
+.arbol-nivel:not(.arbol-nivel-raiz) > .arbol-rama:only-child::before,
+.arbol-nivel:not(.arbol-nivel-raiz) > .arbol-rama:only-child::after {
+  border: none;
+}
+.arbol-nivel:not(.arbol-nivel-raiz) > .arbol-rama:first-child:not(:only-child)::after {
+  border-left: 2px solid var(--line);
+}
+.arbol-nivel:not(.arbol-nivel-raiz) > .arbol-rama:last-child:not(:only-child)::before {
+  border-right: 2px solid var(--line);
+}
+
+.arbol-pareja {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 14px;
+}
+
+.arbol-conector-conyuge {
+  color: var(--ink-soft);
+  font-size: 16px;
+}
+
+.arbol-persona {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+  color: inherit;
+  min-width: 84px;
+}
+
+.arbol-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  object-fit: cover;
+}
+
+.arbol-nombre {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  max-width: 100px;
+}
+
+.arbol-edad {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.arbol-sueltos {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--line);
+}
+
+.arbol-sueltos-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.arbol-persona-suelta {
+  opacity: 0.85;
+}

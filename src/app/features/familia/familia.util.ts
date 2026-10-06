@@ -1,4 +1,8 @@
 import { DocumentoFamilia, DIAS_AVISO_VENCIMIENTO, EstadoVencimientoDocumento } from './documento-familia.model';
+import { MiembroFamilia } from './miembro-familia.model';
+import { PolizaSeguroMiembro } from './poliza-seguro-miembro.model';
+import { CitaMedicaMiembro } from './cita-medica-miembro.model';
+import { EventoFamiliar } from './evento-familiar.model';
 
 /** Igual que fechaLocalDeTexto en presupuesto/shared/wallet.util.ts: arma la
  *  fecha en hora LOCAL a partir de "YYYY-MM-DD" (evita el corrimiento de un
@@ -133,4 +137,128 @@ export function obtenerOSembrarValorLista(
       return forkJoin(altas);
     }),
   );
+}
+
+
+// ── Agenda unificada (Calendario familiar y Resumen) ──────────────────────
+
+export interface EventoAgendaFamiliar {
+  fecha: Date;
+  icono: string;
+  titulo: string;
+  detalle: string;
+  miembroId: number | null;
+  tipo: 'cumpleanos' | 'documento' | 'poliza' | 'cita' | 'evento';
+}
+
+export interface FuentesEventosFamiliares {
+  miembros: MiembroFamilia[];
+  documentos: DocumentoFamilia[];
+  polizas: PolizaSeguroMiembro[];
+  citas: CitaMedicaMiembro[];
+  eventos: EventoFamiliar[];
+}
+
+function nombreCortoMiembro(m: MiembroFamilia): string {
+  return [m.nombre, m.apellidoPaterno].filter(Boolean).join(' ');
+}
+
+/**
+ * Lista unificada de "eventos" de toda la familia, usada tanto por el
+ * Calendario (vista de mes) como por el Resumen (próximos pendientes):
+ * cumpleaños, documentos/pólizas por vencer y citas médicas pendientes de
+ * miembros ACTIVOS, más los eventos manuales capturados (EventoFamiliar).
+ * Un miembro inactivo (dado de baja) no genera ningún evento, igual que ya
+ * hacían documentosPorVencer/cumpleanosProximos en miembros.component.ts.
+ *
+ * `anioCumpleanos`: si se da, fija el año en que se calcula la fecha de
+ * cumpleaños de cada quien — necesario para poder mostrarlos en CUALQUIER
+ * mes que el Calendario esté mostrando, no solo el próximo. Si se omite
+ * (caso del Resumen, que solo lista lo próximo), usa proximoCumpleanos().
+ */
+export function eventosFamiliares(fuentes: FuentesEventosFamiliares, anioCumpleanos?: number): EventoAgendaFamiliar[] {
+  const miembrosActivosPorId = new Map(
+    fuentes.miembros.filter((m) => m.activo !== false).map((m) => [Number(m.id), m]),
+  );
+  const eventos: EventoAgendaFamiliar[] = [];
+
+  for (const m of miembrosActivosPorId.values()) {
+    if (!m.fechaNacimiento) continue;
+    let fecha: Date | null;
+    let edad: number | null;
+    if (anioCumpleanos !== undefined) {
+      const nacimiento = fechaLocalDeTexto(m.fechaNacimiento);
+      fecha = new Date(anioCumpleanos, nacimiento.getMonth(), nacimiento.getDate());
+      edad = anioCumpleanos - nacimiento.getFullYear();
+    } else {
+      fecha = proximoCumpleanos(m.fechaNacimiento);
+      edad = edadEnProximoCumpleanos(m.fechaNacimiento);
+    }
+    if (!fecha) continue;
+    eventos.push({
+      fecha,
+      icono: '🎂',
+      titulo: `Cumpleaños de ${nombreCortoMiembro(m)}`,
+      detalle: edad !== null ? `Cumple ${edad} años` : 'Cumpleaños',
+      miembroId: m.id,
+      tipo: 'cumpleanos',
+    });
+  }
+
+  for (const d of fuentes.documentos) {
+    if (!d.fechaVencimiento) continue;
+    const m = miembrosActivosPorId.get(Number(d.miembroFamiliaId));
+    if (!m) continue;
+    eventos.push({
+      fecha: fechaLocalDeTexto(d.fechaVencimiento),
+      icono: '📄',
+      titulo: `Vence documento de ${nombreCortoMiembro(m)}`,
+      detalle: d.notas || 'Documento',
+      miembroId: m.id,
+      tipo: 'documento',
+    });
+  }
+
+  for (const p of fuentes.polizas) {
+    if (!p.fechaVigenciaFin || p.activo === false) continue;
+    const m = miembrosActivosPorId.get(Number(p.miembroFamiliaId));
+    if (!m) continue;
+    eventos.push({
+      fecha: fechaLocalDeTexto(p.fechaVigenciaFin),
+      icono: '🛡️',
+      titulo: `Vence póliza de ${nombreCortoMiembro(m)}`,
+      detalle: p.aseguradora || 'Póliza de seguro',
+      miembroId: m.id,
+      tipo: 'poliza',
+    });
+  }
+
+  for (const c of fuentes.citas) {
+    if (!c.fecha || c.completada) continue;
+    const m = miembrosActivosPorId.get(Number(c.miembroFamiliaId));
+    if (!m) continue;
+    eventos.push({
+      fecha: fechaLocalDeTexto(c.fecha),
+      icono: '⚕️',
+      titulo: `Cita médica de ${nombreCortoMiembro(m)}`,
+      detalle: c.motivo || c.especialidad || 'Cita médica',
+      miembroId: m.id,
+      tipo: 'cita',
+    });
+  }
+
+  for (const e of fuentes.eventos) {
+    if (!e.fecha || e.activo === false) continue;
+    const m = e.miembroFamiliaId ? miembrosActivosPorId.get(Number(e.miembroFamiliaId)) : null;
+    eventos.push({
+      fecha: fechaLocalDeTexto(e.fecha),
+      icono: '📌',
+      titulo: e.titulo,
+      detalle: m ? nombreCortoMiembro(m) : e.notas || 'Evento familiar',
+      miembroId: m ? m.id : null,
+      tipo: 'evento',
+    });
+  }
+
+  return eventos.sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
 }

@@ -1,6 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
@@ -16,6 +16,9 @@ import { ValorLista } from '../../../shared/valor-lista/valor-lista.model';
 import { calcularRfcYCurp, OPCIONES_ENTIDAD, OPCIONES_SEXO } from '../../panel-control/rfc-curp/rfc-curp.util';
 import { colorAvatar, iniciales } from '../../proyectos/kanban/avatar.util';
 import { DocumentoFamilia } from '../documento-familia.model';
+import { VacunaMiembro } from '../vacuna-miembro.model';
+import { CitaMedicaMiembro } from '../cita-medica-miembro.model';
+import { PolizaSeguroMiembro } from '../poliza-seguro-miembro.model';
 import {
   CLASE_ESTADO_VENCIMIENTO,
   DIAS_AVISO_CUMPLEANOS,
@@ -38,6 +41,12 @@ import {
 
 const ENTIDAD_MIEMBRO = 'MiembroFamilia';
 const ENTIDAD_DOCUMENTO = 'DocumentoFamilia';
+const ENTIDAD_VACUNA = 'VacunaMiembro';
+const ENTIDAD_CITA = 'CitaMedicaMiembro';
+const ENTIDAD_POLIZA = 'PolizaSeguroMiembro';
+
+/** Opciones fijas para el tipo de póliza — ver nota en poliza-seguro-miembro.model.ts. */
+const TIPOS_POLIZA = ['Vida', 'Gastos médicos', 'Auto', 'Hogar', 'Otro'];
 const MODULO_BITACORA = 'Familia / Miembros';
 
 /**
@@ -53,7 +62,7 @@ const MODULO_BITACORA = 'Familia / Miembros';
 @Component({
   selector: 'app-miembros-familia',
   standalone: true,
-  imports: [ReactiveFormsModule, DataTableComponent, ConfirmDialogComponent, AdjuntosPanelComponent, BitacoraComponent, DatePipe],
+  imports: [ReactiveFormsModule, DataTableComponent, ConfirmDialogComponent, AdjuntosPanelComponent, BitacoraComponent, DatePipe, RouterLink],
   templateUrl: './miembros.component.html',
   styleUrl: './miembros.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -87,6 +96,9 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
   protected readonly entidadesNacimiento = signal<ValorLista[]>([]);
   protected readonly tiposSangre = signal<ValorLista[]>([]);
   protected readonly documentos = signal<DocumentoFamilia[]>([]);
+  protected readonly vacunas = signal<VacunaMiembro[]>([]);
+  protected readonly citasMedicas = signal<CitaMedicaMiembro[]>([]);
+  protected readonly polizas = signal<PolizaSeguroMiembro[]>([]);
   protected readonly cargando = signal(false);
   protected readonly mostrarInactivos = signal(false);
   protected readonly aEliminar = signal<MiembroFamilia | null>(null);
@@ -218,11 +230,12 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
 
   // ── Ficha (Datos/Documentos/Tarjeta) ────────────────────────────────
   protected readonly vista = signal<'lista' | 'ficha'>('lista');
-  protected readonly tabFicha = signal<'datos' | 'documentos' | 'tarjeta'>('datos');
+  protected readonly tabFicha = signal<'datos' | 'documentos' | 'salud' | 'polizas' | 'tarjeta'>('datos');
+  protected readonly tiposPoliza = TIPOS_POLIZA;
   /** Sub-pestañas dentro de "Datos" — mismo patrón que las pestañas de
    *  Detalles/Fechas/... del detalle de ticket en Gestión de Proyectos
    *  (kanban.component.ts → tabActiva/seleccionarTab). */
-  protected readonly subTabDatos = signal<'personales' | 'rfc' | 'medica' | 'contacto'>('personales');
+  protected readonly subTabDatos = signal<'personales' | 'relaciones' | 'rfc' | 'medica' | 'contacto'>('personales');
   protected readonly miembroActivo = signal<MiembroFamilia | null>(null);
   /** Foto de la persona en edición (base64, ya redimensionada) — aparte del
    *  form reactivo porque es un valor grande que no tiene <input> con
@@ -240,6 +253,37 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
       .filter((d) => Number(d.miembroFamiliaId) === Number(id))
       .sort((a, b) => (a.fechaVencimiento || '9999').localeCompare(b.fechaVencimiento || '9999'));
   });
+
+  protected readonly vacunasDelMiembro = computed(() => {
+    const id = this.miembroActivo()?.id;
+    if (!id) return [];
+    return this.vacunas()
+      .filter((v) => Number(v.miembroFamiliaId) === Number(id))
+      .sort((a, b) => (b.fechaAplicacion || '').localeCompare(a.fechaAplicacion || ''));
+  });
+
+  protected readonly citasDelMiembro = computed(() => {
+    const id = this.miembroActivo()?.id;
+    if (!id) return [];
+    return this.citasMedicas()
+      .filter((c) => Number(c.miembroFamiliaId) === Number(id))
+      .sort((a, b) => (a.fecha || '9999').localeCompare(b.fecha || '9999'));
+  });
+
+  protected readonly polizasDelMiembro = computed(() => {
+    const id = this.miembroActivo()?.id;
+    if (!id) return [];
+    return this.polizas()
+      .filter((p) => Number(p.miembroFamiliaId) === Number(id))
+      .sort((a, b) => (a.fechaVigenciaFin || '9999').localeCompare(b.fechaVigenciaFin || '9999'));
+  });
+
+  /** Reusa el mismo cálculo de vencimiento que Documentos (estadoVencimiento
+   *  solo necesita un campo `fechaVencimiento`, así que se adapta pasando
+   *  fechaVigenciaFin con ese nombre). */
+  protected estadoVencimientoPoliza(p: PolizaSeguroMiembro) {
+    return this.estadoVencimiento({ fechaVencimiento: p.fechaVigenciaFin });
+  }
 
   protected readonly form = this.fb.nonNullable.group({
     id: [0],
@@ -262,7 +306,19 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
     contactoEmergenciaTelefono: [''],
     aseguradora: [''],
     numeroPoliza: [''],
+    padreId: [0],
+    madreId: [0],
+    conyugeId: [0],
     activo: [true],
+  });
+
+  /** Opciones para los selects de padre/madre/cónyuge: miembros activos,
+   *  sin incluirse a sí mismo (un miembro no puede ser su propio pariente). */
+  protected readonly miembrosParaRelacion = computed(() => {
+    const idActual = this.miembroActivo()?.id ?? 0;
+    return this.miembros()
+      .filter((m) => m.activo !== false && Number(m.id) !== Number(idActual))
+      .sort((a, b) => (a.nombre + a.apellidoPaterno).localeCompare(b.nombre + b.apellidoPaterno, 'es-MX'));
   });
 
   /** Genera (o limpia) el QR de la tarjeta de emergencia cada vez que se
@@ -308,6 +364,9 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
       this.tiposSangre.set(v.filter((r) => r.activo !== false).sort((a, b) => a.orden - b.orden)),
     );
     this.data.list<DocumentoFamilia>(ENTIDAD_DOCUMENTO).subscribe((d) => this.documentos.set(d));
+    this.data.list<VacunaMiembro>(ENTIDAD_VACUNA).subscribe((v) => this.vacunas.set(v));
+    this.data.list<CitaMedicaMiembro>(ENTIDAD_CITA).subscribe((c) => this.citasMedicas.set(c));
+    this.data.list<PolizaSeguroMiembro>(ENTIDAD_POLIZA).subscribe((p) => this.polizas.set(p));
     this.cargar();
 
     // Deep link (p.ej. desde el Asistente Saurix): ?miembro=123 abre
@@ -366,6 +425,9 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
       contactoEmergenciaTelefono: '',
       aseguradora: '',
       numeroPoliza: '',
+      padreId: 0,
+      madreId: 0,
+      conyugeId: 0,
       activo: true,
     });
     this.fotoActual.set('');
@@ -376,7 +438,13 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
 
   abrirMiembro(miembro: MiembroFamilia): void {
     this.miembroActivo.set(miembro);
-    this.form.reset({ ...miembro, apellidoMaterno: miembro.apellidoMaterno ?? '' });
+    this.form.reset({
+      ...miembro,
+      apellidoMaterno: miembro.apellidoMaterno ?? '',
+      padreId: miembro.padreId ?? 0,
+      madreId: miembro.madreId ?? 0,
+      conyugeId: miembro.conyugeId ?? 0,
+    });
     this.fotoActual.set(miembro.foto ?? '');
     this.tabFicha.set('datos');
     this.subTabDatos.set('personales');
@@ -422,7 +490,14 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const valor = { ...this.form.getRawValue(), foto: this.fotoActual() };
+    const bruto = this.form.getRawValue();
+    const valor = {
+      ...bruto,
+      foto: this.fotoActual(),
+      padreId: bruto.padreId ? Number(bruto.padreId) : null,
+      madreId: bruto.madreId ? Number(bruto.madreId) : null,
+      conyugeId: bruto.conyugeId ? Number(bruto.conyugeId) : null,
+    };
     const previo = this.miembroActivo();
     const esEdicion = previo !== null;
 
@@ -444,11 +519,44 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
           })
           .subscribe();
         this.toast.exito(esEdicion ? 'Miembro actualizado.' : 'Miembro creado.');
+        this.sincronizarConyuge(previo?.conyugeId ?? null, resultado);
         this.miembroActivo.set(resultado);
         this.cargar();
       },
       error: () => this.toast.error('No se pudo guardar. Intenta de nuevo.'),
     });
+  }
+
+  /** El cónyuge se captura de un solo lado del formulario, pero la relación
+   *  debe verse desde ambos miembros (para el árbol y para que al abrir la
+   *  ficha de B ya aparezca A como su cónyuge). Tras guardar A: si A quedó
+   *  con un cónyuge nuevo, se actualiza a B.conyugeId = A.id (si no apuntaba
+   *  ya ahí); si A tenía antes un cónyuge distinto (o lo quitó), se limpia
+   *  el conyugeId del lado anterior para no dejar una relación a medias. */
+  private sincronizarConyuge(conyugeAnteriorId: number | null, actual: MiembroFamilia): void {
+    const nuevoConyugeId = actual.conyugeId ?? null;
+
+    if (conyugeAnteriorId && conyugeAnteriorId !== nuevoConyugeId) {
+      this.data.getById<MiembroFamilia>(ENTIDAD_MIEMBRO, conyugeAnteriorId).subscribe({
+        next: (anterior) => {
+          if (Number(anterior.conyugeId) === Number(actual.id)) {
+            this.data.modificacion<MiembroFamilia>(ENTIDAD_MIEMBRO, { ...anterior, conyugeId: null }).subscribe(() => this.cargar());
+          }
+        },
+        error: () => {},
+      });
+    }
+
+    if (nuevoConyugeId) {
+      this.data.getById<MiembroFamilia>(ENTIDAD_MIEMBRO, nuevoConyugeId).subscribe({
+        next: (conyuge) => {
+          if (Number(conyuge.conyugeId) !== Number(actual.id)) {
+            this.data.modificacion<MiembroFamilia>(ENTIDAD_MIEMBRO, { ...conyuge, conyugeId: actual.id }).subscribe(() => this.cargar());
+          }
+        },
+        error: () => {},
+      });
+    }
   }
 
   pedirEliminarMiembro(miembro: MiembroFamilia): void {
@@ -552,6 +660,237 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
         this.toast.exito('Documento eliminado.');
         this.documentoAEliminar.set(null);
         this.data.list<DocumentoFamilia>(ENTIDAD_DOCUMENTO).subscribe((d) => this.documentos.set(d));
+      },
+      error: () => this.toast.error('No se pudo eliminar. Intenta de nuevo.'),
+    });
+  }
+
+  // ── Salud: vacunas ───────────────────────────────────────────────────
+  protected readonly modalVacunaAbierto = signal(false);
+  protected readonly vacunaEnEdicion = signal<VacunaMiembro | null>(null);
+  protected readonly vacunaAEliminar = signal<VacunaMiembro | null>(null);
+
+  protected readonly formVacuna = this.fb.nonNullable.group({
+    id: [0],
+    miembroFamiliaId: [0],
+    nombre: ['', Validators.required],
+    fechaAplicacion: ['', Validators.required],
+    dosis: [''],
+    notas: [''],
+  });
+
+  nuevaVacuna(): void {
+    const miembro = this.miembroActivo();
+    if (!miembro) return;
+    this.vacunaEnEdicion.set(null);
+    this.formVacuna.reset({ id: 0, miembroFamiliaId: miembro.id, nombre: '', fechaAplicacion: '', dosis: '', notas: '' });
+    this.modalVacunaAbierto.set(true);
+  }
+
+  editarVacuna(vacuna: VacunaMiembro): void {
+    this.vacunaEnEdicion.set(vacuna);
+    this.formVacuna.reset(vacuna);
+    this.modalVacunaAbierto.set(true);
+  }
+
+  cerrarModalVacuna(): void {
+    this.toast.info('Cambios descartados.');
+    this.modalVacunaAbierto.set(false);
+  }
+
+  guardarVacuna(): void {
+    if (this.formVacuna.invalid) {
+      this.formVacuna.markAllAsTouched();
+      this.toast.error('Captura el nombre de la vacuna y la fecha de aplicación.');
+      return;
+    }
+    const valor = this.formVacuna.getRawValue();
+    const esEdicion = this.vacunaEnEdicion() !== null;
+    const peticion = esEdicion
+      ? this.data.modificacion<VacunaMiembro>(ENTIDAD_VACUNA, valor)
+      : this.data.alta<VacunaMiembro>(ENTIDAD_VACUNA, valor);
+
+    peticion.subscribe({
+      next: () => {
+        this.toast.exito(esEdicion ? 'Vacuna actualizada.' : 'Vacuna agregada.');
+        this.modalVacunaAbierto.set(false);
+        this.data.list<VacunaMiembro>(ENTIDAD_VACUNA).subscribe((v) => this.vacunas.set(v));
+      },
+      error: () => this.toast.error('No se pudo guardar la vacuna. Intenta de nuevo.'),
+    });
+  }
+
+  pedirEliminarVacuna(vacuna: VacunaMiembro): void {
+    this.vacunaAEliminar.set(vacuna);
+  }
+
+  confirmarEliminarVacuna(): void {
+    const vacuna = this.vacunaAEliminar();
+    if (!vacuna) return;
+    this.data.baja(ENTIDAD_VACUNA, vacuna.id).subscribe({
+      next: () => {
+        this.toast.exito('Vacuna eliminada.');
+        this.vacunaAEliminar.set(null);
+        this.data.list<VacunaMiembro>(ENTIDAD_VACUNA).subscribe((v) => this.vacunas.set(v));
+      },
+      error: () => this.toast.error('No se pudo eliminar. Intenta de nuevo.'),
+    });
+  }
+
+  // ── Salud: citas médicas ─────────────────────────────────────────────
+  protected readonly modalCitaAbierto = signal(false);
+  protected readonly citaEnEdicion = signal<CitaMedicaMiembro | null>(null);
+  protected readonly citaAEliminar = signal<CitaMedicaMiembro | null>(null);
+
+  protected readonly formCita = this.fb.nonNullable.group({
+    id: [0],
+    miembroFamiliaId: [0],
+    motivo: ['', Validators.required],
+    especialidad: [''],
+    fecha: ['', Validators.required],
+    lugar: [''],
+    notas: [''],
+    completada: [false],
+  });
+
+  nuevaCita(): void {
+    const miembro = this.miembroActivo();
+    if (!miembro) return;
+    this.citaEnEdicion.set(null);
+    this.formCita.reset({ id: 0, miembroFamiliaId: miembro.id, motivo: '', especialidad: '', fecha: '', lugar: '', notas: '', completada: false });
+    this.modalCitaAbierto.set(true);
+  }
+
+  editarCita(cita: CitaMedicaMiembro): void {
+    this.citaEnEdicion.set(cita);
+    this.formCita.reset(cita);
+    this.modalCitaAbierto.set(true);
+  }
+
+  cerrarModalCita(): void {
+    this.toast.info('Cambios descartados.');
+    this.modalCitaAbierto.set(false);
+  }
+
+  guardarCita(): void {
+    if (this.formCita.invalid) {
+      this.formCita.markAllAsTouched();
+      this.toast.error('Captura el motivo y la fecha de la cita.');
+      return;
+    }
+    const valor = this.formCita.getRawValue();
+    const esEdicion = this.citaEnEdicion() !== null;
+    const peticion = esEdicion
+      ? this.data.modificacion<CitaMedicaMiembro>(ENTIDAD_CITA, valor)
+      : this.data.alta<CitaMedicaMiembro>(ENTIDAD_CITA, valor);
+
+    peticion.subscribe({
+      next: () => {
+        this.toast.exito(esEdicion ? 'Cita actualizada.' : 'Cita agregada.');
+        this.modalCitaAbierto.set(false);
+        this.data.list<CitaMedicaMiembro>(ENTIDAD_CITA).subscribe((c) => this.citasMedicas.set(c));
+      },
+      error: () => this.toast.error('No se pudo guardar la cita. Intenta de nuevo.'),
+    });
+  }
+
+  pedirEliminarCita(cita: CitaMedicaMiembro): void {
+    this.citaAEliminar.set(cita);
+  }
+
+  confirmarEliminarCita(): void {
+    const cita = this.citaAEliminar();
+    if (!cita) return;
+    this.data.baja(ENTIDAD_CITA, cita.id).subscribe({
+      next: () => {
+        this.toast.exito('Cita eliminada.');
+        this.citaAEliminar.set(null);
+        this.data.list<CitaMedicaMiembro>(ENTIDAD_CITA).subscribe((c) => this.citasMedicas.set(c));
+      },
+      error: () => this.toast.error('No se pudo eliminar. Intenta de nuevo.'),
+    });
+  }
+
+  // ── Pólizas de seguro ────────────────────────────────────────────────
+  protected readonly modalPolizaAbierto = signal(false);
+  protected readonly polizaEnEdicion = signal<PolizaSeguroMiembro | null>(null);
+  protected readonly polizaAEliminar = signal<PolizaSeguroMiembro | null>(null);
+
+  protected readonly formPoliza = this.fb.nonNullable.group({
+    id: [0],
+    miembroFamiliaId: [0],
+    tipo: ['', Validators.required],
+    aseguradora: ['', Validators.required],
+    numeroPoliza: [''],
+    fechaVigenciaInicio: [''],
+    fechaVigenciaFin: [''],
+    notas: [''],
+    activo: [true],
+  });
+
+  nuevaPoliza(): void {
+    const miembro = this.miembroActivo();
+    if (!miembro) return;
+    this.polizaEnEdicion.set(null);
+    this.formPoliza.reset({
+      id: 0,
+      miembroFamiliaId: miembro.id,
+      tipo: '',
+      aseguradora: '',
+      numeroPoliza: '',
+      fechaVigenciaInicio: '',
+      fechaVigenciaFin: '',
+      notas: '',
+      activo: true,
+    });
+    this.modalPolizaAbierto.set(true);
+  }
+
+  editarPoliza(poliza: PolizaSeguroMiembro): void {
+    this.polizaEnEdicion.set(poliza);
+    this.formPoliza.reset(poliza);
+    this.modalPolizaAbierto.set(true);
+  }
+
+  cerrarModalPoliza(): void {
+    this.toast.info('Cambios descartados.');
+    this.modalPolizaAbierto.set(false);
+  }
+
+  guardarPoliza(): void {
+    if (this.formPoliza.invalid) {
+      this.formPoliza.markAllAsTouched();
+      this.toast.error('Captura el tipo y la aseguradora.');
+      return;
+    }
+    const valor = this.formPoliza.getRawValue();
+    const esEdicion = this.polizaEnEdicion() !== null;
+    const peticion = esEdicion
+      ? this.data.modificacion<PolizaSeguroMiembro>(ENTIDAD_POLIZA, valor)
+      : this.data.alta<PolizaSeguroMiembro>(ENTIDAD_POLIZA, valor);
+
+    peticion.subscribe({
+      next: () => {
+        this.toast.exito(esEdicion ? 'Póliza actualizada.' : 'Póliza agregada.');
+        this.modalPolizaAbierto.set(false);
+        this.data.list<PolizaSeguroMiembro>(ENTIDAD_POLIZA).subscribe((p) => this.polizas.set(p));
+      },
+      error: () => this.toast.error('No se pudo guardar la póliza. Intenta de nuevo.'),
+    });
+  }
+
+  pedirEliminarPoliza(poliza: PolizaSeguroMiembro): void {
+    this.polizaAEliminar.set(poliza);
+  }
+
+  confirmarEliminarPoliza(): void {
+    const poliza = this.polizaAEliminar();
+    if (!poliza) return;
+    this.data.baja(ENTIDAD_POLIZA, poliza.id).subscribe({
+      next: () => {
+        this.toast.exito('Póliza eliminada.');
+        this.polizaAEliminar.set(null);
+        this.data.list<PolizaSeguroMiembro>(ENTIDAD_POLIZA).subscribe((p) => this.polizas.set(p));
       },
       error: () => this.toast.error('No se pudo eliminar. Intenta de nuevo.'),
     });

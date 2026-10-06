@@ -1,0 +1,94 @@
+<div class="page-header">
+  <h1>Calendario familiar</h1>
+  <div class="page-actions">
+    <a routerLink="/familia/resumen" class="btn-secondary small">🔔 Ver resumen</a>
+    <button type="button" class="toolbar-btn" (click)="nuevoEvento()">+ Nuevo evento</button>
+  </div>
+</div>
+<p class="hint" style="margin:-10px 0 24px;">
+  Cumpleaños, documentos y pólizas por vencer, citas médicas pendientes y eventos que captures aquí, todos juntos por mes.
+</p>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else {
+  <div class="wallet-calgrid-nav">
+    <button type="button" class="btn-secondary small" (click)="irMesAnterior()">‹ Anterior</button>
+    <strong style="text-transform:capitalize;">{{ etiquetaMesGrid() }}</strong>
+    <button type="button" class="btn-secondary small" (click)="irMesSiguiente()">Siguiente ›</button>
+    <button type="button" class="btn-secondary small" (click)="irMesHoy()">Hoy</button>
+  </div>
+  <div class="wallet-calgrid-head">
+    <span>Dom</span><span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span>
+  </div>
+  <div class="wallet-calgrid">
+    @for (celda of celdasGrid(); track $index) {
+      <div class="wallet-calgrid-cell" [class.wallet-calgrid-cell-vacia]="!celda.fecha" [class.wallet-calgrid-cell-hoy]="celda.esHoy">
+        @if (celda.fecha; as fecha) {
+          <span class="wallet-calgrid-num">{{ fecha | date: 'd' }}</span>
+          @for (evento of celda.eventos; track evento.titulo + evento.tipo) {
+            <button
+              type="button"
+              class="wallet-calgrid-evento"
+              [class.wallet-calgrid-evento-in]="evento.tipo === 'cumpleanos' || evento.tipo === 'cita' || evento.tipo === 'evento'"
+              [class.wallet-calgrid-evento-out]="evento.tipo === 'documento' || evento.tipo === 'poliza'"
+              [title]="evento.titulo + ' · ' + evento.detalle"
+              (click)="onEventoClick(evento)"
+            >
+              {{ evento.icono }} {{ evento.titulo }}
+            </button>
+          }
+          @if (celda.eventos.length === 0) {
+            <button type="button" class="wallet-calgrid-agregar" title="Agregar evento este día" (click)="nuevoEvento(fecha)">+</button>
+          }
+        }
+      </div>
+    }
+  </div>
+}
+
+@if (modalEventoAbierto()) {
+  <div class="modal-overlay modal show d-block" (click)="cerrarModalEvento()">
+    <form class="modal-box modal-dialog modal-content" [formGroup]="formEvento" (click)="$event.stopPropagation()" (ngSubmit)="guardarEvento()">
+      <h3 class="modal-title mb-3">{{ eventoEnEdicion() ? 'Editar evento' : 'Nuevo evento' }}</h3>
+      <div class="edit-form">
+        <label class="floating-field">
+          <span>Título <b>*</b></span>
+          <input type="text" class="form-control pill-control" formControlName="titulo" placeholder=" " />
+        </label>
+        <label class="floating-field">
+          <span>Fecha <b>*</b></span>
+          <input type="date" class="form-control pill-control" formControlName="fecha" placeholder=" " />
+        </label>
+        <label class="floating-field">
+          <span>Miembro relacionado</span>
+          <select class="form-control pill-control" formControlName="miembroFamiliaId">
+            <option [ngValue]="0">Toda la familia</option>
+            @for (m of miembrosActivos(); track m.id) {
+              <option [ngValue]="m.id">{{ m.nombre }} {{ m.apellidoPaterno }}</option>
+            }
+          </select>
+        </label>
+        <label class="floating-field">
+          <span>Notas</span>
+          <input type="text" class="form-control pill-control" formControlName="notas" placeholder=" " />
+        </label>
+      </div>
+      <div class="modal-actions">
+        @if (eventoEnEdicion()) {
+          <button type="button" class="btn-danger" (click)="pedirEliminarEventoEnEdicion()">Eliminar</button>
+        }
+        <button type="button" class="btn-secondary" (click)="cerrarModalEvento()">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="eventoAEliminar() !== null"
+  titulo="Eliminar evento"
+  mensaje="¿Eliminar este evento del calendario?"
+  (confirmar)="confirmarEliminarEvento()"
+  (cancelar)="eventoAEliminar.set(null)"
+/>

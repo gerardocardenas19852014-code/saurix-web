@@ -1,0 +1,89 @@
+<div class="page-header">
+  <h1>Árbol genealógico</h1>
+  <div class="page-actions">
+    <a routerLink="/familia/miembros" class="btn-secondary small">👪 Ver miembros</a>
+  </div>
+</div>
+<p class="hint" style="margin:-10px 0 24px;">
+  Construido a partir del padre, la madre y el cónyuge capturados en la ficha de cada miembro (pestaña Datos → Relaciones).
+</p>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else if (miembros().length === 0) {
+  <div class="empty-state-block">
+    <p>Todavía no hay miembros de familia capturados.</p>
+  </div>
+} @else {
+  @if (arbol().raices.length === 0) {
+    <div class="empty-state-block">
+      <p>Nadie tiene relaciones capturadas todavía — ve a la ficha de un miembro, pestaña Datos → Relaciones, y captura quién es su padre, madre o cónyuge.</p>
+    </div>
+  } @else {
+    <div class="arbol-contenedor">
+      <ul class="arbol-nivel arbol-nivel-raiz">
+        @for (raiz of arbol().raices; track raiz.persona.id) {
+          <li class="arbol-rama">
+            <ng-container [ngTemplateOutlet]="nodoTpl" [ngTemplateOutletContext]="{ $implicit: raiz }" />
+          </li>
+        }
+      </ul>
+    </div>
+  }
+
+  @if (arbol().sueltos.length > 0) {
+    <div class="arbol-sueltos">
+      <strong>Sin relación capturada</strong>
+      <p class="hint" style="margin:4px 0 10px;">Estos miembros no tienen padre, madre ni cónyuge capturado (o la relación apunta a alguien ya mostrado en otra rama).</p>
+      <div class="arbol-sueltos-lista">
+        @for (m of arbol().sueltos; track m.id) {
+          <a routerLink="/familia/miembros" [queryParams]="{ miembro: m.id }" class="arbol-persona arbol-persona-suelta">
+            @if (m.foto) {
+              <img class="arbol-avatar" [src]="m.foto" alt="" />
+            } @else {
+              <div class="arbol-avatar" [style.background]="colorAvatar(nombreCompleto(m))">{{ iniciales(nombreCompleto(m)) }}</div>
+            }
+            <span class="arbol-nombre">{{ nombreCompleto(m) }}</span>
+          </a>
+        }
+      </div>
+    </div>
+  }
+}
+
+<!-- Plantilla recursiva: una pareja (persona + cónyuge opcional) y, debajo, sus hijos con el mismo patrón. -->
+<ng-template #nodoTpl let-nodo>
+  <div class="arbol-pareja">
+    <a routerLink="/familia/miembros" [queryParams]="{ miembro: nodo.persona.id }" class="arbol-persona">
+      @if (nodo.persona.foto) {
+        <img class="arbol-avatar" [src]="nodo.persona.foto" alt="" />
+      } @else {
+        <div class="arbol-avatar" [style.background]="colorAvatar(nombreCompleto(nodo.persona))">{{ iniciales(nombreCompleto(nodo.persona)) }}</div>
+      }
+      <span class="arbol-nombre">{{ nombreCompleto(nodo.persona) }}</span>
+      <span class="arbol-edad">{{ calcularEdad(nodo.persona.fechaNacimiento) ?? '—' }} años</span>
+    </a>
+    @if (nodo.conyuge) {
+      <span class="arbol-conector-conyuge">⚭</span>
+      <a routerLink="/familia/miembros" [queryParams]="{ miembro: nodo.conyuge.id }" class="arbol-persona">
+        @if (nodo.conyuge.foto) {
+          <img class="arbol-avatar" [src]="nodo.conyuge.foto" alt="" />
+        } @else {
+          <div class="arbol-avatar" [style.background]="colorAvatar(nombreCompleto(nodo.conyuge))">{{ iniciales(nombreCompleto(nodo.conyuge)) }}</div>
+        }
+        <span class="arbol-nombre">{{ nombreCompleto(nodo.conyuge) }}</span>
+        <span class="arbol-edad">{{ calcularEdad(nodo.conyuge.fechaNacimiento) ?? '—' }} años</span>
+      </a>
+    }
+  </div>
+
+  @if (nodo.hijos.length > 0) {
+    <ul class="arbol-nivel">
+      @for (hijo of nodo.hijos; track hijo.persona.id) {
+        <li class="arbol-rama">
+          <ng-container [ngTemplateOutlet]="nodoTpl" [ngTemplateOutletContext]="{ $implicit: hijo }" />
+        </li>
+      }
+    </ul>
+  }
+</ng-template>
