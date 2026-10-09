@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ToastService } from '../../../shared/services/toast.service';
 import { calcularRfcYCurp, OPCIONES_ENTIDAD, OPCIONES_SEXO, ResultadoRfcCurp } from './rfc-curp.util';
@@ -20,21 +20,12 @@ import { calcularRfcYCurp, OPCIONES_ENTIDAD, OPCIONES_SEXO, ResultadoRfcCurp } f
   styleUrl: './rfc-curp.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class RfcCurpComponent implements OnInit, OnDestroy {
-  // Pantallas de Panel de Control (menos "Inicio", que es la cuadrícula de
-  // iconos): por defecto .content tiene max-width: 980px y queda centrada,
-  // dejando franjas vacías grandes a los lados en pantallas anchas. Se pide
-  // aquí el mismo ancho ampliado que ya usan Movimientos/Deudas/Proyección/
-  // Familia (ver html[data-wide='grid'] en styles.scss) para que el
-  // contenido aproveche ese espacio.
-  ngOnInit(): void {
-    document.documentElement.setAttribute('data-wide', 'grid');
-  }
-
-  ngOnDestroy(): void {
-    document.documentElement.removeAttribute('data-wide');
-  }
-
+export class RfcCurpComponent {
+  // A diferencia de otras pantallas de Panel de Control, aquí NO se pide el
+  // ancho ampliado (html[data-wide='grid']): el contenido es un formulario
+  // angosto (form-grid-2col, max-width 760px) que no aprovecha ese espacio
+  // extra y dejaba una franja en blanco enorme a la derecha de la tarjeta.
+  // Se deja con el ancho por defecto de .content (980px).
   private readonly fb = inject(FormBuilder);
   protected readonly toast = inject(ToastService);
 

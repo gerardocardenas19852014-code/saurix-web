@@ -1,3 +1,11 @@
+.rfccurp-card {
+  // El formulario (form-grid-2col) y el resultado tienen max-width: 760px;
+  // sin este limite la tarjeta .settings-card se estira al ancho completo
+  // de .content y deja una franja en blanco enorme a la derecha del
+  // contenido real.
+  max-width: 760px;
+}
+
 .rfccurp-resultado-row {
   display: flex;
   align-items: center;
