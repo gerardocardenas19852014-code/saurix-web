@@ -19,3 +19,38 @@
 	font-size: 13px;
 	line-height: 1.4;
 }
+
+/* Selector de fuente de datos (Nube / Este navegador) */
+.fuente-datos {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin: 4px 0 6px;
+  border: 1px solid var(--line, rgba(0, 0, 0, 0.12));
+  border-radius: 999px;
+  background: var(--paper, transparent);
+
+  button {
+    flex: 1;
+    border: 0;
+    border-radius: 999px;
+    padding: 6px 10px;
+    background: transparent;
+    color: var(--ink-soft, inherit);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+
+    &.activa {
+      background: var(--client, #6aa46a);
+      color: #fff;
+      font-weight: 600;
+    }
+  }
+}
+
+.fuente-datos-ayuda {
+  margin: 0 0 12px;
+  font-size: 12px;
+  opacity: 0.75;
+}

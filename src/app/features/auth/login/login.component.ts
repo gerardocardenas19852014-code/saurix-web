@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { ToastService } from '../../../shared/services/toast.service';
+import { FuenteDatos, fuenteDatosActual, guardarFuenteDatos } from '../../../core/services/fuente-datos';
 
 const USUARIO_RECORDADO_KEY = 'saurix.usuarioRecordado';
 
@@ -30,6 +31,17 @@ export class LoginComponent {
 
   protected readonly enviando = signal(false);
   protected readonly mensajeError = signal('');
+  protected readonly fuenteDatos = fuenteDatosActual();
+
+  /** Cambia entre la base en la nube y la de este navegador. Cierra
+   *  cualquier sesión de la otra fuente y recarga, porque el servicio de
+   *  datos se elige al arrancar la app. */
+  cambiarFuente(fuente: FuenteDatos): void {
+    if (fuente === this.fuenteDatos) return;
+    this.auth.cerrarSesion();
+    guardarFuenteDatos(fuente);
+    window.location.reload();
+  }
 
   protected readonly form = this.fb.nonNullable.group({
     usuario: [leerUsuarioRecordado(), Validators.required],

@@ -4,6 +4,8 @@ import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/
 import { errorInterceptor } from './core/interceptors/error.interceptor';
 import { DataClientService } from './core/services/data-client.service';
 import { IndexedDbDataClientService } from './core/services/indexeddb-data-client.service';
+import { SupabaseDataClientService } from './core/services/supabase-data-client.service';
+import { fuenteDatosActual } from './core/services/fuente-datos';
 import { SeedService } from './core/services/seed.service';
 import { routes } from './app.routes';
 
@@ -19,15 +21,18 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withFetch(), withInterceptors([errorInterceptor])),
 
     // ── Fuente de datos activa ──────────────────────────────────────────
-    // Por ahora la app guarda todo localmente con IndexedDB (sin backend).
-    // Cuando PlataformaSaurix (.NET) esté disponible, cambia esta línea a:
-    //   { provide: DataClientService, useClass: HttpDataClientService }
-    // (importando HttpDataClientService desde './core/services/http-data-client.service')
-    // y toda la app pasará a consumir los servicios reales sin tocar
-    // ningún componente ni pantalla.
-    { provide: DataClientService, useClass: IndexedDbDataClientService },
+    // Se elige en la pantalla de login (ver core/services/fuente-datos.ts):
+    //   'supabase'  → base de datos en la nube (Supabase), compartida entre
+    //                 dispositivos, con login de Supabase Auth.
+    //   'indexeddb' → todo local en este navegador, sin backend (modo anterior).
+    // Ningún componente cambia: todos dependen solo de DataClientService.
+    {
+      provide: DataClientService,
+      useClass: fuenteDatosActual() === 'supabase' ? SupabaseDataClientService : IndexedDbDataClientService,
+    },
 
-    // Garantiza que exista el usuario 'root'/'a' antes de que arranque la app.
+    // IndexedDB: garantiza el usuario 'root' y las listas de valores.
+    // Supabase: restaura la sesión guardada antes de que arranque la app.
     provideAppInitializer(() => inject(SeedService).ejecutar()),
   ],
 };

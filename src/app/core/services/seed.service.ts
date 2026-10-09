@@ -5,6 +5,8 @@ import { Usuario } from '../../features/seguridad/usuarios/usuario.model';
 import { hashPassword, pareceHashSha256 } from '../../shared/utils/password.util';
 import { debeDesactivarsePorVigenciaVencida } from '../../shared/utils/vigencia.util';
 import { BitacoraService } from '../../shared/services/bitacora.service';
+import { fuenteDatosActual } from './fuente-datos';
+import { AuthService } from './auth.service';
 
 /** Valores iniciales del catálogo genérico "Listas de valores" (ver
  *  shared/valor-lista): sin esto las pantallas que ya dependen de él
@@ -69,8 +71,18 @@ export class SeedService {
   // BitacoraService no depende de nada que dependa de SeedService, así que
   // esta inyección aquí es segura (sin ciclo).
   private readonly bitacora = inject(BitacoraService);
+  private readonly auth = inject(AuthService);
 
   async ejecutar(): Promise<void> {
+    // Con Supabase no hay 'root' sembrado: el primer usuario registrado en
+    // Auth es el admin, las Listas de valores se sembraron con
+    // supabase/migrations/05 y la vigencia la aplica la RLS. Aquí solo se
+    // valida que la sesión guardada siga viva.
+    if (fuenteDatosActual() === 'supabase') {
+      await this.auth.restaurarSesion();
+      return;
+    }
+
     const usuarios = await firstValueFrom(this.data.list<Usuario>('Usuario'));
     const root = usuarios.find((u) => u.nombreUsuario.toLowerCase() === 'root');
     const hashRoot = await hashPassword(DATOS_ROOT.password);

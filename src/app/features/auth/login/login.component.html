@@ -2,6 +2,32 @@
   <span class="eyebrow">§ Saurix</span>
   <h1>Iniciar sesión</h1>
 
+  <div class="fuente-datos" role="radiogroup" aria-label="Dónde se guardan los datos">
+    <button
+      type="button"
+      role="radio"
+      [attr.aria-checked]="fuenteDatos === 'supabase'"
+      [class.activa]="fuenteDatos === 'supabase'"
+      (click)="cambiarFuente('supabase')"
+    >
+      ☁️ Nube
+    </button>
+    <button
+      type="button"
+      role="radio"
+      [attr.aria-checked]="fuenteDatos === 'indexeddb'"
+      [class.activa]="fuenteDatos === 'indexeddb'"
+      (click)="cambiarFuente('indexeddb')"
+    >
+      💻 Este navegador
+    </button>
+  </div>
+  <p class="fuente-datos-ayuda">
+    {{ fuenteDatos === 'supabase'
+      ? 'Tus datos se guardan en Supabase y los ves desde cualquier dispositivo.'
+      : 'Tus datos se guardan solo en este navegador (sin internet).' }}
+  </p>
+
   <form [formGroup]="form" (ngSubmit)="entrar()">
     <label>
       Usuario

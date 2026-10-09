@@ -32,6 +32,58 @@
   </label>
 </div>
 
+@if (modoSupabase) {
+  <div class="settings-card">
+    <h2 class="settings-card-title">☁️ Importar un respaldo a Supabase</h2>
+    <p class="hint" style="margin:0 0 16px;">
+      Carga en la base de datos en la nube un respaldo (.json) descargado cuando Saurix guardaba
+      todo en este navegador. Se conservan los ids, así que tickets, movimientos, miembros y sus
+      relaciones quedan igual. Lo que ya exista en Supabase se omite, así que puedes volver a
+      correrlo sin duplicar. Los usuarios se relacionan por nombre de usuario; si alguno no existe,
+      lo suyo queda a tu nombre.
+    </p>
+    @if (importando()) {
+      <p class="hint" style="margin:0 0 16px;">⏳ {{ progresoImportacion() }}</p>
+    } @else {
+      <label class="btn-secondary" style="display:inline-block; cursor:pointer;">
+        ☁️ Elegir respaldo para importar…
+        <input type="file" accept="application/json,.json" style="display:none;" (change)="archivoParaImportar($event)" />
+      </label>
+    }
+    @if (resultadosImportacion().length) {
+      <table class="table" style="margin-top:16px;">
+        <thead>
+          <tr><th>Entidad</th><th>Importados</th><th>Omitidos</th><th>Detalle</th></tr>
+        </thead>
+        <tbody>
+          @for (r of resultadosImportacion(); track r.entidad) {
+            <tr>
+              <td>{{ r.entidad }}</td>
+              <td>{{ r.sinTabla ? '—' : r.importados }}</td>
+              <td>{{ r.sinTabla ? r.filas : r.omitidos }}</td>
+              <td style="font-size:12px;">
+                @if (r.sinTabla) { Ya no existe en Saurix (no se importa). }
+                @for (e of r.errores ?? []; track $index) { <div>{{ e }}</div> }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="respaldoAImportar() !== null"
+  titulo="Importar a Supabase"
+  [mensaje]="
+    '¿Importar \'' + nombreArchivoImportar() + '\' (' + totalRegistros(respaldoAImportar()) + ' registros) a la base de datos en la nube? ' +
+    'No borra nada; lo que ya exista se omite.'
+  "
+  (confirmar)="confirmarImportacion()"
+  (cancelar)="cancelarImportacion()"
+/>
+
 <app-confirm-dialog
   [visible]="respaldoPendiente() !== null"
   titulo="Restaurar respaldo"
