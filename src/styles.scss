@@ -370,6 +370,38 @@ html[data-wide='grid'] .content { max-width: 1600px; }
 // Ocupa su propio renglón dentro de .board-filters (en vez de compartir fila
 // con los demás combos), sin estirarse a todo el ancho del contenedor.
 .board-filter-field-full { flex: 0 1 auto; }
+
+// Filtro de Estado con selección múltiple (tickets › Lista de tickets): un
+// botón con la misma pinta que los <select> vecinos que abre un desplegable
+// de casillas — mismo patrón de panel flotante que .notif-panel (shell),
+// pero colgando de un filtro en vez de la campanita.
+.filtro-estado-wrap { position: relative; }
+.filtro-estado-btn {
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 14px;
+  color: var(--text-strong); background: var(--paper-raised); width: 100%; min-width: 0; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: space-between; gap: 6px; cursor: pointer; text-align: left;
+}
+.filtro-estado-btn:hover { border-color: var(--accent); }
+.filtro-estado-panel {
+  display: none; position: absolute; top: calc(100% + 6px); left: 0; width: 220px; max-width: calc(100vw - 24px);
+  background: var(--paper-raised); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 16px 32px -14px rgba(0, 0, 0, .35); z-index: 120;
+}
+.filtro-estado-panel.open { display: block; }
+.filtro-estado-panel-head {
+  display: flex; justify-content: space-between; align-items: center; padding: 10px 12px;
+  border-bottom: 1px solid var(--line); font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  font-weight: 700; color: var(--text-strong); text-transform: uppercase; letter-spacing: .05em;
+}
+.filtro-estado-panel-head a { font-size: 11px; text-transform: none; letter-spacing: 0; font-weight: 600; cursor: pointer; }
+.filtro-estado-panel-list { padding: 6px; max-height: 260px; overflow-y: auto; }
+.filtro-estado-item {
+  display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 8px; cursor: pointer;
+  font-size: 13.5px; color: var(--text-strong); font-family: inherit;
+}
+.filtro-estado-item:hover { background: var(--paper); }
+.filtro-estado-item input[type='checkbox'] { width: auto; }
+.filtro-estado-panel-foot { padding: 8px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; }
 .kanban-board { display: flex; gap: 18px; overflow-x: auto; padding-bottom: 8px; align-items: flex-start; }
 .kanban-column {
   flex: 1 1 300px; min-width: 300px; max-width: 400px; background: var(--paper-raised);

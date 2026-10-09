@@ -75,15 +75,34 @@
     </select>
   </label>
 
-  <label class="board-filter-field">
+  <div class="board-filter-field filtro-estado-wrap">
     Estado
-    <select [value]="filtroEstadoId()" (change)="filtroEstadoId.set(+$any($event.target).value)">
-      <option [value]="0">Todos</option>
-      @for (columna of columnasTablero(); track columna.id) {
-        <option [value]="columna.id">{{ columna.nombre }}</option>
-      }
-    </select>
-  </label>
+    <button type="button" class="filtro-estado-btn" (click)="toggleFiltroEstadoAbierto()">
+      {{ etiquetaFiltroEstado() }}
+      <span aria-hidden="true">▾</span>
+    </button>
+    <div class="filtro-estado-panel" [class.open]="filtroEstadoAbierto()">
+      <div class="filtro-estado-panel-head">
+        <span>Estado</span>
+        <a (click)="filtroEstadoIds.set([])">Limpiar</a>
+      </div>
+      <div class="filtro-estado-panel-list">
+        @for (columna of columnasTablero(); track columna.id) {
+          <label class="filtro-estado-item">
+            <input
+              type="checkbox"
+              [checked]="filtroEstadoIds().includes(columna.id)"
+              (change)="alternarEstadoFiltro(columna.id)"
+            />
+            {{ columna.nombre }}
+          </label>
+        }
+      </div>
+      <div class="filtro-estado-panel-foot">
+        <button type="button" class="btn-secondary small" (click)="filtroEstadoAbierto.set(false)">Cerrar</button>
+      </div>
+    </div>
+  </div>
 
   <label class="board-filter-field">
     Asignado a

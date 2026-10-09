@@ -113,7 +113,18 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly filtroTipoId = signal<number>(0);
   protected readonly filtroModuloId = signal<number>(0);
   protected readonly filtroPrioridadId = signal<number>(0);
-  protected readonly filtroEstadoId = signal<number>(0);
+  /** Multi-selección (antes era un solo id): [] = "Todos" (sin filtro),
+   *  cualquier otro contenido filtra por esos estados/columnas con OR entre
+   *  ellos — mismo criterio que el resto de los filtros multivalor de esta
+   *  pantalla. Se captura con un desplegable de casillas (ver filtroEstadoAbierto)
+   *  en vez de un <select multiple> nativo, por usabilidad (el nativo exige
+   *  Ctrl/Cmd+clic, poco descubrible). */
+  protected readonly filtroEstadoIds = signal<number[]>([]);
+  /** Controla si el desplegable de casillas del filtro de Estado está abierto
+   *  — mismo patrón de panel flotante que .notif-panel (shell), sin cierre al
+   *  hacer clic afuera (tampoco lo tiene el panel de notificaciones): se cierra
+   *  con el botón "Cerrar" de adentro o al volver a hacer clic en el disparador. */
+  protected readonly filtroEstadoAbierto = signal(false);
   protected readonly filtroAsignadoId = signal<number>(0);
   /** 0 = Todos (sin filtro), 1 = solo planeados, 2 = solo no planeados — mismo
    *  patrón de centinelas por número que el resto de los filtros de esta pantalla. */
@@ -128,7 +139,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
         this.filtroTipoId() ||
         this.filtroModuloId() ||
         this.filtroPrioridadId() ||
-        this.filtroEstadoId() ||
+        this.filtroEstadoIds().length ||
         this.filtroAsignadoId() ||
         this.filtroPlaneado() ||
         this.filtroTexto().trim()
@@ -358,7 +369,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     const tipoId = this.filtroTipoId();
     const moduloId = this.filtroModuloId();
     const prioridadId = this.filtroPrioridadId();
-    const estadoId = this.filtroEstadoId();
+    const estadoIds = this.filtroEstadoIds();
     const asignadoId = this.filtroAsignadoId();
     const planeadoFiltro = this.filtroPlaneado();
     // Admite varios folios separados por coma (p.ej. "55350,55182"): cada término
@@ -377,7 +388,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
         // (tickets sin ticketModuloId); cualquier otro valor filtra por ese módulo.
         (!moduloId || (moduloId === -1 ? !t.ticketModuloId : Number(t.ticketModuloId) === moduloId)) &&
         (!prioridadId || Number(t.ticketPrioridadId) === prioridadId) &&
-        (!estadoId || Number(t.tableroColumnaId) === estadoId) &&
+        (!estadoIds.length || estadoIds.includes(Number(t.tableroColumnaId))) &&
         (!asignadoId || Number(t.asignadoUsuarioId) === asignadoId) &&
         // planeadoFiltro === 1 es "solo planeados" (planeado !== false); === 2 es "solo no planeados".
         (!planeadoFiltro || (planeadoFiltro === 1 ? t.planeado !== false : t.planeado === false)) &&
@@ -679,6 +690,27 @@ export class KanbanComponent implements OnInit, OnDestroy {
     return this.columnasTablero().find((c) => Number(c.id) === Number(id))?.nombre ?? '—';
   }
 
+  /** Texto del botón disparador del filtro de Estado: "Todos" sin selección,
+   *  el nombre de la columna cuando hay una sola, o un contador cuando hay
+   *  varias — igual que cualquier combo de "N seleccionados". */
+  protected readonly etiquetaFiltroEstado = computed(() => {
+    const ids = this.filtroEstadoIds();
+    if (!ids.length) return 'Todos';
+    if (ids.length === 1) return this.nombreColumna(ids[0]);
+    return `${ids.length} seleccionados`;
+  });
+
+  toggleFiltroEstadoAbierto(): void {
+    this.filtroEstadoAbierto.update((v) => !v);
+  }
+
+  /** Agrega/quita una columna de la selección del filtro de Estado (checkbox). */
+  alternarEstadoFiltro(id: number): void {
+    this.filtroEstadoIds.update((actuales) =>
+      actuales.includes(id) ? actuales.filter((x) => x !== id) : [...actuales, id],
+    );
+  }
+
   etiquetasDe(ticketId: number): TicketEtiqueta[] {
     return this.etiquetasPorTicket().get(ticketId) ?? [];
   }
@@ -693,7 +725,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.filtroTipoId.set(0);
     this.filtroModuloId.set(0);
     this.filtroPrioridadId.set(0);
-    this.filtroEstadoId.set(0);
+    this.filtroEstadoIds.set([]);
     this.filtroPlaneado.set(0);
     this.filtroAsignadoId.set(0);
     this.filtroTexto.set('');
