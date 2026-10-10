@@ -83,6 +83,15 @@ const snakeACamel = (s: string): string => s.replace(/_([a-z0-9])/g, (_m, c: str
 
 const CACHE = new Map<string, DefinicionTabla>();
 
+/** true si la entidad ya está mapeada a una tabla real de Supabase. Para
+ *  features construidas primero en el frontend (IndexedDB) y pendientes de
+ *  migrar — ver esquema-tablas-saurix.md del proyecto Claude — permite que
+ *  list() se degrade a "sin datos" en vez de un error, sin tener que tocar
+ *  cada pantalla una por una. */
+export function entidadExiste(entidad: string): boolean {
+  return Object.prototype.hasOwnProperty.call(MAPA, entidad);
+}
+
 export function definicionTabla(entidad: string): DefinicionTabla {
   const enCache = CACHE.get(entidad);
   if (enCache) return enCache;

@@ -1,0 +1,18 @@
+{
+  // Las Edge Functions de Supabase (supabase/functions/**) corren en Deno, no en
+  // Node/Angular: usan globals como `Deno.serve`/`Deno.env` e imports tipo
+  // "npm:paquete@version" que el TypeScript de Angular (tsconfig.app.json, que
+  // solo incluye src/**/*.ts) no conoce. Sin esto, VS Code marca esas líneas
+  // como error aunque el build de Angular y el deploy a Supabase están bien.
+  //
+  // Con "deno.enablePaths" la extensión oficial de Deno solo se activa dentro de
+  // supabase/functions: entiende Deno.*, los imports "npm:"/"jsr:" y no toca el
+  // resto del proyecto (src/ sigue 100% en manos del servicio de TypeScript de
+  // Angular, sin cambios).
+  "deno.enablePaths": ["./supabase/functions"],
+  "deno.lint": true,
+  "deno.unstable": true,
+  "[typescript]": {
+    "editor.defaultFormatter": "denoland.vscode-deno"
+  }
+}

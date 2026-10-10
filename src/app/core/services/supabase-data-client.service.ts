@@ -1,9 +1,9 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, from } from 'rxjs';
+import { Observable, from, of } from 'rxjs';
 import { FunctionsHttpError, PostgrestError } from '@supabase/supabase-js';
 import { DataClientService } from './data-client.service';
 import { SupabaseService } from './supabase.service';
-import { DefinicionTabla, definicionTabla } from './supabase-esquema';
+import { DefinicionTabla, definicionTabla, entidadExiste } from './supabase-esquema';
 import { ToastService } from '../../shared/services/toast.service';
 
 const BUCKET_ADJUNTOS = 'adjuntos';
@@ -103,6 +103,17 @@ export class SupabaseDataClientService extends DataClientService {
   private readonly toast = inject(ToastService);
 
   override list<T>(entidad: string, filtro?: Record<string, unknown>): Observable<T[]> {
+    // Entidades construidas primero en el frontend (IndexedDB) y aún sin
+    // migrar a Supabase (ver esquema-tablas-saurix.md del proyecto Claude):
+    // en vez de tronar con un toast de error cada vez que la pantalla
+    // carga, se degradan a "sin datos todavía" — mismo espíritu que el
+    // resto de la app, donde el frontend va por delante del backend real.
+    // alta/modificacion/baja siguen fallando fuerte (nunca ocultar que una
+    // escritura no se guardó).
+    if (!entidadExiste(entidad)) {
+      console.warn(`[Supabase] '${entidad}' aún no existe en Supabase (ver supabase-esquema.ts) — list() regresa [] en vez de un error.`);
+      return of([]);
+    }
     return from(this.conToast(() => this.listar(entidad, filtro))) as Observable<T[]>;
   }
 

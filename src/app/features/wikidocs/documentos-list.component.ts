@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
@@ -14,7 +14,21 @@ import { ToastService } from '../../shared/services/toast.service';
 import { insertarEmbeds } from '../../shared/utils/embeds.util';
 import { generarTablaContenido } from '../../shared/utils/tabla-contenido.util';
 import { truncarTexto } from '../../shared/utils/texto.util';
-import { CategoriaOpcion, Documento, DocumentoFavorito, DocumentoVersion, SeccionOpcion, TipoSistemaOpcion } from './documento.model';
+import { SelectBuscableComponent, OpcionBuscable } from '../../shared/components/select-buscable/select-buscable.component';
+import { DESTINOS } from '../../shared/utils/navegacion-destinos.util';
+import {
+  CategoriaOpcion,
+  Documento,
+  DocumentoFavorito,
+  DocumentoReferenciaModulo,
+  DocumentoReferenciaProceso,
+  DocumentoReferenciaTabla,
+  DocumentoRelacion,
+  DocumentoVersion,
+  SeccionOpcion,
+  TipoRelacionDocumento,
+  TipoSistemaOpcion,
+} from './documento.model';
 import { PlantillaDocumento } from './plantillas/plantilla.model';
 
 interface Migaja {
@@ -51,12 +65,13 @@ interface Migaja {
     ConfirmDialogComponent,
     AdjuntosPanelComponent,
     EditorTextoComponent,
+    SelectBuscableComponent,
   ],
   templateUrl: './documentos-list.component.html',
   styleUrl: './documentos-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class DocumentosListComponent implements OnInit, OnDestroy {
+export class DocumentosListComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly data = inject(DataClientService);
   private readonly auth = inject(AuthService);
@@ -79,12 +94,20 @@ export class DocumentosListComponent implements OnInit, OnDestroy {
    *  pintar la estrella de cada renglón y al filtrar "Solo favoritos". */
   private readonly favoritos = signal<Map<number, DocumentoFavorito>>(new Map());
 
+  /** "Solo huérfanos" — documentos sin NINGUNA referencia de trazabilidad
+   *  (ni saliente: tabla/proceso/módulo/relación: ni entrante: otro
+   *  documento que lo relacione a él). Ver documentosConTrazabilidad(). */
+  protected readonly soloHuerfanos = signal(false);
+
   protected readonly documentos = computed(() => {
     const texto = this.busqueda().trim().toLowerCase();
     const soloFav = this.soloFavoritos();
+    const soloHuerf = this.soloHuerfanos();
     const favoritos = this.favoritos();
+    const conectados = this.documentosConTrazabilidad();
     let lista = this.documentosTodos();
     if (soloFav) lista = lista.filter((doc) => favoritos.has(doc.id));
+    if (soloHuerf) lista = lista.filter((doc) => !conectados.has(doc.id));
     if (!texto) return lista;
     return lista.filter(
       (doc) => doc.titulo.toLowerCase().includes(texto) || this.textoPlano(doc.contenido).toLowerCase().includes(texto),
@@ -106,8 +129,54 @@ export class DocumentosListComponent implements OnInit, OnDestroy {
   private readonly todasLasSecciones = signal<SeccionOpcion[]>([]);
   private readonly mapaSecciones = computed(() => new Map(this.todasLasSecciones().map((s) => [s.id, s])));
 
+  /** Copias SIN filtrar de las 4 tablas de trazabilidad (a diferencia de
+   *  tablasReferenciadas/etc., que sí filtran por el documento abierto en
+   *  cargarReferencias()) — solo para calcular qué documentos tienen
+   *  alguna referencia, en el listado completo. Mismo criterio que
+   *  todasLasSecciones para pintar una columna sin tener que ir
+   *  documento por documento. */
+  private readonly todasLasReferenciasTabla = signal<DocumentoReferenciaTabla[]>([]);
+  private readonly todasLasReferenciasProceso = signal<DocumentoReferenciaProceso[]>([]);
+  private readonly todasLasReferenciasModulo = signal<DocumentoReferenciaModulo[]>([]);
+  private readonly todasLasRelaciones = signal<DocumentoRelacion[]>([]);
+
+  /** Ids de documentos con alguna referencia de trazabilidad — saliente
+   *  (tabla/proceso/módulo/relación) o entrante (otro documento lo
+   *  relaciona a él, "backlink") — usado por la columna "Trazabilidad" y
+   *  el filtro "Solo huérfanos" del listado. */
+  private readonly documentosConTrazabilidad = computed(() => {
+    const ids = new Set<number>();
+    for (const fila of this.todasLasReferenciasTabla()) ids.add(fila.documentoId);
+    for (const fila of this.todasLasReferenciasProceso()) ids.add(fila.documentoId);
+    for (const fila of this.todasLasReferenciasModulo()) ids.add(fila.documentoId);
+    for (const relacion of this.todasLasRelaciones()) {
+      ids.add(relacion.documentoId);
+      ids.add(relacion.documentoRelacionadoId);
+    }
+    return ids;
+  });
+
+  protected esHuerfano(documento: Documento): boolean {
+    return !this.documentosConTrazabilidad().has(documento.id);
+  }
+
   /** null = listado; 'ver'/'editar'/'adjuntos' = documento abierto en esa pestaña. */
-  protected readonly vista = signal<'lista' | 'ver' | 'editar' | 'adjuntos' | 'historial'>('lista');
+  protected readonly vista = signal<'lista' | 'ver' | 'editar' | 'adjuntos' | 'historial' | 'referencias'>('lista');
+
+  /** La vista "lista" (tabla) aprovecha el ancho ampliado de `.content`
+   *  (ver comentario que tenía antes `ngOnInit`); las demás (Ver/Editar/
+   *  Adjuntos/Historial) tienen contenido angosto (`.edit-form` se limita
+   *  a 760px, `.page-body` es texto para leer) y con el ancho ampliado
+   *  fijo dejaban una franja vacía grande a la derecha — mismo problema ya
+   *  corregido en RFC y CURP. Este effect mantiene `data-wide` sincronizado
+   *  con la vista actual en vez de dejarlo fijo todo el tiempo que el
+   *  componente está montado, y lo quita al salir de la pantalla
+   *  (onCleanup corre tanto entre cambios de vista como al destruirse el
+   *  componente). */
+  private readonly _anchoSegunVista = effect((onCleanup) => {
+    if (this.vista() === 'lista') document.documentElement.setAttribute('data-wide', 'grid');
+    onCleanup(() => document.documentElement.removeAttribute('data-wide'));
+  });
   protected readonly documentoActual = signal<Documento | null>(null);
   protected readonly documentoAEliminar = signal<Documento | null>(null);
 
@@ -135,6 +204,16 @@ export class DocumentosListComponent implements OnInit, OnDestroy {
       campo: 'seccionId',
       etiqueta: 'Sección',
       formatear: (fila) => this.mapaSecciones().get(fila.seccionId)?.nombre ?? '—',
+    },
+    {
+      campo: 'id',
+      etiqueta: 'Trazabilidad',
+      formatear: (fila) => (this.esHuerfano(fila) ? 'Huérfano' : 'Conectado'),
+      claseValor: (fila) => (this.esHuerfano(fila) ? 'grid-badge-warning' : 'grid-badge-success'),
+      titulo: (fila) =>
+        this.esHuerfano(fila)
+          ? 'Sin ninguna tabla, proceso, módulo u otro documento referenciado (ni que lo referencien a él)'
+          : 'Tiene al menos una referencia de trazabilidad capturada',
     },
     { campo: 'activo', etiqueta: 'Activo', formatear: (fila) => (fila.activo ? 'Sí' : 'No') },
   ];
@@ -171,6 +250,218 @@ export class DocumentosListComponent implements OnInit, OnDestroy {
       .map((doc) => ({ id: doc.id, titulo: doc.titulo }));
   });
 
+  // ---------------- Referencias (trazabilidad) ----------------
+  // Pestaña "Referencias": permite anotar en qué tablas/procesos/módulos
+  // se apoya este documento, y con qué otros documentos se relaciona. Ver
+  // DocumentoReferenciaTabla/Proceso/Modulo y DocumentoRelacion en
+  // documento.model.ts. Mismo patrón de alta/baja inmediata por registro
+  // que TicketEtiqueta/TicketDependencia en el tablero Kanban.
+
+  protected readonly tablasReferenciadas = signal<DocumentoReferenciaTabla[]>([]);
+  protected readonly procesosReferenciados = signal<DocumentoReferenciaProceso[]>([]);
+  protected readonly modulosReferenciados = signal<DocumentoReferenciaModulo[]>([]);
+  protected readonly documentosRelacionados = signal<DocumentoRelacion[]>([]);
+  /** Backlinks — lo inverso de documentosRelacionados: otros documentos
+   *  que SÍ relacionan a este (DocumentoRelacion.documentoRelacionadoId =
+   *  este documento). Solo lectura aquí: se administra desde la pestaña
+   *  Referencias del documento de origen (fila.documentoId), no desde
+   *  este lado. */
+  protected readonly documentosQueMeReferencian = signal<DocumentoRelacion[]>([]);
+
+  protected readonly formNuevaTabla = this.fb.nonNullable.group({ texto: ['', Validators.required] });
+  protected readonly formNuevoProceso = this.fb.nonNullable.group({ texto: ['', Validators.required] });
+
+  /** Opciones para "+ Agregar módulo": todas las pantallas reales del
+   *  sistema (mismo catálogo que ya usa la paleta de comandos), menos las
+   *  que este documento ya referencia. */
+  protected readonly opcionesModulo = computed<OpcionBuscable[]>(() => {
+    const yaAgregadas = new Set(this.modulosReferenciados().map((m) => m.ruta));
+    return DESTINOS.filter((d) => !yaAgregadas.has(d.ruta)).map((d) => ({
+      valor: d.ruta,
+      etiqueta: d.label,
+      grupo: d.grupo,
+    }));
+  });
+  protected readonly moduloAAgregar = signal<string | null>(null);
+
+  /** Opciones para "+ Agregar documento relacionado": igual que
+   *  documentosParaEnlazar (sin el propio documento), menos los que ya
+   *  están relacionados. */
+  protected readonly opcionesDocumentoRelacionado = computed<OpcionBuscable[]>(() => {
+    const yaAgregados = new Set(this.documentosRelacionados().map((r) => r.documentoRelacionadoId));
+    return this.documentosParaEnlazar()
+      .filter((d) => !yaAgregados.has(d.id))
+      .map((d) => ({ valor: d.id, etiqueta: d.titulo }));
+  });
+  protected readonly documentoRelacionadoAAgregar = signal<number | null>(null);
+  protected readonly tipoRelacionAAgregar = signal<TipoRelacionDocumento>('relacionado');
+  protected static readonly TIPOS_RELACION: { clave: TipoRelacionDocumento; etiqueta: string }[] = [
+    { clave: 'relacionado', etiqueta: 'Relacionado con' },
+    { clave: 'depende_de', etiqueta: 'Depende de' },
+    { clave: 'reemplaza_a', etiqueta: 'Reemplaza a' },
+  ];
+  protected readonly tiposRelacion = DocumentosListComponent.TIPOS_RELACION;
+  private readonly etiquetaTipoRelacion = new Map(
+    DocumentosListComponent.TIPOS_RELACION.map((t) => [t.clave, t.etiqueta]),
+  );
+  protected textoTipoRelacion(tipo: TipoRelacionDocumento): string {
+    return this.etiquetaTipoRelacion.get(tipo) ?? 'Relacionado con';
+  }
+
+  /** Título del documento relacionado, para pintar el chip (los datos de
+   *  DocumentoRelacion solo guardan el id). */
+  protected tituloDocumento(documentoId: number): string {
+    return this.documentosTodos().find((d) => d.id === documentoId)?.titulo ?? `Documento #${documentoId}`;
+  }
+
+  private cargarReferencias(): void {
+    const doc = this.documentoActual();
+    if (!doc) return;
+    this.data
+      .list<DocumentoReferenciaTabla>('DocumentoReferenciaTabla', { documentoId: doc.id })
+      .subscribe({ next: (filas) => this.tablasReferenciadas.set(filas), error: () => this.tablasReferenciadas.set([]) });
+    this.data
+      .list<DocumentoReferenciaProceso>('DocumentoReferenciaProceso', { documentoId: doc.id })
+      .subscribe({ next: (filas) => this.procesosReferenciados.set(filas), error: () => this.procesosReferenciados.set([]) });
+    this.data
+      .list<DocumentoReferenciaModulo>('DocumentoReferenciaModulo', { documentoId: doc.id })
+      .subscribe({ next: (filas) => this.modulosReferenciados.set(filas), error: () => this.modulosReferenciados.set([]) });
+    this.data
+      .list<DocumentoRelacion>('DocumentoRelacion', { documentoId: doc.id })
+      .subscribe({ next: (filas) => this.documentosRelacionados.set(filas), error: () => this.documentosRelacionados.set([]) });
+    this.data
+      .list<DocumentoRelacion>('DocumentoRelacion', { documentoRelacionadoId: doc.id })
+      .subscribe({
+        next: (filas) => this.documentosQueMeReferencian.set(filas),
+        error: () => this.documentosQueMeReferencian.set([]),
+      });
+
+    // La columna "Trazabilidad"/"Solo huérfanos" del listado completo se
+    // alimenta de copias sin filtrar (ver documentosConTrazabilidad) — hay
+    // que refrescarlas aquí también, si no quedan obsoletas en cuanto se
+    // agrega/quita una referencia y se vuelve a la lista sin recargar la
+    // página.
+    this.cargarTrazabilidadGlobal();
+  }
+
+  /** Copias SIN filtrar de las 4 tablas de trazabilidad, para
+   *  documentosConTrazabilidad() (columna "Trazabilidad" y filtro "Solo
+   *  huérfanos" del listado completo) — se llama una vez en ngOnInit y de
+   *  nuevo cada vez que cargarReferencias() corre, para no quedar
+   *  obsoleta tras un alta/baja. Error silencioso (sin volver a tostar:
+   *  SupabaseDataClientService ya muestra su propio toast) — hasta que
+   *  estas 4 tablas existan también en Supabase (ver
+   *  esquema-tablas-saurix.md del proyecto), en modo Nube esto se degrada
+   *  a "sin datos de trazabilidad" en vez de romper el listado completo. */
+  private cargarTrazabilidadGlobal(): void {
+    this.data.list<DocumentoReferenciaTabla>('DocumentoReferenciaTabla').subscribe({
+      next: (filas) => this.todasLasReferenciasTabla.set(filas),
+      error: () => this.todasLasReferenciasTabla.set([]),
+    });
+    this.data.list<DocumentoReferenciaProceso>('DocumentoReferenciaProceso').subscribe({
+      next: (filas) => this.todasLasReferenciasProceso.set(filas),
+      error: () => this.todasLasReferenciasProceso.set([]),
+    });
+    this.data.list<DocumentoReferenciaModulo>('DocumentoReferenciaModulo').subscribe({
+      next: (filas) => this.todasLasReferenciasModulo.set(filas),
+      error: () => this.todasLasReferenciasModulo.set([]),
+    });
+    this.data.list<DocumentoRelacion>('DocumentoRelacion').subscribe({
+      next: (filas) => this.todasLasRelaciones.set(filas),
+      error: () => this.todasLasRelaciones.set([]),
+    });
+  }
+
+  agregarTablaReferenciada(): void {
+    const doc = this.documentoActual();
+    if (!doc || this.formNuevaTabla.invalid) return;
+    this.data
+      .alta<DocumentoReferenciaTabla>('DocumentoReferenciaTabla', {
+        documentoId: doc.id,
+        texto: this.formNuevaTabla.controls.texto.value,
+      })
+      .subscribe(() => {
+        this.formNuevaTabla.reset({ texto: '' });
+        this.cargarReferencias();
+      });
+  }
+
+  quitarTablaReferenciada(fila: DocumentoReferenciaTabla): void {
+    this.data.baja('DocumentoReferenciaTabla', fila.id).subscribe(() => this.cargarReferencias());
+  }
+
+  agregarProcesoReferenciado(): void {
+    const doc = this.documentoActual();
+    if (!doc || this.formNuevoProceso.invalid) return;
+    this.data
+      .alta<DocumentoReferenciaProceso>('DocumentoReferenciaProceso', {
+        documentoId: doc.id,
+        texto: this.formNuevoProceso.controls.texto.value,
+      })
+      .subscribe(() => {
+        this.formNuevoProceso.reset({ texto: '' });
+        this.cargarReferencias();
+      });
+  }
+
+  quitarProcesoReferenciado(fila: DocumentoReferenciaProceso): void {
+    this.data.baja('DocumentoReferenciaProceso', fila.id).subscribe(() => this.cargarReferencias());
+  }
+
+  agregarModuloReferenciado(): void {
+    const doc = this.documentoActual();
+    const ruta = this.moduloAAgregar();
+    if (!doc || !ruta) return;
+    const destino = DESTINOS.find((d) => d.ruta === ruta);
+    if (!destino) return;
+    this.data
+      .alta<DocumentoReferenciaModulo>('DocumentoReferenciaModulo', {
+        documentoId: doc.id,
+        ruta: destino.ruta,
+        etiqueta: destino.label,
+        grupo: destino.grupo,
+      })
+      .subscribe(() => {
+        this.moduloAAgregar.set(null);
+        this.cargarReferencias();
+      });
+  }
+
+  quitarModuloReferenciado(fila: DocumentoReferenciaModulo): void {
+    this.data.baja('DocumentoReferenciaModulo', fila.id).subscribe(() => this.cargarReferencias());
+  }
+
+  agregarDocumentoRelacionado(): void {
+    const doc = this.documentoActual();
+    const relacionadoId = this.documentoRelacionadoAAgregar();
+    if (!doc || !relacionadoId) return;
+    this.data
+      .alta<DocumentoRelacion>('DocumentoRelacion', {
+        documentoId: doc.id,
+        documentoRelacionadoId: relacionadoId,
+        tipo: this.tipoRelacionAAgregar(),
+      })
+      .subscribe(() => {
+        this.documentoRelacionadoAAgregar.set(null);
+        this.tipoRelacionAAgregar.set('relacionado');
+        this.cargarReferencias();
+      });
+  }
+
+  quitarDocumentoRelacionado(fila: DocumentoRelacion): void {
+    this.data.baja('DocumentoRelacion', fila.id).subscribe(() => this.cargarReferencias());
+  }
+
+  /** Abre el documento relacionado (pestaña "Ver") desde un chip de
+   *  Referencias — mismo patrón que onClickContenido() para los enlaces
+   *  #wikidoc-id insertados por el editor. */
+  abrirDocumentoRelacionado(documentoId: number): void {
+    this.data.getById<Documento>('Documento', documentoId).subscribe({
+      next: (documento) => this.verDocumento(documento),
+      error: () => this.toast.error('No se encontró el documento (puede haber sido eliminado).'),
+    });
+  }
+
   /** Salta suavemente al encabezado elegido del índice de contenido. */
   irASeccion(id: string): void {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -205,14 +496,6 @@ export class DocumentosListComponent implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
-    // Pantallas de WikiDocs (menos "Inicio", que es la cuadrícula de
-    // iconos): por defecto .content tiene max-width: 980px y queda
-    // centrada, dejando franjas vacías grandes a los lados en pantallas
-    // anchas. Se pide aquí el mismo ancho ampliado que ya usan
-    // Movimientos/Deudas/Proyección/Familia/Panel de Control (ver
-    // html[data-wide='grid'] en styles.scss) para que el contenido
-    // aproveche ese espacio.
-    document.documentElement.setAttribute('data-wide', 'grid');
     const param = this.route.snapshot.paramMap.get('seccionId');
     this.seccionFijaId = param ? Number(param) : null;
 
@@ -226,6 +509,8 @@ export class DocumentosListComponent implements OnInit, OnDestroy {
     }
 
     this.data.list<SeccionOpcion>('Seccion').subscribe((secciones) => this.todasLasSecciones.set(secciones));
+
+    this.cargarTrazabilidadGlobal();
 
     this.data
       .list<PlantillaDocumento>('PlantillaDocumento', { activo: true })
@@ -247,9 +532,6 @@ export class DocumentosListComponent implements OnInit, OnDestroy {
     });
   }
 
-  ngOnDestroy(): void {
-    document.documentElement.removeAttribute('data-wide');
-  }
 
   private cargarFavoritos(): void {
     const usuario = this.auth.usuarioActual()?.nombreUsuario;
@@ -322,9 +604,12 @@ export class DocumentosListComponent implements OnInit, OnDestroy {
     });
   }
 
-  onTipoSistemaCambia(idTexto: string): void {
-    const tipoSistemaId = Number(idTexto);
-    this.form.patchValue({ tipoSistemaId, categoriaId: 0, seccionId: 0 });
+  /** Los 3 selects usan formControlName (ver HTML) — el control ya trae el
+   *  valor nuevo cuando (change) dispara, así que aquí solo se resetean los
+   *  niveles hijos y se recarga la lista en cascada correspondiente. */
+  onTipoSistemaCambia(): void {
+    const tipoSistemaId = this.form.controls.tipoSistemaId.value;
+    this.form.patchValue({ categoriaId: 0, seccionId: 0 });
     this.categorias.set([]);
     this.secciones.set([]);
     if (!tipoSistemaId) return;
@@ -334,17 +619,13 @@ export class DocumentosListComponent implements OnInit, OnDestroy {
       .subscribe((categorias) => this.categorias.set(categorias));
   }
 
-  onCategoriaCambia(idTexto: string): void {
-    const categoriaId = Number(idTexto);
-    this.form.patchValue({ categoriaId, seccionId: 0 });
+  onCategoriaCambia(): void {
+    const categoriaId = this.form.controls.categoriaId.value;
+    this.form.patchValue({ seccionId: 0 });
     this.secciones.set([]);
     if (!categoriaId) return;
 
     this.data.list<SeccionOpcion>('Seccion', { categoriaId }).subscribe((secciones) => this.secciones.set(secciones));
-  }
-
-  onSeccionCambia(idTexto: string): void {
-    this.form.patchValue({ seccionId: Number(idTexto) });
   }
 
   nuevoDocumento(): void {
@@ -384,12 +665,13 @@ export class DocumentosListComponent implements OnInit, OnDestroy {
     this.vista.set('editar');
   }
 
-  cambiarTab(tab: 'ver' | 'editar' | 'adjuntos' | 'historial'): void {
+  cambiarTab(tab: 'ver' | 'editar' | 'adjuntos' | 'historial' | 'referencias'): void {
     if (tab === 'editar') {
       const doc = this.documentoActual();
       if (doc) this.cargarFormDesde(doc);
     }
     if (tab === 'historial') this.cargarVersiones();
+    if (tab === 'referencias') this.cargarReferencias();
     this.vista.set(tab);
   }
 
@@ -449,6 +731,27 @@ export class DocumentosListComponent implements OnInit, OnDestroy {
       seccionId: documento.seccionId,
       titulo: documento.titulo,
       contenido: documento.contenido,
+    });
+    this.categorias.set([]);
+    this.secciones.set([]);
+    if (this.seccionFijaId) return;
+
+    // Documento solo guarda su seccionId — para que Tipo de sistema y
+    // Categoría aparezcan ya seleccionados (con sus listas en cascada
+    // cargadas) al editar, hay que subir la jerarquía real: Seccion →
+    // Categoria → TipoSistema (ver documento.model.ts).
+    this.data.getById<SeccionOpcion>('Seccion', documento.seccionId).subscribe((seccion) => {
+      this.data
+        .list<SeccionOpcion>('Seccion', { categoriaId: seccion.categoriaId })
+        .subscribe((secciones) => this.secciones.set(secciones));
+
+      this.data.getById<CategoriaOpcion>('Categoria', seccion.categoriaId).subscribe((categoria) => {
+        this.data
+          .list<CategoriaOpcion>('Categoria', { tipoSistemaId: categoria.tipoSistemaId })
+          .subscribe((categorias) => this.categorias.set(categorias));
+
+        this.form.patchValue({ tipoSistemaId: categoria.tipoSistemaId, categoriaId: categoria.id });
+      });
     });
   }
 

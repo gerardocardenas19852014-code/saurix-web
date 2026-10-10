@@ -1,1 +1,81 @@
 /* Estilos en src/styles.scss (.page-header, .breadcrumbs, .grid-table, .page-body, .page-meta, .tab-bar, .edit-form). */
+
+/* Pestaña "Referencias" (trazabilidad) — ver documento.model.ts. */
+.wikidoc-referencias {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 760px;
+}
+
+.wikidoc-ref-bloque h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.wikidoc-ref-ayuda {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.wikidoc-ref-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.wikidoc-ref-chip {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.wikidoc-ref-chip a {
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Backlinks ("Documentos que me referencian") — solo lectura: no hay ✕
+ *  para quitar (esa relación vive en el documento de origen), así que el
+ *  cursor de "clic para quitar" del chip normal no aplica aquí, solo el
+ *  del enlace interno. */
+.wikidoc-ref-bloque--solo-lectura .wikidoc-ref-chip--solo-lectura {
+  cursor: default;
+  opacity: .85;
+}
+
+.wikidoc-ref-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.wikidoc-ref-form input[type='text'],
+.wikidoc-ref-form app-select-buscable {
+  flex: 1;
+  min-width: 0;
+}
+.wikidoc-ref-form input[type='text'] {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-raised);
+  color: var(--text-strong);
+}
+.wikidoc-ref-form select {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  padding: 9px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-raised);
+  color: var(--text-strong);
+}
+
+.wikidoc-ref-form-relacion {
+  flex-wrap: wrap;
+}
