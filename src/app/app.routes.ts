@@ -9,6 +9,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/login/login.component').then((m) => m.LoginComponent),
   },
   {
+    // Enlace del correo "¿Olvidaste tu contraseña?" (Nube).
+    path: 'restablecer',
+    loadComponent: () =>
+      import('./features/auth/restablecer/restablecer.component').then((m) => m.RestablecerComponent),
+  },
+  {
     path: 'modulos',
     canActivate: [authGuard],
     loadComponent: () => import('./features/auth/modulos/modulos.component').then((m) => m.ModulosComponent),

@@ -98,7 +98,8 @@ function mensajeError(error: unknown): string {
  */
 @Injectable({ providedIn: 'root' })
 export class SupabaseDataClientService extends DataClientService {
-  private readonly sb = inject(SupabaseService).cliente;
+  private readonly supabase = inject(SupabaseService);
+  private readonly sb = this.supabase.cliente;
   private readonly toast = inject(ToastService);
 
   override list<T>(entidad: string, filtro?: Record<string, unknown>): Observable<T[]> {
@@ -212,7 +213,8 @@ export class SupabaseDataClientService extends DataClientService {
     const campoPadre = campoPadreAdjunto(def);
     const padre = campoPadre ? String(dto[campoPadre] ?? 'sin-padre') : 'sin-padre';
     const nombreSeguro = nombre.normalize('NFD').replace(/[^\w.-]+/g, '_');
-    const ruta = `${entidad}/${padre}/${crypto.randomUUID()}-${nombreSeguro}`;
+    const prefijo = await this.supabase.prefijoEmpresa();
+    const ruta = `${prefijo}/${entidad}/${padre}/${crypto.randomUUID()}-${nombreSeguro}`;
 
     const almacen = this.sb.storage.from(BUCKET_ADJUNTOS);
     const { error: errSubida } = await almacen.upload(ruta, blob, {

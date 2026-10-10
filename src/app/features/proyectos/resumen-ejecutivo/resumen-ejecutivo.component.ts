@@ -71,6 +71,11 @@ interface TiempoColumna {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ResumenEjecutivoComponent implements OnInit {
+  // Pantalla a ancho completo (html[data-wide='grid'] en styles.scss).
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
+  }
+
   private readonly data = inject(DataClientService);
   private readonly router = inject(Router);
   private readonly MS_POR_DIA = 86400000;
@@ -89,6 +94,7 @@ export class ResumenEjecutivoComponent implements OnInit {
   protected readonly proyectoDetalleId = signal<number>(0);
 
   ngOnInit(): void {
+    document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
     this.cargando.set(true);
     this.data.list<ProyectoOpcion>('Proyecto').subscribe((proyectos) => {
       this.proyectos.set(proyectos);

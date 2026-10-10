@@ -31,6 +31,11 @@ const ENTIDAD_TRAMITE = 'TramiteFamiliar';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TramitesFamiliaresComponent implements OnInit {
+  // Pantalla a ancho completo (html[data-wide='grid'] en styles.scss).
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
+  }
+
   private readonly data = inject(DataClientService);
   private readonly fb = inject(FormBuilder);
   protected readonly toast = inject(ToastService);
@@ -63,6 +68,7 @@ export class TramitesFamiliaresComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
     this.cargando.set(true);
     this.data.list<MiembroFamilia>('MiembroFamilia').subscribe((m) => this.miembros.set(m.filter((x) => x.activo !== false)));
     this.cargarEstados();

@@ -41,6 +41,11 @@ interface TicketOpcion {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TablerosComponent implements OnInit {
+  // Pantalla a ancho completo (html[data-wide='grid'] en styles.scss).
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
+  }
+
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
@@ -88,6 +93,7 @@ export class TablerosComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
     // Deep link desde "Ticket" (aviso de "este proyecto no tiene columnas"):
     // ?proyecto=123 selecciona directo ese proyecto en vez del primero de la lista.
     const proyectoIdParam = Number(this.route.snapshot.queryParamMap.get('proyecto')) || 0;

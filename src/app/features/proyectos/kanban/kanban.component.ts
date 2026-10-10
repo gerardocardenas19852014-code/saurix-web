@@ -572,6 +572,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly filtroAsociado = signal('');
 
   ngOnInit(): void {
+    document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
     // Deep link desde "Mi Dashboard" (u otra pantalla): ?ticket=123 abre
     // directo el detalle de ese ticket, en el proyecto al que pertenece.
     const ticketIdParam = Number(this.route.snapshot.queryParamMap.get('ticket')) || 0;
@@ -619,6 +620,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
     if (this.intervaloReloj) clearInterval(this.intervaloReloj);
   }
 

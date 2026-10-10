@@ -24,6 +24,9 @@ export interface Usuario {
   /** true = debe cambiar su contraseña en el próximo inicio de sesión (lo pone el
    *  botón de "Resetear contraseña" del admin; se apaga solo al cambiarla en Mi Perfil). */
   debeCambiarPassword?: boolean;
+  /** Solo en la Nube: empresa del usuario y si es superadministrador. */
+  empresaId?: number;
+  esSuperadmin?: boolean;
 }
 
 export interface UsuarioFiltro {

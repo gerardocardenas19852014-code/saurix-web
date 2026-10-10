@@ -40,6 +40,11 @@ interface NodoArbol {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ArbolFamiliarComponent implements OnInit {
+  // Pantalla a ancho completo (html[data-wide='grid'] en styles.scss).
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
+  }
+
   private readonly data = inject(DataClientService);
 
   protected readonly colorAvatar = colorAvatar;
@@ -93,6 +98,7 @@ export class ArbolFamiliarComponent implements OnInit {
   protected readonly arbol = computed(() => this.construirArbol(this.miembros().filter((m) => m.activo !== false)));
 
   ngOnInit(): void {
+    document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
     this.cargando.set(true);
     this.data.list<MiembroFamilia>(ENTIDAD_MIEMBRO).subscribe({
       next: (m) => {

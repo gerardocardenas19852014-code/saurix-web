@@ -17,6 +17,7 @@ export const DESTINOS: DestinoPaleta[] = [
 
   { label: 'Inicio', grupo: 'Seguridad', ruta: '/seguridad', icono: '⌂' },
   { label: 'Usuarios', grupo: 'Seguridad', ruta: '/seguridad/usuarios', icono: '👥' },
+  { label: 'Empresas', grupo: 'Seguridad', ruta: '/seguridad/empresas', icono: '🏢' },
 
 
   { label: 'Inicio', grupo: 'WikiDocs', ruta: '/wikidocs', icono: '⌂' },

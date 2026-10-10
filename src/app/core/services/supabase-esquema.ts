@@ -10,6 +10,7 @@
 export type TipoColumna = 't' | 'u' | 'n' | 'f' | 'h' | 'b' | 'j';
 
 const MAPA: Record<string, [string, string, string]> = {
+  Empresa: ['seguridad', 'empresa', 'id:n,clave:t,nombre:t,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   CitaMedicaMiembro: ['familia', 'cita_medica_miembro', 'id:n,miembro_familia_id:n,motivo:t,especialidad:t,fecha:f,lugar:t,notas:t,completada:b,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   CitaMedicaMiembroAdjunto: ['familia', 'cita_medica_miembro_adjunto', 'id:n,cita_medica_miembro_id:n,nombre_archivo:t,tipo_contenido:t,ruta_storage:t,tamano_bytes:n,comentario:t,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   ContactoEmergenciaMiembro: ['familia', 'contacto_emergencia_miembro', 'id:n,miembro_familia_id:n,nombre:t,relacion:t,telefono:t,notas:t,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],

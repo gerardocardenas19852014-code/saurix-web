@@ -36,6 +36,11 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BacklogComponent implements OnInit {
+  // Pantalla a ancho completo (html[data-wide='grid'] en styles.scss).
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
+  }
+
   private readonly data = inject(DataClientService);
   private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
@@ -132,6 +137,7 @@ export class BacklogComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
     // Deep link desde otra pantalla (igual que /proyectos/tablero?proyecto=).
     const proyectoIdParam = Number(this.route.snapshot.queryParamMap.get('proyecto')) || 0;
 

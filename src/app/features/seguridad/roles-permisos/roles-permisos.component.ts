@@ -18,6 +18,11 @@ import { Permiso, Rol, RolPermiso } from './rol-permiso.model';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class RolesPermisosComponent implements OnInit {
+  // Pantalla a ancho completo (html[data-wide='grid'] en styles.scss).
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
+  }
+
   private readonly data = inject(DataClientService);
   private readonly toast = inject(ToastService);
 
@@ -33,6 +38,7 @@ export class RolesPermisosComponent implements OnInit {
   );
 
   ngOnInit(): void {
+    document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
     this.data.list<Rol>('Rol').subscribe({
       next: (roles) => this.roles.set(roles),
       error: () => this.toast.error('No se pudieron cargar los roles.'),

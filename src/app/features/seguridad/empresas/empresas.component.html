@@ -1,0 +1,116 @@
+<div class="page-header">
+  <div>
+    <span class="eyebrow">§ Seguridad</span>
+    <h1>Empresas</h1>
+  </div>
+</div>
+
+@if (!permitido) {
+  <div class="settings-card">
+    <p class="hint" style="margin:0;">
+      Esta pantalla solo está disponible para el superadministrador y trabajando en la ☁️ Nube.
+    </p>
+  </div>
+} @else {
+  <p class="hint" style="margin:0 0 12px;">
+    Cada empresa es un cliente con sus datos separados. <strong>Primer admin</strong> crea el usuario
+    administrador de la empresa; <strong>Entrar</strong> te pone a trabajar dentro de ella (modo soporte)
+    hasta que regreses a la tuya desde la etiqueta de arriba.
+  </p>
+
+  <div class="grid-toolbar">
+    <button type="button" class="toolbar-btn" (click)="nueva()">+ Nueva empresa</button>
+  </div>
+
+  <app-data-table
+    [columnas]="columnas"
+    [filas]="empresas()"
+    [cargando]="cargando()"
+    [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+    accionExtraEtiqueta="Primer admin"
+    accionExtraTitulo="Crear el usuario administrador de esta empresa"
+    (accionExtra)="pedirAdmin($event)"
+    [accionExtra2EtiquetaFn]="etiquetaEntrar"
+    accionExtra2Titulo="Trabajar dentro de esta empresa (modo soporte)"
+    (accionExtra2)="pedirEntrar($event)"
+    (editar)="editar($event)"
+    (eliminar)="pedirEliminar($event)"
+  />
+}
+
+@if (modalEmpresa()) {
+  <div class="modal-overlay modal show d-block" (click)="modalEmpresa.set(false)">
+    <form class="modal-box modal-dialog modal-content" [formGroup]="formEmpresa" (click)="$event.stopPropagation()" (ngSubmit)="guardarEmpresa()">
+      <h3 class="modal-title mb-3">{{ empresaEnEdicion() ? 'Editar empresa' : 'Nueva empresa' }}</h3>
+      <div class="edit-form">
+        <label>
+          Clave
+          <input type="text" class="form-control" formControlName="clave" placeholder="p.ej. acme" />
+          <span class="hint">Minúsculas, números o guiones. No se puede cambiar después.</span>
+        </label>
+        <label>
+          Nombre
+          <input type="text" class="form-control" formControlName="nombre" placeholder="p.ej. ACME S.A. de C.V." />
+        </label>
+        <label class="checkbox-inline">
+          <input type="checkbox" formControlName="activo" />
+          Activa (si la desactivas, sus usuarios dejan de ver datos)
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="modalEmpresa.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary btn btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+@if (empresaParaAdmin(); as empresa) {
+  <div class="modal-overlay modal show d-block" (click)="empresaParaAdmin.set(null)">
+    <form class="modal-box modal-dialog modal-content" [formGroup]="formAdmin" (click)="$event.stopPropagation()" (ngSubmit)="crearAdmin()">
+      <h3 class="modal-title mb-3">Primer admin de {{ empresa.nombre }}</h3>
+      <div class="edit-form form-grid-2col">
+        <label>
+          Usuario
+          <input type="text" class="form-control" formControlName="nombreUsuario" autocomplete="off" />
+        </label>
+        <label>
+          Nombre
+          <input type="text" class="form-control" formControlName="nombre" />
+        </label>
+        <label class="full-span">
+          Correo
+          <input type="email" class="form-control" formControlName="email" autocomplete="off" />
+        </label>
+        <label class="full-span">
+          Contraseña inicial
+          <input type="password" class="form-control" formControlName="password" autocomplete="new-password" />
+          <span class="hint">Mínimo 8 caracteres. Compártela con el cliente; podrá cambiarla en Mi perfil.</span>
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="empresaParaAdmin.set(null)">Cancelar</button>
+        <button type="submit" class="btn-primary btn btn-primary" [disabled]="guardando()">
+          {{ guardando() ? 'Creando…' : 'Crear admin' }}
+        </button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="aEliminar() !== null"
+  titulo="Eliminar empresa"
+  [mensaje]="'¿Eliminar la empresa \'' + (aEliminar()?.nombre ?? '') + '\'? Solo es posible si aún no tiene usuarios ni datos.'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="aEliminar.set(null)"
+/>
+
+<app-confirm-dialog
+  [visible]="empresaParaEntrar() !== null"
+  titulo="Entrar a la empresa"
+  textoConfirmar="Entrar"
+  [mensaje]="'Vas a trabajar dentro de \'' + (empresaParaEntrar()?.nombre ?? '') + '\': todo lo que veas y captures será de esa empresa hasta que regreses a la tuya desde la etiqueta de arriba.'"
+  (confirmar)="confirmarEntrar()"
+  (cancelar)="empresaParaEntrar.set(null)"
+/>

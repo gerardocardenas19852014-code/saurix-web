@@ -2,6 +2,7 @@
   <h1>🆔 Generación de RFC y CURP</h1>
 </div>
 
+<div class="rfccurp-layout">
 <div class="settings-card rfccurp-card">
   <h2 class="settings-card-title">Datos de la persona</h2>
   <p class="hint" style="margin:0 0 16px;">
@@ -56,9 +57,9 @@
   </form>
 </div>
 
-@if (resultado(); as r) {
-  <div class="settings-card rfccurp-card">
-    <h2 class="settings-card-title">Resultado</h2>
+<div class="settings-card rfccurp-card">
+  <h2 class="settings-card-title">Resultado</h2>
+  @if (resultado(); as r) {
 
     <div class="rfccurp-resultado-row">
       <div>
@@ -82,5 +83,20 @@
       (el que distingue a personas que coincidirían en todo lo demás) solo lo asigna RENAPO cuando detecta ese caso —
       aquí se usa el valor por defecto. Verifica siempre el resultado en el sitio oficial antes de usarlo en trámites.
     </p>
-  </div>
-}
+  } @else {
+    <p class="hint" style="margin:0 0 14px;">
+      Llena los datos de la izquierda y presiona <strong>Calcular</strong>; aquí aparecerán el RFC y el CURP listos para copiar.
+    </p>
+    <div class="rfccurp-guia">
+      <p class="rfccurp-resultado-etiqueta">Cómo se forma el RFC (13)</p>
+      <p class="rfccurp-guia-texto">4 letras del nombre · 6 dígitos de la fecha (AAMMDD) · 3 de homoclave</p>
+      <p class="rfccurp-guia-ejemplo">GOMJ <span>850315</span> <em>AB1</em></p>
+    </div>
+    <div class="rfccurp-guia">
+      <p class="rfccurp-resultado-etiqueta">Cómo se forma el CURP (18)</p>
+      <p class="rfccurp-guia-texto">4 letras del nombre · fecha AAMMDD · sexo · entidad · 3 consonantes internas · diferenciador · dígito verificador</p>
+      <p class="rfccurp-guia-ejemplo">GOMJ <span>850315</span> H <span>DF</span> MRN <em>0</em>9</p>
+    </div>
+  }
+</div>
+</div>

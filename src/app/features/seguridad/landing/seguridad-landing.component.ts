@@ -1,4 +1,6 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { AuthService } from '../../../core/services/auth.service';
+import { fuenteDatosActual } from '../../../core/services/fuente-datos';
 import { RouterLink } from '@angular/router';
 
 /** Mismo criterio de color que Presupuesto/Proyectos/Familia (ver
@@ -51,5 +53,25 @@ const GRUPOS: GrupoModulo[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SeguridadLandingComponent {
-  protected readonly grupos = GRUPOS;
+  private readonly auth = inject(AuthService);
+
+  /** Empresas solo para el superadministrador y trabajando en la Nube. */
+  protected readonly grupos: GrupoModulo[] =
+    fuenteDatosActual() === 'supabase' && this.auth.usuarioActual()?.esSuperadmin
+      ? [
+          ...GRUPOS,
+          {
+            titulo: 'Empresas',
+            enlaces: [
+              {
+                ruta: 'empresas',
+                icono: '🏢',
+                color: 'indigo',
+                titulo: 'Empresas',
+                descripcion: 'Clientes del sistema: alta, primer admin y entrar a trabajar dentro de una empresa.',
+              },
+            ],
+          },
+        ]
+      : GRUPOS;
 }

@@ -74,6 +74,11 @@ const COLORES_SERIE = ['var(--indigo)', 'var(--amber)', 'var(--teal)', 'var(--da
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ReportesEjecutivosComponent implements OnInit {
+  // Pantalla a ancho completo (html[data-wide='grid'] en styles.scss).
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
+  }
+
   private readonly data = inject(DataClientService);
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
   private readonly MS_POR_DIA = 86400000;
@@ -104,6 +109,7 @@ export class ReportesEjecutivosComponent implements OnInit {
   protected readonly ordenSprintDireccion = signal<'desc' | 'asc'>('desc');
 
   ngOnInit(): void {
+    document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
     this.cargando.set(true);
     this.data.list<ProyectoOpcion>('Proyecto').subscribe((p) => this.proyectos.set(p));
     this.data.list<TableroColumna>('TableroColumna').subscribe((c) => this.columnas.set(c));

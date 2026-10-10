@@ -69,6 +69,11 @@ interface TicketResumen {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProyectosDashboardComponent implements OnInit {
+  // Pantalla a ancho completo (html[data-wide='grid'] en styles.scss).
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
+  }
+
   private readonly data = inject(DataClientService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
@@ -153,6 +158,7 @@ export class ProyectosDashboardComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
     this.cargando.set(true);
     this.data.list<ProyectoOpcion>('Proyecto').subscribe((p) => this.proyectos.set(p));
     this.data.list<TableroColumna>('TableroColumna').subscribe((c) => this.columnas.set(c));

@@ -3,6 +3,9 @@
 //   crear       { perfil, password }            → solo admin
 //   sincronizar { usuarioId, email?, password? } → admin, o el propio usuario
 //   eliminar    { usuarioId }                    → solo admin
+//   crear_empresa { clave, nombre }              → solo superadmin
+// Un admin solo opera sobre usuarios de su empresa; el superadmin puede
+// crear usuarios en cualquier empresa pasando `empresaId` en `crear`.
 // `perfil` viene en snake_case con las columnas de seguridad.usuario.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
@@ -44,13 +47,14 @@ Deno.serve(async (req: Request) => {
 
   const { data: yo } = await seguridad
     .from('usuario')
-    .select('id, role, activo, fecha_inicio_vigencia, fecha_fin_vigencia')
+    .select('id, role, activo, fecha_inicio_vigencia, fecha_fin_vigencia, empresa_id, es_superadmin, empresa_activa_id')
     .eq('auth_user_id', sesion.user.id)
     .maybeSingle();
   const hoy = new Date().toISOString().slice(0, 10);
   const vigente = !!yo && yo.activo && hoy >= yo.fecha_inicio_vigencia && hoy <= yo.fecha_fin_vigencia;
   if (!vigente) return falla('Tu usuario no está activo o vigente.', 403);
-  const esAdmin = yo.role === 'admin';
+  const esSuperadmin = yo.es_superadmin === true;
+  const esAdmin = yo.role === 'admin' || esSuperadmin;
 
   let cuerpo: Record<string, unknown>;
   try {
@@ -59,6 +63,21 @@ Deno.serve(async (req: Request) => {
     return falla('Cuerpo inválido.');
   }
   const accion = cuerpo.accion as string;
+
+  // ── crear_empresa ────────────────────────────────────────────────────
+  if (accion === 'crear_empresa') {
+    if (!esSuperadmin) return falla('Solo el superadministrador puede crear empresas.', 403);
+    const clave = String(cuerpo.clave ?? '').trim();
+    const nombre = String(cuerpo.nombre ?? '').trim();
+    if (!clave || !nombre) return falla('Clave y nombre son obligatorios.');
+    const { data, error } = await seguridad
+      .from('empresa')
+      .insert({ clave, nombre, creado_por: yo.id })
+      .select()
+      .single();
+    if (error) return falla(error.code === '23505' ? 'Ya existe una empresa con esa clave.' : error.message);
+    return respuesta({ empresa: data });
+  }
 
   // ── crear ────────────────────────────────────────────────────────────
   if (accion === 'crear') {
@@ -69,6 +88,10 @@ Deno.serve(async (req: Request) => {
     const nombreUsuario = String(perfilEntrada.nombre_usuario ?? '').trim();
     if (!email || !nombreUsuario) return falla('Usuario y correo son obligatorios.');
     if (password.length < 6) return falla('La contraseña es demasiado corta.');
+    // Superadmin: la empresa indicada, o en la que está trabajando (modo soporte).
+    const empresaId = esSuperadmin
+      ? Number(cuerpo.empresaId ?? yo.empresa_activa_id ?? yo.empresa_id)
+      : yo.empresa_id;
 
     const { data: duplicado } = await seguridad
       .from('usuario')
@@ -81,13 +104,14 @@ Deno.serve(async (req: Request) => {
       email,
       password,
       email_confirm: true,
-      user_metadata: { nombre_usuario: nombreUsuario, nombre: perfilEntrada.nombre },
+      user_metadata: { nombre_usuario: nombreUsuario, nombre: perfilEntrada.nombre, empresa_id: empresaId },
     });
     if (errCrear || !creado?.user) return falla(errCrear?.message ?? 'No se pudo crear la cuenta.');
 
     const perfil: Record<string, unknown> = {};
     for (const c of COLUMNAS_PERFIL) if (c in perfilEntrada) perfil[c] = perfilEntrada[c];
     perfil.creado_por = yo.id;
+    perfil.empresa_id = empresaId;
 
     const { data: fila, error: errPerfil } = await seguridad
       .from('usuario')
@@ -106,10 +130,12 @@ Deno.serve(async (req: Request) => {
   const usuarioId = Number(cuerpo.usuarioId);
   const { data: objetivo } = await seguridad
     .from('usuario')
-    .select('id, auth_user_id, email')
+    .select('id, auth_user_id, email, empresa_id')
     .eq('id', usuarioId)
     .maybeSingle();
-  if (!objetivo) return falla('Usuario no encontrado.', 404);
+  if (!objetivo || (!esSuperadmin && objetivo.empresa_id !== yo.empresa_id)) {
+    return falla('Usuario no encontrado.', 404);
+  }
 
   // ── sincronizar (correo y/o contraseña de la cuenta de acceso) ──────
   if (accion === 'sincronizar') {

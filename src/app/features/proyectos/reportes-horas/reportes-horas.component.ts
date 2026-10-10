@@ -41,6 +41,11 @@ interface HorasAgrupadas {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ReportesHorasComponent implements OnInit {
+  // Pantalla a ancho completo (html[data-wide='grid'] en styles.scss).
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
+  }
+
   private readonly data = inject(DataClientService);
 
   protected readonly colorAvatar = colorAvatar;
@@ -63,6 +68,7 @@ export class ReportesHorasComponent implements OnInit {
   protected readonly hayRangoManual = computed(() => !!(this.rangoDesde() || this.rangoHasta()));
 
   ngOnInit(): void {
+    document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
     this.cargando.set(true);
     this.data.list<ProyectoOpcion>('Proyecto').subscribe((p) => this.proyectos.set(p));
     this.data.list<TicketModulo>('TicketModulo').subscribe((m) => this.modulos.set(m));

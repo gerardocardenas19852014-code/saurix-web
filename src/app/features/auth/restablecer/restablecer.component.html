@@ -1,0 +1,37 @@
+<div class="login-layout login-layout-simple">
+  <div class="auth-box">
+    <span class="eyebrow"><img class="eyebrow-icon" src="brand/saurix-icon-dark.png" alt="" /> Saurix</span>
+    <h1>Nueva contraseña</h1>
+
+    @if (!listo()) {
+      <p class="hint">Verificando el enlace…</p>
+    } @else if (!enNube) {
+      <p class="hint">La recuperación de contraseña solo existe para la ☁️ Nube.</p>
+      <button type="button" class="btn-primary" (click)="irALogin()">Ir a iniciar sesión</button>
+    } @else if (!sesionValida()) {
+      <p class="login-error">El enlace no es válido o ya expiró. Pide uno nuevo desde "¿Olvidaste tu contraseña?".</p>
+      <button type="button" class="btn-primary" (click)="irALogin()">Ir a iniciar sesión</button>
+    } @else {
+      <form [formGroup]="form" (ngSubmit)="guardar()">
+        <label>
+          Contraseña nueva
+          <span class="password-campo">
+            <input [type]="verPassword() ? 'text' : 'password'" formControlName="password" autocomplete="new-password" />
+            <button type="button" class="password-ojo" (click)="verPassword.set(!verPassword())"
+              [attr.aria-label]="verPassword() ? 'Ocultar contraseña' : 'Ver contraseña'">
+              {{ verPassword() ? '🙈' : '👁️' }}
+            </button>
+          </span>
+          <span class="hint">Mínimo 8 caracteres, con una mayúscula y un número.</span>
+        </label>
+        <label>
+          Confirmar contraseña
+          <input [type]="verPassword() ? 'text' : 'password'" formControlName="confirmacion" autocomplete="new-password" />
+        </label>
+        <button type="submit" class="btn-primary" [disabled]="guardando()">
+          {{ guardando() ? 'Guardando…' : 'Guardar contraseña' }}
+        </button>
+      </form>
+    }
+  </div>
+</div>

@@ -43,6 +43,11 @@ interface FilaBalanceo {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BalanceoComponent implements OnInit {
+  // Pantalla a ancho completo (html[data-wide='grid'] en styles.scss).
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
+  }
+
   private readonly data = inject(DataClientService);
 
   protected readonly iniciales = iniciales;
@@ -75,6 +80,7 @@ export class BalanceoComponent implements OnInit {
   protected readonly ordenDireccion = signal<'desc' | 'asc'>('desc');
 
   ngOnInit(): void {
+    document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
     this.cargando.set(true);
     this.data.list<ProyectoOpcion>('Proyecto').subscribe((p) => this.proyectos.set(p));
     this.data.list<TableroColumna>('TableroColumna').subscribe((c) => this.columnas.set(c));

@@ -37,6 +37,11 @@ interface CeldaCalendarioFamiliar {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CalendarioFamiliarComponent implements OnInit {
+  // Pantalla a ancho completo (html[data-wide='grid'] en styles.scss).
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
+  }
+
   private readonly data = inject(DataClientService);
   private readonly fb = inject(FormBuilder);
   protected readonly toast = inject(ToastService);
@@ -129,6 +134,7 @@ export class CalendarioFamiliarComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
     this.cargando.set(true);
     this.data.list<MiembroFamilia>('MiembroFamilia').subscribe((m) => this.miembros.set(m));
     this.data.list<DocumentoFamilia>('DocumentoFamilia').subscribe((d) => this.documentos.set(d));

@@ -20,6 +20,7 @@ import { CuentaPresupuesto } from '../../features/presupuesto/cuenta-presupuesto
 import { CategoriaPresupuesto } from '../../features/presupuesto/categoria-presupuesto/categoria-presupuesto.model';
 import { DeudaPresupuesto } from '../../features/presupuesto/deudas/deuda.model';
 import { Usuario, nombreCompletoUsuario } from '../../features/seguridad/usuarios/usuario.model';
+import { fuenteDatosActual } from '../../core/services/fuente-datos';
 
 /** Un resultado de búsqueda del asistente, clicable: navega directo a esa
  *  pantalla con el registro ya abierto (mismo patrón de deep link que
@@ -69,6 +70,9 @@ interface DocumentoBuscable {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ShellComponent implements OnDestroy {
+  /** Para el pie de página: dónde se guardan los datos. */
+  protected readonly enNube = fuenteDatosActual() === 'supabase';
+
   /** Cierra el modal/diálogo abierto con Escape, igual que ya hace el clic
    *  afuera de la caja (.modal-overlay) en cada pantalla — a pedido del
    *  usuario. Un solo listener aquí, en vez de tocar los 30+ archivos que

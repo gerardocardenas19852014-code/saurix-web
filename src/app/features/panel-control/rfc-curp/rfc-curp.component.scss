@@ -1,9 +1,31 @@
-.rfccurp-card {
-  // El formulario (form-grid-2col) y el resultado tienen max-width: 760px;
-  // sin este limite la tarjeta .settings-card se estira al ancho completo
-  // de .content y deja una franja en blanco enorme a la derecha del
-  // contenido real.
-  max-width: 760px;
+/* Dos columnas a todo el ancho: datos a la izquierda, resultado a la
+   derecha (sin franjas vacías). En pantallas angostas, una sola columna. */
+.rfccurp-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+.rfccurp-layout .settings-card { margin: 0; }
+@media (max-width: 1000px) {
+  .rfccurp-layout { grid-template-columns: 1fr; }
+}
+
+.rfccurp-guia {
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.rfccurp-guia-texto { margin: 0 0 6px; font-size: 13px; color: var(--ink-soft); }
+.rfccurp-guia-ejemplo {
+  margin: 0;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--heading-navy);
+  opacity: 0.55;
+  span { color: #2e7d5b; }
+  em { font-style: normal; color: #c2410c; }
 }
 
 .rfccurp-resultado-row {
@@ -25,14 +47,14 @@
 .rfccurp-resultado-etiqueta {
   margin: 0 0 2px;
   font-size: 12px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'Montserrat', sans-serif;
   color: var(--ink-soft);
 }
 
 .rfccurp-resultado-valor {
   margin: 0;
   font-size: 22px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'Montserrat', sans-serif;
   font-weight: 700;
   letter-spacing: 1px;
   color: var(--heading-navy);

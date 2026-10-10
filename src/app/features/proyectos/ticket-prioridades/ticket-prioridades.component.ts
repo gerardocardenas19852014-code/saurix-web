@@ -18,6 +18,11 @@ import { TicketPrioridad, TicketPrioridadNotificar } from './ticket-prioridad.mo
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TicketPrioridadesComponent implements OnInit {
+  // Pantalla a ancho completo (html[data-wide='grid'] en styles.scss).
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
+  }
+
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
@@ -76,6 +81,7 @@ export class TicketPrioridadesComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
     this.cargar();
     this.cargarUsuarios();
   }

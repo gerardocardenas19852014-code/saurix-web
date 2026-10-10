@@ -1,49 +1,143 @@
-<div class="auth-box">
-  <span class="eyebrow">§ Saurix</span>
-  <h1>Iniciar sesión</h1>
+<div class="login-layout">
+  <!-- Panel de bienvenida (se oculta en pantallas angostas) -->
+  <aside class="login-marca" aria-hidden="true">
+    <div class="login-marca-glow"></div>
+    <div class="login-marca-brand">
+      <img class="login-marca-icon" src="brand/saurix-icon-light.png" alt="" />
+      <div class="login-marca-wordmark">SAURI<span>X</span></div>
+    </div>
+    <p class="login-marca-tagline">Tecnología que <span>entiende</span> tu negocio</p>
+    <p class="login-marca-frase">Tu oficina en un solo lugar: documentos, proyectos, presupuesto y familia.</p>
+    <ul class="login-marca-modulos">
+      @for (m of modulos; track m.nombre) {
+        <li><span>{{ m.icono }}</span>{{ m.nombre }}</li>
+      }
+    </ul>
+    <p class="login-marca-version">v{{ version.version }} · {{ version.fecha }}</p>
+  </aside>
 
-  <div class="fuente-datos" role="radiogroup" aria-label="Dónde se guardan los datos">
-    <button
-      type="button"
-      role="radio"
-      [attr.aria-checked]="fuenteDatos === 'supabase'"
-      [class.activa]="fuenteDatos === 'supabase'"
-      (click)="cambiarFuente('supabase')"
-    >
-      ☁️ Nube
-    </button>
-    <button
-      type="button"
-      role="radio"
-      [attr.aria-checked]="fuenteDatos === 'indexeddb'"
-      [class.activa]="fuenteDatos === 'indexeddb'"
-      (click)="cambiarFuente('indexeddb')"
-    >
-      💻 Este navegador
-    </button>
-  </div>
-  <p class="fuente-datos-ayuda">
-    {{ fuenteDatos === 'supabase'
-      ? 'Tus datos se guardan en Supabase y los ves desde cualquier dispositivo.'
-      : 'Tus datos se guardan solo en este navegador (sin internet).' }}
-  </p>
+  <div class="auth-box">
+    <span class="eyebrow"><img class="eyebrow-icon" src="brand/saurix-icon-dark.png" alt="" /> Saurix</span>
 
-  <form [formGroup]="form" (ngSubmit)="entrar()">
-    <label>
-      Usuario
-      <input type="text" formControlName="usuario" placeholder="p.ej. ana" autofocus autocomplete="username" />
-    </label>
-    <label>
-      Contraseña
-      <input type="password" formControlName="password" autocomplete="current-password" />
-    </label>
-    <label class="checkbox-inline">
-      <input type="checkbox" formControlName="recordarUsuario" />
-      Recordar usuario
-    </label>
-    @if (mensajeError()) {
-      <p class="login-error" role="alert">{{ mensajeError() }}</p>
+    <!-- 1. ¿Dónde vas a trabajar? (lo primero que se decide) -->
+    <p class="fuente-datos-titulo">¿Dónde vas a trabajar?</p>
+    <div class="fuente-datos" role="radiogroup" aria-label="Dónde se guardan los datos">
+      <button
+        type="button"
+        role="radio"
+        class="nube"
+        [attr.aria-checked]="enNube"
+        [class.activa]="enNube"
+        (click)="cambiarFuente('supabase')"
+      >
+        ☁️ Nube
+      </button>
+      <button
+        type="button"
+        role="radio"
+        class="local"
+        [attr.aria-checked]="!enNube"
+        [class.activa]="!enNube"
+        (click)="cambiarFuente('indexeddb')"
+      >
+        💻 Este navegador
+      </button>
+    </div>
+    <p class="fuente-datos-ayuda">
+      {{ enNube
+        ? 'Tus datos se guardan en Supabase y los ves desde cualquier dispositivo.'
+        : 'Tus datos se guardan solo en este navegador (sin internet).' }}
+    </p>
+
+    @if (enNube && conexiones.length > 1) {
+      <label class="conexion-select">
+        Empresa
+        <select [value]="conexion.clave" (change)="cambiarConexion($any($event.target).value)">
+          @for (c of conexiones; track c.clave) {
+            <option [value]="c.clave">{{ c.nombre }}</option>
+          }
+        </select>
+      </label>
     }
-    <button type="submit" class="btn-primary" [disabled]="enviando()">Entrar</button>
-  </form>
+
+    <h1>{{ modoRecuperar() ? 'Recuperar contraseña' : 'Iniciar sesión' }}</h1>
+
+    @if (!modoRecuperar()) {
+      <form [formGroup]="form" (ngSubmit)="entrar()">
+        <label>
+          Usuario
+          <input
+            type="text"
+            formControlName="usuario"
+            [placeholder]="enNube ? 'Usuario o correo' : 'p.ej. ana'"
+            autofocus
+            autocomplete="username"
+          />
+        </label>
+        <label>
+          Contraseña
+          <span class="password-campo">
+            <input
+              [type]="verPassword() ? 'text' : 'password'"
+              formControlName="password"
+              autocomplete="current-password"
+              (keydown)="revisarMayusculas($event)"
+              (keyup)="revisarMayusculas($event)"
+              (blur)="bloqMayus.set(false)"
+            />
+            <button
+              type="button"
+              class="password-ojo"
+              [attr.aria-label]="verPassword() ? 'Ocultar contraseña' : 'Ver contraseña'"
+              [title]="verPassword() ? 'Ocultar contraseña' : 'Ver contraseña'"
+              (click)="verPassword.set(!verPassword())"
+            >
+              {{ verPassword() ? '🙈' : '👁️' }}
+            </button>
+          </span>
+          @if (bloqMayus()) {
+            <span class="aviso-mayus" role="status">⇪ Bloq Mayús está activado</span>
+          }
+        </label>
+        <div class="login-fila">
+          <label class="checkbox-inline">
+            <input type="checkbox" formControlName="recordarUsuario" />
+            Recordar usuario
+          </label>
+          @if (enNube) {
+            <button type="button" class="link-olvide" (click)="abrirRecuperar()">¿Olvidaste tu contraseña?</button>
+          }
+        </div>
+        @if (mensajeError()) {
+          <p class="login-error" role="alert">{{ mensajeError() }}</p>
+        }
+        @if (sugerenciaAmbiente()) {
+          <p class="login-sugerencia">{{ sugerenciaAmbiente() }}</p>
+        }
+        <button type="submit" class="btn-primary" [class.btn-local]="!enNube" [disabled]="enviando()">
+          {{ enviando() ? 'Entrando…' : enNube ? 'Entrar a la Nube' : 'Entrar (este navegador)' }}
+        </button>
+      </form>
+    } @else {
+      <div class="recuperar">
+        @if (!recuperacionEnviada()) {
+          <p class="hint">Escribe tu usuario o correo y te mandamos un enlace para elegir una contraseña nueva.</p>
+          <label>
+            Usuario o correo
+            <input type="text" [value]="form.controls.usuario.value" (input)="form.controls.usuario.setValue($any($event.target).value)" />
+          </label>
+          <button type="button" class="btn-primary" [disabled]="enviandoRecuperacion()" (click)="enviarRecuperacion()">
+            {{ enviandoRecuperacion() ? 'Enviando…' : 'Enviar enlace' }}
+          </button>
+        } @else {
+          <p class="recuperar-ok">
+            📧 Si el usuario existe, te enviamos un correo con el enlace. Revisa también tu carpeta de spam.
+          </p>
+        }
+        <button type="button" class="link-olvide" (click)="cerrarRecuperar()">← Volver a iniciar sesión</button>
+      </div>
+    }
+
+    <p class="login-version">Saurix v{{ version.version }} · {{ version.fecha }}</p>
+  </div>
 </div>

@@ -94,7 +94,8 @@ export class RespaldoComponent implements OnInit, OnDestroy {
 
   // ── Importar a Supabase ─────────────────────────────────────────────
   protected readonly modoSupabase = fuenteDatosActual() === 'supabase';
-  private readonly sb = this.modoSupabase ? inject(SupabaseService).cliente : null;
+  private readonly supabase = this.modoSupabase ? inject(SupabaseService) : null;
+  private readonly sb = this.supabase?.cliente ?? null;
   protected readonly respaldoAImportar = signal<RespaldoSaurix | null>(null);
   protected readonly nombreArchivoImportar = signal('');
   protected readonly importando = signal(false);
@@ -272,6 +273,7 @@ export class RespaldoComponent implements OnInit, OnDestroy {
     errores: string[],
   ): Promise<Record<string, unknown>[]> {
     const almacen = this.sb!.storage.from('adjuntos');
+    const prefijo = await this.supabase!.prefijoEmpresa();
     const listos: Record<string, unknown>[] = [];
     for (const fila of filas) {
       const { contenido, ...resto } = fila;
@@ -284,7 +286,7 @@ export class RespaldoComponent implements OnInit, OnDestroy {
         const campoPadre = Object.keys(fila).find((k) => k !== 'id' && k.endsWith('Id'));
         const padre = campoPadre ? String(fila[campoPadre]) : 'sin-padre';
         const nombre = String(fila['nombreArchivo'] ?? 'archivo').normalize('NFD').replace(/[^\w.-]+/g, '_');
-        const ruta = `${entidad}/${padre}/${crypto.randomUUID()}-${nombre}`;
+        const ruta = `${prefijo}/${entidad}/${padre}/${crypto.randomUUID()}-${nombre}`;
         const { error } = await almacen.upload(ruta, blob, {
           contentType: String(fila['tipoContenido'] ?? blob.type ?? 'application/octet-stream'),
         });

@@ -55,6 +55,11 @@ interface GrupoEstado {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class GanttComponent implements OnInit {
+  // Pantalla a ancho completo (html[data-wide='grid'] en styles.scss).
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
+  }
+
   private readonly data = inject(DataClientService);
 
   /** Ancho, en píxeles, de un día en la línea de tiempo. */
@@ -191,6 +196,7 @@ export class GanttComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
     this.data.list<ProyectoOpcion>('Proyecto').subscribe({
       next: (proyectos) => {
         this.proyectos.set(proyectos);
