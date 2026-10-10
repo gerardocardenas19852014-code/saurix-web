@@ -62,4 +62,25 @@ export const DESTINOS: DestinoPaleta[] = [
   { label: 'Inicio', grupo: 'Panel de Control', ruta: '/panel-control', icono: '⌂' },
   { label: 'Apariencia', grupo: 'Panel de Control', ruta: '/panel-control/apariencia', icono: '🎨' },
   { label: 'Respaldo y restauración', grupo: 'Panel de Control', ruta: '/panel-control/respaldo', icono: '💾' },
+
+  // Faltaba el módulo Familia completo (hallado 2026-10-10 al agregar
+  // Directorio familiar) — sin esto, WikiDocs no podía referenciar ninguna
+  // pantalla de Familia como "módulo" (ver DocumentoReferenciaModulo) y
+  // Familia tampoco tenía breadcrumb, porque ShellComponent arma el
+  // breadcrumb con esta misma lista.
+  { label: 'Inicio', grupo: 'Familia', ruta: '/familia', icono: '⌂' },
+  { label: 'Miembros de familia', grupo: 'Familia', ruta: '/familia/miembros', icono: '👪' },
+  { label: 'Árbol genealógico', grupo: 'Familia', ruta: '/familia/arbol', icono: '🌳' },
+  { label: 'Calendario familiar', grupo: 'Familia', ruta: '/familia/calendario', icono: '📅' },
+  { label: 'Resumen', grupo: 'Familia', ruta: '/familia/resumen', icono: '🔔' },
+  { label: 'Trámites familiares', grupo: 'Familia', ruta: '/familia/tramites', icono: '🗒️' },
+  { label: 'Tareas del hogar', grupo: 'Familia', ruta: '/familia/tareas', icono: '🧹' },
+  { label: 'Directorio familiar', grupo: 'Familia', ruta: '/familia/directorio', icono: '📇' },
+  { label: 'Parentesco', grupo: 'Familia', ruta: '/familia/parentesco', icono: '👤' },
+  { label: 'Tipo de documento', grupo: 'Familia', ruta: '/familia/tipo-documento', icono: '🗂️' },
+  { label: 'Sexo', grupo: 'Familia', ruta: '/familia/sexo', icono: '🚻' },
+  { label: 'Entidad de nacimiento', grupo: 'Familia', ruta: '/familia/entidad-nacimiento', icono: '🗺️' },
+  { label: 'Tipo de sangre', grupo: 'Familia', ruta: '/familia/tipo-sangre', icono: '🩸' },
+  { label: 'Proveedores de salud', grupo: 'Familia', ruta: '/familia/proveedor-salud', icono: '🏥' },
+  { label: 'Categoría de contacto', grupo: 'Familia', ruta: '/familia/categoria-contacto', icono: '📇' },
 ];

@@ -30,6 +30,10 @@ export const FAMILIA_ROUTES: Routes = [
     loadComponent: () => import('./tareas-hogar/tareas-hogar.component').then((m) => m.TareasHogarComponent),
   },
   {
+    path: 'directorio',
+    loadComponent: () => import('./directorio/directorio-familiar.component').then((m) => m.DirectorioFamiliarComponent),
+  },
+  {
     path: 'parentesco',
     loadComponent: () => import('./parentesco/parentesco.component').then((m) => m.ParentescoComponent),
   },
@@ -52,5 +56,9 @@ export const FAMILIA_ROUTES: Routes = [
   {
     path: 'proveedor-salud',
     loadComponent: () => import('./proveedor-salud/proveedor-salud.component').then((m) => m.ProveedorSaludComponent),
+  },
+  {
+    path: 'categoria-contacto',
+    loadComponent: () => import('./categoria-contacto/categoria-contacto.component').then((m) => m.CategoriaContactoComponent),
   },
 ];

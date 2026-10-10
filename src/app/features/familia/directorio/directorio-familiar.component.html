@@ -1,0 +1,80 @@
+<div class="page-header">
+  <h1>Directorio familiar</h1>
+  <div class="page-actions">
+    <button type="button" class="toolbar-btn" (click)="nuevoContacto()">+ Nuevo contacto</button>
+  </div>
+</div>
+<p class="hint" style="margin:-10px 0 16px;">
+  Contactos útiles para toda la familia, sin pertenecer a un miembro en particular — médico de cabecera, escuela, veterinario, aseguradora…
+</p>
+
+<div class="grid-toolbar">
+  <input
+    type="text"
+    class="form-control pill-control"
+    style="max-width:260px;"
+    placeholder="Buscar por nombre, teléfono o notas…"
+    [value]="filtroTexto()"
+    (input)="filtroTexto.set($any($event.target).value)"
+  />
+  <select class="form-control pill-control" style="max-width:220px;" [value]="filtroCategoria()" (change)="filtroCategoria.set($any($event.target).value)">
+    <option value="">Todas las categorías</option>
+    @for (c of categorias(); track c.id) {
+      <option [value]="c.clave">{{ c.etiqueta }}</option>
+    }
+  </select>
+</div>
+
+<app-data-table [columnas]="columnas" [filas]="contactosFiltrados()" [cargando]="cargando()" (editar)="editarContacto($event)" (eliminar)="pedirEliminar($event)" />
+
+@if (modalAbierto()) {
+  <div class="modal-overlay modal show d-block" (click)="cerrarModal()">
+    <form class="modal-box modal-dialog modal-content" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3 class="modal-title mb-3">{{ enEdicion() ? 'Editar contacto' : 'Nuevo contacto' }}</h3>
+      <div class="edit-form">
+        <label class="floating-field">
+          <span>Nombre <b>*</b></span>
+          <input type="text" class="form-control pill-control" formControlName="nombre" placeholder=" " />
+        </label>
+        <label class="floating-field">
+          <span>Categoría</span>
+          <select class="form-control pill-control" formControlName="categoria">
+            @for (c of categorias(); track c.id) {
+              <option [value]="c.clave">{{ c.etiqueta }}</option>
+            }
+          </select>
+        </label>
+        <label class="floating-field">
+          <span>Teléfono</span>
+          <input type="text" class="form-control pill-control" formControlName="telefono" placeholder=" " />
+        </label>
+        <label class="floating-field">
+          <span>Correo</span>
+          <input type="email" class="form-control pill-control" formControlName="correo" placeholder=" " />
+        </label>
+        <label class="floating-field full-span">
+          <span>Dirección</span>
+          <input type="text" class="form-control pill-control" formControlName="direccion" placeholder=" " />
+        </label>
+        <label class="floating-field full-span">
+          <span>Notas</span>
+          <input type="text" class="form-control pill-control" formControlName="notas" placeholder=" " />
+        </label>
+      </div>
+      <div class="modal-actions">
+        @if (enEdicion()) {
+          <button type="button" class="btn-danger" (click)="pedirEliminar(enEdicion()!); cerrarModal()">Eliminar</button>
+        }
+        <button type="button" class="btn-secondary" (click)="cerrarModal()">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+<app-confirm-dialog
+  [visible]="aEliminar() !== null"
+  titulo="Eliminar contacto"
+  mensaje="¿Eliminar este contacto del directorio familiar?"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="aEliminar.set(null)"
+/>

@@ -4,7 +4,7 @@
     <button type="button" class="toolbar-btn" (click)="nuevaTarea()">+ Nueva tarea</button>
   </div>
 </div>
-<p class="hint" style="margin:-10px 0 16px;">Quehaceres del hogar con responsable y frecuencia.</p>
+<p class="hint" style="margin:-10px 0 16px;">Quehaceres del hogar con responsable y frecuencia. Las recurrentes (diaria/semanal/mensual) vuelven a verse pendientes solas en cuanto empieza el siguiente ciclo.</p>
 
 <label class="checkbox-inline" style="margin-bottom:16px; display:inline-flex;">
   <input type="checkbox" [checked]="mostrarCompletadas()" (change)="mostrarCompletadas.set($any($event.target).checked)" />
@@ -18,11 +18,14 @@
 } @else {
   <div class="tareas-hogar-lista">
     @for (t of tareasVisibles(); track t.id) {
-      <div class="tareas-hogar-fila" [class.tareas-hogar-fila-completada]="t.completada">
-        <input type="checkbox" [checked]="t.completada" (change)="alternarCompletada(t)" />
+      <div class="tareas-hogar-fila" [class.tareas-hogar-fila-completada]="estaHechaEsteCiclo(t)">
+        <input type="checkbox" [checked]="estaHechaEsteCiclo(t)" (change)="alternarCompletada(t)" />
         <button type="button" class="tareas-hogar-titulo" (click)="editarTarea(t)">{{ t.titulo }}</button>
         <span class="hint" style="margin:0;">{{ nombreMiembro(t.miembroFamiliaId) }}</span>
         <span class="grid-badge grid-badge-muted">{{ etiquetaFrecuencia[t.frecuencia] }}</span>
+        @if (t.frecuencia !== 'unica' && textoUltimaVez(t)) {
+          <span class="hint" style="margin:0;">{{ textoUltimaVez(t) }}</span>
+        }
         @if (t.fechaLimite) {
           <span class="hint" style="margin:0;">{{ t.fechaLimite | date: 'dd/MM/yyyy' }}</span>
         }
@@ -67,10 +70,14 @@
           <span>Notas</span>
           <input type="text" class="form-control pill-control" formControlName="notas" placeholder=" " />
         </label>
-        <label class="checkbox-inline full-span">
-          <input type="checkbox" formControlName="completada" />
-          Ya está hecha
-        </label>
+        @if (form.controls.frecuencia.value === 'unica') {
+          <label class="checkbox-inline full-span">
+            <input type="checkbox" formControlName="completada" />
+            Ya está hecha
+          </label>
+        } @else {
+          <p class="hint full-span" style="margin:0;">Esta tarea es recurrente: se marca hecha o pendiente desde el checkbox de la lista, no aquí.</p>
+        }
       </div>
       <div class="modal-actions">
         @if (tareaEnEdicion()) {

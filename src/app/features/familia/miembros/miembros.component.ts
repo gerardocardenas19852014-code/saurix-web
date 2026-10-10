@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { jsPDF } from 'jspdf';
@@ -76,7 +76,7 @@ const MODULO_BITACORA = 'Familia / Miembros';
   styleUrl: './miembros.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
+export class MiembrosFamiliaComponent implements OnInit {
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
@@ -394,10 +394,19 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
       .catch(() => this.qrDataUrl.set(''));
   });
 
+  /** Ancho completo solo donde hay tablas (lista de miembros, y las pestañas
+   *  Documentos/Salud/Pólizas dentro de una ficha); la pestaña Datos (formulario)
+   *  y la Tarjeta de emergencia (tarjeta angosta) se quedan en el ancho normal —
+   *  mismo criterio que WikiDocs (ver documentos-list.component.ts). */
+  private readonly _anchoSegunVista = effect((onCleanup) => {
+    const esTabla =
+      this.vista() === 'lista' ||
+      (this.vista() === 'ficha' && ['documentos', 'salud', 'polizas'].includes(this.tabFicha()));
+    if (esTabla) document.documentElement.setAttribute('data-wide', 'grid');
+    onCleanup(() => document.documentElement.removeAttribute('data-wide'));
+  });
+
   ngOnInit(): void {
-    // Fichas con varios campos + pestañas — mismo criterio que Movimientos/
-    // Deudas/Proyección (ver html[data-wide='grid'] en styles.scss).
-    document.documentElement.setAttribute('data-wide', 'grid');
     this.data.list<ValorLista>('ValorLista', { grupo: 'FamiliaParentesco' }).subscribe((v) =>
       this.parentescos.set(v.filter((r) => r.grupo === 'FamiliaParentesco' && r.activo !== false).sort((a, b) => a.orden - b.orden)),
     );
@@ -443,10 +452,6 @@ export class MiembrosFamiliaComponent implements OnInit, OnDestroy {
         error: () => {},
       });
     });
-  }
-
-  ngOnDestroy(): void {
-    document.documentElement.removeAttribute('data-wide');
   }
 
   cargar(): void {

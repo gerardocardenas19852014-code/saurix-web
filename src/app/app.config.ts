@@ -1,6 +1,7 @@
-import { ApplicationConfig, LOCALE_ID, inject, provideAppInitializer, provideZonelessChangeDetection } from '@angular/core';
+import { ApplicationConfig, LOCALE_ID, inject, isDevMode, provideAppInitializer, provideZonelessChangeDetection } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
+import { provideServiceWorker } from '@angular/service-worker';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
 import { DataClientService } from './core/services/data-client.service';
 import { IndexedDbDataClientService } from './core/services/indexeddb-data-client.service';
@@ -34,5 +35,15 @@ export const appConfig: ApplicationConfig = {
     // IndexedDB: garantiza el usuario 'root' y las listas de valores.
     // Supabase: restaura la sesión guardada antes de que arranque la app.
     provideAppInitializer(() => inject(SeedService).ejecutar()),
+
+    // PWA: service worker de solo caché de app shell/estáticos (sin manejo de
+    // push todavía — eso queda pendiente, ver claude/esquema-tablas-saurix.md).
+    // Deshabilitado en `ng serve` (isDevMode()) porque solo existe en builds de
+    // producción (`ng build`); registrarlo también se retrasa 'registerWhenStable:30000'
+    // para no competir con la carga inicial de la app.
+    provideServiceWorker('ngsw-worker.js', {
+      enabled: !isDevMode(),
+      registrationStrategy: 'registerWhenStable:30000',
+    }),
   ],
 };

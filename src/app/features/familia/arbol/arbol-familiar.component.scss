@@ -142,3 +142,55 @@
 .arbol-persona-suelta {
   opacity: 0.85;
 }
+
+/* ---------------- Familiares de referencia (sin ficha completa) ---------------- */
+
+.arbol-persona-bloque {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.arbol-btn-referencia {
+  background: none;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: color .12s ease, border-color .12s ease;
+}
+.arbol-btn-referencia:hover {
+  color: var(--text-strong);
+  border-color: var(--ink-soft);
+}
+
+.arbol-referencias {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 6px auto 0;
+  max-width: 320px;
+}
+
+.arbol-chip-referencia {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: color .12s ease, border-color .12s ease;
+}
+.arbol-chip-referencia:hover {
+  color: var(--text-strong);
+  border-color: var(--ink-soft);
+}
+.arbol-chip-referencia-fallecido {
+  opacity: .8;
+}

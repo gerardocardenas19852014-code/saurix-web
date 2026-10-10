@@ -6,13 +6,21 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
 import { ToastService } from '../../../shared/services/toast.service';
 import { MiembroFamilia } from '../miembro-familia.model';
 import { ETIQUETA_FRECUENCIA_TAREA, FrecuenciaTareaHogar, TareaHogar } from '../tarea-hogar.model';
+import { cicloDeFrecuenciaHogar, fechaLocalDeTexto } from '../familia.util';
 
 const ENTIDAD = 'TareaHogar';
 
 /** Lista simple de quehaceres del hogar — a propósito NO es un tablero
  *  Kanban como Trámites familiares: aquí lo único que importa es
  *  "¿está hecha o no?", así que una lista con checkbox es más rápida de
- *  usar que arrastrar tarjetas entre columnas. */
+ *  usar que arrastrar tarjetas entre columnas.
+ *
+ *  Las tareas recurrentes (diaria/semanal/mensual) NO se "reinician" con un
+ *  job en segundo plano: el checkbox siempre refleja si ya se marcó hecha
+ *  EN EL CICLO ACTUAL (ver estaHechaEsteCiclo), calculado al vuelo a partir
+ *  de ultimaVezCompletada — mismo criterio que "Ciclo actual" en
+ *  Presupuesto → Fijos y Proyección. Una tarea 'unica' sigue usando
+ *  directamente el campo completada, como antes. */
 @Component({
   selector: 'app-tareas-hogar',
   standalone: true,
@@ -40,14 +48,32 @@ export class TareasHogarComponent implements OnInit {
   protected readonly tareasVisibles = computed(() =>
     this.tareas()
       .filter((t) => t.activo !== false)
-      .filter((t) => this.mostrarCompletadas() || !t.completada)
-      .sort((a, b) => Number(a.completada) - Number(b.completada) || (a.fechaLimite || '9999').localeCompare(b.fechaLimite || '9999')),
+      .filter((t) => this.mostrarCompletadas() || !this.estaHechaEsteCiclo(t))
+      .sort((a, b) => Number(this.estaHechaEsteCiclo(a)) - Number(this.estaHechaEsteCiclo(b)) || (a.fechaLimite || '9999').localeCompare(b.fechaLimite || '9999')),
   );
 
   protected nombreMiembro(id?: number | null): string {
     if (!id) return 'Sin asignar';
     const m = this.miembros().find((x) => Number(x.id) === Number(id));
     return m ? `${m.nombre} ${m.apellidoPaterno}` : 'Sin asignar';
+  }
+
+  /** ¿Ya se hizo esta tarea? Para 'unica' es el campo completada de
+   *  siempre (permanente); para una recurrente se calcula comparando el
+   *  ciclo de ultimaVezCompletada contra el ciclo de hoy — así cada
+   *  día/semana/mes la tarea vuelve a verse pendiente sola. */
+  protected estaHechaEsteCiclo(t: TareaHogar): boolean {
+    if (t.frecuencia === 'unica') return t.completada;
+    if (!t.ultimaVezCompletada) return false;
+    return cicloDeFrecuenciaHogar(fechaLocalDeTexto(t.ultimaVezCompletada), t.frecuencia) === cicloDeFrecuenciaHogar(new Date(), t.frecuencia);
+  }
+
+  /** Texto corto para mostrar junto a una tarea recurrente ya hecha, o la
+   *  última vez que se hizo si ahora mismo está pendiente otra vez. */
+  protected textoUltimaVez(t: TareaHogar): string {
+    if (!t.ultimaVezCompletada) return '';
+    const etiqueta = this.estaHechaEsteCiclo(t) ? 'Hecha' : 'Última vez';
+    return `${etiqueta}: ${fechaLocalDeTexto(t.ultimaVezCompletada).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
   }
 
   ngOnInit(): void {
@@ -68,9 +94,19 @@ export class TareasHogarComponent implements OnInit {
   }
 
   /** Marcar/desmarcar directo desde el checkbox de la lista, sin abrir el
-   *  modal — es la acción que más se usa, así que no debería costar 3 clics. */
+   *  modal — es la acción que más se usa, así que no debería costar 3 clics.
+   *  En una 'unica' simplemente alterna completada, como siempre. En una
+   *  recurrente, marcar hecha guarda hoy en ultimaVezCompletada (eso basta
+   *  para que el ciclo actual se vea hecho); desmarcar limpia esa fecha. */
   alternarCompletada(tarea: TareaHogar): void {
-    this.data.modificacion<TareaHogar>(ENTIDAD, { ...tarea, completada: !tarea.completada }).subscribe({
+    const hoyIso = new Date().toISOString().slice(0, 10);
+    const cambios =
+      tarea.frecuencia === 'unica'
+        ? { completada: !tarea.completada }
+        : this.estaHechaEsteCiclo(tarea)
+          ? { ultimaVezCompletada: null, completada: false }
+          : { ultimaVezCompletada: hoyIso, completada: true };
+    this.data.modificacion<TareaHogar>(ENTIDAD, { ...tarea, ...cambios }).subscribe({
       next: () => this.cargar(),
       error: () => this.toast.error('No se pudo actualizar. Intenta de nuevo.'),
     });
@@ -89,18 +125,19 @@ export class TareasHogarComponent implements OnInit {
     fechaLimite: [''],
     notas: [''],
     completada: [false],
+    ultimaVezCompletada: [null as string | null],
     activo: [true],
   });
 
   nuevaTarea(): void {
     this.tareaEnEdicion.set(null);
-    this.form.reset({ id: 0, titulo: '', miembroFamiliaId: 0, frecuencia: 'unica', fechaLimite: '', notas: '', completada: false, activo: true });
+    this.form.reset({ id: 0, titulo: '', miembroFamiliaId: 0, frecuencia: 'unica', fechaLimite: '', notas: '', completada: false, ultimaVezCompletada: null, activo: true });
     this.modalAbierto.set(true);
   }
 
   editarTarea(t: TareaHogar): void {
     this.tareaEnEdicion.set(t);
-    this.form.reset({ ...t, miembroFamiliaId: t.miembroFamiliaId ?? 0 });
+    this.form.reset({ ...t, miembroFamiliaId: t.miembroFamiliaId ?? 0, ultimaVezCompletada: t.ultimaVezCompletada ?? null });
     this.modalAbierto.set(true);
   }
 

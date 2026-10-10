@@ -6,6 +6,7 @@
 </div>
 <p class="hint" style="margin:-10px 0 24px;">
   Construido a partir del padre, la madre y el cónyuge capturados en la ficha de cada miembro (pestaña Datos → Relaciones).
+  El botón 👤+ junto a cada persona agrega un familiar de referencia (ya fallecido o externo) sin necesidad de darlo de alta como miembro completo.
 </p>
 
 @if (cargando()) {
@@ -54,28 +55,51 @@
 <!-- Plantilla recursiva: una pareja (persona + cónyuge opcional) y, debajo, sus hijos con el mismo patrón. -->
 <ng-template #nodoTpl let-nodo>
   <div class="arbol-pareja">
-    <a routerLink="/familia/miembros" [queryParams]="{ miembro: nodo.persona.id }" class="arbol-persona">
-      @if (nodo.persona.foto) {
-        <img class="arbol-avatar" [src]="nodo.persona.foto" alt="" />
-      } @else {
-        <div class="arbol-avatar" [style.background]="colorAvatar(nombreCompleto(nodo.persona))">{{ iniciales(nombreCompleto(nodo.persona)) }}</div>
-      }
-      <span class="arbol-nombre">{{ nombreCompleto(nodo.persona) }}</span>
-      <span class="arbol-edad">{{ calcularEdad(nodo.persona.fechaNacimiento) ?? '—' }} años</span>
-    </a>
+    <div class="arbol-persona-bloque">
+      <a routerLink="/familia/miembros" [queryParams]="{ miembro: nodo.persona.id }" class="arbol-persona">
+        @if (nodo.persona.foto) {
+          <img class="arbol-avatar" [src]="nodo.persona.foto" alt="" />
+        } @else {
+          <div class="arbol-avatar" [style.background]="colorAvatar(nombreCompleto(nodo.persona))">{{ iniciales(nombreCompleto(nodo.persona)) }}</div>
+        }
+        <span class="arbol-nombre">{{ nombreCompleto(nodo.persona) }}</span>
+        <span class="arbol-edad">{{ calcularEdad(nodo.persona.fechaNacimiento) ?? '—' }} años</span>
+      </a>
+      <button type="button" class="arbol-btn-referencia" title="Agregar familiar de referencia" (click)="nuevoPara(nodo.persona.id)">👤+</button>
+    </div>
     @if (nodo.conyuge) {
       <span class="arbol-conector-conyuge">⚭</span>
-      <a routerLink="/familia/miembros" [queryParams]="{ miembro: nodo.conyuge.id }" class="arbol-persona">
-        @if (nodo.conyuge.foto) {
-          <img class="arbol-avatar" [src]="nodo.conyuge.foto" alt="" />
-        } @else {
-          <div class="arbol-avatar" [style.background]="colorAvatar(nombreCompleto(nodo.conyuge))">{{ iniciales(nombreCompleto(nodo.conyuge)) }}</div>
-        }
-        <span class="arbol-nombre">{{ nombreCompleto(nodo.conyuge) }}</span>
-        <span class="arbol-edad">{{ calcularEdad(nodo.conyuge.fechaNacimiento) ?? '—' }} años</span>
-      </a>
+      <div class="arbol-persona-bloque">
+        <a routerLink="/familia/miembros" [queryParams]="{ miembro: nodo.conyuge.id }" class="arbol-persona">
+          @if (nodo.conyuge.foto) {
+            <img class="arbol-avatar" [src]="nodo.conyuge.foto" alt="" />
+          } @else {
+            <div class="arbol-avatar" [style.background]="colorAvatar(nombreCompleto(nodo.conyuge))">{{ iniciales(nombreCompleto(nodo.conyuge)) }}</div>
+          }
+          <span class="arbol-nombre">{{ nombreCompleto(nodo.conyuge) }}</span>
+          <span class="arbol-edad">{{ calcularEdad(nodo.conyuge.fechaNacimiento) ?? '—' }} años</span>
+        </a>
+        <button type="button" class="arbol-btn-referencia" title="Agregar familiar de referencia" (click)="nuevoPara(nodo.conyuge.id)">👤+</button>
+      </div>
     }
   </div>
+
+  @if (referenciasDe(nodo.persona.id).length > 0 || (nodo.conyuge && referenciasDe(nodo.conyuge.id).length > 0)) {
+    <div class="arbol-referencias">
+      @for (r of referenciasDe(nodo.persona.id); track r.id) {
+        <button type="button" class="arbol-chip-referencia" [class.arbol-chip-referencia-fallecido]="r.fallecido" [title]="r.notas || ''" (click)="editar(r)">
+          {{ r.fallecido ? '🕊️' : '👤' }} {{ r.parentesco }}: {{ r.nombre }}
+        </button>
+      }
+      @if (nodo.conyuge) {
+        @for (r of referenciasDe(nodo.conyuge.id); track r.id) {
+          <button type="button" class="arbol-chip-referencia" [class.arbol-chip-referencia-fallecido]="r.fallecido" [title]="r.notas || ''" (click)="editar(r)">
+            {{ r.fallecido ? '🕊️' : '👤' }} {{ r.parentesco }}: {{ r.nombre }}
+          </button>
+        }
+      }
+    </div>
+  }
 
   @if (nodo.hijos.length > 0) {
     <ul class="arbol-nivel">
@@ -87,3 +111,54 @@
     </ul>
   }
 </ng-template>
+
+@if (modalAbierto()) {
+  <div class="modal-overlay modal show d-block" (click)="cerrarModal()">
+    <form class="modal-box modal-dialog modal-content" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3 class="modal-title mb-3">{{ enEdicion() ? 'Editar familiar de referencia' : 'Nuevo familiar de referencia' }}</h3>
+      <p class="hint" style="margin:0 0 10px;">Para parientes sin ficha completa — ya fallecidos o externos — que solo quieres ver reflejados en el árbol.</p>
+      <div class="edit-form">
+        <label class="floating-field">
+          <span>Nombre <b>*</b></span>
+          <input type="text" class="form-control pill-control" formControlName="nombre" placeholder=" " />
+        </label>
+        <label class="floating-field">
+          <span>Parentesco <b>*</b></span>
+          <input type="text" class="form-control pill-control" formControlName="parentesco" placeholder="Ej. Abuelo paterno, Tío, Bisabuela…" />
+        </label>
+        <label class="floating-field">
+          <span>Fecha de nacimiento</span>
+          <input type="date" class="form-control pill-control" formControlName="fechaNacimiento" placeholder=" " />
+        </label>
+        <label class="checkbox-inline full-span">
+          <input type="checkbox" formControlName="fallecido" />
+          Falleció
+        </label>
+        @if (form.controls.fallecido.value) {
+          <label class="floating-field">
+            <span>Fecha de fallecimiento</span>
+            <input type="date" class="form-control pill-control" formControlName="fechaFallecimiento" placeholder=" " />
+          </label>
+        }
+        <label class="floating-field full-span">
+          <span>Notas</span>
+          <input type="text" class="form-control pill-control" formControlName="notas" placeholder=" " />
+        </label>
+      </div>
+      <div class="modal-actions">
+        @if (enEdicion()) {
+          <button type="button" class="btn-danger" (click)="pedirEliminar(enEdicion()!); cerrarModal()">Eliminar</button>
+        }
+        <button type="button" class="btn-secondary" (click)="cerrarModal()">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+<app-confirm-dialog
+  [visible]="aEliminar() !== null"
+  titulo="Eliminar familiar de referencia"
+  mensaje="¿Eliminar a este familiar de referencia del árbol?"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="aEliminar.set(null)"
+/>

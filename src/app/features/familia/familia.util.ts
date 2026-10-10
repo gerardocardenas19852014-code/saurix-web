@@ -318,3 +318,22 @@ export function eventosFamiliares(fuentes: FuentesEventosFamiliares, anioCumplea
 
   return eventos.sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
 }
+
+/** Clave de "ciclo" para una tarea del hogar recurrente (ver TareaHogar en
+ *  tarea-hogar.model.ts) — mismo espíritu que cicloActual/cicloDeFecha en
+ *  Presupuesto → Fijos y Proyección, pero sin distinguir "proyectado":
+ *  - diaria: el día mismo ('YYYY-MM-DD').
+ *  - semanal: el lunes de esa semana ('YYYY-MM-DD') — evita calcular el
+ *    número de semana ISO, con el mismo resultado práctico (dos fechas en
+ *    la misma semana caen siempre en el mismo lunes).
+ *  - mensual: el mes ('YYYY-MM'). */
+export function cicloDeFrecuenciaHogar(fecha: Date, frecuencia: 'diaria' | 'semanal' | 'mensual'): string {
+  if (frecuencia === 'mensual') return `${fecha.getFullYear()}-${fecha.getMonth() + 1}`;
+  if (frecuencia === 'semanal') {
+    const lunes = new Date(fecha);
+    const diaSemanaDesdeLunes = (lunes.getDay() + 6) % 7; // lunes=0 … domingo=6
+    lunes.setDate(lunes.getDate() - diaSemanaDesdeLunes);
+    return `${lunes.getFullYear()}-${lunes.getMonth() + 1}-${lunes.getDate()}`;
+  }
+  return `${fecha.getFullYear()}-${fecha.getMonth() + 1}-${fecha.getDate()}`;
+}
