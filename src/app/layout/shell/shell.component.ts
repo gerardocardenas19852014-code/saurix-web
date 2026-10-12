@@ -353,6 +353,8 @@ export class ShellComponent implements OnDestroy {
       'presupuesto:Metas y límites',
       'presupuesto:Reportes',
       'presupuesto:Catálogos',
+      'familia:Miembros',
+      'familia:Hogar',
       'familia:Catálogos',
       'wikidocs:Catálogos',
     ]),

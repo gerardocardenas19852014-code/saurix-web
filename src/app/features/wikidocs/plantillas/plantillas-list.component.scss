@@ -1,5 +1,18 @@
 /* Ensancha el modal solo aquí (mismo criterio que Usuarios en Seguridad):
  * el resto de estilos vive en src/styles.scss (.page-header, .grid-table,
  * .modal-box, .edit-form). El editor visual (app-editor-texto) necesita
- * más ancho que un catálogo simple de un solo campo. */
-.modal-box.plantilla-modal { max-width: 720px; }
+ * más ancho que un catálogo simple de un solo campo — sobre todo ahora
+ * que soporta tablas (plantillas tipo "Solicitud de Cambio"). 1400px se
+ * seguía viendo angosto en pantallas anchas porque `.modal-overlay` centra
+ * el modal en TODO el viewport (`.modal-box` ya trae `width: 90%` propio),
+ * así que max-width ahora es solo un tope de seguridad en pantallas muy
+ * grandes — el 90% de `.modal-box` es quien de verdad define el ancho en
+ * la mayoría de las pantallas. */
+.modal-box.plantilla-modal { max-width: 1800px; }
+
+/* El modal ya es ancho (arriba), pero `.edit-form` (global) sigue topado
+ * en 760px por defecto, así que adentro del modal ancho los campos
+ * "Nombre" y "Contenido de partida" quedaban angostos con un hueco grande
+ * a la derecha. Modificador propio de esta pantalla, no toca el
+ * `.edit-form` que usan los catálogos simples en otras pantallas. */
+.edit-form--plantilla { max-width: none; }

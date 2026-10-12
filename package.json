@@ -23,10 +23,12 @@
     "bootstrap": "^5.3.8",
     "curp": "^1.5.0",
     "highlight.js": "^11.12.0",
+    "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "marked": "^18.0.13",
     "qrcode": "^1.5.4",
     "quill": "^2.0.3",
+    "quill-table-better": "^1.2.3",
     "rfc-facil": "^1.1.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"

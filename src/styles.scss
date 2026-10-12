@@ -1467,6 +1467,15 @@ button { font-family: inherit; }
   min-height: 320px;
   color: var(--text-strong);
 }
+/* Sin esto, una imagen subida tal cual (logo, foto, captura) se muestra a
+ * su tamaño real en píxeles dentro del editor — con cualquier imagen de
+ * ancho moderado o grande se ve enorme. Mismo criterio que ya tiene
+ * `.page-body img` para el modo "Ver": nunca más ancha que el editor,
+ * alto proporcional automático. */
+.editor-texto-wrap .ql-editor img {
+  max-width: 100%;
+  height: auto;
+}
 .editor-texto-wrap .ql-editor.ql-blank::before {
   color: var(--ink-soft);
   font-style: normal;
@@ -1510,6 +1519,60 @@ button { font-family: inherit; }
   content: '🔖';
   font-size: 14px;
   line-height: 1;
+}
+
+/* Botón propio "Insertar línea divisoria" (➖) — mismo criterio que
+   ql-archivo/ql-wikidoc (ver editor-texto.component.ts, blot 'divider' y
+   handler 'divider'). */
+.editor-texto-wrap .ql-toolbar.ql-snow button.ql-divider {
+  width: auto;
+  padding: 3px 5px;
+}
+.editor-texto-wrap .ql-toolbar.ql-snow button.ql-divider::before {
+  content: '➖';
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* La línea que inserta el botón "➖" (blot 'divider' de
+   editor-texto.component.ts) se ve igual al editar que al ver el
+   documento — línea negra sólida, sin el degradado gris por default del
+   navegador. */
+.editor-texto-wrap .ql-editor hr,
+.page-body hr {
+  border: none;
+  border-top: 2px solid #000;
+  margin: 16px 0;
+}
+
+/* Selector "Tamaño de letra" (Normal/Pequeño/Grande/Enorme) en español —
+ * el formato `size` aquí es el propio registrado en
+ * editor-texto.component.ts (StyleAttributor de ALCANCE DE BLOQUE, no el
+ * de fábrica de Quill), así que agranda la línea completa — número de
+ * lista incluido — y no solo el texto seleccionado. Quill dibuja el
+ * selector en inglés por default (ver quill.snow.css); se sobreescribe el
+ * texto de sus opciones igual que ya se traduce la tabla (IDIOMA_TABLA_ES
+ * en editor-texto.component.ts). Los `data-value` son los valores reales
+ * en em que usa ese formato (0.85em/1.5em/2.5em), no "small/large/huge".
+ */
+.editor-texto-wrap .ql-snow .ql-picker.ql-size .ql-picker-label::before,
+.editor-texto-wrap .ql-snow .ql-picker.ql-size .ql-picker-item::before {
+  content: 'Normal';
+}
+.editor-texto-wrap .ql-snow .ql-picker.ql-size .ql-picker-label[data-value='0.85em']::before,
+.editor-texto-wrap .ql-snow .ql-picker.ql-size .ql-picker-item[data-value='0.85em']::before {
+  content: 'Pequeño';
+}
+.editor-texto-wrap .ql-snow .ql-picker.ql-size .ql-picker-label[data-value='1.5em']::before,
+.editor-texto-wrap .ql-snow .ql-picker.ql-size .ql-picker-item[data-value='1.5em']::before {
+  content: 'Grande';
+}
+.editor-texto-wrap .ql-snow .ql-picker.ql-size .ql-picker-label[data-value='2.5em']::before,
+.editor-texto-wrap .ql-snow .ql-picker.ql-size .ql-picker-item[data-value='2.5em']::before {
+  content: 'Enorme';
+}
+.editor-texto-wrap .ql-snow .ql-picker.ql-size {
+  width: 108px;
 }
 
 /* Colores de sintaxis para los bloques de código (botón </> de la barra,

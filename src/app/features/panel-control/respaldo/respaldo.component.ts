@@ -4,6 +4,8 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
 import { ToastService } from '../../../shared/services/toast.service';
 import { fuenteDatosActual } from '../../../core/services/fuente-datos';
 import { SupabaseService } from '../../../core/services/supabase.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { BitacoraService } from '../../../shared/services/bitacora.service';
 
 /** Orden de carga a Supabase: primero los catálogos y los "padres", después
  *  lo que los referencia. Lo que no esté aquí se manda al final. */
@@ -31,6 +33,12 @@ interface ResultadoImportacion {
   errores?: string[];
   sinTabla?: boolean;
   filas?: number;
+}
+
+/** Resultado de panel_control.limpiar_datos_empresa() (ver supabase/migrations/13). */
+interface ResultadoLimpiezaEmpresa {
+  totalRegistros: number;
+  tablas: { tabla: string; borrados: number }[];
 }
 
 /** Forma del archivo .json que genera/lee esta pantalla. */
@@ -101,6 +109,18 @@ export class RespaldoComponent implements OnInit, OnDestroy {
   protected readonly importando = signal(false);
   protected readonly progresoImportacion = signal('');
   protected readonly resultadosImportacion = signal<ResultadoImportacion[]>([]);
+
+  // ── Limpiar base local (IndexedDB) ──────────────────────────────────
+  protected readonly limpiandoLocal = signal(false);
+  protected readonly confirmandoLimpiezaLocal = signal(false);
+
+  // ── Limpiar datos de mi empresa (Nube, solo admin) ──────────────────
+  private readonly auth = inject(AuthService);
+  private readonly bitacoraSvc = inject(BitacoraService);
+  protected readonly esAdmin = this.auth.usuarioActual()?.role === 'admin';
+  protected readonly textoConfirmacionNube = signal('');
+  protected readonly limpiandoNube = signal(false);
+  protected readonly resultadoLimpiezaNube = signal<ResultadoLimpiezaEmpresa | null>(null);
 
   async descargarRespaldo(): Promise<void> {
     this.generandoRespaldo.set(true);
@@ -297,6 +317,68 @@ export class RespaldoComponent implements OnInit, OnDestroy {
       }
     }
     return listos;
+  }
+
+  // ── Limpiar base local (IndexedDB) ──────────────────────────────────
+  pedirLimpiezaLocal(): void {
+    this.confirmandoLimpiezaLocal.set(true);
+  }
+
+  cancelarLimpiezaLocal(): void {
+    this.confirmandoLimpiezaLocal.set(false);
+  }
+
+  async confirmarLimpiezaLocal(): Promise<void> {
+    this.confirmandoLimpiezaLocal.set(false);
+    this.limpiandoLocal.set(true);
+    try {
+      await this.engine.borrarTodo();
+      this.toast.exito('Base local (IndexedDB) limpiada. Recargando…');
+      // Igual que en confirmarRestauracion(): todo lo cacheado en memoria por
+      // cada pantalla quedaría desactualizado, así que se recarga la app.
+      setTimeout(() => window.location.reload(), 1200);
+    } catch {
+      this.toast.error('No se pudo limpiar la base local. Intenta de nuevo.');
+      this.limpiandoLocal.set(false);
+    }
+  }
+
+  // ── Limpiar datos de mi empresa (Nube) ──────────────────────────────
+  /** Solo se habilita el botón cuando el texto escrito coincide exactamente
+   *  (es la propia confirmación del usuario; no hace falta otro diálogo). */
+  protected confirmacionNubeValida(): boolean {
+    return this.textoConfirmacionNube().trim().toUpperCase() === 'LIMPIAR';
+  }
+
+  async confirmarLimpiezaNube(): Promise<void> {
+    if (!this.sb || !this.confirmacionNubeValida() || this.limpiandoNube()) return;
+    this.limpiandoNube.set(true);
+    this.resultadoLimpiezaNube.set(null);
+    try {
+      const { data, error } = await this.sb.schema('panel_control').rpc('limpiar_datos_empresa');
+      if (error) throw new Error(error.message);
+      const resultado = data as ResultadoLimpiezaEmpresa;
+      this.resultadoLimpiezaNube.set(resultado);
+      this.textoConfirmacionNube.set('');
+      // Se registra DESPUÉS de que la limpieza ya terminó bien: si se
+      // registrara antes (o el backend lo hiciera), este mismo proceso
+      // borraría ese registro al limpiar seguridad.bitacora (ver migración 13).
+      const usuario = this.auth.usuarioActual();
+      this.bitacoraSvc
+        .registrar({
+          modulo: 'Panel de Control / Restauración y respaldo',
+          entidad: 'Empresa',
+          accion: 'Limpieza de datos capturados',
+          usuario: usuario?.nombreUsuario ?? 'Sistema',
+          actual: { totalRegistros: resultado.totalRegistros },
+        })
+        .subscribe({ error: () => undefined });
+      this.toast.exito(`Datos de tu empresa limpiados (${resultado.totalRegistros} registros borrados).`);
+    } catch (error) {
+      this.toast.error(`No se pudo limpiar: ${(error as Error).message}`);
+    } finally {
+      this.limpiandoNube.set(false);
+    }
   }
 
   totalRegistros(respaldo: RespaldoSaurix | null): number {

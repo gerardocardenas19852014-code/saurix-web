@@ -4,6 +4,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { marked } from 'marked';
 import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import { DataClientService } from '../../core/services/data-client.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AdjuntosPanelComponent } from '../../shared/components/adjuntos-panel/adjuntos-panel.component';
@@ -164,17 +165,26 @@ export class DocumentosListComponent implements OnInit {
   protected readonly vista = signal<'lista' | 'ver' | 'editar' | 'adjuntos' | 'historial' | 'referencias'>('lista');
 
   /** La vista "lista" (tabla) aprovecha el ancho ampliado de `.content`
-   *  (ver comentario que tenía antes `ngOnInit`); las demás (Ver/Editar/
-   *  Adjuntos/Historial) tienen contenido angosto (`.edit-form` se limita
-   *  a 760px, `.page-body` es texto para leer) y con el ancho ampliado
-   *  fijo dejaban una franja vacía grande a la derecha — mismo problema ya
-   *  corregido en RFC y CURP. Este effect mantiene `data-wide` sincronizado
-   *  con la vista actual en vez de dejarlo fijo todo el tiempo que el
-   *  componente está montado, y lo quita al salir de la pantalla
+   *  (ver comentario que tenía antes `ngOnInit`). "Ver"/"Editar" también lo
+   *  usan: documentos con contenido ancho (tablas, plantillas tipo
+   *  "Solicitud de Cambio") quedaban aplastados contra el límite angosto
+   *  por defecto, dejando franjas vacías enormes a los lados — el `.content`
+   *  ampliado resuelve `.page-body` (sin max-width propio, aprovecha el
+   *  espacio solo) y, para "Editar", se complementa con el modificador
+   *  `.edit-form--documento` (ver documentos-list.component.scss), porque
+   *  `.edit-form` tiene su propio tope de 760px independiente de `.content`
+   *  que si no se queda angosto aunque el padre se ensanche. "Adjuntos"/
+   *  "Historial"/"Referencias" se dejan con el ancho angosto por defecto,
+   *  ya que no tienen el mismo problema. Este effect mantiene `data-wide`
+   *  sincronizado con la vista actual en vez de dejarlo fijo todo el tiempo
+   *  que el componente está montado, y lo quita al salir de la pantalla
    *  (onCleanup corre tanto entre cambios de vista como al destruirse el
    *  componente). */
   private readonly _anchoSegunVista = effect((onCleanup) => {
-    if (this.vista() === 'lista') document.documentElement.setAttribute('data-wide', 'grid');
+    const vista = this.vista();
+    if (vista === 'lista' || vista === 'ver' || vista === 'editar') {
+      document.documentElement.setAttribute('data-wide', 'grid');
+    }
     onCleanup(() => document.documentElement.removeAttribute('data-wide'));
   });
   protected readonly documentoActual = signal<Documento | null>(null);
@@ -824,15 +834,26 @@ export class DocumentosListComponent implements OnInit {
 
   /** Genera un PDF del documento actual a partir del mismo HTML ya usado
    *  para "Descargar" (.html) — se renderiza en un contenedor invisible
-   *  fuera de pantalla y jsPDF.html() (basado en html2canvas) lo rasteriza
-   *  a páginas tamaño carta, igual que ya hace Comercio con sus PDFs, solo
-   *  que ahí construyen el PDF a mano por ser datos tabulares; aquí el
-   *  contenido es HTML libre (imágenes, tablas, código, etc.), así que
-   *  conviene rasterizarlo en vez de reconstruirlo campo por campo. */
-  exportarPdf(documento: Documento): void {
+   *  fuera de pantalla, se rasteriza con html2canvas directamente (no con
+   *  el envoltorio `jsPDF.html()`) y el canvas resultante se recorta en
+   *  franjas del alto de una hoja carta que se insertan como imagen con
+   *  `pdf.addImage`, una por página.
+   *
+   *  Se abandonó `jsPDF.html()` después de varias vueltas: esa función usa
+   *  por dentro un "contexto 2D" propio de jsPDF que traduce las órdenes
+   *  de dibujo de html2canvas directo a operaciones del PDF, envolviendo
+   *  todo en un overlay invisible que la propia librería posiciona sola
+   *  (fijo en `left:-100000px`, sin importar cómo se posicione el
+   *  contenedor que uno le pasa). La consola confirmó que html2canvas SÍ
+   *  renderizaba bien ("Finished rendering", sin errores) — el PDF salía
+   *  en blanco en el paso posterior, dentro de esa caja negra de jsPDF.
+   *  Rasterizar nosotros mismos con html2canvas y pegar el resultado con
+   *  `addImage` es el patrón estándar y evita ese envoltorio por completo.
+   *  Costo: el texto del PDF queda como imagen, no seleccionable/buscable. */
+  async exportarPdf(documento: Documento): Promise<void> {
     const contenedor = document.createElement('div');
     contenedor.style.cssText =
-      'position:fixed; left:-9999px; top:0; width:700px; padding:24px; ' +
+      'position:absolute; left:-9999px; top:0; width:700px; padding:24px; ' +
       'font-family: Helvetica, Arial, sans-serif; color:#111; background:#fff;';
     contenedor.innerHTML =
       `<h1 style="font-size:22px;margin:0 0 4px;">${documento.titulo}</h1>` +
@@ -841,18 +862,44 @@ export class DocumentosListComponent implements OnInit {
     document.body.appendChild(contenedor);
 
     this.toast.info('Generando PDF…');
-    const pdf = new jsPDF({ unit: 'pt', format: 'letter' });
-    pdf.html(contenedor, {
-      x: 24,
-      y: 24,
-      width: 550,
-      windowWidth: 700,
-      autoPaging: 'text',
-      callback: (pdfFinal) => {
-        pdfFinal.save(`${documento.titulo || 'documento'}.pdf`);
-        document.body.removeChild(contenedor);
-      },
-    });
+    try {
+      const canvas = await html2canvas(contenedor, {
+        scale: 2, // más nitidez, ya que el texto queda rasterizado
+        backgroundColor: '#ffffff',
+        useCORS: true,
+      });
+
+      const pdf = new jsPDF({ unit: 'pt', format: 'letter' });
+      const margen = 24;
+      const anchoUtil = pdf.internal.pageSize.getWidth() - margen * 2;
+      const altoUtilPt = pdf.internal.pageSize.getHeight() - margen * 2;
+      const escalaPxAPt = anchoUtil / canvas.width; // puntos PDF por cada píxel del canvas
+      const altoUtilPx = altoUtilPt / escalaPxAPt; // cuántos píxeles del canvas caben en una hoja
+
+      let recortadoPx = 0;
+      let esPrimeraPagina = true;
+      while (recortadoPx < canvas.height) {
+        const alturaFranjaPx = Math.min(altoUtilPx, canvas.height - recortadoPx);
+
+        const franja = document.createElement('canvas');
+        franja.width = canvas.width;
+        franja.height = alturaFranjaPx;
+        franja.getContext('2d')!.drawImage(canvas, 0, recortadoPx, canvas.width, alturaFranjaPx, 0, 0, canvas.width, alturaFranjaPx);
+
+        if (!esPrimeraPagina) pdf.addPage();
+        pdf.addImage(franja.toDataURL('image/png'), 'PNG', margen, margen, anchoUtil, alturaFranjaPx * escalaPxAPt);
+
+        recortadoPx += alturaFranjaPx;
+        esPrimeraPagina = false;
+      }
+
+      pdf.save(`${documento.titulo || 'documento'}.pdf`);
+    } catch (error) {
+      console.error('No se pudo generar el PDF del documento:', error);
+      this.toast.error('No se pudo generar el PDF. Intenta de nuevo.');
+    } finally {
+      document.body.removeChild(contenedor);
+    }
   }
 
   /** Los documentos creados con el editor visual ya guardan HTML; los

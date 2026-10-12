@@ -73,6 +73,68 @@
   </div>
 }
 
+<div class="settings-card">
+  <h2 class="settings-card-title">🧹 Limpiar base local (IndexedDB)</h2>
+  <p class="hint" style="margin:0 0 16px;">
+    Borra TODO lo guardado en el navegador de este dispositivo (IndexedDB): usuarios,
+    proyectos, tickets, presupuesto, catálogos, bitácora, todo. Útil para empezar de
+    cero aquí. No afecta a otros dispositivos ni, si usas la Nube, a Supabase.
+  </p>
+  <p class="form-error" style="margin:0 0 16px;">
+    ⚠️ Esta acción no se puede deshacer. Si no estás seguro, descarga primero un
+    respaldo de lo que tienes ahora.
+  </p>
+  <button type="button" class="btn-danger" [disabled]="limpiandoLocal()" (click)="pedirLimpiezaLocal()">
+    {{ limpiandoLocal() ? 'Limpiando…' : '🧹 Limpiar IndexedDB' }}
+  </button>
+</div>
+
+@if (modoSupabase && esAdmin) {
+  <div class="settings-card">
+    <h2 class="settings-card-title">🧨 Limpiar datos de mi empresa (Nube)</h2>
+    <p class="hint" style="margin:0 0 16px;">
+      Borra TODOS los datos capturados de tu empresa en la Nube: proyectos, tickets,
+      presupuesto, familia, documentos, bitácora, notificaciones, etc. SE CONSERVAN
+      los usuarios, roles y permisos (nadie pierde el acceso) y los catálogos y la
+      apariencia. Afecta a TODOS los usuarios de tu empresa, no solo a ti.
+    </p>
+    <p class="form-error" style="margin:0 0 16px;">
+      ⚠️ Esta acción no se puede deshacer. Para confirmar, escribe <strong>LIMPIAR</strong>
+      en el campo y presiona el botón.
+    </p>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+      <input
+        type="text"
+        placeholder="Escribe LIMPIAR"
+        style="padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--paper-raised); color:var(--text-strong); font-family:inherit; font-size:14px; max-width:220px;"
+        [disabled]="limpiandoNube()"
+        [value]="textoConfirmacionNube()"
+        (input)="textoConfirmacionNube.set($any($event.target).value)"
+      />
+      <button
+        type="button"
+        class="btn-danger"
+        [disabled]="limpiandoNube() || !confirmacionNubeValida()"
+        (click)="confirmarLimpiezaNube()"
+      >
+        {{ limpiandoNube() ? 'Limpiando…' : '🧨 Limpiar datos de mi empresa' }}
+      </button>
+    </div>
+    @if (resultadoLimpiezaNube(); as resultado) {
+      <p class="hint" style="margin:16px 0 0;">
+        ✅ Se borraron {{ resultado.totalRegistros }} registros en total.
+      </p>
+      @if (resultado.tablas.length) {
+        <div style="font-size:12px; margin-top:4px;">
+          @for (t of resultado.tablas; track t.tabla) {
+            <div>{{ t.tabla }}: {{ t.borrados }}</div>
+          }
+        </div>
+      }
+    }
+  </div>
+}
+
 <app-confirm-dialog
   [visible]="respaldoAImportar() !== null"
   titulo="Importar a Supabase"
@@ -93,4 +155,13 @@
   "
   (confirmar)="confirmarRestauracion()"
   (cancelar)="cancelarRestauracion()"
+/>
+
+<app-confirm-dialog
+  [visible]="confirmandoLimpiezaLocal()"
+  titulo="Limpiar IndexedDB"
+  mensaje="¿Borrar TODO lo guardado en este dispositivo? No se puede deshacer."
+  textoConfirmar="Limpiar"
+  (confirmar)="confirmarLimpiezaLocal()"
+  (cancelar)="cancelarLimpiezaLocal()"
 />

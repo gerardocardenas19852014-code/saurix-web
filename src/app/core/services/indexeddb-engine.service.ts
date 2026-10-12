@@ -244,6 +244,27 @@ export class IndexedDbEngineService {
     });
   }
 
+  /**
+   * Borra TODO el contenido de la base local (IndexedDB): vacía cada object
+   * store que exista hoy en una sola transacción. Los stores en sí NO se
+   * eliminan (solo quedan vacíos), así que no hace falta volver a migrar
+   * nada después. Usado por "Panel de Control → Restauración y respaldo"
+   * para el botón "Limpiar IndexedDB" (modo local).
+   */
+  async borrarTodo(): Promise<void> {
+    return this.encolar(async () => {
+      const db = await this.abrir();
+      const nombres = Array.from(db.objectStoreNames);
+      if (!nombres.length) return;
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(nombres, 'readwrite');
+        for (const nombre of nombres) tx.objectStore(nombre).clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    });
+  }
+
   /** Inserta datos de ejemplo solo si el store todavía está vacío (útil para "sembrar" catálogos base). */
   async seedSiVacio<T extends Record<string, unknown>>(entidad: string, filas: T[]): Promise<void> {
     return this.encolar(async () => {

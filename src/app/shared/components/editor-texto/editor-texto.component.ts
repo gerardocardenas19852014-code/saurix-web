@@ -13,6 +13,7 @@ import {
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import Quill from 'quill';
+import QuillTableBetter from 'quill-table-better';
 import hljs from 'highlight.js/lib/core';
 import bash from 'highlight.js/lib/languages/bash';
 import cpp from 'highlight.js/lib/languages/cpp';
@@ -48,6 +49,110 @@ hljs.registerLanguage('plain', plaintext);
 hljs.registerLanguage('python', python);
 hljs.registerLanguage('ruby', ruby);
 hljs.registerLanguage('sql', sql);
+
+// Tablas reales en el editor (insertar/borrar filas y columnas, combinar
+// celdas, redimensionar) — Quill no las trae de fábrica. La librería no
+// incluye español entre sus idiomas predefinidos (language: 'en_US' por
+// default), así que se registra un diccionario propio con las mismas
+// claves que su en_US.ts para que la barra de acciones de la tabla salga
+// en español en vez de en inglés.
+Quill.register({ 'modules/table-better': QuillTableBetter }, true);
+
+const IDIOMA_TABLA_ES = {
+  name: 'es_MX',
+  content: {
+    col: 'Columna',
+    insColL: 'Insertar columna a la izquierda',
+    insColR: 'Insertar columna a la derecha',
+    delCol: 'Eliminar columna',
+    selCol: 'Seleccionar columna',
+    row: 'Fila',
+    headerRow: 'Fila de encabezado',
+    insRowAbv: 'Insertar fila arriba',
+    insRowBlw: 'Insertar fila abajo',
+    delRow: 'Eliminar fila',
+    selRow: 'Seleccionar fila',
+    mCells: 'Combinar celdas',
+    sCell: 'Dividir celda',
+    tblProps: 'Propiedades de la tabla',
+    cellProps: 'Propiedades de la celda',
+    insParaOTbl: 'Insertar párrafo fuera de la tabla',
+    insB4: 'Insertar antes',
+    insAft: 'Insertar después',
+    copyTable: 'Copiar tabla',
+    delTable: 'Eliminar tabla',
+    border: 'Borde',
+    color: 'Color',
+    width: 'Ancho',
+    background: 'Fondo',
+    dims: 'Dimensiones',
+    height: 'Alto',
+    padding: 'Relleno',
+    tblCellTxtAlm: 'Alineación del texto de la celda',
+    alCellTxtL: 'Alinear texto a la izquierda',
+    alCellTxtC: 'Centrar texto',
+    alCellTxtR: 'Alinear texto a la derecha',
+    jusfCellTxt: 'Justificar texto',
+    alCellTxtT: 'Alinear texto arriba',
+    alCellTxtM: 'Alinear texto al medio',
+    alCellTxtB: 'Alinear texto abajo',
+    dimsAlm: 'Dimensiones y alineación',
+    alTblL: 'Alinear tabla a la izquierda',
+    tblC: 'Centrar tabla',
+    alTblR: 'Alinear tabla a la derecha',
+    save: 'Guardar',
+    cancel: 'Cancelar',
+    colorMsg: 'El color no es válido. Prueba "#FF0000", "rgb(255,0,0)" o "red".',
+    dimsMsg: 'El valor no es válido. Prueba "10px", "2em", "2%" o solo "2".',
+    colorPicker: 'Selector de color',
+    removeColor: 'Quitar color',
+    black: 'Negro',
+    dimGrey: 'Gris oscuro',
+    grey: 'Gris',
+    lightGrey: 'Gris claro',
+    white: 'Blanco',
+    red: 'Rojo',
+    orange: 'Naranja',
+    yellow: 'Amarillo',
+    lightGreen: 'Verde claro',
+    green: 'Verde',
+    aquamarine: 'Aguamarina',
+    turquoise: 'Turquesa',
+    lightBlue: 'Azul claro',
+    blue: 'Azul',
+    purple: 'Morado',
+  },
+};
+
+// Línea divisoria (➖) — Quill no trae un botón para insertar una <hr>, así
+// que se registra un blot de bloque propio ('divider') que renderiza una
+// <hr> real; el estilo (línea negra) vive en `.ql-editor hr` / `.page-body
+// hr` dentro de styles.scss, para que se vea igual al editar y al ver.
+const BlockEmbedBlot = Quill.import('blots/block/embed') as any;
+class DividerBlot extends BlockEmbedBlot {
+  static blotName = 'divider';
+  static tagName = 'hr';
+}
+Quill.register(DividerBlot);
+
+// Tamaño de letra por LÍNEA (no solo del texto seleccionado) — el 'size'
+// que trae Quill de fábrica es un formato de ALCANCE INLINE (clase sobre
+// un <span>, ver node_modules/quill/formats/size.js): agranda el texto
+// pero no la propia etiqueta <li>/<p> de la línea. El "1." de una lista
+// numerada lo dibuja Quill con un ::before sobre un <span class="ql-ui">
+// hermano — fuera de ese <span> de texto — así que nunca heredaba el
+// tamaño inline (por eso "Grande"/"Enorme" agrandaba el texto pero el
+// número se quedaba normal). Se reemplaza por un formato de ALCANCE DE
+// BLOQUE (mismo criterio que usa el propio 'align' de Quill, ver
+// formats/align.js): se aplica como `style="font-size:…"` directo sobre
+// la etiqueta de la línea, así que el número — descendiente de esa
+// etiqueta — hereda el tamaño igual que el texto.
+const { StyleAttributor, Scope } = Quill.import('parchment');
+const TamanoLineaStyle = new StyleAttributor('size', 'font-size', {
+  scope: Scope.BLOCK,
+  whitelist: ['0.85em', '1.5em', '2.5em'],
+});
+Quill.register({ 'formats/size': TamanoLineaStyle }, true);
 
 const PESO_MAXIMO_ARCHIVO = 4 * 1024 * 1024; // 4 MB — mismo límite que app-adjuntos-panel.
 
@@ -157,29 +262,48 @@ export class EditorTextoComponent implements ControlValueAccessor, AfterViewInit
         toolbar: {
           container: [
             [{ header: [1, 2, 3, false] }],
+            [{ size: ['0.85em', false, '1.5em', '2.5em'] }],
             ['bold', 'italic', 'underline', 'strike'],
             [{ color: [] }, { background: [] }],
+            [{ align: [] }],
             [{ list: 'ordered' }, { list: 'bullet' }],
             ['blockquote', 'code-block'],
+            ['divider'],
             ['link', 'image', 'archivo', 'wikidoc'],
+            ['table-better'],
             ['clean'],
           ],
           handlers: {
             image: () => this.insertarImagen(),
             archivo: () => this.insertarArchivo(),
             wikidoc: () => this.abrirPickerEnlace(),
+            divider: () => this.insertarLineaDivisoria(),
           },
         },
         // Colorea los bloques de código (botón </> de la barra) según el
         // lenguaje — cada bloque trae su propio selector de lenguaje (incluye
         // SQL) y se recolorea solo mientras se escribe.
         syntax: { hljs },
+        // El formato de tabla básico que trae Quill de fábrica (solo
+        // renderiza, sin UI para editar) se desactiva a favor del módulo
+        // 'table-better' de abajo, que sí la trae completa.
+        table: false,
+        'table-better': {
+          language: IDIOMA_TABLA_ES,
+          menus: ['column', 'row', 'merge', 'table', 'cell', 'wrap', 'delete'],
+          toolbarTable: true,
+        },
+        // 'table-better' necesita estos atajos de teclado propios para que
+        // las flechas/Tab/Enter se comporten bien dentro de una tabla.
+        keyboard: {
+          bindings: QuillTableBetter.keyboardBindings,
+        },
       },
     });
 
     if (this.valorPendiente) {
       this.aplicandoValorInterno = true;
-      this.quill.clipboard.dangerouslyPasteHTML(this.valorPendiente);
+      this.cargarHtml(this.valorPendiente);
       this.aplicandoValorInterno = false;
     }
 
@@ -203,8 +327,24 @@ export class EditorTextoComponent implements ControlValueAccessor, AfterViewInit
     if (!this.quill) return;
     this.aplicandoValorInterno = true;
     this.quill.setText('');
-    this.quill.clipboard.dangerouslyPasteHTML(this.valorPendiente);
+    this.cargarHtml(this.valorPendiente);
     this.aplicandoValorInterno = false;
+  }
+
+  /** Carga HTML guardado dentro del editor. A propósito NO usa
+   *  `quill.clipboard.dangerouslyPasteHTML(html)` (la forma de un solo
+   *  argumento) porque esa variante llama a `quill.setContents()` por
+   *  dentro (ver node_modules/quill/modules/clipboard.js), y el propio
+   *  README de `quill-table-better` advierte que `setContents` deja las
+   *  tablas mal renderizadas — es justo el bug de "al editar/ver no se ve
+   *  la tabla que guardé". La forma de dos argumentos
+   *  (`dangerouslyPasteHTML(index, html)`) usa `quill.updateContents()`
+   *  en vez de `setContents()`, que sí reconstruye las tablas bien; con
+   *  `index: 0` sobre un editor recién vaciado equivale a "reemplazar todo
+   *  el contenido", el mismo efecto que se buscaba con la forma de un
+   *  argumento. */
+  private cargarHtml(html: string): void {
+    this.quill!.clipboard.dangerouslyPasteHTML(0, html, 'silent');
   }
 
   registerOnChange(fn: (valor: string) => void): void {
@@ -252,6 +392,16 @@ export class EditorTextoComponent implements ControlValueAccessor, AfterViewInit
     } catch {
       this.toast.error('No se pudo leer el archivo.');
     }
+  }
+
+  /** Inserta una línea divisoria horizontal (<hr>) en la posición del
+   *  cursor — botón propio "➖" de la barra (ver blot 'divider' arriba). */
+  private insertarLineaDivisoria(): void {
+    if (!this.quill) return;
+    const rango = this.quill.getSelection(true);
+    const indice = rango ? rango.index : this.quill.getLength();
+    this.quill.insertEmbed(indice, 'divider', true, 'user');
+    this.quill.setSelection(indice + 1, 0, 'user');
   }
 
   protected abrirPickerEnlace(): void {

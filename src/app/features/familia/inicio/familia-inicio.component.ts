@@ -69,6 +69,13 @@ const GRUPOS: GrupoModulo[] = [
         titulo: 'Tareas del hogar',
         descripcion: 'Quehaceres con responsable y frecuencia.',
       },
+      {
+        ruta: 'directorio',
+        icono: '📇',
+        color: 'indigo',
+        titulo: 'Directorio familiar',
+        descripcion: 'Contactos que no pertenecen a nadie en particular: médico, escuela, veterinario, aseguradora, mantenimiento del hogar…',
+      },
     ],
   },
   {
@@ -115,6 +122,13 @@ const GRUPOS: GrupoModulo[] = [
         color: 'amber',
         titulo: 'Proveedores de salud',
         descripcion: 'Médicos, clínicas y hospitales que se pueden elegir al capturar una cita médica.',
+      },
+      {
+        ruta: 'categoria-contacto',
+        icono: '📇',
+        color: 'amber',
+        titulo: 'Categoría de contacto',
+        descripcion: 'Catálogo de categorías para el Directorio familiar.',
       },
     ],
   },

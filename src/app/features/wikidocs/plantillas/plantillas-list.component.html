@@ -45,7 +45,7 @@
     <form class="modal-box modal-dialog modal-content plantilla-modal" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
       <h3 class="modal-title mb-3">{{ registroEnEdicion() ? 'Editar plantilla' : 'Nueva plantilla' }}</h3>
 
-      <div class="edit-form">
+      <div class="edit-form edit-form--plantilla">
         <label class="floating-field full-span">
           <span>Nombre <b>*</b></span>
           <input type="text" class="form-control pill-control" formControlName="nombre" placeholder=" " aria-label="Nombre" />

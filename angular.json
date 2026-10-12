@@ -34,6 +34,7 @@
             "styles": [
               "node_modules/bootstrap/dist/css/bootstrap.min.css",
               "node_modules/quill/dist/quill.snow.css",
+              "node_modules/quill-table-better/dist/quill-table-better.css",
               "src/styles.scss"
             ],
             "optimization": {

@@ -1,5 +1,21 @@
 /* Estilos en src/styles.scss (.page-header, .breadcrumbs, .grid-table, .page-body, .page-meta, .tab-bar, .edit-form). */
 
+/* `.edit-form` global se limita a 760px (bueno para formularios cortos
+ *  en otras pantallas), pero aquí adentro vive el editor de "Contenido"
+ *  (app-editor-texto / Quill), que puede tener documentos anchos —
+ *  tablas, plantillas tipo "Solicitud de Cambio" — y con 760px quedaban
+ *  aplastados aunque `.content` ya esté ampliado (ver el effect
+ *  `_anchoSegunVista` en el .ts). `max-width: none` (no un número fijo)
+ *  porque el pedido fue usar TODO el espacio en blanco disponible, no
+ *  solo ensancharlo un poco — así ocupa el 100% de `.content`, que a su
+ *  vez ya quedó en 1600px por el data-wide='grid' del effect. Este
+ *  modificador solo aplica en esta pantalla (encapsulado por Angular),
+ *  así que no afecta ningún otro `.edit-form` del resto de la app. */
+.edit-form--documento {
+  max-width: none;
+}
+
+
 /* Pestaña "Referencias" (trazabilidad) — ver documento.model.ts. */
 .wikidoc-referencias {
   display: flex;
