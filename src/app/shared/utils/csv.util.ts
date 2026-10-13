@@ -35,3 +35,63 @@ export function exportarCsv<T extends Record<string, unknown>>(
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/**
+ * Parsea un CSV (separado por coma, comillas dobles para campos con coma o
+ * salto de línea, BOM opcional al inicio) a un arreglo de arreglos de texto
+ * — la fila 0 son los encabezados tal cual vienen en el archivo. No asume
+ * nada sobre las columnas; quien llama decide cómo mapearlas a un modelo.
+ * Pensado para leer de vuelta un archivo generado por `exportarCsv()` (o
+ * exportado desde Excel/Google Sheets), para la importación masiva de
+ * Productos (ver productos.component.ts).
+ */
+export function parsearCsv(texto: string): string[][] {
+  const limpio = texto.replace(/^\uFEFF/, ''); // quita el BOM si viene
+  const filas: string[][] = [];
+  let fila: string[] = [];
+  let campo = '';
+  let entreComillas = false;
+
+  for (let i = 0; i < limpio.length; i++) {
+    const c = limpio[i];
+    if (entreComillas) {
+      if (c === '"') {
+        if (limpio[i + 1] === '"') {
+          campo += '"';
+          i++;
+        } else {
+          entreComillas = false;
+        }
+      } else {
+        campo += c;
+      }
+      continue;
+    }
+    if (c === '"') {
+      entreComillas = true;
+      continue;
+    }
+    if (c === ',') {
+      fila.push(campo);
+      campo = '';
+      continue;
+    }
+    if (c === '\r') continue;
+    if (c === '\n') {
+      fila.push(campo);
+      filas.push(fila);
+      fila = [];
+      campo = '';
+      continue;
+    }
+    campo += c;
+  }
+  // Última fila/campo si el archivo no termina con salto de línea.
+  if (campo.length > 0 || fila.length > 0) {
+    fila.push(campo);
+    filas.push(fila);
+  }
+
+  // Descarta renglones totalmente vacíos (líneas en blanco al final del archivo).
+  return filas.filter((f) => f.some((v) => v.trim() !== ''));
+}

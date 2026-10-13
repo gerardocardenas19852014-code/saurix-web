@@ -1,0 +1,81 @@
+<div class="page-header">
+  <div>
+    <button type="button" class="btn-secondary small" (click)="volver()" style="margin-bottom: 8px;">← Volver</button>
+    <h1>{{ tipoListaPrecio()?.nombre ?? 'Lista de precios' }}</h1>
+  </div>
+</div>
+
+<p class="hint" style="margin-top:-6px;">
+  Deja el precio en blanco para que ese producto use su precio base (columna "Precio base", de solo lectura). Solo las filas con cambios se guardan al hacer clic en "Guardar cambios".
+</p>
+
+<div class="grid-toolbar">
+  <div class="grid-filter">
+    <input
+      type="search"
+      placeholder="Buscar por nombre o código…"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value)"
+    />
+  </div>
+
+  @if (filasModificadas().length > 0) {
+    <span class="hint" style="margin:0 10px;">
+      ✏️ {{ filasModificadas().length }} cambio{{ filasModificadas().length === 1 ? '' : 's' }} sin guardar
+    </span>
+    <button type="button" class="btn-secondary small" [disabled]="guardando()" (click)="descartarCambios()">Descartar</button>
+    <button type="button" class="btn-primary small" [disabled]="guardando()" (click)="guardarCambios()">
+      {{ guardando() ? progresoGuardado() || 'Guardando…' : 'Guardar cambios' }}
+    </button>
+  }
+</div>
+
+<div class="grid-table-scroll">
+  <table class="grid-table">
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Nombre</th>
+        <th>Categoría</th>
+        <th>Precio base</th>
+        <th>Precio en esta lista</th>
+      </tr>
+    </thead>
+    <tbody>
+      @if (cargando()) {
+        <tr>
+          <td colspan="5"><p class="empty">Cargando…</p></td>
+        </tr>
+      } @else {
+        @for (fila of filasFiltradas(); track fila.productoId) {
+          <tr>
+            <td data-label="Código">{{ fila.codigo || '—' }}</td>
+            <td data-label="Nombre">{{ fila.nombre }}</td>
+            <td data-label="Categoría">{{ fila.categoriaNombre }}</td>
+            <td data-label="Precio base">{{ formatMoneda(fila.precioBase) }}</td>
+            <td data-label="Precio en esta lista">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                class="precio-lista-input"
+                [class.precio-lista-input-modificado]="estaModificada(fila)"
+                [placeholder]="formatMoneda(fila.precioBase)"
+                [value]="fila.precioTexto"
+                (input)="cambiarPrecio(fila.productoId, $any($event.target).value)"
+              />
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="5">
+              <div class="empty-state-block">
+                <p>No hay productos activos para asignarles precio. Da de alta productos en Inventario → Productos y servicios.</p>
+              </div>
+            </td>
+          </tr>
+        }
+      }
+    </tbody>
+  </table>
+</div>

@@ -269,11 +269,13 @@ export class ShellComponent implements OnDestroy {
     this.observadorModales.observe(document.body, { childList: true, subtree: true });
   }
 
-  /** SLA de tickets + alertas de tarjeta (uso ≥90%, recordatorio de pago) — mismo
-   *  intervalo, así ninguna pantalla en particular necesita estar abierta. */
+  /** SLA de tickets + alertas de tarjeta (uso ≥90%, recordatorio de pago) + stock
+   *  bajo de Inventario — mismo intervalo, así ninguna pantalla en particular
+   *  necesita estar abierta. */
   private revisarNotificacionesPeriodicas(): void {
     void this.notificacionesService.revisarSlaTickets();
     void this.notificacionesService.revisarAlertasTarjetas();
+    void this.notificacionesService.revisarAlertasStockBajo();
   }
 
   ngOnDestroy(): void {
@@ -317,6 +319,13 @@ export class ShellComponent implements OnDestroy {
     '/proyectos/tipos-ticket',
     '/proyectos/prioridades',
     '/proyectos/modulos',
+    '/inventario/productos',
+    '/inventario/valor-stock',
+    '/inventario/movimientos-bodega',
+    '/inventario/bodegas',
+    '/inventario/categorias-producto',
+    '/inventario/unidades-medida',
+    '/inventario/tipos-lista-precio',
   ];
   protected readonly contenidoAncho = computed(() =>
     ShellComponent.RUTAS_ANCHO_COMPLETO.some((ruta) => this.urlActual().startsWith(ruta)),
@@ -357,6 +366,7 @@ export class ShellComponent implements OnDestroy {
       'familia:Hogar',
       'familia:Catálogos',
       'wikidocs:Catálogos',
+      'inventario:Catálogos',
     ]),
   );
 
@@ -409,7 +419,7 @@ export class ShellComponent implements OnDestroy {
   }
 
   protected readonly moduloActivo = computed<
-    'seguridad' | 'wikidocs' | 'presupuesto' | 'proyectos' | 'panel-control' | 'familia' | null
+    'seguridad' | 'wikidocs' | 'presupuesto' | 'proyectos' | 'panel-control' | 'familia' | 'inventario' | null
   >(() => {
     const url = this.urlActual();
     if (url.startsWith('/seguridad')) return 'seguridad';
@@ -418,6 +428,7 @@ export class ShellComponent implements OnDestroy {
     if (url.startsWith('/proyectos')) return 'proyectos';
     if (url.startsWith('/panel-control')) return 'panel-control';
     if (url.startsWith('/familia')) return 'familia';
+    if (url.startsWith('/inventario')) return 'inventario';
     return null;
   });
 

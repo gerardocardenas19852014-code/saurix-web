@@ -83,4 +83,16 @@ export const DESTINOS: DestinoPaleta[] = [
   { label: 'Tipo de sangre', grupo: 'Familia', ruta: '/familia/tipo-sangre', icono: '🩸' },
   { label: 'Proveedores de salud', grupo: 'Familia', ruta: '/familia/proveedor-salud', icono: '🏥' },
   { label: 'Categoría de contacto', grupo: 'Familia', ruta: '/familia/categoria-contacto', icono: '📇' },
+
+  { label: 'Inicio', grupo: 'Inventario', ruta: '/inventario', icono: '⌂' },
+  { label: 'Productos y servicios', grupo: 'Inventario', ruta: '/inventario/productos', icono: '📦' },
+  { label: 'Valor de stock', grupo: 'Inventario', ruta: '/inventario/valor-stock', icono: '📊' },
+  { label: 'Movimientos entre bodegas', grupo: 'Inventario', ruta: '/inventario/movimientos-bodega', icono: '🚚' },
+  { label: 'Sugerencia de reposición', grupo: 'Inventario', ruta: '/inventario/sugerencia-reposicion', icono: '🧾' },
+  { label: 'Conteo físico', grupo: 'Inventario', ruta: '/inventario/conteo-fisico', icono: '🧮' },
+  { label: 'Bodegas', grupo: 'Inventario', ruta: '/inventario/bodegas', icono: '🏬' },
+  { label: 'Proveedores', grupo: 'Inventario', ruta: '/inventario/proveedores', icono: '🚛' },
+  { label: 'Categorías de producto', grupo: 'Inventario', ruta: '/inventario/categorias-producto', icono: '🏷️' },
+  { label: 'Unidades de medida', grupo: 'Inventario', ruta: '/inventario/unidades-medida', icono: '📏' },
+  { label: 'Tipos de lista de precio', grupo: 'Inventario', ruta: '/inventario/tipos-lista-precio', icono: '💲' },
 ];

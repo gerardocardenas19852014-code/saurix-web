@@ -1,0 +1,76 @@
+<div class="page-header">
+  <h1>Proveedores</h1>
+</div>
+
+<div class="grid-toolbar">
+  <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo</button>
+
+  <div class="grid-filter">
+    <input
+      type="search"
+      placeholder="Buscar por nombre…"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value); cargar()"
+    />
+    <label class="board-filter-field board-filter-checkbox" style="margin:0;">
+      <input type="checkbox" [checked]="mostrarInactivos()" (change)="mostrarInactivos.set($any($event.target).checked)" />
+      Mostrar inactivos
+    </label>
+  </div>
+</div>
+
+<app-data-table
+  [columnas]="columnas"
+  [filas]="proveedoresFiltrados()"
+  [cargando]="cargando()"
+  (editar)="editar($event)"
+  (eliminar)="pedirEliminar($event)"
+/>
+
+@if (modalAbierto()) {
+  <div class="modal-overlay show" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
+    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3>{{ proveedorEnEdicion() ? 'Editar proveedor' : 'Nuevo proveedor' }}</h3>
+
+      <div class="edit-form" style="margin-bottom: 18px;">
+        <label>
+          Nombre
+          <input type="text" formControlName="nombre" />
+        </label>
+
+        <label>
+          Contacto (opcional)
+          <input type="text" formControlName="contacto" placeholder="Persona de contacto" />
+        </label>
+
+        <label>
+          Teléfono (opcional)
+          <input type="text" formControlName="telefono" />
+        </label>
+
+        <label>
+          Correo (opcional)
+          <input type="email" formControlName="correo" />
+        </label>
+
+        <label class="checkbox-inline">
+          <input type="checkbox" formControlName="activo" />
+          Activo
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="proveedorAEliminar() !== null"
+  titulo="Eliminar proveedor"
+  [mensaje]="'¿Eliminar ' + (proveedorAEliminar()?.nombre ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="proveedorAEliminar.set(null)"
+/>

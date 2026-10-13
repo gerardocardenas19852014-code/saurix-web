@@ -1,0 +1,74 @@
+<div class="page-header">
+  <h1>Tipos de lista de precio</h1>
+</div>
+
+<div class="grid-toolbar">
+  <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo</button>
+
+  <div class="grid-filter">
+    <input
+      type="search"
+      placeholder="Buscar por nombre…"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value); cargar()"
+    />
+    <label class="board-filter-field board-filter-checkbox" style="margin:0;">
+      <input type="checkbox" [checked]="mostrarInactivos()" (change)="mostrarInactivos.set($any($event.target).checked)" />
+      Mostrar inactivos
+    </label>
+  </div>
+</div>
+
+<app-data-table
+  [columnas]="columnas"
+  [filas]="tiposFiltrados()"
+  [cargando]="cargando()"
+  accionExtraEtiqueta="Ver precios"
+  accionExtraTitulo="Asignar el precio de cada producto en esta lista"
+  (accionExtra)="verPrecios($event)"
+  (editar)="editar($event)"
+  (eliminar)="pedirEliminar($event)"
+/>
+
+@if (modalAbierto()) {
+  <div class="modal-overlay show" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
+    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3>{{ tipoEnEdicion() ? 'Editar tipo' : 'Nuevo tipo' }}</h3>
+
+      <div class="edit-form" style="margin-bottom: 18px;">
+        <label>
+          Nombre
+          <input type="text" formControlName="nombre" placeholder="Ej. Lista general, Mayoreo, Distribuidor…" />
+        </label>
+
+        <label>
+          Clave
+          <input type="text" formControlName="clave" />
+        </label>
+
+        <label>
+          Descripción (opcional)
+          <textarea formControlName="descripcion" rows="2"></textarea>
+        </label>
+
+        <label class="checkbox-inline">
+          <input type="checkbox" formControlName="activo" />
+          Activo
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="tipoAEliminar() !== null"
+  titulo="Eliminar tipo"
+  [mensaje]="'¿Eliminar ' + (tipoAEliminar()?.nombre ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="tipoAEliminar.set(null)"
+/>

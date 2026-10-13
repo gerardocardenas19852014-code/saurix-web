@@ -1,0 +1,81 @@
+<div class="page-header">
+  <h1>Conteo físico / cuadre de inventario</h1>
+</div>
+
+<p class="hint" style="margin-top:-6px;">
+  Elige una bodega, captura lo que realmente contaste por producto y guarda el cuadre: el sistema
+  calcula la diferencia contra ExistenciaBodega y registra el ajuste que haga falta (Entrada si contaste
+  de más, Salida/Ajuste si contaste de menos) — queda igual en el historial de Movimientos entre bodegas.
+</p>
+
+<div class="board-filters" style="margin:18px 0;">
+  <label class="board-filter-field">
+    Bodega
+    <select [value]="bodegaId()" (change)="seleccionarBodega(+$any($event.target).value)">
+      <option [value]="0">Elige una bodega…</option>
+      @for (b of bodegasActivas(); track b.id) {
+        <option [value]="b.id">{{ b.nombre }}</option>
+      }
+    </select>
+  </label>
+</div>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else if (bodegaId() === 0) {
+  <div class="empty-state-block">
+    <p>Elige una bodega para empezar el conteo.</p>
+  </div>
+} @else if (filas().length === 0) {
+  <div class="empty-state-block">
+    <p>Esta bodega todavía no tiene ningún producto asignado — asígnalo primero desde Movimientos entre bodegas.</p>
+  </div>
+} @else {
+  <div class="grid-table-scroll">
+    <table class="grid-table">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Producto</th>
+          <th>Existencia en sistema</th>
+          <th>Cantidad contada</th>
+          <th>Diferencia</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (fila of filas(); track fila.productoId) {
+          <tr>
+            <td data-label="Código">{{ fila.codigo || '—' }}</td>
+            <td data-label="Producto">{{ fila.nombre }}</td>
+            <td data-label="Existencia en sistema">{{ fila.sistema }}</td>
+            <td data-label="Cantidad contada">
+              <input
+                type="number"
+                step="1"
+                min="0"
+                style="width:90px;"
+                [value]="contadoDe(fila)"
+                (input)="actualizarContado(fila.productoId, $any($event.target).value)"
+              />
+            </td>
+            <td data-label="Diferencia">
+              @if (diferencia(fila) > 0) {
+                <span class="tag" style="background:var(--client-soft); color:var(--client);">+{{ diferencia(fila) }}</span>
+              } @else if (diferencia(fila) < 0) {
+                <span class="tag" style="background:var(--danger-soft); color:var(--danger);">{{ diferencia(fila) }}</span>
+              } @else {
+                <span class="hint">sin diferencia</span>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="modal-actions" style="justify-content:flex-start; margin-top:18px;">
+    <button type="button" class="btn-primary" [disabled]="guardando() || !hayDiferencias()" (click)="guardarCuadre()">
+      {{ guardando() ? 'Guardando…' : 'Guardar cuadre (' + totalDiferencias() + ' ajuste' + (totalDiferencias() === 1 ? '' : 's') + ')' }}
+    </button>
+  </div>
+}

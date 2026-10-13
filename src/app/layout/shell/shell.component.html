@@ -178,6 +178,29 @@
         }
       </nav>
     }
+
+    @if (moduloActivo() === 'inventario') {
+      <span class="sidebar-label">Inventario</span>
+      <nav class="sidebar-nav" aria-label="Menú de inventario">
+        <a routerLink="/inventario" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
+        <a routerLink="/inventario/productos" routerLinkActive="active">📦 Productos y servicios</a>
+        <a routerLink="/inventario/valor-stock" routerLinkActive="active">📊 Valor de stock</a>
+        <a routerLink="/inventario/movimientos-bodega" routerLinkActive="active">🚚 Movimientos entre bodegas</a>
+        <a routerLink="/inventario/sugerencia-reposicion" routerLinkActive="active">🧾 Sugerencia de reposición</a>
+        <a routerLink="/inventario/conteo-fisico" routerLinkActive="active">🧮 Conteo físico</a>
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('inventario', 'Catálogos')">
+          <span>{{ grupoAbierto('inventario', 'Catálogos') ? '▾' : '▸' }} Catálogos</span>
+        </button>
+        @if (grupoAbierto('inventario', 'Catálogos')) {
+          <a routerLink="/inventario/bodegas" routerLinkActive="active">🏬 Bodegas</a>
+          <a routerLink="/inventario/proveedores" routerLinkActive="active">🚛 Proveedores</a>
+          <a routerLink="/inventario/categorias-producto" routerLinkActive="active">🏷️ Categorías de producto</a>
+          <a routerLink="/inventario/unidades-medida" routerLinkActive="active">📏 Unidades de medida</a>
+          <a routerLink="/inventario/tipos-lista-precio" routerLinkActive="active">💲 Tipos de lista de precio</a>
+        }
+      </nav>
+    }
   </aside>
 
   <div class="main-area">

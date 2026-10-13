@@ -53,6 +53,12 @@ export const routes: Routes = [
         path: 'familia',
         loadChildren: () => import('./features/familia/familia.routes').then((m) => m.FAMILIA_ROUTES),
       },
+
+      {
+        path: 'inventario',
+        loadChildren: () =>
+          import('./features/inventario/inventario.routes').then((m) => m.INVENTARIO_ROUTES),
+      },
     ],
   },
   { path: '**', redirectTo: 'modulos' },

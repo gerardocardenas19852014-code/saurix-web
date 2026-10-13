@@ -1041,14 +1041,42 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
 
 .grid-toolbar { display: flex; align-items: center; gap: 10px; row-gap: 10px; margin: 4px 0 18px; flex-wrap: wrap; padding: 12px 16px; background: var(--paper-raised); border: 1px solid var(--line); border-bottom: 1px solid var(--line); border-radius: 10px 10px 0 0; }
 .toolbar-group { display: flex; align-items: center; gap: 6px; }
-.grid-filter { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-wrap: wrap; font-size: 13px; color: var(--ink-soft); font-family: 'Montserrat', sans-serif; min-width: 0; }
-.grid-filter input {
+.grid-filter { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-wrap: nowrap; font-size: 13px; color: var(--ink-soft); font-family: 'Montserrat', sans-serif; min-width: 0; }
+/* flex-wrap:nowrap de arriba evita que, al convivir con el botón "+ Nuevo"
+   dentro de .grid-toolbar, el buscador y el checkbox "Mostrar inactivos"
+   se partan en 2 líneas internas incluso con ancho de sobra disponible
+   (bug de sizing de flexbox: un flex-item con flex-wrap:wrap propio, sin
+   flex-basis fijo y empujado por margin-left:auto, puede resolver un ancho
+   menor al de su contenido). En vez de eso, si de plano no cabe, ahora
+   .grid-toolbar (que sí tiene flex-wrap:wrap) baja TODO .grid-filter junto
+   a una nueva línea — mucho más limpio que partirlo a la mitad. En móvil
+   sí necesitamos que el buscador y el checkbox se apilen (ver media query
+   de abajo), así que ahí se restaura flex-wrap:wrap. */
+/* :not([type='checkbox']) es necesario: .grid-filter a veces envuelve,
+   ademas del <input type="search"> de busqueda, el checkbox de "Mostrar
+   inactivos" (dentro de .board-filter-checkbox). Sin esta exclusion, el
+   min-width:140px/height:36px de abajo (pensados para el buscador) tambien
+   se le aplicaban AL CHECKBOX (flex-basis/min-width/max-width son
+   propiedades distintas a "width", así que el width:auto de
+   .board-filter-checkbox no bastaba para evitarlo) y lo estiraban a un
+   cuadro gigante de 140x36 en vez de su tamaño nativo chiquito. */
+.grid-filter input:not([type='checkbox']) {
   padding: 8px 14px; border: 1px solid var(--line); border-radius: 20px; height: 36px; box-sizing: border-box;
   font-family: inherit; font-size: 13px; background: var(--paper); color: var(--text-strong);
   flex: 1 1 200px; min-width: 140px; max-width: 260px;
   transition: border-color .15s ease, box-shadow .15s ease;
 }
-.grid-filter input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.grid-filter input:not([type='checkbox']):focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+/* Cuando .grid-filter tiene un hermano antes (el boton "+ Nuevo", o un
+   .toolbar-group de iconos) dentro del mismo .grid-toolbar, lo agrupamos
+   pegado a la izquierda junto a ese boton (estilo Familia/Parentesco) en
+   vez de empujarlo todo a la derecha con el margin-left:auto de la regla
+   base. Cuando .grid-filter es el UNICO hijo de .grid-toolbar (pantallas
+   operativas como Documentos, donde el boton vive aparte en page-header),
+   no hay hermano anterior que matchee "* + .grid-filter", así que ahí
+   conserva su margin-left:auto de siempre (se sigue viendo igual). */
+.grid-toolbar > * + .grid-filter { margin-left: 0; }
+
 .toolbar-icon-button {
   width: 36px; height: 36px; padding: 0; border-radius: 50%; flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
@@ -1089,8 +1117,8 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
 .pagesize-select { padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); color: var(--text-strong); font-family: inherit; font-size: 14px; flex-shrink: 0; }
 
 @media (max-width: 720px) {
-  .grid-filter { margin-left: 0; width: 100%; }
-  .grid-filter input { max-width: none; }
+  .grid-filter { margin-left: 0; width: 100%; flex-wrap: wrap; }
+  .grid-filter input:not([type='checkbox']) { max-width: none; }
 }
 
 .grid-table-scroll { overflow-x: auto; border-radius: 0 0 10px 10px; }

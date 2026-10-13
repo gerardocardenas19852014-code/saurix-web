@@ -1,0 +1,71 @@
+<div class="page-header">
+  <h1>Sugerencia de reposición</h1>
+</div>
+
+<p class="hint" style="margin-top:-6px;">
+  Productos físicos activos cuya existencia ya está por debajo de su nivel mínimo. La cantidad sugerida
+  busca dejar la existencia en el doble del mínimo, no solo igualarlo, para no volver a caer en alerta
+  con la primera salida. Esta pantalla no registra ningún movimiento — cuando llegue la mercancía,
+  regístrala como Entrada en Movimientos entre bodegas.
+</p>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else if (filas().length === 0) {
+  <div class="empty-state-block">
+    <p>✅ Ningún producto está por debajo de su nivel mínimo en este momento.</p>
+  </div>
+} @else {
+  <div class="dashboard-stats">
+    <div class="dashboard-stat-card dashboard-stat-warning">
+      <div class="num">{{ filas().length }}</div>
+      <div class="label">Productos por reabastecer</div>
+    </div>
+  </div>
+
+  @if (opcionesProveedorFiltro().length > 0) {
+    <div class="board-filters" style="margin:18px 0;">
+      <label class="board-filter-field">
+        Proveedor
+        <select [value]="filtroProveedorId()" (change)="filtroProveedorId.set(+$any($event.target).value)">
+          <option [value]="0">Todos</option>
+          @for (p of opcionesProveedorFiltro(); track p.id) {
+            <option [value]="p.id">{{ p.nombre }}</option>
+          }
+        </select>
+      </label>
+    </div>
+  }
+
+  <div class="grid-table-scroll">
+    <table class="grid-table">
+      <thead>
+        <tr>
+          <th>Proveedor</th>
+          <th>Código</th>
+          <th>Producto</th>
+          <th>Existencia</th>
+          <th>Mínimo</th>
+          <th>Sugerido a comprar</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (fila of filasFiltradas(); track fila.productoId) {
+          <tr>
+            <td data-label="Proveedor">
+              {{ fila.proveedorNombre }}
+              @if (!fila.proveedorId) {
+                <span class="tag" style="background:var(--amber-soft); color:var(--amber); margin-left:6px;">Sin proveedor</span>
+              }
+            </td>
+            <td data-label="Código">{{ fila.codigo || '—' }}</td>
+            <td data-label="Producto">{{ fila.nombre }}</td>
+            <td data-label="Existencia">{{ fila.existencia }}</td>
+            <td data-label="Mínimo">{{ fila.nivelMinimo }}</td>
+            <td data-label="Sugerido a comprar"><strong>{{ fila.sugerida }}</strong></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

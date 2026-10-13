@@ -1,0 +1,199 @@
+<div class="page-header">
+  <h1>Movimientos entre bodegas</h1>
+  <div class="page-actions">
+    <button type="button" class="toolbar-btn" (click)="nuevoMovimiento('traspaso')">+ Nuevo movimiento</button>
+  </div>
+</div>
+
+<p class="hint" style="margin-top:-6px;">
+  Registra entradas (mercancía nueva, o la asignación inicial de la existencia que ya tenía un
+  producto), traspasos de cantidad entre bodegas, y salidas/ajustes (mermas, daños, correcciones de
+  conteo). Cada movimiento queda en el historial de abajo.
+</p>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else {
+  @if (productosSinAsignar().length > 0) {
+    <div class="empty-state-block" style="text-align:left; margin-bottom:28px;">
+      <p>
+        <strong>{{ productosSinAsignar().length }}</strong>
+        producto{{ productosSinAsignar().length === 1 ? '' : 's' }} con existencia heredada que todavía
+        no se asignó a ninguna bodega — se sigue viendo normal en Productos y Valor de stock, pero no
+        se puede traspasar ni dar de salida hasta asignarlo.
+      </p>
+      <div class="grid-table-scroll">
+        <table class="grid-table">
+          <thead><tr><th>Código</th><th>Producto</th><th>Existencia</th><th></th></tr></thead>
+          <tbody>
+            @for (fila of productosSinAsignar(); track fila.productoId) {
+              <tr>
+                <td data-label="Código">{{ fila.codigo || '—' }}</td>
+                <td data-label="Producto">{{ fila.nombre }}</td>
+                <td data-label="Existencia">{{ fila.cantidad }}</td>
+                <td><button type="button" class="btn-secondary small" (click)="asignarABodega(fila)">Asignar a bodega</button></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+
+  <h2 class="catalog-group-title">Existencia actual por bodega</h2>
+  @if (filasExistencia().length === 0) {
+    <p class="hint" style="margin:0 0 28px;">Todavía no hay existencia asignada a ninguna bodega.</p>
+  } @else {
+    <div class="grid-table-scroll" style="margin-bottom:28px;">
+      <table class="grid-table">
+        <thead><tr><th>Producto</th><th>Bodega</th><th>Existencia</th></tr></thead>
+        <tbody>
+          @for (fila of filasExistencia(); track fila.id) {
+            <tr>
+              <td data-label="Producto">{{ fila.productoNombre }}</td>
+              <td data-label="Bodega">{{ fila.bodegaNombre }}</td>
+              <td data-label="Existencia">{{ fila.existencia }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <h2 class="catalog-group-title">Historial de movimientos</h2>
+
+  <div class="board-filters" style="margin:12px 0 18px;">
+    <label class="board-filter-field">
+      Producto
+      <select [value]="filtroProductoId()" (change)="filtroProductoId.set(+$any($event.target).value)">
+        <option [value]="0">Todos</option>
+        @for (p of productosFisicosActivos(); track p.id) {
+          <option [value]="p.id">{{ p.nombre }}</option>
+        }
+      </select>
+    </label>
+
+    <label class="board-filter-field">
+      Bodega
+      <select [value]="filtroBodegaId()" (change)="filtroBodegaId.set(+$any($event.target).value)">
+        <option [value]="0">Todas</option>
+        @for (b of bodegasActivas(); track b.id) {
+          <option [value]="b.id">{{ b.nombre }}</option>
+        }
+      </select>
+    </label>
+
+    <label class="board-filter-field">
+      Desde
+      <input type="date" [value]="filtroDesde()" (change)="filtroDesde.set($any($event.target).value)" />
+    </label>
+
+    <label class="board-filter-field">
+      Hasta
+      <input type="date" [value]="filtroHasta()" (change)="filtroHasta.set($any($event.target).value)" />
+    </label>
+
+    @if (hayFiltrosActivos()) {
+      <button type="button" class="btn-secondary small" (click)="limpiarFiltros()">Limpiar filtros</button>
+    }
+  </div>
+
+  @if (historialFiltrado().length === 0) {
+    <div class="empty-state-block">
+      <p>{{ hayFiltrosActivos() ? 'Ningún movimiento coincide con estos filtros.' : 'Todavía no hay movimientos registrados.' }}</p>
+    </div>
+  } @else {
+    <div class="grid-table-scroll">
+      <table class="grid-table">
+        <thead><tr><th>Fecha</th><th>Producto</th><th>Tipo</th><th>Origen</th><th>Destino</th><th>Cantidad</th><th>Nota</th></tr></thead>
+        <tbody>
+          @for (fila of historialFiltrado(); track fila.id) {
+            <tr>
+              <td data-label="Fecha">{{ fila.fecha | date: 'dd/MM/yyyy HH:mm' }}</td>
+              <td data-label="Producto">{{ fila.productoNombre }}</td>
+              <td data-label="Tipo">
+                @switch (fila.tipo) {
+                  @case ('entrada') {
+                    <span class="tag" style="background:var(--client-soft); color:var(--client);">Entrada</span>
+                  }
+                  @case ('salida') {
+                    <span class="tag" style="background:var(--danger-soft); color:var(--danger);">Salida/Ajuste</span>
+                  }
+                  @default {
+                    <span class="tag">Traspaso</span>
+                  }
+                }
+              </td>
+              <td data-label="Origen">{{ fila.origenNombre ?? '—' }}</td>
+              <td data-label="Destino">{{ fila.destinoNombre ?? '—' }}</td>
+              <td data-label="Cantidad">{{ fila.cantidad }}</td>
+              <td data-label="Nota">{{ fila.nota ?? '—' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}
+
+@if (modalAbierto()) {
+  <div class="modal-overlay show" (click)="modalAbierto.set(false)">
+    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3>Nuevo movimiento</h3>
+
+      <div class="edit-form form-grid-2col" style="margin-bottom: 18px;">
+        <div class="tipo-producto-toggle full-span" role="group" aria-label="Tipo de movimiento">
+          <label class="checkbox-inline">
+            <input type="radio" formControlName="tipo" value="entrada" />
+            Entrada (mercancía nueva)
+          </label>
+          <label class="checkbox-inline">
+            <input type="radio" formControlName="tipo" value="traspaso" />
+            Traspaso entre bodegas
+          </label>
+          <label class="checkbox-inline">
+            <input type="radio" formControlName="tipo" value="salida" />
+            Salida/Ajuste (merma, daño, corrección)
+          </label>
+        </div>
+
+        <label class="full-span">
+          Producto
+          <app-select-buscable [opciones]="opcionesProducto()" formControlName="productoId" placeholder="Buscar producto…" />
+        </label>
+
+        @if (form.controls.tipo.value === 'traspaso' || form.controls.tipo.value === 'salida') {
+          <label>
+            Bodega de origen
+            <app-select-buscable [opciones]="opcionesBodega()" formControlName="bodegaOrigenId" placeholder="Buscar bodega…" />
+          </label>
+        }
+
+        @if (form.controls.tipo.value === 'entrada' || form.controls.tipo.value === 'traspaso') {
+          <label>
+            Bodega de destino
+            <app-select-buscable [opciones]="opcionesBodega()" formControlName="bodegaDestinoId" placeholder="Buscar bodega…" />
+          </label>
+        }
+
+        <label>
+          Cantidad
+          <input type="number" step="1" min="1" formControlName="cantidad" />
+          @if ((form.controls.tipo.value === 'traspaso' || form.controls.tipo.value === 'salida') && form.controls.bodegaOrigenId.value) {
+            <span class="hint" style="margin:4px 0 0; display:block;">Disponible en origen: {{ existenciaDisponibleOrigen() }}</span>
+          }
+        </label>
+
+        <label class="full-span">
+          Nota (opcional)
+          <input type="text" formControlName="nota" placeholder="p.ej. mercancía dañada, conteo físico…" />
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="guardando()">{{ guardando() ? 'Guardando…' : 'Guardar' }}</button>
+      </div>
+    </form>
+  </div>
+}

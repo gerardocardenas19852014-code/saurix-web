@@ -9,6 +9,10 @@ import { AvisoTarjetaCiclo } from '../../features/presupuesto/shared/aviso-tarje
 import { CuentaPresupuesto } from '../../features/presupuesto/cuenta-presupuesto/cuenta-presupuesto.model';
 import { MovimientoPresupuesto } from '../../features/presupuesto/movimientos/movimiento.model';
 import { formatMoneda, infoTarjeta } from '../../features/presupuesto/shared/wallet.util';
+import { Producto } from '../../features/inventario/productos/producto.model';
+import { existenciaTotal } from '../../features/inventario/productos/producto.util';
+import { ExistenciaBodega } from '../../features/inventario/movimientos-bodega/existencia-bodega.model';
+import { AvisoStockBajo } from '../../features/inventario/valor-stock/aviso-stock-bajo.model';
 
 const ENTIDAD = 'Notificacion';
 
@@ -255,6 +259,51 @@ export class NotificacionesService {
       }
     } catch (error) {
       console.warn('No se pudo revisar las alertas de tarjetas:', error);
+    }
+  }
+
+  /**
+   * Alerta de stock bajo: productos físicos activos con nivelMinimo
+   * definido cuya existencia (ExistenciaBodega + fallback legado, ver
+   * existenciaTotal()) ya cayó por debajo de ese mínimo — mismo criterio
+   * que `stockBajo` en valor-stock.component.ts, pero llevado a una
+   * notificación real en la campanita (antes solo se veía si entrabas a
+   * esa pantalla). Dedupe por día vía AvisoStockBajo (ver ese modelo):
+   * si el producto sigue bajo al día siguiente, se vuelve a avisar.
+   */
+  async revisarAlertasStockBajo(): Promise<void> {
+    const usuarioId = this.auth.usuarioActual()?.id;
+    if (!usuarioId) return;
+    try {
+      const hoy = new Date();
+      const dia = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+
+      const [productos, existenciasBodega, avisos] = await Promise.all([
+        firstValueFrom(this.data.list<Producto>('Producto')),
+        firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega')),
+        firstValueFrom(this.data.list<AvisoStockBajo>('AvisoStockBajo', { usuarioId, dia })),
+      ]);
+      const yaAvisado = (productoId: number) => avisos.some((a) => Number(a.productoId) === productoId);
+
+      for (const producto of productos) {
+        // typeof === 'number' (no === null): ver mismo comentario en valor-stock.component.ts.
+        if (!producto.activo || producto.existencia === null || typeof producto.nivelMinimo !== 'number') continue;
+        if (yaAvisado(producto.id)) continue;
+
+        const existencia = existenciaTotal(producto, existenciasBodega);
+        if (existencia >= producto.nivelMinimo) continue;
+
+        this.notificar(
+          usuarioId,
+          `📉 "${producto.nombre}" tiene ${existencia} de existencia, por debajo de su mínimo (${producto.nivelMinimo}).`,
+          '/inventario/valor-stock',
+        );
+        this.data.alta<AvisoStockBajo>('AvisoStockBajo', { productoId: producto.id, usuarioId, dia }).subscribe({
+          error: (error) => console.warn('No se pudo registrar el aviso de stock bajo:', error),
+        });
+      }
+    } catch (error) {
+      console.warn('No se pudo revisar las alertas de stock bajo:', error);
     }
   }
 }

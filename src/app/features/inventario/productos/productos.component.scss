@@ -1,0 +1,21 @@
+// El sistema visual global (page-header, grid-toolbar, grid-table, modal-overlay,
+// edit-form, table, grid-badge, etc.) vive en src/styles.scss. Lo de aquí es
+// específico de esta pantalla.
+
+.tipo-producto-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: -6px 0 2px;
+}
+
+// La vista previa de la importación masiva necesita más espacio que el
+// .modal-box por default (400px, ver styles.scss) porque muestra una tabla
+// de 6 columnas con el detalle de cada renglón — sin esto la tabla queda
+// comprimida y el detalle del error se recorta. Mismo criterio ya usado en
+// Plantillas de WikiDocs (.modal-box.plantilla-modal) cuando el contenido
+// del modal de verdad lo necesita, no como default.
+.modal-box.importar-modal {
+  max-width: 900px;
+  width: 95%;
+}
