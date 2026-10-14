@@ -591,6 +591,10 @@ export class MiembrosFamiliaComponent implements OnInit {
         this.toast.exito(esEdicion ? 'Miembro actualizado.' : 'Miembro creado.');
         this.sincronizarConyuge(previo?.conyugeId ?? null, resultado);
         this.miembroActivo.set(resultado);
+        // Si fue alta, el formulario se queda con id:0 (lo que trae
+        // nuevoMiembro()) — sin esto, un segundo "Guardar cambios" sin
+        // volver a abrir la ficha mandaría un PATCH a id=0 y fallaría.
+        this.form.patchValue({ id: resultado.id });
         this.cargar();
       },
       error: () => this.toast.error('No se pudo guardar. Intenta de nuevo.'),

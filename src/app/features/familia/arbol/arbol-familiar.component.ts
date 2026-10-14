@@ -19,6 +19,11 @@ interface NodoArbol {
   persona: MiembroFamilia;
   conyuge: MiembroFamilia | null;
   hijos: NodoArbol[];
+  /** true = esta persona ya se dibuja completa (con su pareja y sus hijos)
+   *  en otra rama del árbol — aquí solo aparece como hoja de referencia,
+   *  colgada de sus papás reales, SIN repetir a su cónyuge ni a sus hijos
+   *  (eso evitaría duplicar, p.ej., a Juan Gerardo y a Mindy). */
+  esReferencia?: boolean;
 }
 
 /**
@@ -72,6 +77,34 @@ export class ArbolFamiliarComponent implements OnInit {
     return [m.nombre, m.apellidoPaterno, m.apellidoMaterno].filter(Boolean).join(' ');
   }
 
+  private readonly porId = computed(() => new Map(this.miembros().map((m) => [Number(m.id), m])));
+
+  /** Cuando alguien aparece en el árbol SOLO como cónyuge de otra rama (su
+   *  propia rama como hijo/a ya se "gastó" en otra parte del árbol — ver el
+   *  comentario de construirArbol()), esta leyenda evita que se pierda de
+   *  vista quiénes son sus padres reales, aunque la línea del árbol no
+   *  llegue hasta ellos. */
+  protected padresDe(persona: MiembroFamilia): string | null {
+    const porId = this.porId();
+    const padre = persona.padreId ? (porId.get(Number(persona.padreId)) ?? null) : null;
+    const madre = persona.madreId ? (porId.get(Number(persona.madreId)) ?? null) : null;
+    if (!padre && !madre) return null;
+    const prefijo = persona.sexo === 'M' ? 'Hija de' : persona.sexo === 'H' ? 'Hijo de' : 'Hijo/a de';
+    const nombres = [padre, madre].filter((p): p is MiembroFamilia => !!p).map((p) => this.nombreCompleto(p));
+    return `${prefijo} ${nombres.join(' y ')}`;
+  }
+
+  /** Leyenda para una hoja de referencia (ver esReferencia en NodoArbol):
+   *  con quién está casado/a, ya que aquí no se repite su tarjeta de
+   *  cónyuge ni sus hijos — esos se ven completos en la otra rama. */
+  protected conyugeDe(persona: MiembroFamilia): string | null {
+    if (!persona.conyugeId) return null;
+    const conyuge = this.porId().get(Number(persona.conyugeId));
+    if (!conyuge) return null;
+    const prefijo = persona.sexo === 'M' ? 'Casada con' : persona.sexo === 'H' ? 'Casado con' : 'Casado/a con';
+    return `${prefijo} ${this.nombreCompleto(conyuge)}`;
+  }
+
   /** Familiares de referencia de un miembro puntual, para pintarlos como
    *  chips debajo de su nodo en el árbol. */
   protected referenciasDe(miembroId: number): ParienteReferencia[] {
@@ -83,6 +116,11 @@ export class ArbolFamiliarComponent implements OnInit {
   private construirArbol(miembros: MiembroFamilia[]): { raices: NodoArbol[]; sueltos: MiembroFamilia[] } {
     const porId = new Map(miembros.map((m) => [Number(m.id), m]));
     const visitados = new Set<number>();
+    // Quién sí quedó dibujado como "hijo" de sus propios papás en algún
+    // punto del árbol — lo que NO logra esto es justo el caso de alguien
+    // que ya se consumió como cónyuge de otra raíz antes de llegar a la
+    // rama de sus propios papás (ver la segunda pasada, más abajo).
+    const dibujadosComoHijoPropio = new Set<number>();
 
     const hijosDe = (id: number, conyugeId: number | null): MiembroFamilia[] =>
       miembros
@@ -99,7 +137,9 @@ export class ArbolFamiliarComponent implements OnInit {
       visitados.add(Number(persona.id));
       const conyuge = persona.conyugeId ? (porId.get(Number(persona.conyugeId)) ?? null) : null;
       if (conyuge) visitados.add(Number(conyuge.id));
-      const hijos = hijosDe(Number(persona.id), conyuge ? Number(conyuge.id) : null).map((h) => construirNodo(h));
+      const hijosDirectos = hijosDe(Number(persona.id), conyuge ? Number(conyuge.id) : null);
+      hijosDirectos.forEach((h) => dibujadosComoHijoPropio.add(Number(h.id)));
+      const hijos = hijosDirectos.map((h) => construirNodo(h));
       return { persona, conyuge, hijos };
     };
 
@@ -111,6 +151,31 @@ export class ArbolFamiliarComponent implements OnInit {
     for (const candidata of candidatasRaiz) {
       if (visitados.has(Number(candidata.id))) continue; // ya quedó como cónyuge de otra raíz
       raices.push(construirNodo(candidata));
+    }
+
+    // Segunda pasada: alguien que SÍ aparece en el árbol (como cónyuge de
+    // otra rama) pero nunca se dibujó como hijo de sus propios papás,
+    // porque ya estaba "ocupado" cuando le tocaba su turno — se agrega
+    // ahí como una hoja de referencia (sin repetir a su pareja ni a sus
+    // hijos, que ya se ven completos en la otra rama). Mismo patrón que
+    // Senyasi: casada con Juan Gerardo (se dibuja completa en la rama de
+    // Luis Alfonso/Martha Edith), pero también colgada de Lucina/Antonio.
+    const buscarNodo = (nodos: NodoArbol[], id: number): NodoArbol | null => {
+      for (const nodo of nodos) {
+        if (Number(nodo.persona.id) === id || (nodo.conyuge && Number(nodo.conyuge.id) === id)) return nodo;
+        const enHijos = buscarNodo(nodo.hijos, id);
+        if (enHijos) return enHijos;
+      }
+      return null;
+    };
+
+    for (const m of miembros) {
+      if (dibujadosComoHijoPropio.has(Number(m.id)) || !visitados.has(Number(m.id))) continue;
+      const padreId = m.padreId ? Number(m.padreId) : null;
+      const madreId = m.madreId ? Number(m.madreId) : null;
+      if (!padreId && !madreId) continue;
+      const nodoPadre = (padreId && buscarNodo(raices, padreId)) || (madreId && buscarNodo(raices, madreId));
+      if (nodoPadre) nodoPadre.hijos.push({ persona: m, conyuge: null, hijos: [], esReferencia: true });
     }
 
     const sueltos = miembros.filter((m) => !visitados.has(Number(m.id)));

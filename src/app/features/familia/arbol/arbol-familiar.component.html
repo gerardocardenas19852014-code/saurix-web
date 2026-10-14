@@ -64,8 +64,17 @@
         }
         <span class="arbol-nombre">{{ nombreCompleto(nodo.persona) }}</span>
         <span class="arbol-edad">{{ calcularEdad(nodo.persona.fechaNacimiento) ?? '—' }} años</span>
+        @if (nodo.esReferencia) {
+          @if (conyugeDe(nodo.persona); as conyuge) {
+            <span class="arbol-padres">💍 {{ conyuge }}</span>
+          }
+        } @else if (padresDe(nodo.persona); as padres) {
+          <span class="arbol-padres">{{ padres }}</span>
+        }
       </a>
-      <button type="button" class="arbol-btn-referencia" title="Agregar familiar de referencia" (click)="nuevoPara(nodo.persona.id)">👤+</button>
+      @if (!nodo.esReferencia) {
+        <button type="button" class="arbol-btn-referencia" title="Agregar familiar de referencia" (click)="nuevoPara(nodo.persona.id)">👤+</button>
+      }
     </div>
     @if (nodo.conyuge) {
       <span class="arbol-conector-conyuge">⚭</span>
@@ -78,13 +87,16 @@
           }
           <span class="arbol-nombre">{{ nombreCompleto(nodo.conyuge) }}</span>
           <span class="arbol-edad">{{ calcularEdad(nodo.conyuge.fechaNacimiento) ?? '—' }} años</span>
+          @if (padresDe(nodo.conyuge); as padres) {
+            <span class="arbol-padres">{{ padres }}</span>
+          }
         </a>
         <button type="button" class="arbol-btn-referencia" title="Agregar familiar de referencia" (click)="nuevoPara(nodo.conyuge.id)">👤+</button>
       </div>
     }
   </div>
 
-  @if (referenciasDe(nodo.persona.id).length > 0 || (nodo.conyuge && referenciasDe(nodo.conyuge.id).length > 0)) {
+  @if (!nodo.esReferencia && (referenciasDe(nodo.persona.id).length > 0 || (nodo.conyuge && referenciasDe(nodo.conyuge.id).length > 0))) {
     <div class="arbol-referencias">
       @for (r of referenciasDe(nodo.persona.id); track r.id) {
         <button type="button" class="arbol-chip-referencia" [class.arbol-chip-referencia-fallecido]="r.fallecido" [title]="r.notas || ''" (click)="editar(r)">
