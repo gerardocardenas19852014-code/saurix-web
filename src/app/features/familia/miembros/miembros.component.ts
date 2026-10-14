@@ -396,14 +396,19 @@ export class MiembrosFamiliaComponent implements OnInit {
       .catch(() => this.qrDataUrl.set(''));
   });
 
-  /** Ancho completo solo donde hay tablas (lista de miembros, y las pestañas
-   *  Documentos/Salud/Pólizas dentro de una ficha); la pestaña Datos (formulario)
-   *  y la Tarjeta de emergencia (tarjeta angosta) se quedan en el ancho normal —
-   *  mismo criterio que WikiDocs (ver documentos-list.component.ts). */
+  /** Ancho completo donde hay tablas (lista de miembros, y las pestañas
+   *  Documentos/Salud/Pólizas dentro de una ficha) y también en la pestaña Datos
+   *  (formulario): con el .content angosto de 980px el formulario de 5 columnas
+   *  quedaba aplastado y dejaba franjas vacías enormes a los lados en pantallas
+   *  anchas — se complementa con el modificador .form-grid-5col--miembro (ver
+   *  miembros.component.scss), porque .form-grid-5col tiene su propio tope de
+   *  1200px independiente de .content. La Tarjeta de emergencia (tarjeta angosta
+   *  tipo credencial) se queda en el ancho normal — mismo criterio que WikiDocs
+   *  (ver documentos-list.component.ts). */
   private readonly _anchoSegunVista = effect((onCleanup) => {
     const esTabla =
       this.vista() === 'lista' ||
-      (this.vista() === 'ficha' && ['documentos', 'salud', 'polizas'].includes(this.tabFicha()));
+      (this.vista() === 'ficha' && ['datos', 'documentos', 'salud', 'polizas'].includes(this.tabFicha()));
     if (esTabla) document.documentElement.setAttribute('data-wide', 'grid');
     onCleanup(() => document.documentElement.removeAttribute('data-wide'));
   });

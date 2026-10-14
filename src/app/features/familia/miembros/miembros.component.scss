@@ -206,3 +206,11 @@
   padding: 10px 18px;
   text-align: left;
 }
+
+/* .form-grid-5col trae su propio tope de 1200px (independiente de .content);
+ * en la pestaña "Datos" de la ficha, con .content ya ensanchado por el effect
+ * _anchoSegunVista, este modificador lo quita para aprovechar el espacio y no
+ * dejar franjas vacías enormes a los lados en pantallas anchas. */
+.form-grid-5col--miembro {
+  max-width: none;
+}
