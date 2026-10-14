@@ -10,11 +10,30 @@ import { ColumnaTabla, DataTableComponent } from '../../../shared/components/dat
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { hashPassword } from '../../../shared/utils/password.util';
 
+/** Los 5 módulos que se venden por separado (ver licencia-modulos.service.ts
+ *  en el frontend y supabase/migrations/15_licencias_modulos.sql en la base).
+ *  Seguridad y Panel de control no aparecen aquí: son base del sistema. */
+const MODULOS_VENDIBLES: { clave: string; nombre: string }[] = [
+  { clave: 'wikidocs', nombre: 'WikiDocs' },
+  { clave: 'presupuesto', nombre: 'Presupuesto Personal' },
+  { clave: 'proyectos', nombre: 'Gestión de Proyectos' },
+  { clave: 'familia', nombre: 'Familia' },
+  { clave: 'inventario', nombre: 'Inventario' },
+];
+
+interface ModuloEmpresaFila {
+  clave: string;
+  nombre: string;
+  activo: boolean;
+}
+
 export interface Empresa {
   id: number;
   clave: string;
   nombre: string;
   activo: boolean;
+  /** Tope de usuarios activos para esta empresa; null/undefined = sin límite. */
+  maxUsuarios?: number | null;
   fechaCreacion?: string;
 }
 
@@ -55,6 +74,11 @@ export class EmpresasComponent implements OnInit, OnDestroy {
   protected readonly empresaParaEntrar = signal<Empresa | null>(null);
   protected readonly guardando = signal(false);
 
+  // ── Módulos contratados ──────────────────────────────────────────
+  protected readonly empresaParaModulos = signal<Empresa | null>(null);
+  protected readonly modulosDeEmpresa = signal<ModuloEmpresaFila[]>([]);
+  protected readonly cargandoModulos = signal(false);
+
   protected readonly columnas: ColumnaTabla<Empresa>[] = [
     { campo: 'clave', etiqueta: 'Clave' },
     { campo: 'nombre', etiqueta: 'Nombre' },
@@ -63,6 +87,11 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       etiqueta: 'Activa',
       formatear: (f) => (f.activo ? 'Sí' : 'No'),
       claseValor: (f) => (f.activo ? 'grid-badge-success' : 'grid-badge-muted'),
+    },
+    {
+      campo: 'maxUsuarios',
+      etiqueta: 'Máx. usuarios',
+      formatear: (f) => (f.maxUsuarios ? String(f.maxUsuarios) : 'Sin límite'),
     },
     {
       campo: 'fechaCreacion',
@@ -75,6 +104,8 @@ export class EmpresasComponent implements OnInit, OnDestroy {
     clave: ['', [Validators.required, Validators.pattern(/^[a-z0-9-]{2,30}$/)]],
     nombre: ['', [Validators.required, Validators.maxLength(80)]],
     activo: [true],
+    // Vacío = sin límite de usuarios.
+    maxUsuarios: this.fb.control<number | null>(null, [Validators.min(1)]),
   });
 
   protected readonly formAdmin = this.fb.nonNullable.group({
@@ -109,14 +140,19 @@ export class EmpresasComponent implements OnInit, OnDestroy {
   // ── Alta / edición ────────────────────────────────────────────────
   nueva(): void {
     this.empresaEnEdicion.set(null);
-    this.formEmpresa.reset({ clave: '', nombre: '', activo: true });
+    this.formEmpresa.reset({ clave: '', nombre: '', activo: true, maxUsuarios: null });
     this.formEmpresa.controls.clave.enable();
     this.modalEmpresa.set(true);
   }
 
   editar(empresa: Empresa): void {
     this.empresaEnEdicion.set(empresa);
-    this.formEmpresa.reset({ clave: empresa.clave, nombre: empresa.nombre, activo: empresa.activo });
+    this.formEmpresa.reset({
+      clave: empresa.clave,
+      nombre: empresa.nombre,
+      activo: empresa.activo,
+      maxUsuarios: empresa.maxUsuarios ?? null,
+    });
     // La clave identifica a la empresa (p.ej. en ?conexion= o subdominios): no se cambia.
     this.formEmpresa.controls.clave.disable();
     this.modalEmpresa.set(true);
@@ -131,8 +167,18 @@ export class EmpresasComponent implements OnInit, OnDestroy {
     const valor = this.formEmpresa.getRawValue();
     const edicion = this.empresaEnEdicion();
     const peticion = edicion
-      ? this.data.modificacion<Empresa>('Empresa', { id: edicion.id, nombre: valor.nombre.trim(), activo: valor.activo })
-      : this.data.alta<Empresa>('Empresa', { clave: valor.clave.trim(), nombre: valor.nombre.trim(), activo: valor.activo });
+      ? this.data.modificacion<Empresa>('Empresa', {
+          id: edicion.id,
+          nombre: valor.nombre.trim(),
+          activo: valor.activo,
+          maxUsuarios: valor.maxUsuarios,
+        })
+      : this.data.alta<Empresa>('Empresa', {
+          clave: valor.clave.trim(),
+          nombre: valor.nombre.trim(),
+          activo: valor.activo,
+          maxUsuarios: valor.maxUsuarios,
+        });
     peticion.subscribe({
       next: (empresa) => {
         this.modalEmpresa.set(false);
@@ -208,6 +254,46 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       this.toast.error((e as Error).message || 'No se pudo crear el usuario.');
     } finally {
       this.guardando.set(false);
+    }
+  }
+
+  // ── Módulos contratados ──────────────────────────────────────────
+  async pedirModulos(empresa: Empresa): Promise<void> {
+    if (!this.sb) return;
+    this.empresaParaModulos.set(empresa);
+    this.cargandoModulos.set(true);
+    const { data, error } = await this.sb
+      .schema('seguridad')
+      .from('empresa_modulo')
+      .select('modulo_clave, activo')
+      .eq('empresa_id', empresa.id);
+    const activosPorClave = new Map(
+      (error ? [] : (data ?? [])).map((f: { modulo_clave: string; activo: boolean }) => [f.modulo_clave, f.activo]),
+    );
+    this.modulosDeEmpresa.set(
+      MODULOS_VENDIBLES.map((m) => ({ clave: m.clave, nombre: m.nombre, activo: activosPorClave.get(m.clave) ?? false })),
+    );
+    this.cargandoModulos.set(false);
+    if (error) this.toast.error(error.message);
+  }
+
+  async toggleModulo(fila: ModuloEmpresaFila): Promise<void> {
+    const empresa = this.empresaParaModulos();
+    if (!empresa || !this.sb) return;
+    const nuevoValor = !fila.activo;
+    // Optimista: refleja el cambio de inmediato, se revierte si falla.
+    this.modulosDeEmpresa.update((filas) =>
+      filas.map((f) => (f.clave === fila.clave ? { ...f, activo: nuevoValor } : f)),
+    );
+    const { error } = await this.sb
+      .schema('seguridad')
+      .from('empresa_modulo')
+      .upsert({ empresa_id: empresa.id, modulo_clave: fila.clave, activo: nuevoValor }, { onConflict: 'empresa_id,modulo_clave' });
+    if (error) {
+      this.modulosDeEmpresa.update((filas) =>
+        filas.map((f) => (f.clave === fila.clave ? { ...f, activo: !nuevoValor } : f)),
+      );
+      this.toast.error(error.message);
     }
   }
 

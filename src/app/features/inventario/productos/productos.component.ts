@@ -6,6 +6,7 @@ import { ColumnaTabla, DataTableComponent } from '../../../shared/components/dat
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { SelectBuscableComponent, OpcionBuscable } from '../../../shared/components/select-buscable/select-buscable.component';
 import { ToastService } from '../../../shared/services/toast.service';
+import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { exportarCsv, parsearCsv } from '../../../shared/utils/csv.util';
 import { Producto } from './producto.model';
 import { CategoriaProducto } from '../categorias-producto/categoria-producto.model';
@@ -49,6 +50,7 @@ export class ProductosComponent implements OnInit, OnDestroy {
 
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
+  protected readonly preferenciasGrid = inject(PreferenciasGridService);
   private readonly fb = inject(FormBuilder);
 
   protected readonly productos = signal<Producto[]>([]);

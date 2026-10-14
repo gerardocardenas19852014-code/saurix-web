@@ -12,6 +12,7 @@ import { EditorTextoComponent } from '../../shared/components/editor-texto/edito
 import { ColumnaTabla, DataTableComponent } from '../../shared/components/data-table/data-table.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../shared/services/toast.service';
+import { PreferenciasGridService } from '../../shared/services/preferencias-grid.service';
 import { insertarEmbeds } from '../../shared/utils/embeds.util';
 import { generarTablaContenido } from '../../shared/utils/tabla-contenido.util';
 import { truncarTexto } from '../../shared/utils/texto.util';
@@ -77,6 +78,7 @@ export class DocumentosListComponent implements OnInit {
   private readonly data = inject(DataClientService);
   private readonly auth = inject(AuthService);
   protected readonly toast = inject(ToastService);
+  protected readonly preferenciasGrid = inject(PreferenciasGridService);
   private readonly fb = inject(FormBuilder);
   private readonly sanitizer = inject(DomSanitizer);
 

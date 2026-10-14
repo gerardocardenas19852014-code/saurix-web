@@ -7,6 +7,7 @@ import { ColumnaTabla, DataTableComponent } from '../../../shared/components/dat
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { AdjuntosPanelComponent } from '../../../shared/components/adjuntos-panel/adjuntos-panel.component';
 import { ToastService } from '../../../shared/services/toast.service';
+import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { CategoriaPresupuesto } from '../categoria-presupuesto/categoria-presupuesto.model';
 import { CuentaPresupuesto } from '../cuenta-presupuesto/cuenta-presupuesto.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
@@ -36,6 +37,7 @@ import { SelectBuscableComponent } from '../../../shared/components/select-busca
 export class RecurrentesComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
+  protected readonly preferenciasGrid = inject(PreferenciasGridService);
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
 

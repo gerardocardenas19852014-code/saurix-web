@@ -28,6 +28,7 @@
 </div>
 
 <app-data-table
+  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
   [columnas]="columnas"
   [filas]="productosFiltrados()"
   [cargando]="cargando()"

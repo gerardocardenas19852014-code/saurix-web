@@ -4,6 +4,7 @@ import { DataClientService } from '../../../core/services/data-client.service';
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../../shared/services/toast.service';
+import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { Bodega } from './bodega.model';
 
 /** Catálogo "Bodega" (Inventario) — mismo patrón exacto que TicketTiposComponent
@@ -24,6 +25,7 @@ export class BodegasComponent implements OnInit, OnDestroy {
 
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
+  protected readonly preferenciasGrid = inject(PreferenciasGridService);
   private readonly fb = inject(FormBuilder);
 
   protected readonly bodegas = signal<Bodega[]>([]);

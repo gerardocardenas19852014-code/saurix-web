@@ -5,6 +5,7 @@ import { DataClientService } from '../../../core/services/data-client.service';
 import { ColumnaTabla, DataTableComponent } from '../data-table/data-table.component';
 import { ConfirmDialogComponent } from '../confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../services/toast.service';
+import { PreferenciasGridService } from '../../services/preferencias-grid.service';
 import { CatalogoSimpleConfig, CatalogoSimpleItem } from './catalogo-simple.model';
 
 /**
@@ -33,6 +34,7 @@ export class CatalogoSimpleComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
+  protected readonly preferenciasGrid = inject(PreferenciasGridService);
   private readonly fb = inject(FormBuilder);
 
   protected config!: CatalogoSimpleConfig;

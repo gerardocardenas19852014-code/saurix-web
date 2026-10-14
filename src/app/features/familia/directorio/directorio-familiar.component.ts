@@ -4,6 +4,7 @@ import { DataClientService } from '../../../core/services/data-client.service';
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../../shared/services/toast.service';
+import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { ValorLista } from '../../../shared/valor-lista/valor-lista.model';
 import { obtenerOSembrarValorLista } from '../familia.util';
 import { ContactoFamiliar, GRUPO_CATEGORIA_CONTACTO, SEMILLA_CATEGORIA_CONTACTO } from '../contacto-familiar.model';
@@ -42,6 +43,7 @@ export class DirectorioFamiliarComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
   private readonly fb = inject(FormBuilder);
   protected readonly toast = inject(ToastService);
+  protected readonly preferenciasGrid = inject(PreferenciasGridService);
 
   protected readonly categorias = signal<ValorLista[]>([]);
   protected readonly contactos = signal<ContactoFamiliar[]>([]);

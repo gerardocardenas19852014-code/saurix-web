@@ -33,6 +33,9 @@
     [accionExtra2EtiquetaFn]="etiquetaEntrar"
     accionExtra2Titulo="Trabajar dentro de esta empresa (modo soporte)"
     (accionExtra2)="pedirEntrar($event)"
+    accionExtra3Etiqueta="Módulos"
+    accionExtra3Titulo="Elegir qué módulos tiene contratados esta empresa"
+    (accionExtra3)="pedirModulos($event)"
     (editar)="editar($event)"
     (eliminar)="pedirEliminar($event)"
   />
@@ -56,12 +59,45 @@
           <input type="checkbox" formControlName="activo" />
           Activa (si la desactivas, sus usuarios dejan de ver datos)
         </label>
+        <label>
+          Máximo de usuarios
+          <input type="number" class="form-control" formControlName="maxUsuarios" min="1" placeholder="Sin límite" />
+          <span class="hint">Vacío = sin límite. Al llegar al tope, no se pueden dar de alta más usuarios.</span>
+        </label>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="modalEmpresa.set(false)">Cancelar</button>
         <button type="submit" class="btn-primary btn btn-primary">Guardar</button>
       </div>
     </form>
+  </div>
+}
+
+@if (empresaParaModulos(); as empresa) {
+  <div class="modal-overlay modal show d-block" (click)="empresaParaModulos.set(null)">
+    <div class="modal-box modal-dialog modal-content" (click)="$event.stopPropagation()">
+      <h3 class="modal-title mb-3">Módulos de {{ empresa.nombre }}</h3>
+      <p class="hint" style="margin:0 0 12px;">
+        Solo los módulos marcados aquí están disponibles para esta empresa — tanto en el menú como en la
+        base de datos (si lo desmarcas, sus usuarios dejan de poder leer y escribir ahí de inmediato).
+        Seguridad y Panel de control no aparecen porque son base del sistema: siempre están disponibles.
+      </p>
+      @if (cargandoModulos()) {
+        <p class="hint">Cargando…</p>
+      } @else {
+        <div class="edit-form">
+          @for (fila of modulosDeEmpresa(); track fila.clave) {
+            <label class="checkbox-inline">
+              <input type="checkbox" [checked]="fila.activo" (change)="toggleModulo(fila)" />
+              {{ fila.nombre }}
+            </label>
+          }
+        </div>
+      }
+      <div class="modal-actions">
+        <button type="button" class="btn-primary btn btn-primary" (click)="empresaParaModulos.set(null)">Cerrar</button>
+      </div>
+    </div>
   </div>
 }
 

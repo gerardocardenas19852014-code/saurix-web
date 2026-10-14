@@ -88,6 +88,14 @@ export class DataTableComponent<T extends { id: number }> {
   readonly accionExtra2Titulo = input<string | undefined>(undefined);
   readonly accionExtra2 = output<T>();
 
+  /** Tercer botón de acción extra opcional por fila, con etiqueta fija (igual
+   *  patrón que accionExtraEtiqueta) — pensado para cuando ya se usan
+   *  accionExtra y accionExtra2 (p.ej. Empresas: "Primer admin" + "Entrar" +
+   *  "Módulos"). */
+  readonly accionExtra3Etiqueta = input<string | undefined>(undefined);
+  readonly accionExtra3Titulo = input<string | undefined>(undefined);
+  readonly accionExtra3 = output<T>();
+
   readonly paginaActual = signal(1);
   readonly campoOrden = signal<keyof T & string | null>(null);
   readonly direccionOrden = signal<'asc' | 'desc'>('asc');

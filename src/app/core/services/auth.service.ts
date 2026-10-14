@@ -7,6 +7,7 @@ import { hashPassword } from '../../shared/utils/password.util';
 import { fuenteDatosActual } from './fuente-datos';
 import { SupabaseService } from './supabase.service';
 import { filaACamel } from './supabase-data-client.service';
+import { LicenciaModulosService } from './licencia-modulos.service';
 
 const STORAGE_KEY = 'saurix.sesion';
 const MODULO_BITACORA = 'Seguridad / Usuarios';
@@ -36,6 +37,7 @@ export class AuthService {
   // BitacoraService NO depende de AuthService (a propósito, ver bitacora.service.ts),
   // así que esta inyección es de un solo sentido y no forma un ciclo.
   private readonly bitacora = inject(BitacoraService);
+  private readonly licencia = inject(LicenciaModulosService);
 
   readonly usuarioActual = signal<Usuario | null>(this.leerSesionGuardada());
 
@@ -76,6 +78,7 @@ export class AuthService {
       const perfil = await this.cargarPerfilSupabase(data.session.user.id);
       this.validarAcceso(perfil);
       this.establecerSesion(perfil);
+      await this.licencia.cargar();
     } catch {
       await this.sb.auth.signOut();
       this.limpiarSesionLocal();
@@ -94,6 +97,7 @@ export class AuthService {
 
   cerrarSesion(): void {
     this.limpiarSesionLocal();
+    this.licencia.limpiar();
     if (this.sb) void this.sb.auth.signOut();
   }
 
@@ -157,6 +161,7 @@ export class AuthService {
       })
       .subscribe({ error: () => undefined });
     this.establecerSesion(actualizado);
+    await this.licencia.cargar();
     return actualizado;
   }
 

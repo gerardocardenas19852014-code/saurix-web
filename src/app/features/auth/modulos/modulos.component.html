@@ -12,7 +12,7 @@
 <p class="hint">Elige un módulo para continuar. Aquí se irán agregando más conforme se vayan sumando al sistema.</p>
 
 <div class="tiles-grid">
-  @for (modulo of modulos; track modulo.ruta) {
+  @for (modulo of modulos(); track modulo.ruta) {
     <a class="module-tile" [class]="modulo.clase" [routerLink]="modulo.ruta">
       <div class="module-tile-icon">{{ modulo.icono }}</div>
       <div class="module-tile-label">{{ modulo.etiqueta }}</div>

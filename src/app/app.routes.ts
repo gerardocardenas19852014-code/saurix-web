@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
+import { moduloGuard } from './core/guards/modulo.guard';
 import { ShellComponent } from './layout/shell/shell.component';
 
 export const routes: Routes = [
@@ -30,6 +31,7 @@ export const routes: Routes = [
       },
       {
         path: 'wikidocs',
+        canActivate: [moduloGuard('wikidocs')],
         loadChildren: () => import('./features/wikidocs/wikidocs.routes').then((m) => m.WIKIDOCS_ROUTES),
       },
       {
@@ -40,22 +42,26 @@ export const routes: Routes = [
 
       {
         path: 'presupuesto',
+        canActivate: [moduloGuard('presupuesto')],
         loadChildren: () =>
           import('./features/presupuesto/presupuesto.routes').then((m) => m.PRESUPUESTO_ROUTES),
       },
 
       {
         path: 'proyectos',
+        canActivate: [moduloGuard('proyectos')],
         loadChildren: () => import('./features/proyectos/proyectos.routes').then((m) => m.PROYECTOS_ROUTES),
       },
 
       {
         path: 'familia',
+        canActivate: [moduloGuard('familia')],
         loadChildren: () => import('./features/familia/familia.routes').then((m) => m.FAMILIA_ROUTES),
       },
 
       {
         path: 'inventario',
+        canActivate: [moduloGuard('inventario')],
         loadChildren: () =>
           import('./features/inventario/inventario.routes').then((m) => m.INVENTARIO_ROUTES),
       },

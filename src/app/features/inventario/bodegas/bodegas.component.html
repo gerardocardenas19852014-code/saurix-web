@@ -20,6 +20,7 @@
 </div>
 
 <app-data-table
+  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
   [columnas]="columnas"
   [filas]="bodegasFiltradas()"
   [cargando]="cargando()"

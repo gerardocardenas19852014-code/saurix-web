@@ -48,6 +48,13 @@ const GRUPOS: GrupoModulo[] = [
         titulo: 'Deudas',
         descripcion: 'Préstamos personales, de auto, etc. — con historial real de abonos.',
       },
+      {
+        ruta: 'presupuesto-anual',
+        icono: '🗓️',
+        color: 'indigo',
+        titulo: 'Presupuesto por año',
+        descripcion: 'Monto presupuestado por categoría para cada año.',
+      },
     ],
   },
   {
@@ -139,13 +146,6 @@ const GRUPOS: GrupoModulo[] = [
         color: 'amber',
         titulo: 'Frecuencia de fijos',
         descripcion: 'Frecuencias disponibles para los movimientos recurrentes.',
-      },
-      {
-        ruta: 'presupuesto-anual',
-        icono: '🗓️',
-        color: 'amber',
-        titulo: 'Presupuesto por año',
-        descripcion: 'Monto presupuestado por categoría para cada año.',
       },
       {
         ruta: 'estatus-presupuesto-anual',

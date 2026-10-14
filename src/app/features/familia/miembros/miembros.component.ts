@@ -12,6 +12,7 @@ import { ColumnaTabla, DataTableComponent } from '../../../shared/components/dat
 import { BitacoraComponent } from '../../../shared/components/bitacora/bitacora.component';
 import { BitacoraService } from '../../../shared/services/bitacora.service';
 import { ToastService } from '../../../shared/services/toast.service';
+import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { ValorLista } from '../../../shared/valor-lista/valor-lista.model';
 import { calcularRfcYCurp, OPCIONES_ENTIDAD, OPCIONES_SEXO } from '../../panel-control/rfc-curp/rfc-curp.util';
 import { colorAvatar, iniciales } from '../../proyectos/kanban/avatar.util';
@@ -79,6 +80,7 @@ const MODULO_BITACORA = 'Familia / Miembros';
 export class MiembrosFamiliaComponent implements OnInit {
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
+  protected readonly preferenciasGrid = inject(PreferenciasGridService);
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);

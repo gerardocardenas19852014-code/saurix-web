@@ -63,6 +63,17 @@
                     {{ accionExtraEtiqueta() }}
                   </button>
                 }
+                @if (accionExtra3Etiqueta()) {
+                  <button
+                    type="button"
+                    class="btn-secondary small"
+                    [title]="accionExtra3Titulo() ?? accionExtra3Etiqueta()"
+                    [attr.aria-label]="accionExtra3Titulo() ?? accionExtra3Etiqueta()"
+                    (click)="accionExtra3.emit(fila)"
+                  >
+                    {{ accionExtra3Etiqueta() }}
+                  </button>
+                }
                 @if (!ocultarEditarEliminar()) {
                   <button
                     type="button"

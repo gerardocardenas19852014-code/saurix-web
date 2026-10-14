@@ -25,7 +25,8 @@
   </select>
 </div>
 
-<app-data-table [columnas]="columnas" [filas]="contactosFiltrados()" [cargando]="cargando()" (editar)="editarContacto($event)" (eliminar)="pedirEliminar($event)" />
+<app-data-table
+  [tamanoPagina]="preferenciasGrid.tamanoPagina()" [columnas]="columnas" [filas]="contactosFiltrados()" [cargando]="cargando()" (editar)="editarContacto($event)" (eliminar)="pedirEliminar($event)" />
 
 @if (modalAbierto()) {
   <div class="modal-overlay modal show d-block" (click)="cerrarModal()">
