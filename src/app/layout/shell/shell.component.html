@@ -183,11 +183,17 @@
       <span class="sidebar-label">Inventario</span>
       <nav class="sidebar-nav" aria-label="Menú de inventario">
         <a routerLink="/inventario" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
-        <a routerLink="/inventario/productos" routerLinkActive="active">📦 Productos y servicios</a>
-        <a routerLink="/inventario/valor-stock" routerLinkActive="active">📊 Valor de stock</a>
-        <a routerLink="/inventario/movimientos-bodega" routerLinkActive="active">🚚 Movimientos entre bodegas</a>
-        <a routerLink="/inventario/sugerencia-reposicion" routerLinkActive="active">🧾 Sugerencia de reposición</a>
-        <a routerLink="/inventario/conteo-fisico" routerLinkActive="active">🧮 Conteo físico</a>
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('inventario', 'Operación')">
+          <span>{{ grupoAbierto('inventario', 'Operación') ? '▾' : '▸' }} Operación</span>
+        </button>
+        @if (grupoAbierto('inventario', 'Operación')) {
+          <a routerLink="/inventario/productos" routerLinkActive="active">📦 Productos y servicios</a>
+          <a routerLink="/inventario/valor-stock" routerLinkActive="active">📊 Valor de stock</a>
+          <a routerLink="/inventario/movimientos-bodega" routerLinkActive="active">🚚 Movimientos entre bodegas</a>
+          <a routerLink="/inventario/sugerencia-reposicion" routerLinkActive="active">🧾 Sugerencia de reposición</a>
+          <a routerLink="/inventario/conteo-fisico" routerLinkActive="active">🧮 Conteo físico</a>
+        }
 
         <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('inventario', 'Catálogos')">
           <span>{{ grupoAbierto('inventario', 'Catálogos') ? '▾' : '▸' }} Catálogos</span>

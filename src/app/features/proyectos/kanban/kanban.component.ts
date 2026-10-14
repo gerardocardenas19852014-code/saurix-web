@@ -752,6 +752,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       'tickets.csv',
       [
         { clave: 'numeroTicket', etiqueta: 'Folio' },
+        { clave: 'folioInterno', etiqueta: 'Folio interno' },
         { clave: 'titulo', etiqueta: 'Título' },
         { clave: 'tipoTexto', etiqueta: 'Tipo' },
         { clave: 'prioridadTexto', etiqueta: 'Prioridad' },

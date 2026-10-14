@@ -102,6 +102,14 @@ export class ProductosComponent implements OnInit, OnDestroy {
    *  se hace desde Movimientos entre bodegas, para no tener dos números que
    *  puedan desincronizarse. */
   protected readonly existenciaBloqueada = signal(false);
+  /** Foto del producto en edición (base64, ya redimensionada) — aparte del
+   *  formulario reactivo por lo mismo que fotoActual en miembros.component.ts:
+   *  más simple de resetear/precargar que meterla como FormControl. */
+  protected readonly fotoActual = signal<string>('');
+  /** true mientras el visor de foto a tamaño completo está abierto (ver
+   *  guardar()/quitarFoto() no la tocan; solo se cierra al abrir/cerrar el
+   *  modal o con el botón ✕ del visor). */
+  protected readonly fotoAmpliada = signal(false);
 
   protected readonly columnas: ColumnaTabla<Producto>[] = [
     { campo: 'codigo', etiqueta: 'Código', formatear: (fila) => fila.codigo ?? '—' },
@@ -185,6 +193,8 @@ export class ProductosComponent implements OnInit, OnDestroy {
     }
     this.productoEnEdicion.set(null);
     this.existenciaBloqueada.set(false);
+    this.fotoActual.set('');
+    this.fotoAmpliada.set(false);
     this.form.controls.existencia.enable();
     this.form.reset({
       id: 0,
@@ -208,6 +218,8 @@ export class ProductosComponent implements OnInit, OnDestroy {
     this.productoEnEdicion.set(producto);
     const bloqueada = tieneBodegaAsignada(producto.id, this.existenciasBodega());
     this.existenciaBloqueada.set(bloqueada);
+    this.fotoActual.set(producto.foto ?? '');
+    this.fotoAmpliada.set(false);
     /** Deshabilitar de verdad el FormControl (no solo el atributo HTML) es
      *  necesario: ReactiveFormsModule reescribe la propiedad `disabled` del
      *  <input> en cada ciclo de detección de cambios según el estado del
@@ -251,6 +263,7 @@ export class ProductosComponent implements OnInit, OnDestroy {
       existencia: esServicio ? null : existencia,
       nivelMinimo: esServicio ? null : nivelMinimo,
       proveedorId: resto.proveedorId || null,
+      foto: this.fotoActual(),
     };
     const esEdicion = this.productoEnEdicion() !== null;
     const peticion = esEdicion
@@ -483,5 +496,73 @@ export class ProductosComponent implements OnInit, OnDestroy {
 
     this.toast.exito(`Importación terminada: ${importados} creado${importados === 1 ? '' : 's'}.`);
     this.cargar();
+  }
+
+  // ── Foto del producto ────────────────────────────────────────────────
+  /** Igual que redimensionarFoto() en miembros.component.ts (FileReader →
+   *  <canvas> → JPEG comprimido), para no guardar fotos de cámara de varios
+   *  MB tal cual en IndexedDB. */
+  private redimensionarFoto(archivo: File): Promise<string> {
+    const MAX_LADO = 480;
+    return new Promise((resolve, reject) => {
+      const lector = new FileReader();
+      lector.onload = () => {
+        const imagen = new Image();
+        imagen.onload = () => {
+          let { width, height } = imagen;
+          if (width > height && width > MAX_LADO) {
+            height = Math.round((height * MAX_LADO) / width);
+            width = MAX_LADO;
+          } else if (height >= width && height > MAX_LADO) {
+            width = Math.round((width * MAX_LADO) / height);
+            height = MAX_LADO;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const contexto = canvas.getContext('2d');
+          if (!contexto) {
+            reject(new Error('Sin contexto de canvas.'));
+            return;
+          }
+          contexto.drawImage(imagen, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
+        };
+        imagen.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+        imagen.src = lector.result as string;
+      };
+      lector.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+      lector.readAsDataURL(archivo);
+    });
+  }
+
+  onFotoSeleccionada(evento: Event): void {
+    const input = evento.target as HTMLInputElement;
+    const archivo = input.files?.[0];
+    if (!archivo) return;
+
+    if (!archivo.type.startsWith('image/')) {
+      this.toast.advertencia('Elige un archivo de imagen (JPG, PNG, etc.).');
+      input.value = '';
+      return;
+    }
+    if (archivo.size > 8 * 1024 * 1024) {
+      this.toast.advertencia('La imagen no puede pesar más de 8 MB.');
+      input.value = '';
+      return;
+    }
+
+    this.redimensionarFoto(archivo)
+      .then((dataUrl) => this.fotoActual.set(dataUrl))
+      .catch(() => this.toast.error('No se pudo procesar la imagen. Intenta con otra.'))
+      .finally(() => {
+        input.value = '';
+      });
+  }
+
+  quitarFoto(input: HTMLInputElement): void {
+    this.fotoActual.set('');
+    this.fotoAmpliada.set(false);
+    input.value = '';
   }
 }

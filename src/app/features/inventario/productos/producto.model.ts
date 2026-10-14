@@ -37,5 +37,10 @@ export interface Producto {
    *  a nivel de tipo porque algún servicio podría igual tener un proveedor
    *  habitual (p.ej. quien lo subcontrata). */
   proveedorId: number | null;
+  /** Foto del producto en base64 (data URL), ya redimensionada/comprimida en
+   *  el navegador antes de guardarse — mismo patrón que Miembro.foto (ver
+   *  miembro-familia.model.ts). Opcional: sin foto se muestra un placeholder
+   *  en el formulario. */
+  foto?: string;
   activo: boolean;
 }

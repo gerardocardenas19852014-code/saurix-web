@@ -37,10 +37,33 @@
 
 @if (modalAbierto()) {
   <div class="modal-overlay show" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
-    <form class="modal-box" style="max-width: 640px;" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+    <form class="modal-box" style="max-width: 980px;" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
       <h3>{{ productoEnEdicion() ? 'Editar producto' : 'Nuevo producto' }}</h3>
 
-      <div class="edit-form form-grid-2col" style="margin-bottom: 18px;">
+      <div class="edit-form form-grid-3col" style="margin-bottom: 18px;">
+        <div class="full-span foto-producto-campo">
+          <span class="foto-producto-etiqueta">Foto del producto</span>
+          <div class="foto-producto-fila">
+            @if (fotoActual()) {
+              <button type="button" class="foto-producto-preview-boton" title="Ver en tamaño completo" (click)="fotoAmpliada.set(true)">
+                <img class="foto-producto-preview" [src]="fotoActual()" alt="Foto del producto" />
+              </button>
+            } @else {
+              <div class="foto-producto-preview foto-producto-preview-vacia">📦</div>
+            }
+            <div class="foto-producto-acciones">
+              <label class="btn-secondary small foto-producto-boton">
+                {{ fotoActual() ? 'Cambiar foto' : 'Subir foto' }}
+                <input #fotoInput type="file" accept="image/*" hidden (change)="onFotoSeleccionada($event)" />
+              </label>
+              @if (fotoActual()) {
+                <button type="button" class="btn-secondary small" (click)="fotoAmpliada.set(true)">Ver tamaño completo</button>
+                <button type="button" class="btn-secondary small" (click)="quitarFoto(fotoInput)">Quitar foto</button>
+              }
+            </div>
+          </div>
+        </div>
+
         <label>
           Nombre
           <input type="text" formControlName="nombre" />
@@ -119,6 +142,18 @@
         <button type="submit" class="btn-primary">Guardar</button>
       </div>
     </form>
+  </div>
+}
+
+@if (fotoAmpliada() && fotoActual()) {
+  <div class="modal-overlay show foto-producto-lightbox-overlay" (click)="fotoAmpliada.set(false)">
+    <div class="foto-producto-lightbox" (click)="$event.stopPropagation()">
+      <button type="button" class="foto-producto-lightbox-cerrar" title="Cerrar" (click)="fotoAmpliada.set(false)">✕</button>
+      <img [src]="fotoActual()" alt="Foto del producto en tamaño completo" />
+      <div class="foto-producto-lightbox-acciones">
+        <a class="btn-secondary small" [href]="fotoActual()" download="foto-producto.jpg">⬇️ Descargar imagen</a>
+      </div>
+    </div>
   </div>
 }
 
