@@ -151,8 +151,16 @@ export class NotificacionesService {
    * Ticket.slaAvisoNivel el nivel ('warning'/'expired') para el que ya se avisó;
    * solo se vuelve a avisar si el nivel escala (de nada a warning, o de warning a
    * expired). Best-effort: cualquier error aquí se traga, nunca debe tumbar el login.
+   *
+   * Corta de inmediato si no hay usuario en sesión (mismo guard que
+   * revisarAlertasTarjetas/revisarAlertasStockBajo, abajo) — sin esto, cuando el
+   * refresh token de Supabase expira (sesión cerrada por su cuenta), este método
+   * seguía llamándose en cada ciclo del intervalo de ShellComponent y mandaba
+   * peticiones reales a la API con un token ya inválido, inundando la consola de
+   * errores 401 sin parar.
    */
   async revisarSlaTickets(): Promise<void> {
+    if (!this.auth.usuarioActual()?.id) return;
     try {
       const [tickets, prioridades, avisosExtra, columnas] = await Promise.all([
         firstValueFrom(this.data.list<Ticket>('Ticket')),
