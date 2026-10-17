@@ -1,5 +1,7 @@
 export type EstadoTurnoCaja = 'Abierto' | 'Cerrado';
 
+export type MomentoConteoCaja = 'Apertura' | 'Cierre';
+
 /**
  * Un turno de caja: desde que se abre (con un monto inicial en efectivo)
  * hasta que se cierra (contando el efectivo físico contra lo que el
@@ -27,6 +29,19 @@ export interface TurnoCaja {
   diferenciaCierre: number | null;
   notasCierre: string | null;
   estado: EstadoTurnoCaja;
+  activo: boolean;
+}
+
+/** Desglose de billetes/monedas contado en Apertura o Cierre — solo existen
+ *  filas cuando el parámetro "Conteo de caja por denominación" está activo
+ *  (ver ConfiguracionVentasService); si está apagado, montoApertura/
+ *  montoCierreContado se siguen llenando a mano, sin ninguna fila aquí. */
+export interface TurnoCajaDenominacion {
+  id: number;
+  turnoCajaId: number;
+  momento: MomentoConteoCaja;
+  valor: number;
+  cantidad: number;
   activo: boolean;
 }
 

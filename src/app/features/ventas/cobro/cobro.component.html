@@ -89,6 +89,21 @@
             </select>
           </label>
         }
+
+        @if (puntosDisponiblesCliente() > 0) {
+          <label title="Programa de lealtad — ver lealtad.service.ts">
+            Puntos disponibles: {{ puntosDisponiblesCliente() }}
+            <input
+              type="number"
+              min="0"
+              [max]="puntosDisponiblesCliente()"
+              step="1"
+              [value]="puntosACanjear()"
+              (change)="actualizarPuntosACanjear($any($event.target).value)"
+              placeholder="Puntos a canjear"
+            />
+          </label>
+        }
       </div>
 
       <div class="pos-ticket-lineas">
@@ -126,7 +141,10 @@
           <div class="pos-ticket-total-linea"><span>Subtotal</span><span>{{ formatMoneda(subtotalCarrito()) }}</span></div>
           <div class="pos-ticket-total-linea"><span>Descuento</span><span>-{{ formatMoneda(descuentoCarrito()) }}</span></div>
         }
-        <div class="pos-ticket-total-linea pos-ticket-total-grande"><span>Total</span><span>{{ formatMoneda(totalCarrito()) }}</span></div>
+        @if (descuentoPuntosSeleccionado() > 0) {
+          <div class="pos-ticket-total-linea"><span>Descuento por puntos ({{ puntosACanjear() }} pts)</span><span>-{{ formatMoneda(descuentoPuntosSeleccionado()) }}</span></div>
+        }
+        <div class="pos-ticket-total-linea pos-ticket-total-grande"><span>Total</span><span>{{ formatMoneda(totalConPuntos()) }}</span></div>
       </div>
 
       <div class="pos-ticket-acciones">
@@ -189,7 +207,7 @@
       <h3>Cobrar</h3>
 
       <div class="pos-ticket-totales" style="margin-bottom: 14px;">
-        <div class="pos-ticket-total-linea"><span>Total de la venta</span><span>{{ formatMoneda(totalCarrito()) }}</span></div>
+        <div class="pos-ticket-total-linea"><span>Total de la venta</span><span>{{ formatMoneda(totalConPuntos()) }}</span></div>
         <div class="pos-ticket-total-linea"><span>Pagado</span><span>{{ formatMoneda(totalPagado()) }}</span></div>
         <div class="pos-ticket-total-linea pos-ticket-total-grande">
           <span>{{ faltantePorPagar() > 0.01 ? 'Falta' : 'Cambio' }}</span>

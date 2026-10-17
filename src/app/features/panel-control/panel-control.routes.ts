@@ -18,4 +18,8 @@ export const PANEL_CONTROL_ROUTES: Routes = [
     path: 'rfc-curp',
     loadComponent: () => import('./rfc-curp/rfc-curp.component').then((m) => m.RfcCurpComponent),
   },
+  {
+    path: 'parametros',
+    loadComponent: () => import('./parametros/parametros.component').then((m) => m.ParametrosComponent),
+  },
 ];

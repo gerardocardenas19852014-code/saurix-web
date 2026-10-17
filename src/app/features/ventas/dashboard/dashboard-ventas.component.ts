@@ -3,7 +3,10 @@ import { DecimalPipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { Venta, VentaItem, VentaPago, MetodoPago, METODOS_PAGO } from '../venta/venta.model';
-import { formatMoneda } from '../ventas.util';
+import { Producto } from '../../inventario/productos/producto.model';
+import { exportarCsv } from '../../../shared/utils/csv.util';
+import { exportarTablaPdf } from '../../../shared/utils/pdf-tabla.util';
+import { formatMoneda, redondear } from '../ventas.util';
 
 interface ProductoVendido {
   nombre: string;
@@ -47,6 +50,7 @@ export class DashboardVentasComponent implements OnInit {
   private readonly ventas = signal<Venta[]>([]);
   private readonly items = signal<VentaItem[]>([]);
   private readonly pagos = signal<VentaPago[]>([]);
+  private readonly productos = signal<Producto[]>([]);
 
   private readonly hoyISO = new Date().toISOString().slice(0, 10);
   private readonly ayerISO = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -73,6 +77,31 @@ export class DashboardVentasComponent implements OnInit {
   });
 
   protected readonly idsVentasHoy = computed(() => new Set(this.ventasHoy().map((v) => v.id)));
+
+  /** Costo de lo vendido hoy — solo renglones con producto real (ver
+   *  Producto.costo, ya existente en Inventario para "Valor de stock"); un
+   *  renglón de "Venta simple" (productoId: null, texto libre) no tiene
+   *  costo conocido, así que no participa — el margen calculado es exacto
+   *  para lo que SÍ es producto de catálogo, y se queda corto si hay mucha
+   *  Venta simple (decisión de alcance: no se le pide costo a mano a una
+   *  venta simple). Usa el costo ACTUAL del producto (Producto.costo), no
+   *  un costo histórico por lote — mismo criterio que Valor de stock. */
+  protected readonly costoVendidoHoy = computed(() => {
+    const ids = this.idsVentasHoy();
+    const productosPorId = new Map(this.productos().map((p) => [p.id, p]));
+    return redondear(
+      this.items()
+        .filter((i) => ids.has(i.ventaId) && i.productoId !== null)
+        .reduce((acc, i) => acc + i.cantidad * (productosPorId.get(i.productoId!)?.costo ?? 0), 0),
+    );
+  });
+
+  protected readonly margenHoy = computed(() => redondear(this.totalHoy() - this.costoVendidoHoy()));
+
+  protected readonly margenPctHoy = computed(() => {
+    const total = this.totalHoy();
+    return total > 0 ? (this.margenHoy() / total) * 100 : 0;
+  });
 
   protected readonly totalPorMetodoHoy = computed<{ metodoPago: MetodoPago; total: number }[]>(() => {
     const ids = this.idsVentasHoy();
@@ -112,11 +141,35 @@ export class DashboardVentasComponent implements OnInit {
       firstValueFrom(this.data.list<Venta>('Venta')),
       firstValueFrom(this.data.list<VentaItem>('VentaItem')),
       firstValueFrom(this.data.list<VentaPago>('VentaPago')),
-    ]).then(([ventas, items, pagos]) => {
+      firstValueFrom(this.data.list<Producto>('Producto')),
+    ]).then(([ventas, items, pagos, productos]) => {
       this.ventas.set(ventas);
       this.items.set(items);
       this.pagos.set(pagos);
+      this.productos.set(productos);
       this.cargando.set(false);
+    });
+  }
+
+  exportarCsv(): void {
+    exportarCsv(
+      'productos_mas_vendidos.csv',
+      [
+        { clave: 'nombre', etiqueta: 'Producto' },
+        { clave: 'cantidad', etiqueta: 'Cantidad' },
+        { clave: 'total', etiqueta: 'Total vendido' },
+      ],
+      this.productosMasVendidos().map((p) => ({ nombre: p.nombre, cantidad: p.cantidad, total: p.total })),
+    );
+  }
+
+  exportarPdf(): void {
+    exportarTablaPdf({
+      nombreArchivo: 'productos_mas_vendidos.pdf',
+      titulo: 'Dashboard de ventas — Productos más vendidos',
+      subtitulo: `Últimos ${DIAS_TOP_PRODUCTOS} días · Ventas de hoy: ${formatMoneda(this.totalHoy())} · Margen: ${formatMoneda(this.margenHoy())}`,
+      columnas: [{ etiqueta: 'Producto' }, { etiqueta: 'Cantidad', ancho: 30 }, { etiqueta: 'Total vendido', ancho: 36 }],
+      filas: this.productosMasVendidos().map((p) => [p.nombre, String(p.cantidad), formatMoneda(p.total)]),
     });
   }
 }

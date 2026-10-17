@@ -1,0 +1,30 @@
+.denominaciones-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.denominaciones-row {
+  display: grid;
+  grid-template-columns: 90px 90px 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.denominaciones-label {
+  font-weight: 500;
+}
+
+.denominaciones-subtotal {
+  text-align: right;
+  color: var(--ink-soft);
+}
+
+.denominaciones-total {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 1.05rem;
+}

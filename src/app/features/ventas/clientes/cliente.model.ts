@@ -46,6 +46,13 @@ export interface Cliente {
    *  ClienteService.obtenerOCrearGenerico(). Nunca se marca a mano desde el
    *  formulario (el checkbox no existe en la pantalla). */
   esGenerico: boolean;
+  /** Puntos acumulados del programa de lealtad (ver lealtad.model.ts) —
+   *  opcional por compatibilidad con clientes creados antes de que existiera
+   *  el programa; tratar como 0 si falta (ver puntosCliente() en
+   *  lealtad.service.ts). Nunca se edita a mano desde el formulario de
+   *  Cliente — solo lo mueve ProgramaLealtadService, ganado al vender y
+   *  descontado al canjear. */
+  puntosAcumulados?: number;
   activo: boolean;
 }
 

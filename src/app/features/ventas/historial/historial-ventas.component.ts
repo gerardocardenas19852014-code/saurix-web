@@ -13,8 +13,12 @@ import { Cliente } from '../clientes/cliente.model';
 import { MetodoPago, METODOS_PAGO, Venta, VentaItem, VentaPago } from '../venta/venta.model';
 import { VentaService } from '../venta/venta.service';
 import { Devolucion, DevolucionItem } from '../devolucion/devolucion.model';
+import { CuentaPorCobrar } from '../cuenta-por-cobrar/cuenta-por-cobrar.model';
+import { CuentaPorCobrarService } from '../cuenta-por-cobrar/cuenta-por-cobrar.service';
 import { cantidadDisponibleParaDevolver, DevolucionService, LineaDevolucionEntrada } from '../devolucion/devolucion.service';
 import { construirTicketHtml, ESTILO_TICKET, formatMoneda, redondear } from '../ventas.util';
+import { exportarCsv } from '../../../shared/utils/csv.util';
+import { exportarTablaPdf } from '../../../shared/utils/pdf-tabla.util';
 
 /**
  * Historial de ventas — todas las ventas registradas (de cualquier turno),
@@ -45,6 +49,7 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
   private readonly ventaService = inject(VentaService);
   private readonly devolucionService = inject(DevolucionService);
+  private readonly cuentaPorCobrarService = inject(CuentaPorCobrarService);
   private readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
   protected readonly toast = inject(ToastService);
@@ -98,6 +103,7 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
   protected readonly itemsDetalle = signal<VentaItem[]>([]);
   protected readonly pagosDetalle = signal<VentaPago[]>([]);
   protected readonly devolucionItemsDetalle = signal<DevolucionItem[]>([]);
+  protected readonly cuentasPorCobrarDetalle = signal<CuentaPorCobrar[]>([]);
   protected readonly cargandoDetalle = signal(false);
   protected readonly ventaACancelar = signal<Venta | null>(null);
 
@@ -111,7 +117,10 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
    *  reposición. Por eso solo se permite cancelar una venta que todavía no
    *  tiene ninguna devolución registrada. */
   protected readonly puedeCancelarDetalle = computed(
-    () => this.ventaDetalle()?.estado === 'Completada' && this.devolucionItemsDetalle().length === 0,
+    () =>
+      this.ventaDetalle()?.estado === 'Completada' &&
+      this.devolucionItemsDetalle().length === 0 &&
+      this.cuentasPorCobrarDetalle().every((c) => c.estado === 'Pendiente' && c.saldoPendiente >= c.montoOriginal - 0.01),
   );
 
   protected readonly puedeDevolverDetalle = computed(
@@ -190,13 +199,15 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
    *  después de registrar una devolución) sin parpadear "Cargando…" otra
    *  vez ni perder el modal abierto. */
   private async cargarDetalle(venta: Venta): Promise<void> {
-    const [items, pagos, devoluciones] = await Promise.all([
+    const [items, pagos, devoluciones, cuentasPorCobrar] = await Promise.all([
       firstValueFrom(this.data.list<VentaItem>('VentaItem', { ventaId: venta.id })),
       firstValueFrom(this.data.list<VentaPago>('VentaPago', { ventaId: venta.id })),
       firstValueFrom(this.data.list<Devolucion>('Devolucion', { ventaId: venta.id })),
+      this.cuentaPorCobrarService.porVenta(venta.id),
     ]);
     this.itemsDetalle.set(items);
     this.pagosDetalle.set(pagos);
+    this.cuentasPorCobrarDetalle.set(cuentasPorCobrar);
 
     if (devoluciones.length === 0) {
       this.devolucionItemsDetalle.set([]);
@@ -213,6 +224,7 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
     this.itemsDetalle.set([]);
     this.pagosDetalle.set([]);
     this.devolucionItemsDetalle.set([]);
+    this.cuentasPorCobrarDetalle.set([]);
   }
 
   disponibleParaDevolver(item: VentaItem): number {
@@ -297,11 +309,62 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
     const venta = this.ventaACancelar();
     if (!venta) return;
 
-    const ventaCancelada = await this.ventaService.cancelar(venta);
-    this.toast.exito(`Venta ${venta.folio} cancelada — existencia repuesta.`);
-    this.ventaACancelar.set(null);
-    this.ventaDetalle.set(ventaCancelada);
-    await this.cargar();
+    try {
+      const ventaCancelada = await this.ventaService.cancelar(venta);
+      this.toast.exito(`Venta ${venta.folio} cancelada — existencia repuesta.`);
+      this.ventaACancelar.set(null);
+      this.ventaDetalle.set(ventaCancelada);
+      await this.cargar();
+    } catch (error) {
+      this.ventaACancelar.set(null);
+      this.toast.error(error instanceof Error ? error.message : 'No se pudo cancelar la venta.');
+    }
+  }
+
+  exportarCsv(): void {
+    exportarCsv(
+      'historial_ventas.csv',
+      [
+        { clave: 'folio', etiqueta: 'Folio' },
+        { clave: 'fecha', etiqueta: 'Fecha' },
+        { clave: 'cliente', etiqueta: 'Cliente' },
+        { clave: 'vendedor', etiqueta: 'Vendedor' },
+        { clave: 'total', etiqueta: 'Total' },
+        { clave: 'estado', etiqueta: 'Estado' },
+      ],
+      this.ventasFiltradas().map((v) => ({
+        folio: v.folio,
+        fecha: this.formatearFecha(v.fecha),
+        cliente: this.nombreCliente(v.clienteId),
+        vendedor: this.nombreVendedor(v.vendedorUsuarioId),
+        total: v.total,
+        estado: v.estado,
+      })),
+    );
+  }
+
+  exportarPdf(): void {
+    exportarTablaPdf({
+      nombreArchivo: 'historial_ventas.pdf',
+      titulo: 'Historial de ventas',
+      subtitulo: `Del ${this.fechaDesde()} al ${this.fechaHasta()}`,
+      columnas: [
+        { etiqueta: 'Folio', ancho: 26 },
+        { etiqueta: 'Fecha', ancho: 32 },
+        { etiqueta: 'Cliente', ancho: 50 },
+        { etiqueta: 'Vendedor', ancho: 40 },
+        { etiqueta: 'Total', ancho: 24 },
+        { etiqueta: 'Estado' },
+      ],
+      filas: this.ventasFiltradas().map((v) => [
+        v.folio,
+        this.formatearFecha(v.fecha),
+        this.nombreCliente(v.clienteId),
+        this.nombreVendedor(v.vendedorUsuarioId),
+        formatMoneda(v.total),
+        v.estado,
+      ]),
+    });
   }
 
   imprimirTicket(venta: Venta, items: VentaItem[], pagos: VentaPago[]): void {

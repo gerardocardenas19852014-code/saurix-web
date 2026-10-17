@@ -1,0 +1,47 @@
+<div class="page-header">
+  <h1>Comisiones de vendedores</h1>
+</div>
+
+<p class="hint" style="margin-top:-6px;">
+  Configura el porcentaje o monto fijo de comisión de cada vendedor — el cálculo por periodo está en
+  Reporte de comisiones.
+</p>
+
+<app-data-table
+  [columnas]="columnas"
+  [filas]="filas()"
+  [cargando]="cargando()"
+  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+  [ocultarEditarEliminar]="true"
+  accionExtraEtiqueta="✏️ Editar"
+  (accionExtra)="abrirEditar($event)"
+/>
+
+@if (filaEditando(); as fila) {
+  <div class="modal-overlay">
+    <div class="modal-box" style="max-width: 400px;">
+      <h2>Comisión — {{ fila.usuario.nombre }}</h2>
+      <form class="edit-form" [formGroup]="form" (ngSubmit)="guardar()">
+        <div class="tipo-producto-toggle" role="group" aria-label="Tipo de comisión">
+          <label class="checkbox-inline">
+            <input type="radio" formControlName="tipo" value="Porcentaje" />
+            Porcentaje del total vendido
+          </label>
+          <label class="checkbox-inline">
+            <input type="radio" formControlName="tipo" value="MontoFijo" />
+            Monto fijo por venta
+          </label>
+        </div>
+        <label>
+          {{ form.controls.tipo.value === 'Porcentaje' ? 'Porcentaje (%)' : 'Monto fijo ($)' }}
+          <input type="number" step="0.01" min="0" formControlName="valor" />
+        </label>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="cerrarEditar()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="guardando()">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

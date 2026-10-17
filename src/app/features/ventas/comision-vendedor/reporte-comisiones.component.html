@@ -1,0 +1,65 @@
+<div class="page-header">
+  <h1>Reporte de comisiones</h1>
+</div>
+
+<div class="toolbar">
+  <label>
+    Desde
+    <input type="date" [value]="fechaDesde()" (change)="fechaDesde.set($any($event.target).value)" />
+  </label>
+  <label>
+    Hasta
+    <input type="date" [value]="fechaHasta()" (change)="fechaHasta.set($any($event.target).value)" />
+  </label>
+</div>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else {
+  <div class="dashboard-stats" style="margin-bottom: 24px;">
+    <div class="dashboard-stat-card">
+      <div class="num">{{ formatMoneda(totalComisiones()) }}</div>
+      <div class="label">Total a pagar en comisiones</div>
+    </div>
+  </div>
+
+  <div class="catalog-group">
+    <h2 class="catalog-group-title">Comisión por vendedor</h2>
+    <div class="grid-table-scroll">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th>Vendedor</th>
+            <th># Ventas</th>
+            <th>Total vendido</th>
+            <th>Devuelto</th>
+            <th>Ventas netas</th>
+            <th>Comisión configurada</th>
+            <th>A pagar</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (fila of filas(); track fila.usuario.id) {
+            <tr>
+              <td>{{ fila.usuario.nombre }}</td>
+              <td>{{ fila.numeroVentas }}</td>
+              <td>{{ formatMoneda(fila.totalVentas) }}</td>
+              <td>{{ formatMoneda(fila.totalDevuelto) }}</td>
+              <td>{{ formatMoneda(fila.ventasNetas) }}</td>
+              <td>
+                @if (fila.comision) {
+                  {{ fila.comision.tipo === 'Porcentaje' ? fila.comision.valor + '%' : formatMoneda(fila.comision.valor) + ' por venta' }}
+                } @else {
+                  Sin comisión
+                }
+              </td>
+              <td><strong>{{ formatMoneda(fila.montoComision) }}</strong></td>
+            </tr>
+          } @empty {
+            <tr><td colspan="7" class="empty">Sin ventas completadas en este periodo.</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}

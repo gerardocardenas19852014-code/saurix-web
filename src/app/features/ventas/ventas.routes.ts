@@ -42,4 +42,24 @@ export const VENTAS_ROUTES: Routes = [
     path: 'cotizaciones',
     loadComponent: () => import('./cotizacion/cotizaciones.component').then((m) => m.CotizacionesComponent),
   },
+  {
+    path: 'cuentas-por-cobrar',
+    loadComponent: () =>
+      import('./cuenta-por-cobrar/cuentas-por-cobrar.component').then((m) => m.CuentasPorCobrarComponent),
+  },
+  {
+    path: 'comisiones-vendedores',
+    loadComponent: () =>
+      import('./comision-vendedor/comisiones-vendedores.component').then((m) => m.ComisionesVendedoresComponent),
+  },
+  {
+    path: 'reporte-comisiones',
+    loadComponent: () =>
+      import('./comision-vendedor/reporte-comisiones.component').then((m) => m.ReporteComisionesComponent),
+  },
+  {
+    path: 'configuracion-lealtad',
+    loadComponent: () =>
+      import('./lealtad/configuracion-lealtad.component').then((m) => m.ConfiguracionLealtadComponent),
+  },
 ];

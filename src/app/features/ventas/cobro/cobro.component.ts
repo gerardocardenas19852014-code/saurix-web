@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { ToastService } from '../../../shared/services/toast.service';
+import { ProgramaLealtadService } from '../lealtad/lealtad.service';
 import { SelectBuscableComponent, OpcionBuscable } from '../../../shared/components/select-buscable/select-buscable.component';
 import { EscaneoCodigoComponent } from '../../../shared/components/escaneo-codigo/escaneo-codigo.component';
 import { Producto } from '../../inventario/productos/producto.model';
@@ -91,6 +92,7 @@ export class CobroComponent implements OnInit, OnDestroy {
   private readonly clienteService = inject(ClienteService);
   private readonly turnoCajaService = inject(TurnoCajaService);
   private readonly ventaService = inject(VentaService);
+  protected readonly lealtadService = inject(ProgramaLealtadService);
 
   protected readonly formatMoneda = formatMoneda;
   protected readonly metodosPago = METODOS_PAGO;
@@ -166,14 +168,38 @@ export class CobroComponent implements OnInit, OnDestroy {
   );
   protected readonly totalCarrito = computed(() => redondear(this.subtotalCarrito() - this.descuentoCarrito()));
 
+  // ── Programa de lealtad (ver lealtad.service.ts) ────────────────────────
+  protected readonly puntosACanjear = signal(0);
+
+  /** Puntos disponibles del cliente elegido — 0 si es el genérico "Público
+   *  en General" o si el programa está apagado (no tiene sentido ofrecer
+   *  canjear algo que no se puede canjear). */
+  protected readonly puntosDisponiblesCliente = computed(() => {
+    const cliente = this.clienteSeleccionado();
+    if (!cliente || cliente.esGenerico || !this.lealtadService.programaActivo()) return 0;
+    return this.lealtadService.puntosDeCliente(cliente);
+  });
+
+  protected readonly descuentoPuntosSeleccionado = computed(() =>
+    Math.min(this.lealtadService.descuentoPorPuntos(this.puntosACanjear()), this.totalCarrito()),
+  );
+
+  /** Total real a cobrar, ya con el descuento de puntos aplicado — esto es
+   *  lo que de verdad hay que cubrir con los pagos (ver faltantePorPagar). */
+  protected readonly totalConPuntos = computed(() =>
+    redondear(Math.max(0, this.totalCarrito() - this.descuentoPuntosSeleccionado())),
+  );
+
   protected readonly totalPagado = computed(() => redondear(this.pagos().reduce((acc, p) => acc + p.monto, 0)));
-  protected readonly faltantePorPagar = computed(() => redondear(this.totalCarrito() - this.totalPagado()));
+  protected readonly faltantePorPagar = computed(() => redondear(this.totalConPuntos() - this.totalPagado()));
 
   async ngOnInit(): Promise<void> {
     document.documentElement.setAttribute('data-wide', 'grid');
 
     const usuario = this.auth.usuarioActual();
     if (!usuario) return;
+
+    await this.lealtadService.cargar();
 
     const turno = await this.turnoCajaService.turnoAbierto(usuario.id);
     if (!turno) {
@@ -339,6 +365,7 @@ export class CobroComponent implements OnInit, OnDestroy {
   elegirCliente(id: number | string | null): void {
     const nuevoId = id === null ? null : Number(id);
     this.clienteId.set(nuevoId);
+    this.puntosACanjear.set(0); // cambiar de cliente invalida cualquier canje que se tuviera capturado
 
     // "Información de venta" del cliente (ver cliente-form-modal.component.ts):
     // su lista de precio predeterminada se preselecciona aquí — sigue siendo
@@ -354,7 +381,19 @@ export class CobroComponent implements OnInit, OnDestroy {
   alGuardarCliente(cliente: Cliente): void {
     this.clientes.update((lista) => [...lista, cliente]);
     this.clienteId.set(cliente.id);
+    this.puntosACanjear.set(0);
     this.modalClienteAbierto.set(false);
+  }
+
+  /** Clamba la cantidad de puntos a canjear entre 0 y los puntos disponibles del cliente. */
+  actualizarPuntosACanjear(valorTexto: string): void {
+    const valor = Number(valorTexto);
+    const disponibles = this.puntosDisponiblesCliente();
+    if (!Number.isFinite(valor) || valor <= 0) {
+      this.puntosACanjear.set(0);
+      return;
+    }
+    this.puntosACanjear.set(Math.min(Math.floor(valor), disponibles));
   }
 
   // ── Cobro ───────────────────────────────────────────────────────────
@@ -364,7 +403,7 @@ export class CobroComponent implements OnInit, OnDestroy {
       return;
     }
     this.pagos.set([]);
-    this.pagoForm.reset({ metodoPago: 'Efectivo', monto: this.totalCarrito(), montoRecibido: null });
+    this.pagoForm.reset({ metodoPago: 'Efectivo', monto: this.totalConPuntos(), montoRecibido: null });
     this.modalPagoAbierto.set(true);
   }
 
@@ -377,6 +416,10 @@ export class CobroComponent implements OnInit, OnDestroy {
     const faltante = this.faltantePorPagar();
     if (valor.monto > faltante + 0.01) {
       this.toast.advertencia(`El monto no puede ser mayor al saldo pendiente (${this.formatMoneda(faltante)}).`);
+      return;
+    }
+    if (valor.metodoPago === 'Crédito' && this.clienteSeleccionado()?.esGenerico) {
+      this.toast.advertencia('Elige un cliente real para vender a crédito — "Público en General" no puede fiar.');
       return;
     }
 
@@ -447,11 +490,13 @@ export class CobroComponent implements OnInit, OnDestroy {
           bodegaId: i.bodegaId,
         })),
         pagos: this.pagos().map((p) => ({ metodoPago: p.metodoPago, monto: p.monto, montoRecibido: p.montoRecibido, cambio: p.cambio })),
+        puntosACanjear: this.puntosACanjear(),
       });
 
       this.toast.exito(`Venta ${venta.folio} registrada.`);
       this.carrito.set([]);
       this.pagos.set([]);
+      this.puntosACanjear.set(0);
       this.modalPagoAbierto.set(false);
 
       this.ventaRecienCobrada.set(venta);

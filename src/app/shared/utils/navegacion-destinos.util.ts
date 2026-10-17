@@ -62,6 +62,7 @@ export const DESTINOS: DestinoPaleta[] = [
   { label: 'Inicio', grupo: 'Panel de Control', ruta: '/panel-control', icono: '⌂' },
   { label: 'Apariencia', grupo: 'Panel de Control', ruta: '/panel-control/apariencia', icono: '🎨' },
   { label: 'Respaldo y restauración', grupo: 'Panel de Control', ruta: '/panel-control/respaldo', icono: '💾' },
+  { label: 'Parámetros del sistema', grupo: 'Panel de Control', ruta: '/panel-control/parametros', icono: '🧮' },
 
   // Faltaba el módulo Familia completo (hallado 2026-10-10 al agregar
   // Directorio familiar) — sin esto, WikiDocs no podía referenciar ninguna
@@ -107,6 +108,10 @@ export const DESTINOS: DestinoPaleta[] = [
   { label: 'Historial de ventas', grupo: 'Ventas', ruta: '/ventas/historial', icono: '🧾' },
   { label: 'Dashboard de ventas', grupo: 'Ventas', ruta: '/ventas/dashboard', icono: '📊' },
   { label: 'Cotizaciones', grupo: 'Ventas', ruta: '/ventas/cotizaciones', icono: '📝' },
+  { label: 'Cuentas por cobrar', grupo: 'Ventas', ruta: '/ventas/cuentas-por-cobrar', icono: '💳' },
+  { label: 'Comisiones de vendedores', grupo: 'Ventas', ruta: '/ventas/comisiones-vendedores', icono: '🤝' },
+  { label: 'Programa de lealtad', grupo: 'Ventas', ruta: '/ventas/configuracion-lealtad', icono: '🎁' },
+  { label: 'Reporte de comisiones', grupo: 'Ventas', ruta: '/ventas/reporte-comisiones', icono: '🤝' },
   { label: 'Clientes', grupo: 'Ventas', ruta: '/ventas/clientes', icono: '👤' },
   { label: 'Regímenes fiscales', grupo: 'Ventas', ruta: '/ventas/regimenes-fiscales', icono: '🧾' },
 ];

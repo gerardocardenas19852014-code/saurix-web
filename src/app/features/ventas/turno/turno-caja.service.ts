@@ -3,7 +3,10 @@ import { firstValueFrom } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { Venta } from '../venta/venta.model';
 import { VentaPago } from '../venta/venta.model';
-import { ResumenTurno, TurnoCaja } from './turno-caja.model';
+import { DenominacionCantidad } from '../../../shared/components/conteo-denominaciones/conteo-denominaciones.model';
+import { AbonoCuentaPorCobrar } from '../cuenta-por-cobrar/cuenta-por-cobrar.model';
+import { METODOS_PAGO } from '../venta/venta.model';
+import { MomentoConteoCaja, ResumenTurno, TurnoCaja, TurnoCajaDenominacion } from './turno-caja.model';
 
 /**
  * Abrir/cerrar turno de caja y resumir sus ventas — único lugar que calcula
@@ -56,9 +59,19 @@ export class TurnoCajaService {
     );
     const pagos = pagosPorVenta.flat();
 
-    const totalPorMetodo = ['Efectivo', 'Tarjeta', 'Transferencia'].map((metodoPago) => ({
+    // Abonos a cuentas por cobrar cobrados DURANTE este turno (de ventas de
+    // cualquier turno, incluso anteriores — ver AbonoCuentaPorCobrar.model.ts):
+    // ese dinero sí entra al cajón de este turno, aunque la venta original
+    // no sea de hoy.
+    const abonos = (
+      await firstValueFrom(this.data.list<AbonoCuentaPorCobrar>('AbonoCuentaPorCobrar', { turnoCajaId: turno.id }))
+    ).filter((a) => a.activo !== false);
+
+    const totalPorMetodo = METODOS_PAGO.map((metodoPago) => ({
       metodoPago,
-      total: pagos.filter((p) => p.metodoPago === metodoPago).reduce((acc, p) => acc + p.monto, 0),
+      total:
+        pagos.filter((p) => p.metodoPago === metodoPago).reduce((acc, p) => acc + p.monto, 0) +
+        abonos.filter((a) => a.metodoPago === metodoPago).reduce((acc, a) => acc + a.monto, 0),
     }));
 
     const efectivo = totalPorMetodo.find((m) => m.metodoPago === 'Efectivo')?.total ?? 0;
@@ -82,5 +95,35 @@ export class TurnoCajaService {
         estado: 'Cerrado',
       }),
     );
+  }
+
+  /** Guarda el desglose de billetes/monedas de Apertura o Cierre — solo se
+   *  llama cuando el parámetro de conteo por denominación está activo (ver
+   *  ConfiguracionVentasService). No reemplaza montoApertura/
+   *  montoCierreContado (que siguen siendo la fuente de verdad del total);
+   *  es solo el detalle de cómo se llegó a ese total. */
+  async guardarDenominaciones(
+    turnoCajaId: number,
+    momento: MomentoConteoCaja,
+    desglose: DenominacionCantidad[],
+  ): Promise<void> {
+    for (const linea of desglose) {
+      await firstValueFrom(
+        this.data.alta<TurnoCajaDenominacion>('TurnoCajaDenominacion', {
+          turnoCajaId,
+          momento,
+          valor: linea.valor,
+          cantidad: linea.cantidad,
+          activo: true,
+        }),
+      );
+    }
+  }
+
+  async obtenerDenominaciones(turnoCajaId: number, momento: MomentoConteoCaja): Promise<TurnoCajaDenominacion[]> {
+    const filas = await firstValueFrom(
+      this.data.list<TurnoCajaDenominacion>('TurnoCajaDenominacion', { turnoCajaId }),
+    );
+    return filas.filter((f) => f.momento === momento);
   }
 }

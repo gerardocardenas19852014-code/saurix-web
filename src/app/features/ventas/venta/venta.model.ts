@@ -1,7 +1,17 @@
 export type EstadoVenta = 'Completada' | 'Cancelada';
-export type MetodoPago = 'Efectivo' | 'Tarjeta' | 'Transferencia';
+export type MetodoPago = 'Efectivo' | 'Tarjeta' | 'Transferencia' | 'Crédito';
 
-export const METODOS_PAGO: MetodoPago[] = ['Efectivo', 'Tarjeta', 'Transferencia'];
+export const METODOS_PAGO: MetodoPago[] = ['Efectivo', 'Tarjeta', 'Transferencia', 'Crédito'];
+
+/** Métodos de pago que SÍ representan dinero ya cobrado (ver
+ *  TurnoCajaService.resumen()) — 'Crédito' se excluye a propósito: ese
+ *  monto queda pendiente de cobrar (ver CuentaPorCobrar) hasta que el
+ *  cliente abone, así que no debe contarse como vendido-y-cobrado. */
+export const METODOS_PAGO_COBRADOS: MetodoPago[] = ['Efectivo', 'Tarjeta', 'Transferencia'];
+
+/** Un abono a una cuenta por cobrar no puede ser, a su vez, "a crédito" —
+ *  este tipo excluye esa opción en el formulario de abono. */
+export type MetodoPagoCobrado = Exclude<MetodoPago, 'Crédito'>;
 
 /**
  * Una venta ya cobrada — folio autogenerado 'VTA-0001' (ver

@@ -1,0 +1,19 @@
+<div class="denominaciones-grid">
+  @for (d of denominaciones; track d.valor) {
+    <label class="denominaciones-row">
+      <span class="denominaciones-label">{{ d.tipo === 'Billete' ? '💵' : '🪙' }} ${{ d.valor }}</span>
+      <input
+        type="number"
+        min="0"
+        step="1"
+        [value]="cantidadDe(d.valor)"
+        (input)="actualizarCantidad(d.valor, $any($event.target).value)"
+      />
+      <span class="denominaciones-subtotal">${{ (d.valor * cantidadDe(d.valor)).toFixed(2) }}</span>
+    </label>
+  }
+</div>
+<div class="denominaciones-total">
+  <span>Total contado</span>
+  <strong>${{ total().toFixed(2) }}</strong>
+</div>

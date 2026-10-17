@@ -49,6 +49,14 @@ const GRUPOS: GrupoConfig[] = [
         descripcion: 'Calcula el RFC (con homoclave) y el CURP a partir de nombre, apellidos y fecha de nacimiento.',
         grupo: 'General',
       },
+      {
+        ruta: 'parametros',
+        icono: '🧮',
+        color: 'generic',
+        titulo: 'Parámetros del sistema',
+        descripcion: 'Parámetros que afectan a otros módulos — p.ej. el conteo de caja por denominación en Ventas.',
+        grupo: 'General',
+      },
     ],
   },
 ];

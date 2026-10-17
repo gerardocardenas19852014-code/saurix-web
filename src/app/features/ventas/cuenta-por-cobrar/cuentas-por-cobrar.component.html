@@ -1,0 +1,77 @@
+<div class="page-header">
+  <h1>Cuentas por cobrar</h1>
+</div>
+
+<p class="hint" style="margin-top:-6px;">
+  Ventas cobradas a crédito (método "Crédito" en Cobro) — registra aquí los abonos del cliente
+  conforme va pagando.
+</p>
+
+<div class="toolbar">
+  <input
+    type="search"
+    placeholder="Buscar por cliente o folio…"
+    [value]="busqueda()"
+    (input)="busqueda.set($any($event.target).value)"
+  />
+  <label class="checkbox-inline">
+    <input type="checkbox" [checked]="soloPendientes()" (change)="soloPendientes.set($any($event.target).checked)" />
+    Solo pendientes
+  </label>
+</div>
+
+<app-data-table
+  [columnas]="columnas"
+  [filas]="cuentasFiltradas()"
+  [cargando]="cargando()"
+  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+  [ocultarEditarEliminar]="true"
+  accionExtraEtiqueta="💰 Abonar"
+  (accionExtra)="abrirAbono($event)"
+/>
+
+@if (cuentaAbonar(); as cuenta) {
+  <div class="modal-overlay">
+    <div class="modal-box" style="max-width: 440px;">
+      <h2>Registrar abono — {{ nombreCliente(cuenta.clienteId) }}</h2>
+      <p class="hint">Venta {{ folioVenta(cuenta.ventaId) }} · Saldo pendiente: <strong>{{ formatMoneda(cuenta.saldoPendiente) }}</strong></p>
+
+      @if (abonosPrevios().length > 0) {
+        <div class="pos-ticket-lineas" style="margin-bottom: 14px;">
+          @for (abono of abonosPrevios(); track abono.id) {
+            <div class="pos-ticket-item">
+              <div class="pos-ticket-item-info">
+                <span class="pos-ticket-item-desc">{{ abono.metodoPago }}</span>
+              </div>
+              <span class="pos-ticket-item-subtotal">{{ formatMoneda(abono.monto) }}</span>
+            </div>
+          }
+        </div>
+      }
+
+      <form class="edit-form" [formGroup]="abonoForm" (ngSubmit)="confirmarAbono()">
+        <label>
+          Monto del abono
+          <input type="number" step="0.01" min="0.01" formControlName="monto" />
+        </label>
+        <label>
+          Método de pago
+          <select formControlName="metodoPago">
+            @for (metodo of metodosPagoCobrados; track metodo) {
+              <option [value]="metodo">{{ metodo }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          Notas (opcional)
+          <input type="text" formControlName="notas" />
+        </label>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" (click)="cerrarAbono()">Cancelar</button>
+          <button type="submit" class="btn-primary" [disabled]="guardandoAbono()">Registrar abono</button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

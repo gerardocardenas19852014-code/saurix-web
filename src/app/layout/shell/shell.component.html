@@ -231,15 +231,17 @@
           <a routerLink="/ventas/apertura-turno" routerLinkActive="active">🔓 Apertura de caja</a>
           <a routerLink="/ventas/corte-turno" routerLinkActive="active">📋 Corte de caja</a>
           <a routerLink="/ventas/cierre-turno" routerLinkActive="active">🔒 Cierre de caja</a>
-          <a routerLink="/ventas/historial" routerLinkActive="active">🧾 Historial de ventas</a>
           <a routerLink="/ventas/cotizaciones" routerLinkActive="active">📝 Cotizaciones</a>
+          <a routerLink="/ventas/cuentas-por-cobrar" routerLinkActive="active">💳 Cuentas por cobrar</a>
         }
 
         <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('ventas', 'Reportes')">
           <span>{{ grupoAbierto('ventas', 'Reportes') ? '▾' : '▸' }} Reportes</span>
         </button>
         @if (grupoAbierto('ventas', 'Reportes')) {
+          <a routerLink="/ventas/historial" routerLinkActive="active">🧾 Historial de ventas</a>
           <a routerLink="/ventas/dashboard" routerLinkActive="active">📊 Dashboard</a>
+          <a routerLink="/ventas/reporte-comisiones" routerLinkActive="active">🤝 Reporte de comisiones</a>
         }
 
         <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('ventas', 'Administración')">
@@ -254,6 +256,8 @@
         </button>
         @if (grupoAbierto('ventas', 'Catálogos')) {
           <a routerLink="/ventas/regimenes-fiscales" routerLinkActive="active">🧾 Regímenes fiscales</a>
+          <a routerLink="/ventas/comisiones-vendedores" routerLinkActive="active">🤝 Comisiones de vendedores</a>
+          <a routerLink="/ventas/configuracion-lealtad" routerLinkActive="active">🎁 Programa de lealtad</a>
         }
       </nav>
     }

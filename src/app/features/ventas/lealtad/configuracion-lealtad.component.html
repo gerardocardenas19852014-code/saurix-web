@@ -1,0 +1,41 @@
+<div class="page-header">
+  <h1>Programa de lealtad</h1>
+</div>
+
+<form class="settings-card" [formGroup]="form" (ngSubmit)="guardar()">
+  <h2 class="settings-card-title">🎁 Puntos por compra</h2>
+
+  <div class="toggle-row">
+    <div>
+      <p class="toggle-row-title">Programa activo</p>
+      <p class="hint" style="margin:2px 0 0;">
+        Apaga o enciende todo el programa de un jalón: con esto apagado, Cobro no muestra puntos
+        ni gana/canjea nada, aunque haya clientes con saldo acumulado de antes.
+      </p>
+    </div>
+    <label class="toggle-switch">
+      <input type="checkbox" formControlName="programaActivo" />
+      <span class="toggle-switch-track"></span>
+    </label>
+  </div>
+
+  <label style="display:block; margin-top:16px;">
+    Pesos vendidos por cada punto ganado
+    <input type="number" min="0.01" step="0.01" formControlName="pesosPorPunto" />
+    <span class="hint">Ej. 10 = el cliente gana 1 punto por cada $10 de venta (sobre el total ya con descuentos).</span>
+  </label>
+
+  <label style="display:block; margin-top:12px;">
+    Pesos de descuento por cada punto canjeado
+    <input type="number" min="0.01" step="0.01" formControlName="pesosDescuentoPorPunto" />
+    <span class="hint">Ej. 1 = cada punto que el cliente canjea en Cobro vale $1 de descuento.</span>
+  </label>
+
+  @if (!esAdmin) {
+    <p class="hint" style="margin:12px 0 0;">Solo un administrador puede cambiar esta configuración.</p>
+  }
+
+  <div class="modal-actions" style="margin-top:16px;">
+    <button type="submit" class="btn-primary" [disabled]="!esAdmin">Guardar</button>
+  </div>
+</form>

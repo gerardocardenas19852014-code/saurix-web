@@ -33,7 +33,19 @@
       <div class="num">{{ formatMoneda(totalAyer()) }}</div>
       <div class="label">Ventas de ayer</div>
     </div>
+    <div class="dashboard-stat-card">
+      <div class="num">{{ formatMoneda(costoVendidoHoy()) }}</div>
+      <div class="label">Costo de lo vendido hoy</div>
+    </div>
+    <div class="dashboard-stat-card" [class.dashboard-stat-danger]="margenHoy() < 0">
+      <div class="num">{{ formatMoneda(margenHoy()) }}</div>
+      <div class="label">Margen bruto de hoy ({{ margenPctHoy() | number: '1.0-0' }}%)</div>
+    </div>
   </div>
+  <p class="hint" style="margin-top:-18px; margin-bottom:24px;">
+    El costo/margen solo considera renglones con producto del catálogo (usa Producto.costo) — una
+    "Venta simple" sin producto no tiene costo conocido y no se incluye.
+  </p>
 
   <div class="catalog-group" style="margin-bottom:24px;">
     <h2 class="catalog-group-title">Ventas de hoy por método de pago</h2>
@@ -53,7 +65,13 @@
   </div>
 
   <div class="catalog-group">
-    <h2 class="catalog-group-title">Productos más vendidos (últimos 30 días)</h2>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+      <h2 class="catalog-group-title" style="margin:0; border-bottom:none; padding-bottom:0;">Productos más vendidos (últimos 30 días)</h2>
+      <div class="grid-filter">
+        <button type="button" class="btn-secondary small" (click)="exportarCsv()">⬇ Exportar CSV</button>
+        <button type="button" class="btn-secondary small" (click)="exportarPdf()">⬇ Exportar PDF</button>
+      </div>
+    </div>
     @if (productosMasVendidos().length > 0) {
       <div class="grid-table-scroll">
         <table class="grid-table">
