@@ -1,0 +1,72 @@
+<div class="page-header">
+  <h1>Dashboard</h1>
+</div>
+
+<p class="hint" style="margin-top:-6px;">
+  Un resumen rápido de cómo está el inventario ahora mismo, sin tener que entrar a cada pantalla
+  por separado.
+</p>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else {
+  <div class="dashboard-stats" style="margin-bottom:24px;">
+    <div class="dashboard-stat-card">
+      <div class="num">{{ valorTotalFormateado() }}</div>
+      <div class="label">Valor total del inventario</div>
+    </div>
+    <a class="dashboard-stat-card" routerLink="/inventario/valor-stock" style="text-decoration:none; color:inherit;">
+      <div class="num" [style.color]="totalStockBajo() > 0 ? 'var(--danger)' : null">{{ totalStockBajo() }}</div>
+      <div class="label">Productos en stock bajo</div>
+    </a>
+    <a class="dashboard-stat-card" routerLink="/inventario/valor-stock" style="text-decoration:none; color:inherit;">
+      <div class="num" [style.color]="totalSobreStock() > 0 ? 'var(--amber)' : null">{{ totalSobreStock() }}</div>
+      <div class="label">Productos en sobre-stock</div>
+    </a>
+    <a class="dashboard-stat-card" routerLink="/inventario/ordenes-compra" style="text-decoration:none; color:inherit;">
+      <div class="num">{{ ordenesPendientes() }}</div>
+      <div class="label">Órdenes de compra pendientes{{ ordenesVencidas() > 0 ? ' (' + ordenesVencidas() + ' vencidas)' : '' }}</div>
+    </a>
+    <a class="dashboard-stat-card" routerLink="/inventario/lotes-caducidad" style="text-decoration:none; color:inherit;">
+      <div class="num" [style.color]="lotesVencidos() > 0 ? 'var(--danger)' : (lotesPorVencer() > 0 ? 'var(--amber)' : null)">{{ lotesPorVencer() }}</div>
+      <div class="label">Lotes próximos a vencer{{ lotesVencidos() > 0 ? ' (' + lotesVencidos() + ' vencidos)' : '' }}</div>
+    </a>
+  </div>
+
+  @if (ultimosMovimientos().length > 0) {
+    <div class="catalog-group">
+      <h2 class="catalog-group-title">Últimos movimientos</h2>
+      <div class="grid-table-scroll">
+        <table class="grid-table">
+          <thead><tr><th>Fecha</th><th>Producto</th><th>Tipo</th><th>Cantidad</th></tr></thead>
+          <tbody>
+            @for (fila of ultimosMovimientos(); track fila.id) {
+              <tr>
+                <td data-label="Fecha">{{ fila.fecha | date: 'dd/MM/yyyy HH:mm' }}</td>
+                <td data-label="Producto">{{ fila.productoNombre }}</td>
+                <td data-label="Tipo">
+                  @switch (fila.tipo) {
+                    @case ('entrada') {
+                      <span class="tag" style="background:var(--client-soft); color:var(--client);">Entrada</span>
+                    }
+                    @case ('salida') {
+                      <span class="tag" style="background:var(--danger-soft); color:var(--danger);">Salida/Ajuste</span>
+                    }
+                    @default {
+                      <span class="tag">Traspaso</span>
+                    }
+                  }
+                </td>
+                <td data-label="Cantidad">{{ fila.cantidad }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  } @else {
+    <div class="empty-state-block">
+      <p>Todavía no hay ningún movimiento registrado.</p>
+    </div>
+  }
+}

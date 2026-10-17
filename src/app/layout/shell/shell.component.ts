@@ -270,12 +270,13 @@ export class ShellComponent implements OnDestroy {
   }
 
   /** SLA de tickets + alertas de tarjeta (uso ≥90%, recordatorio de pago) + stock
-   *  bajo de Inventario — mismo intervalo, así ninguna pantalla en particular
-   *  necesita estar abierta. */
+   *  bajo y órdenes de compra vencidas de Inventario — mismo intervalo, así
+   *  ninguna pantalla en particular necesita estar abierta. */
   private revisarNotificacionesPeriodicas(): void {
     void this.notificacionesService.revisarSlaTickets();
     void this.notificacionesService.revisarAlertasTarjetas();
     void this.notificacionesService.revisarAlertasStockBajo();
+    void this.notificacionesService.revisarOrdenesVencidas();
   }
 
   ngOnDestroy(): void {
@@ -326,6 +327,8 @@ export class ShellComponent implements OnDestroy {
     '/inventario/categorias-producto',
     '/inventario/unidades-medida',
     '/inventario/tipos-lista-precio',
+    '/ventas/cobro',
+    '/ventas/clientes',
   ];
   protected readonly contenidoAncho = computed(() =>
     ShellComponent.RUTAS_ANCHO_COMPLETO.some((ruta) => this.urlActual().startsWith(ruta)),
@@ -367,6 +370,8 @@ export class ShellComponent implements OnDestroy {
       'familia:Catálogos',
       'wikidocs:Catálogos',
       'inventario:Catálogos',
+      'ventas:Administración',
+      'ventas:Catálogos',
     ]),
   );
 
@@ -419,7 +424,15 @@ export class ShellComponent implements OnDestroy {
   }
 
   protected readonly moduloActivo = computed<
-    'seguridad' | 'wikidocs' | 'presupuesto' | 'proyectos' | 'panel-control' | 'familia' | 'inventario' | null
+    | 'seguridad'
+    | 'wikidocs'
+    | 'presupuesto'
+    | 'proyectos'
+    | 'panel-control'
+    | 'familia'
+    | 'inventario'
+    | 'ventas'
+    | null
   >(() => {
     const url = this.urlActual();
     if (url.startsWith('/seguridad')) return 'seguridad';
@@ -429,6 +442,7 @@ export class ShellComponent implements OnDestroy {
     if (url.startsWith('/panel-control')) return 'panel-control';
     if (url.startsWith('/familia')) return 'familia';
     if (url.startsWith('/inventario')) return 'inventario';
+    if (url.startsWith('/ventas')) return 'ventas';
     return null;
   });
 

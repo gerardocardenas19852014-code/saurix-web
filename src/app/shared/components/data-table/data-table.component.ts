@@ -2,6 +2,15 @@ import { ChangeDetectionStrategy, Component, computed, input, output, signal } f
 
 export interface ColumnaTabla<T> {
   campo: keyof T & string;
+  /**
+   * Opcional: clave única para el `track` de la columna en el @for de
+   * data-table.component.html. Solo hace falta cuando dos columnas leen el
+   * mismo `campo` con dos formateadores distintos (p.ej. "Tipo" y
+   * "Existencia" ambas derivadas de Producto.existencia en
+   * productos.component.ts) — sin esto, Angular lanza NG0955 por claves de
+   * tracking duplicadas. Si no se da, se usa `campo`.
+   */
+  claveColumna?: string;
   etiqueta: string;
   /** Formateador opcional para mostrar el valor de la celda */
   formatear?: (fila: T) => string;

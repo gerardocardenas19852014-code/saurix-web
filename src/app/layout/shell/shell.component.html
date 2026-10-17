@@ -193,6 +193,16 @@
           <a routerLink="/inventario/movimientos-bodega" routerLinkActive="active">🚚 Movimientos entre bodegas</a>
           <a routerLink="/inventario/sugerencia-reposicion" routerLinkActive="active">🧾 Sugerencia de reposición</a>
           <a routerLink="/inventario/conteo-fisico" routerLinkActive="active">🧮 Conteo físico</a>
+          <a routerLink="/inventario/ordenes-compra" routerLinkActive="active">🛒 Órdenes de compra</a>
+          <a routerLink="/inventario/kardex" routerLinkActive="active">📒 Kardex</a>
+          <a routerLink="/inventario/lotes-caducidad" routerLinkActive="active">🧪 Lotes y caducidad</a>
+        }
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('inventario', 'Reportes')">
+          <span>{{ grupoAbierto('inventario', 'Reportes') ? '▾' : '▸' }} Reportes</span>
+        </button>
+        @if (grupoAbierto('inventario', 'Reportes')) {
+          <a routerLink="/inventario/dashboard" routerLinkActive="active">📊 Dashboard</a>
         }
 
         <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('inventario', 'Catálogos')">
@@ -204,6 +214,46 @@
           <a routerLink="/inventario/categorias-producto" routerLinkActive="active">🏷️ Categorías de producto</a>
           <a routerLink="/inventario/unidades-medida" routerLinkActive="active">📏 Unidades de medida</a>
           <a routerLink="/inventario/tipos-lista-precio" routerLinkActive="active">💲 Tipos de lista de precio</a>
+        }
+      </nav>
+    }
+
+    @if (moduloActivo() === 'ventas') {
+      <span class="sidebar-label">Ventas</span>
+      <nav class="sidebar-nav" aria-label="Menú de ventas">
+        <a routerLink="/ventas" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('ventas', 'Proceso')">
+          <span>{{ grupoAbierto('ventas', 'Proceso') ? '▾' : '▸' }} Proceso</span>
+        </button>
+        @if (grupoAbierto('ventas', 'Proceso')) {
+          <a routerLink="/ventas/cobro" routerLinkActive="active">🧾 Cobro</a>
+          <a routerLink="/ventas/apertura-turno" routerLinkActive="active">🔓 Apertura de caja</a>
+          <a routerLink="/ventas/corte-turno" routerLinkActive="active">📋 Corte de caja</a>
+          <a routerLink="/ventas/cierre-turno" routerLinkActive="active">🔒 Cierre de caja</a>
+          <a routerLink="/ventas/historial" routerLinkActive="active">🧾 Historial de ventas</a>
+          <a routerLink="/ventas/cotizaciones" routerLinkActive="active">📝 Cotizaciones</a>
+        }
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('ventas', 'Reportes')">
+          <span>{{ grupoAbierto('ventas', 'Reportes') ? '▾' : '▸' }} Reportes</span>
+        </button>
+        @if (grupoAbierto('ventas', 'Reportes')) {
+          <a routerLink="/ventas/dashboard" routerLinkActive="active">📊 Dashboard</a>
+        }
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('ventas', 'Administración')">
+          <span>{{ grupoAbierto('ventas', 'Administración') ? '▾' : '▸' }} Administración</span>
+        </button>
+        @if (grupoAbierto('ventas', 'Administración')) {
+          <a routerLink="/ventas/clientes" routerLinkActive="active">👤 Clientes</a>
+        }
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('ventas', 'Catálogos')">
+          <span>{{ grupoAbierto('ventas', 'Catálogos') ? '▾' : '▸' }} Catálogos</span>
+        </button>
+        @if (grupoAbierto('ventas', 'Catálogos')) {
+          <a routerLink="/ventas/regimenes-fiscales" routerLinkActive="active">🧾 Regímenes fiscales</a>
         }
       </nav>
     }

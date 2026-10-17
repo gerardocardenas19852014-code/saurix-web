@@ -1,0 +1,110 @@
+<div class="page-header">
+  <h1>Lotes y caducidad</h1>
+</div>
+
+<p class="hint" style="margin-top:-6px;">
+  Registro informativo de lotes con fecha de caducidad, solo para productos marcados como
+  "Maneja lotes y caducidad" (ver Productos). No reemplaza la existencia por bodega — la cantidad
+  aquí se captura aparte.
+</p>
+
+<div class="dashboard-stats" style="margin-bottom:18px;">
+  <div class="dashboard-stat-card">
+    <div class="num">{{ totalProximos() }}</div>
+    <div class="label">Próximos a vencer (≤30 días)</div>
+  </div>
+  <div class="dashboard-stat-card">
+    <div class="num">{{ totalVencidos() }}</div>
+    <div class="label">Vencidos</div>
+  </div>
+</div>
+
+<div class="grid-toolbar">
+  <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo lote</button>
+
+  <div class="grid-filter">
+    <select [value]="filtroVencimiento()" (change)="filtroVencimiento.set($any($event.target).value)">
+      <option value="todos">Todos</option>
+      <option value="proximos">Próximos a vencer</option>
+      <option value="vencidos">Vencidos</option>
+    </select>
+    <label class="board-filter-field board-filter-checkbox" style="margin:0;">
+      <input type="checkbox" [checked]="mostrarInactivos()" (change)="mostrarInactivos.set($any($event.target).checked)" />
+      Mostrar inactivos
+    </label>
+  </div>
+</div>
+
+@if (productosConLotes().length === 0) {
+  <div class="empty-state-block">
+    <p>Todavía no hay ningún producto marcado con "Maneja lotes y caducidad". Activa esa opción en
+    Productos para poder registrar lotes aquí.</p>
+  </div>
+}
+
+<app-data-table
+  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+  [columnas]="columnas"
+  [filas]="filasLotes()"
+  [cargando]="cargando()"
+  (editar)="editar($event)"
+  (eliminar)="pedirEliminar($event)"
+/>
+
+@if (modalAbierto()) {
+  <div class="modal-overlay show" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
+    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3>{{ loteEnEdicion() ? 'Editar lote' : 'Nuevo lote' }}</h3>
+
+      <div class="edit-form" style="margin-bottom: 18px;">
+        <label>
+          Producto
+          <app-select-buscable [opciones]="opcionesProducto()" formControlName="productoId" placeholder="Buscar producto…" />
+        </label>
+
+        <label>
+          Lote
+          <input type="text" formControlName="lote" placeholder="p.ej. L-2026-10" />
+        </label>
+
+        <label>
+          Bodega (opcional)
+          <app-select-buscable [opciones]="opcionesBodega()" formControlName="bodegaId" placeholder="Sin precisar…" />
+        </label>
+
+        <label>
+          Fecha de caducidad (opcional)
+          <input type="date" formControlName="fechaCaducidad" />
+        </label>
+
+        <label>
+          Cantidad (opcional, informativa)
+          <input type="number" formControlName="cantidad" min="0" step="any" />
+        </label>
+
+        <label>
+          Notas (opcional)
+          <textarea formControlName="notas" rows="2"></textarea>
+        </label>
+
+        <label class="checkbox-inline">
+          <input type="checkbox" formControlName="activo" />
+          Activo
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="loteAEliminar() !== null"
+  titulo="Eliminar lote"
+  [mensaje]="'¿Eliminar el lote ' + (loteAEliminar()?.lote ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="loteAEliminar.set(null)"
+/>

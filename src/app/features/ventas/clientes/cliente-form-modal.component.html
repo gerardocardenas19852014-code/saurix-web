@@ -1,0 +1,116 @@
+@if (visible()) {
+  <div class="modal-overlay show" (click)="cancelar()">
+    <form class="modal-box" style="max-width: 820px; width: 94%;" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <h3>{{ clienteEnEdicion() ? 'Editar cliente' : 'Nuevo cliente' }}</h3>
+      @if (esGenerico) {
+        <p class="hint" style="margin-top:-6px;">
+          Este es el contacto genérico de "Público en General" — su nombre y RFC están protegidos,
+          pero el resto de sus datos (domicilio, correo, teléfono, lista de precio) se puede editar.
+        </p>
+      }
+
+      <div class="edit-form form-grid-3col" style="margin-bottom: 18px;">
+        <div class="tipo-producto-toggle full-span" role="group" aria-label="Tipo de contacto">
+          <label class="checkbox-inline">
+            <input type="radio" formControlName="esExtranjero" [value]="false" />
+            Nacional
+          </label>
+          <label class="checkbox-inline">
+            <input type="radio" formControlName="esExtranjero" [value]="true" />
+            Extranjero
+          </label>
+        </div>
+
+        <label>
+          RFC
+          <input type="text" formControlName="rfc" maxlength="13" style="text-transform: uppercase;" />
+        </label>
+
+        <label>
+          Nombre / Razón social
+          <input type="text" formControlName="nombre" />
+        </label>
+
+        <label>
+          Régimen fiscal (opcional)
+          <app-select-buscable [opciones]="opcionesRegimenFiscal()" formControlName="regimenFiscalClave" placeholder="Buscar régimen…" />
+        </label>
+
+        <label>
+          País
+          <input type="text" formControlName="pais" />
+        </label>
+
+        <label>
+          Estado
+          <input type="text" formControlName="estado" />
+        </label>
+
+        <label>
+          Municipio
+          <input type="text" formControlName="municipio" />
+        </label>
+
+        <label>
+          Localidad
+          <input type="text" formControlName="localidad" />
+        </label>
+
+        <label>
+          Código postal
+          <input type="text" formControlName="codigoPostal" />
+        </label>
+
+        <label>
+          Colonia
+          <input type="text" formControlName="colonia" />
+        </label>
+
+        <label>
+          Calle
+          <input type="text" formControlName="calle" />
+        </label>
+
+        <label>
+          Número exterior
+          <input type="text" formControlName="numeroExterior" />
+        </label>
+
+        <label>
+          Número interior (opcional)
+          <input type="text" formControlName="numeroInterior" />
+        </label>
+
+        <label>
+          Correo (opcional)
+          <input type="email" formControlName="correo" />
+        </label>
+
+        <label>
+          Teléfono (opcional)
+          <input type="text" formControlName="telefono" />
+        </label>
+
+        <label class="full-span">
+          Lista de precio predeterminada (opcional)
+          <app-select-buscable [opciones]="opcionesListaPrecio()" formControlName="listaPrecioPredeterminadaId" placeholder="Buscar lista de precio…" />
+        </label>
+        <p class="hint full-span" style="margin: -8px 0 0;">
+          Se preselecciona en Cobro en cuanto se elige este cliente — se puede cambiar al vender.
+        </p>
+
+        @if (clienteEnEdicion()) {
+          <label class="checkbox-inline full-span">
+            <input type="checkbox" formControlName="activo" />
+            Activo
+          </label>
+        }
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="cancelar()">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}

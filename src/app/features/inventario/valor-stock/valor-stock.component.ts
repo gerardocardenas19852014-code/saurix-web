@@ -1,12 +1,18 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { Producto } from '../productos/producto.model';
-import { formatMoneda, existenciaTotal } from '../productos/producto.util';
+import { formatMoneda, existenciaTotal, alertasStockBajo, haySobreStock } from '../productos/producto.util';
 import { CategoriaProducto } from '../categorias-producto/categoria-producto.model';
 import { Bodega } from '../bodegas/bodega.model';
 import { ExistenciaBodega } from '../movimientos-bodega/existencia-bodega.model';
+import { NivelMinimoBodega } from '../productos/nivel-minimo-bodega.model';
+import { MovimientoInventario } from '../movimientos-bodega/movimiento-inventario.model';
+import { exportarCsv } from '../../../shared/utils/csv.util';
+import { exportarTablaPdf } from '../../../shared/utils/pdf-tabla.util';
+
+type TabValorStock = 'resumen' | 'productos' | 'rotacion';
 
 interface FilaValor {
   productoId: number;
@@ -19,6 +25,23 @@ interface FilaValor {
   valor: number;
   /** true si tiene nivelMinimo definido y la existencia ya cayó por debajo. */
   stockBajo: boolean;
+  sobreStock: boolean;
+}
+
+interface FilaRotacion {
+  productoId: number;
+  codigo: string;
+  nombre: string;
+  existencia: number;
+  /** ISO 8601 del movimiento más reciente de este producto (cualquier
+   *  tipo: entrada, traspaso, salida/ajuste) — null = nunca tuvo ninguno
+   *  desde que existe MovimientoInventario (puede ser un producto viejo
+   *  cuya existencia solo viene de la asignación inicial, o uno que de
+   *  plano nunca se ha movido). */
+  ultimoMovimiento: string | null;
+  /** null cuando ultimoMovimiento es null (no se puede calcular "hace
+   *  cuánto" sin una fecha) — se muestra como "nunca" en vez de un número. */
+  diasSinMovimiento: number | null;
 }
 
 interface ValorCategoria {
@@ -72,7 +95,7 @@ function colorCategoria(id: number): string {
 @Component({
   selector: 'app-valor-stock',
   standalone: true,
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, DatePipe],
   templateUrl: './valor-stock.component.html',
   styleUrl: './valor-stock.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -85,8 +108,19 @@ export class ValorStockComponent implements OnInit {
   protected readonly categorias = signal<CategoriaProducto[]>([]);
   protected readonly bodegas = signal<Bodega[]>([]);
   protected readonly existenciasBodega = signal<ExistenciaBodega[]>([]);
+  protected readonly nivelesMinimoBodega = signal<NivelMinimoBodega[]>([]);
+  protected readonly movimientos = signal<MovimientoInventario[]>([]);
   protected readonly cargando = signal(false);
   protected readonly busqueda = signal('');
+  protected readonly tabActiva = signal<TabValorStock>('resumen');
+  /** Umbral de "sin movimiento" para la pestaña Rotación — editable, 60
+   *  días por default (criterio razonable genérico; no se guarda nada, es
+   *  solo del filtro de esta pantalla). */
+  protected readonly umbralDias = signal(60);
+
+  seleccionarTab(tab: TabValorStock): void {
+    this.tabActiva.set(tab);
+  }
 
   /** Solo productos físicos (existencia !== null) y activos — base de todo lo demás. */
   protected readonly productosValorizables = computed(() =>
@@ -107,11 +141,11 @@ export class ValorStockComponent implements OnInit {
           existencia,
           costo: p.costo,
           valor: existencia * p.costo,
-          // typeof === 'number' (no solo !== null): un producto creado antes de
-          // que existiera este campo no lo tiene en absoluto en IndexedDB (sin
-          // migraciones de esquema) y vale `undefined`, no `null` — con !== null
-          // se cuela y dispara un falso "stock bajo" contra undefined.
-          stockBajo: typeof p.nivelMinimo === 'number' && existencia < p.nivelMinimo,
+          // Ver alertasStockBajo() en producto.util.ts: evalúa por bodega si el
+          // producto ya tiene NivelMinimoBodega propios, o cae al mínimo global
+          // "heredado" contra la existencia TOTAL si no tiene ninguno.
+          stockBajo: alertasStockBajo(p, this.existenciasBodega(), this.nivelesMinimoBodega()).length > 0,
+          sobreStock: haySobreStock(p, this.existenciasBodega()),
         };
       })
       .sort((a, b) => b.valor - a.valor);
@@ -136,6 +170,7 @@ export class ValorStockComponent implements OnInit {
 
   protected readonly sinExistencia = computed(() => this.filas().filter((f) => f.existencia === 0).length);
   protected readonly stockBajo = computed(() => this.filas().filter((f) => f.stockBajo).length);
+  protected readonly sobreStock = computed(() => this.filas().filter((f) => f.sobreStock).length);
 
   protected readonly porCategoria = computed<ValorCategoria[]>(() => {
     const total = this.valorInventario();
@@ -200,12 +235,95 @@ export class ValorStockComponent implements OnInit {
       firstValueFrom(this.data.list<CategoriaProducto>('CategoriaProducto')),
       firstValueFrom(this.data.list<Bodega>('Bodega')),
       firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega')),
-    ]).then(([productos, categorias, bodegas, existenciasBodega]) => {
+      firstValueFrom(this.data.list<NivelMinimoBodega>('NivelMinimoBodega')),
+      firstValueFrom(this.data.list<MovimientoInventario>('MovimientoInventario')),
+    ]).then(([productos, categorias, bodegas, existenciasBodega, nivelesMinimoBodega, movimientos]) => {
       this.productos.set(productos);
       this.categorias.set(categorias);
       this.bodegas.set(bodegas);
       this.existenciasBodega.set(existenciasBodega);
+      this.nivelesMinimoBodega.set(nivelesMinimoBodega);
+      this.movimientos.set(movimientos);
       this.cargando.set(false);
+    });
+  }
+
+  /** Último movimiento (cualquier tipo) de cada producto físico activo, y
+   *  cuántos días lleva sin ninguno — para detectar capital inmovilizado
+   *  por falta de rotación, no solo por exceso de cantidad (ver
+   *  haySobreStock(), que es un criterio distinto y complementario). */
+  protected readonly rotacion = computed<FilaRotacion[]>(() => {
+    const ahora = Date.now();
+    return this.productosValorizables()
+      .map((p) => {
+        const propios = this.movimientos().filter((m) => m.productoId === p.id);
+        const ultimoMovimiento = propios.length > 0 ? propios.reduce((max, m) => (m.fecha > max ? m.fecha : max), propios[0].fecha) : null;
+        const diasSinMovimiento = ultimoMovimiento ? Math.floor((ahora - new Date(ultimoMovimiento).getTime()) / 86400000) : null;
+        return {
+          productoId: p.id,
+          codigo: p.codigo ?? '',
+          nombre: p.nombre,
+          existencia: existenciaTotal(p, this.existenciasBodega()),
+          ultimoMovimiento,
+          diasSinMovimiento,
+        };
+      })
+      .sort((a, b) => (b.diasSinMovimiento ?? Infinity) - (a.diasSinMovimiento ?? Infinity));
+  });
+
+  protected readonly rotacionFiltrada = computed(() =>
+    this.rotacion().filter((f) => f.diasSinMovimiento === null || f.diasSinMovimiento >= this.umbralDias()),
+  );
+
+  /** Etiqueta de la(s) alerta(s) de una fila, para la columna "Alertas" del
+   *  CSV/PDF — mismo criterio que los <span class="tag"> de la tabla en
+   *  pantalla, pero como texto plano. */
+  private etiquetaAlerta(fila: FilaValor): string {
+    if (fila.existencia === 0) return 'Sin existencia';
+    if (fila.stockBajo) return 'Stock bajo';
+    if (fila.sobreStock) return 'Sobre-stock';
+    return '';
+  }
+
+  exportarCsvProductos(): void {
+    exportarCsv(
+      'valor_stock.csv',
+      [
+        { clave: 'codigo', etiqueta: 'Código' },
+        { clave: 'nombre', etiqueta: 'Nombre' },
+        { clave: 'categoriaNombre', etiqueta: 'Categoría' },
+        { clave: 'existencia', etiqueta: 'Existencia' },
+        { clave: 'costo', etiqueta: 'Costo' },
+        { clave: 'valor', etiqueta: 'Valor' },
+        { clave: 'alerta', etiqueta: 'Alerta' },
+      ],
+      this.filasFiltradas().map((f) => ({ ...f, alerta: this.etiquetaAlerta(f) })),
+    );
+  }
+
+  exportarPdfProductos(): void {
+    exportarTablaPdf({
+      nombreArchivo: 'valor_stock.pdf',
+      titulo: 'Valor de stock',
+      subtitulo: `Valor total: ${formatMoneda(this.valorInventario())}`,
+      columnas: [
+        { etiqueta: 'Código', ancho: 26 },
+        { etiqueta: 'Nombre' },
+        { etiqueta: 'Categoría', ancho: 36 },
+        { etiqueta: 'Existencia', ancho: 24 },
+        { etiqueta: 'Costo', ancho: 26 },
+        { etiqueta: 'Valor', ancho: 26 },
+        { etiqueta: 'Alerta', ancho: 28 },
+      ],
+      filas: this.filasFiltradas().map((f) => [
+        f.codigo || '—',
+        f.nombre,
+        f.categoriaNombre,
+        String(f.existencia),
+        formatMoneda(f.costo),
+        formatMoneda(f.valor),
+        this.etiquetaAlerta(f),
+      ]),
     });
   }
 }

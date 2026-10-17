@@ -12,6 +12,10 @@ export interface RegistroMovimiento {
   bodegaDestinoId: number | null;
   cantidad: number;
   nota: string | null;
+  /** Ver MovimientoInventario.ordenCompraId/costoUnitario — opcionales,
+   *  solo los manda orden-compra.service.ts al recibir una orden. */
+  ordenCompraId?: number | null;
+  costoUnitario?: number | null;
 }
 
 /**
@@ -39,7 +43,7 @@ export class MovimientoInventarioService {
 
   async registrar(registro: RegistroMovimiento): Promise<void> {
     const existenciasBodega = await firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega'));
-    const { productoId, bodegaOrigenId, bodegaDestinoId, cantidad, nota } = registro;
+    const { productoId, bodegaOrigenId, bodegaDestinoId, cantidad, nota, ordenCompraId, costoUnitario } = registro;
 
     // 1. Restar del origen, si aplica (Traspaso o Salida/Ajuste).
     if (bodegaOrigenId !== null) {
@@ -60,7 +64,9 @@ export class MovimientoInventarioService {
           this.data.modificacion<ExistenciaBodega>('ExistenciaBodega', { ...filaDestino, existencia: filaDestino.existencia + cantidad }),
         );
       } else {
-        await firstValueFrom(this.data.alta<ExistenciaBodega>('ExistenciaBodega', { productoId, bodegaId: bodegaDestinoId, existencia: cantidad }));
+        await firstValueFrom(
+          this.data.alta<ExistenciaBodega>('ExistenciaBodega', { productoId, bodegaId: bodegaDestinoId, existencia: cantidad, ubicacion: null }),
+        );
       }
     }
 
@@ -73,6 +79,86 @@ export class MovimientoInventarioService {
         cantidad,
         fecha: new Date().toISOString(),
         nota,
+        ordenCompraId: ordenCompraId ?? null,
+        costoUnitario: costoUnitario ?? null,
+        enTransito: false,
+        fechaRecepcion: null,
+      }),
+    );
+  }
+
+  /**
+   * Primera mitad de un Traspaso "en tránsito" (ver
+   * MovimientoInventario.enTransito): resta de bodegaOrigenId igual que
+   * registrar(), pero NO suma a bodegaDestinoId todavía — eso se hace
+   * aparte en confirmarRecepcionTransito(), cuando de verdad llega la
+   * mercancía. Se agrega como método NUEVO (no se tocó registrar()) para
+   * no arriesgar el flujo normal de Traspaso/Entrada/Salida que ya
+   * funciona en todas las pantallas que lo usan.
+   */
+  async enviarEnTransito(registro: RegistroMovimiento): Promise<void> {
+    const existenciasBodega = await firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega'));
+    const { productoId, bodegaOrigenId, bodegaDestinoId, cantidad, nota } = registro;
+
+    if (bodegaOrigenId !== null) {
+      const filaOrigen = existenciasBodega.find((e) => e.productoId === productoId && e.bodegaId === bodegaOrigenId);
+      if (filaOrigen) {
+        await firstValueFrom(
+          this.data.modificacion<ExistenciaBodega>('ExistenciaBodega', { ...filaOrigen, existencia: filaOrigen.existencia - cantidad }),
+        );
+      }
+    }
+
+    await firstValueFrom(
+      this.data.alta<MovimientoInventario>('MovimientoInventario', {
+        productoId,
+        bodegaOrigenId,
+        bodegaDestinoId,
+        cantidad,
+        fecha: new Date().toISOString(),
+        nota,
+        ordenCompraId: null,
+        costoUnitario: null,
+        enTransito: true,
+        fechaRecepcion: null,
+      }),
+    );
+  }
+
+  /**
+   * Segunda mitad de un Traspaso "en tránsito" (ver enviarEnTransito()):
+   * suma a bodegaDestinoId lo que ya se había restado de origen, y marca
+   * el movimiento como recibido. No vuelve a tocar bodegaOrigenId — ya se
+   * restó cuando se envió.
+   */
+  async confirmarRecepcionTransito(movimientoId: number): Promise<void> {
+    const movimiento = await firstValueFrom(this.data.getById<MovimientoInventario>('MovimientoInventario', movimientoId));
+    if (!movimiento || !movimiento.enTransito || movimiento.bodegaDestinoId === null) return;
+
+    const existenciasBodega = await firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega'));
+    const filaDestino = existenciasBodega.find(
+      (e) => e.productoId === movimiento.productoId && e.bodegaId === movimiento.bodegaDestinoId,
+    );
+    if (filaDestino) {
+      await firstValueFrom(
+        this.data.modificacion<ExistenciaBodega>('ExistenciaBodega', { ...filaDestino, existencia: filaDestino.existencia + movimiento.cantidad }),
+      );
+    } else {
+      await firstValueFrom(
+        this.data.alta<ExistenciaBodega>('ExistenciaBodega', {
+          productoId: movimiento.productoId,
+          bodegaId: movimiento.bodegaDestinoId,
+          existencia: movimiento.cantidad,
+          ubicacion: null,
+        }),
+      );
+    }
+
+    await firstValueFrom(
+      this.data.modificacion<MovimientoInventario>('MovimientoInventario', {
+        ...movimiento,
+        enTransito: false,
+        fechaRecepcion: new Date().toISOString(),
       }),
     );
   }

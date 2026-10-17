@@ -268,6 +268,7 @@ h1, h2 { font-family: 'Montserrat', sans-serif; font-weight: 700; color: var(--h
 .module-tile-indigo { background: var(--indigo); }
 .module-tile-teal { background: var(--teal); }
 .module-tile-accent { background: var(--accent); }
+.module-tile-danger { background: var(--danger); }
 // Mismos colores que .catalog-list-icon-siif/-personal/-generic (misma
 // paleta semántica), para las landings que antes usaban catalog-list y
 // ahora usan .module-tile-* (WikiDocs, Panel de Control): Gestión de
@@ -326,6 +327,11 @@ html[data-wide='ticket'] .content { max-width: 1200px; }
 /* Grids con muchas columnas (p.ej. Usuarios en Seguridad): aprovechar el
    ancho disponible en vez del límite angosto por defecto de .content. */
 html[data-wide='grid'] .content { max-width: 1600px; }
+
+/* Inventario: imprimir etiquetas con código de barras — ver
+   ProductosComponent.imprimirEtiquetas(). Se imprime en una ventana/pestaña
+   NUEVA con su propio HTML/CSS inline, así que no hace falta nada aquí en
+   el stylesheet global de la app. */
 .board-view-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .bulk-action-bar {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px; background: var(--accent-soft);
@@ -737,6 +743,86 @@ html[data-theme='dark'] .edit-form input[type=date], html[data-theme='ocean'] .e
 
 .ticket-edit-form { max-width: 1200px; }
 .hint { color: var(--ink-soft); font-size: 14px; max-width: 640px; }
+
+/* Ícono de ayuda junto a la etiqueta de un campo: reemplaza el texto fijo
+   de .hint debajo de un campo cuando ese texto solo explica qué hace el
+   campo (no aplica a subtítulos de sección, mensajes de "sin datos" ni
+   texto que es parte de un dato mostrado — esos se quedan como .hint
+   normal, siempre visibles). Ahorra espacio vertical en formularios
+   largos: el texto aparece en un tooltip oscuro con el mouse, con foco de
+   teclado (Tab) o con tap — mismo patrón en toda la app. */
+/* Agrupa el texto de una etiqueta de campo con su .info-tip en un solo
+   renglón — sin esto, el <label> de .edit-form (flex-direction: column)
+   trata al ícono como un elemento aparte y lo manda a su propio renglón
+   en vez de dejarlo junto al texto. */
+.label-con-tip { display: inline-flex; align-items: center; }
+
+.info-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 5px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  vertical-align: middle;
+  padding: 0;
+}
+.info-tip::before { content: '?'; }
+.info-tip-texto {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%) translateY(4px);
+  width: max-content;
+  max-width: 260px;
+  background: #0D1B2A;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  padding: 8px 12px;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px -8px rgba(0, 0, 0, .45);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .12s ease, transform .12s ease;
+  z-index: 60;
+  text-align: left;
+  cursor: auto;
+}
+.info-tip-texto::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #0D1B2A;
+}
+.info-tip:hover .info-tip-texto,
+.info-tip:focus .info-tip-texto,
+.info-tip:focus-visible .info-tip-texto {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+@media (max-width: 480px) {
+  .info-tip-texto { left: auto; right: -8px; transform: translateY(4px); }
+  .info-tip:hover .info-tip-texto,
+  .info-tip:focus .info-tip-texto,
+  .info-tip:focus-visible .info-tip-texto { transform: translateY(0); }
+}
 .image-upload-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .anexos-upload-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
 .anexos-upload-row input[type=text] { flex: 1; min-width: 200px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper-raised); color: var(--text-strong); font-family: inherit; font-size: 14px; }
@@ -1657,3 +1743,33 @@ button { font-family: inherit; }
   line-height: 1.4;
   padding: 2px 4px;
 }
+
+
+/* ── Lista de renglones tipo "ticket" (Ventas) ──────────────────────────
+ * Compartida entre CobroComponent (carrito en vivo) y
+ * HistorialVentasComponent (detalle de una venta ya cobrada, solo
+ * lectura) — antes vivía solo en cobro.component.scss. */
+.pos-ticket-lineas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.pos-ticket-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.pos-ticket-item-info { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.pos-ticket-item-desc { font-size: 13px; font-weight: 600; }
+.pos-ticket-item-precio { font-size: 11.5px; color: var(--ink-soft); }
+.pos-ticket-item-subtotal { font-size: 13.5px; font-weight: 700; flex: 0 0 auto; min-width: 64px; text-align: right; }
+
+.pos-ticket-totales { border-top: 1px dashed var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+.pos-ticket-total-linea { display: flex; justify-content: space-between; font-size: 13.5px; }
+.pos-ticket-total-grande { font-size: 17px; font-weight: 700; }

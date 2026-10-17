@@ -27,6 +27,12 @@ interface GrupoModulo {
 // todavía ninguna bodega asignada (ver existenciaTotal() en producto.util.ts)
 // — mismo criterio de agrupado que Proyectos/WikiDocs (ver
 // proyectos-landing.component.ts/wikidocs-landing.component.ts).
+//
+// El resumen de métricas ("¿cómo está el inventario ahora mismo?") que
+// vivía aquí arriba de esta cuadrícula se movió a su propia pantalla, ver
+// dashboard/dashboard.component.ts — Inicio se quedó solo como índice de
+// pantallas. Reportes es su propio grupo (mismo criterio que
+// Presupuesto/Proyectos), con Dashboard como primera pantalla dentro.
 const GRUPOS: GrupoModulo[] = [
   {
     titulo: 'Operación',
@@ -60,11 +66,44 @@ const GRUPOS: GrupoModulo[] = [
         descripcion: 'Qué comprar y a quién — productos por debajo de su nivel mínimo, con cantidad sugerida.',
       },
       {
+        ruta: 'ordenes-compra',
+        icono: '🛒',
+        color: 'accent',
+        titulo: 'Órdenes de compra',
+        descripcion: 'Da seguimiento a lo que pediste a cada proveedor — la recepción actualiza existencia y costo solos.',
+      },
+      {
         ruta: 'conteo-fisico',
         icono: '🧮',
         color: 'accent',
         titulo: 'Conteo físico',
         descripcion: 'Cuadra la existencia de una bodega contra un conteo real y registra el ajuste automáticamente.',
+      },
+      {
+        ruta: 'kardex',
+        icono: '📒',
+        color: 'accent',
+        titulo: 'Kardex',
+        descripcion: 'Historial completo de un producto, con saldo acumulado después de cada movimiento.',
+      },
+      {
+        ruta: 'lotes-caducidad',
+        icono: '🧪',
+        color: 'accent',
+        titulo: 'Lotes y caducidad',
+        descripcion: 'Registro de lotes con fecha de caducidad, para productos marcados como perecederos.',
+      },
+    ],
+  },
+  {
+    titulo: 'Reportes',
+    enlaces: [
+      {
+        ruta: 'dashboard',
+        icono: '📊',
+        color: 'accent',
+        titulo: 'Dashboard',
+        descripcion: 'Resumen rápido: valor del inventario, alertas y últimos movimientos.',
       },
     ],
   },

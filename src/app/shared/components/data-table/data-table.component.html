@@ -2,7 +2,7 @@
   <table class="grid-table" [attr.data-cargando]="cargando()">
     <thead>
       <tr>
-        @for (columna of columnasFila(); track columna.campo) {
+        @for (columna of columnasFila(); track columna.claveColumna ?? columna.campo) {
           <th>
             <button
               type="button"
@@ -22,7 +22,7 @@
     <tbody>
       @for (fila of filasPagina(); track fila.id) {
         <tr [class.grid-fila-con-subfila]="columnaSubfila()">
-          @for (columna of columnasFila(); track columna.campo) {
+          @for (columna of columnasFila(); track columna.claveColumna ?? columna.campo) {
             <td [attr.data-label]="columna.etiqueta">
               @if (columna.claseValor) {
                 <span class="grid-badge {{ columna.claseValor(fila) }}" [title]="columna.titulo ? columna.titulo(fila) : ''">{{ valorCelda(fila, columna) }}</span>

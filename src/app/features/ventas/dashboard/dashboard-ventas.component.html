@@ -1,0 +1,78 @@
+<div class="page-header">
+  <h1>Dashboard de ventas</h1>
+</div>
+
+<p class="hint" style="margin-top:-6px;">
+  Cómo van las ventas de hoy, sin tener que entrar al Historial a contarlas a mano.
+</p>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else {
+  <div class="dashboard-stats" style="margin-bottom:24px;">
+    <div class="dashboard-stat-card">
+      <div class="num">{{ formatMoneda(totalHoy()) }}</div>
+      <div class="label">
+        Ventas de hoy
+        @if (cambioPctVsAyer(); as cambio) {
+          <span [style.color]="cambio >= 0 ? 'var(--client)' : 'var(--danger)'">
+            ({{ cambio >= 0 ? '+' : '' }}{{ cambio | number: '1.0-0' }}% vs. ayer)
+          </span>
+        }
+      </div>
+    </div>
+    <div class="dashboard-stat-card">
+      <div class="num">{{ numeroVentasHoy() }}</div>
+      <div class="label">Número de ventas hoy</div>
+    </div>
+    <div class="dashboard-stat-card">
+      <div class="num">{{ formatMoneda(ticketPromedioHoy()) }}</div>
+      <div class="label">Ticket promedio de hoy</div>
+    </div>
+    <div class="dashboard-stat-card">
+      <div class="num">{{ formatMoneda(totalAyer()) }}</div>
+      <div class="label">Ventas de ayer</div>
+    </div>
+  </div>
+
+  <div class="catalog-group" style="margin-bottom:24px;">
+    <h2 class="catalog-group-title">Ventas de hoy por método de pago</h2>
+    <div class="grid-table-scroll">
+      <table class="grid-table">
+        <thead><tr><th>Método</th><th>Total</th></tr></thead>
+        <tbody>
+          @for (fila of totalPorMetodoHoy(); track fila.metodoPago) {
+            <tr>
+              <td data-label="Método">{{ fila.metodoPago }}</td>
+              <td data-label="Total">{{ formatMoneda(fila.total) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="catalog-group">
+    <h2 class="catalog-group-title">Productos más vendidos (últimos 30 días)</h2>
+    @if (productosMasVendidos().length > 0) {
+      <div class="grid-table-scroll">
+        <table class="grid-table">
+          <thead><tr><th>Producto</th><th>Cantidad</th><th>Total vendido</th></tr></thead>
+          <tbody>
+            @for (fila of productosMasVendidos(); track fila.nombre) {
+              <tr>
+                <td data-label="Producto">{{ fila.nombre }}</td>
+                <td data-label="Cantidad">{{ fila.cantidad }}</td>
+                <td data-label="Total vendido">{{ formatMoneda(fila.total) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <div class="empty-state-block">
+        <p>Todavía no hay ventas en los últimos 30 días.</p>
+      </div>
+    }
+  </div>
+}

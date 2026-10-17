@@ -19,6 +19,7 @@ const MODULOS_VENDIBLES: { clave: string; nombre: string }[] = [
   { clave: 'proyectos', nombre: 'Gestión de Proyectos' },
   { clave: 'familia', nombre: 'Familia' },
   { clave: 'inventario', nombre: 'Inventario' },
+  { clave: 'ventas', nombre: 'Ventas' },
 ];
 
 interface ModuloEmpresaFila {

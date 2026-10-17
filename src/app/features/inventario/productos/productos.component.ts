@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
@@ -14,6 +15,8 @@ import { UnidadMedida } from '../unidades-medida/unidad-medida.model';
 import { Proveedor } from '../proveedores/proveedor.model';
 import { formatMoneda, existenciaTotal, tieneBodegaAsignada } from './producto.util';
 import { ExistenciaBodega } from '../movimientos-bodega/existencia-bodega.model';
+import { EscaneoCodigoComponent } from '../../../shared/components/escaneo-codigo/escaneo-codigo.component';
+import JsBarcode from 'jsbarcode';
 
 /** Una fila ya parseada del CSV de importación masiva, con su validación
  *  resuelta — ver importarArchivo()/validarFila() más abajo. `payload` solo
@@ -37,7 +40,7 @@ const ENCABEZADOS_CSV = ['nombre', 'codigo', 'categoria', 'unidad', 'costo', 'pr
 @Component({
   selector: 'app-productos',
   standalone: true,
-  imports: [ReactiveFormsModule, DataTableComponent, ConfirmDialogComponent, SelectBuscableComponent],
+  imports: [ReactiveFormsModule, DataTableComponent, ConfirmDialogComponent, SelectBuscableComponent, EscaneoCodigoComponent],
   templateUrl: './productos.component.html',
   styleUrl: './productos.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -49,6 +52,7 @@ export class ProductosComponent implements OnInit, OnDestroy {
   }
 
   private readonly data = inject(DataClientService);
+  private readonly router = inject(Router);
   protected readonly toast = inject(ToastService);
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
   private readonly fb = inject(FormBuilder);
@@ -75,6 +79,15 @@ export class ProductosComponent implements OnInit, OnDestroy {
       .filter((u) => u.activo !== false)
       .map((u) => ({ valor: u.id, etiqueta: u.nombre })),
   );
+  /** Mismo catálogo que opcionesUnidad, con "Sin unidad de compra alterna"
+   *  (valor 0) al inicio — igual que opcionesProveedor con "Sin proveedor":
+   *  tener una unidad de compra distinta a la base es opcional. */
+  protected readonly opcionesUnidadCompra = computed<OpcionBuscable[]>(() => [
+    { valor: 0, etiqueta: 'Sin unidad de compra alterna' },
+    ...this.unidades()
+      .filter((u) => u.activo !== false)
+      .map((u) => ({ valor: u.id, etiqueta: u.nombre })),
+  ]);
   /** Incluye la opción "Sin proveedor" (valor 0) porque, a diferencia de
    *  Categoría/Unidad, asignar proveedor es opcional (ver Producto.proveedorId). */
   protected readonly opcionesProveedor = computed<OpcionBuscable[]>(() => [
@@ -120,6 +133,7 @@ export class ProductosComponent implements OnInit, OnDestroy {
     { campo: 'unidadMedidaId', etiqueta: 'Unidad', formatear: (fila) => this.nombreUnidad(fila.unidadMedidaId) },
     {
       campo: 'existencia',
+      claveColumna: 'tipo',
       etiqueta: 'Tipo',
       formatear: (fila) => (fila.existencia === null ? 'Servicio' : 'Producto'),
       claseValor: (fila) => (fila.existencia === null ? 'grid-badge-muted' : 'grid-badge-warning'),
@@ -158,9 +172,23 @@ export class ProductosComponent implements OnInit, OnDestroy {
      *  que `existencia`, se oculta y se fuerza a null cuando es servicio
      *  (ver guardar()). */
     nivelMinimo: [null as number | null, [Validators.min(0)]],
+    /** Opuesto a nivelMinimo — ver producto.model.ts. Mismo criterio: se
+     *  oculta y se fuerza a null cuando es servicio (ver guardar()). */
+    nivelMaximo: [null as number | null, [Validators.min(0)]],
+    /** Opt-in — ver producto.model.ts. Igual que nivelMinimo/nivelMaximo,
+     *  se oculta y se fuerza a false cuando es servicio (ver guardar()). */
+    manejaLotes: [false],
     /** 0 = "Sin proveedor" (ver opcionesProveedor arriba) — se convierte a
      *  null en guardar() antes de mandarlo, igual que codigo/descripcion. */
     proveedorId: [0],
+    /** 0 = "Sin unidad de compra alterna" (ver opcionesUnidadCompra arriba)
+     *  — igual que proveedorId, se convierte a null en guardar(). Ver
+     *  Producto.unidadCompraId/factorConversionCompra. */
+    unidadCompraId: [0],
+    /** Solo tiene sentido cuando unidadCompraId != 0 — se valida a mano en
+     *  guardar() (no con Validators, porque depende de otro control) y se
+     *  fuerza a null si unidadCompraId vuelve a "Sin unidad de compra alterna". */
+    factorConversionCompra: [null as number | null, [Validators.min(0.0001)]],
     activo: [true],
   });
 
@@ -210,7 +238,11 @@ export class ProductosComponent implements OnInit, OnDestroy {
       esServicio: false,
       existencia: 0,
       nivelMinimo: null,
+      nivelMaximo: null,
+      manejaLotes: false,
       proveedorId: 0,
+      unidadCompraId: 0,
+      factorConversionCompra: null,
       activo: true,
     });
     this.modalAbierto.set(true);
@@ -244,10 +276,32 @@ export class ProductosComponent implements OnInit, OnDestroy {
       esServicio: producto.existencia === null,
       existencia: existenciaTotal(producto, this.existenciasBodega()),
       nivelMinimo: producto.nivelMinimo ?? null,
+      nivelMaximo: producto.nivelMaximo ?? null,
+      manejaLotes: producto.manejaLotes ?? false,
       proveedorId: producto.proveedorId ?? 0,
+      unidadCompraId: producto.unidadCompraId ?? 0,
+      factorConversionCompra: producto.factorConversionCompra ?? null,
       activo: producto.activo !== false,
     });
     this.modalAbierto.set(true);
+  }
+
+  /** Pone en el campo "Código / SKU" lo que se acaba de escanear (lector
+   *  USB/Bluetooth o cámara — ver app-escaneo-codigo) — [limpiarDespues]
+   *  en false en el template para que se vea el código capturado. Avisa
+   *  (sin bloquear) si ya hay OTRO producto activo con ese mismo código,
+   *  ya que ahora se usa para buscar por escaneo en Movimientos entre
+   *  bodegas/Conteo físico/Órdenes de compra y un duplicado haría que el
+   *  escaneo encuentre el producto equivocado. */
+  asignarCodigoEscaneado(codigo: string): void {
+    const idActual = this.productoEnEdicion()?.id ?? 0;
+    const duplicado = this.productos().find(
+      (p) => p.id !== idActual && p.activo !== false && (p.codigo ?? '').trim().toLowerCase() === codigo.trim().toLowerCase(),
+    );
+    if (duplicado) {
+      this.toast.advertencia(`Ojo: "${duplicado.nombre}" ya tiene este mismo código.`);
+    }
+    this.form.patchValue({ codigo });
   }
 
   guardar(): void {
@@ -255,16 +309,26 @@ export class ProductosComponent implements OnInit, OnDestroy {
       this.form.markAllAsTouched();
       return;
     }
+    // unidadCompraId != 0 ("Sin unidad de compra alterna") exige un factor
+    // > 0 — no se valida con Validators porque depende de otro control.
+    if (this.form.controls.unidadCompraId.value !== 0 && !this.form.controls.factorConversionCompra.value) {
+      this.toast.advertencia('Captura a cuántas unidades base equivale la unidad de compra (factor de conversión).');
+      return;
+    }
 
     const valor = this.form.getRawValue();
-    const { esServicio, existencia, nivelMinimo, ...resto } = valor;
+    const { esServicio, existencia, nivelMinimo, nivelMaximo, manejaLotes, ...resto } = valor;
     const payload = {
       ...resto,
       codigo: resto.codigo || null,
       descripcion: resto.descripcion || null,
       existencia: esServicio ? null : existencia,
       nivelMinimo: esServicio ? null : nivelMinimo,
+      nivelMaximo: esServicio ? null : nivelMaximo,
+      manejaLotes: esServicio ? false : manejaLotes,
       proveedorId: resto.proveedorId || null,
+      unidadCompraId: resto.unidadCompraId || null,
+      factorConversionCompra: resto.unidadCompraId ? resto.factorConversionCompra : null,
       foto: this.fotoActual(),
     };
     const esEdicion = this.productoEnEdicion() !== null;
@@ -279,6 +343,13 @@ export class ProductosComponent implements OnInit, OnDestroy {
         this.cargar();
       },
     });
+  }
+
+  /** Navega a la pantalla de nivel mínimo por bodega de este producto (ver
+   *  nivel-minimo-bodega.component.ts) — mismo patrón que verProductos() en
+   *  proveedores.component.ts. */
+  verNivelMinimoBodega(producto: Producto): void {
+    this.router.navigate(['/inventario/productos', producto.id, 'nivel-minimo']);
   }
 
   pedirEliminar(producto: Producto): void {
@@ -440,7 +511,11 @@ export class ProductosComponent implements OnInit, OnDestroy {
         precioUnitario: precio,
         existencia,
         nivelMinimo: null, // el CSV no trae esta columna — se define luego, por producto, en Productos.
+        nivelMaximo: null, // idem — se asigna después, en Productos.
+        manejaLotes: false, // idem — se activa después, por producto, en Productos.
         proveedorId: null, // idem — se asigna después, en Productos.
+        unidadCompraId: null, // idem — se asigna después, en Productos.
+        factorConversionCompra: null,
         activo,
       },
     };
@@ -566,5 +641,225 @@ export class ProductosComponent implements OnInit, OnDestroy {
     this.fotoActual.set('');
     this.fotoAmpliada.set(false);
     input.value = '';
+  }
+
+  // ── Imprimir etiquetas con código de barras ──
+  // Modal de selección: qué productos (con código/SKU) y cuántas copias de
+  // cada uno — ver imprimirEtiquetas() más abajo, que imprime en una
+  // ventana nueva aparte, no desde esta misma pantalla.
+  protected readonly modalEtiquetasAbierto = signal(false);
+  protected readonly busquedaEtiquetas = signal('');
+  protected readonly seleccionEtiquetas = signal<Set<number>>(new Set());
+  protected readonly cantidadEtiquetas = signal<Record<number, number>>({});
+
+  protected readonly productosParaEtiquetas = computed(() => {
+    const texto = this.busquedaEtiquetas().trim().toLowerCase();
+    return this.productos()
+      .filter((p) => p.activo !== false)
+      .filter((p) => !texto || p.nombre.toLowerCase().includes(texto) || (p.codigo ?? '').toLowerCase().includes(texto))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  });
+
+  protected readonly totalEtiquetasSeleccionadas = computed(() =>
+    Array.from(this.seleccionEtiquetas()).reduce((acc, id) => acc + this.cantidadEtiquetaDe(id), 0),
+  );
+
+  abrirModalEtiquetas(): void {
+    this.busquedaEtiquetas.set('');
+    this.seleccionEtiquetas.set(new Set());
+    this.cantidadEtiquetas.set({});
+    this.modalEtiquetasAbierto.set(true);
+  }
+
+  estaSeleccionadoParaEtiqueta(id: number): boolean {
+    return this.seleccionEtiquetas().has(id);
+  }
+
+  toggleSeleccionEtiqueta(id: number): void {
+    this.seleccionEtiquetas.update((actual) => {
+      const nuevo = new Set(actual);
+      if (nuevo.has(id)) {
+        nuevo.delete(id);
+      } else {
+        nuevo.add(id);
+      }
+      return nuevo;
+    });
+  }
+
+  cantidadEtiquetaDe(id: number): number {
+    return this.cantidadEtiquetas()[id] ?? 1;
+  }
+
+  actualizarCantidadEtiqueta(id: number, valor: string): void {
+    const numero = Math.max(1, Math.round(Number(valor) || 1));
+    this.cantidadEtiquetas.update((actual) => ({ ...actual, [id]: numero }));
+  }
+
+  /** Dibuja un código de barras CODE128 en un <canvas> fuera de pantalla y
+   *  devuelve su PNG como data URL — CODE128 porque acepta cualquier texto
+   *  (Producto.codigo es libre, ver producto.model.ts), a diferencia de
+   *  EAN13/UPC que exigen un formato numérico fijo. Un <canvas> no necesita
+   *  estar insertado en el documento para dibujarse, así que esto no toca
+   *  el DOM de la pantalla para nada. */
+  /** Devuelve el código de barras como marcado <svg> (texto), NO como PNG
+   *  en un <canvas>. Antes se usaba canvas.toDataURL('image/png'), pero
+   *  varios navegadores con protección anti-"fingerprinting" (confirmado:
+   *  Brave) interceptan la lectura de un <canvas> y devuelven una imagen en
+   *  blanco/alterada en vez de los píxeles reales — el código se generaba
+   *  sin error pero salía vacío al imprimir. JsBarcode también sabe dibujar
+   *  directo a un <svg>, que no pasa por esa protección (no es lectura de
+   *  píxeles de canvas), así que el SVG se incrusta tal cual en el HTML de
+   *  la etiqueta — además imprime más nítido por ser vectorial. */
+  private dibujarCodigoBarras(codigo: string): string {
+    // JsBarcode también se expone en window.JsBarcode como efecto secundario
+    // de cargarse (ver node_modules/jsbarcode/bin/JsBarcode.js) — si el
+    // import ESM llegara a resolver mal por la interoperabilidad CJS/ESM del
+    // bundler (JsBarcode quedando como objeto en vez de función), esto cae
+    // de vuelta a esa referencia global en lugar de fallar en silencio.
+    const dibujar: typeof JsBarcode =
+      typeof JsBarcode === 'function' ? JsBarcode : (window as unknown as { JsBarcode?: typeof JsBarcode }).JsBarcode!;
+    if (typeof dibujar !== 'function') {
+      throw new Error('No se pudo cargar el generador de códigos de barras (JsBarcode).');
+    }
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    dibujar(svg, codigo, { format: 'CODE128', width: 1.6, height: 42, displayValue: false, margin: 0 });
+    return new XMLSerializer().serializeToString(svg);
+  }
+
+  /** Imprime con un <iframe> OCULTO insertado en la propia página — nada de
+   *  ventana/pestaña nueva. Se probaron dos enfoques antes y ninguno
+   *  resultó confiable: (1) ocultar el resto de la app con CSS global
+   *  (visibility/[data-print-etiquetas]) dependía de que TODO lo demás en
+   *  pantalla se ocultara bien; (2) una ventana nueva vía window.open()
+   *  depende de que el navegador no la bloquee como pop-up — y varios
+   *  navegadores lo hacen en silencio, sin avisar ni devolver un error,
+   *  dejando la sensación de que "no pasa nada". Un iframe insertado en el
+   *  DOM (aunque con tamaño 0 y fuera de la vista) SÍ se renderiza, así que
+   *  print() puede imprimir solo su contenido sin que ningún bloqueador de
+   *  pop-ups intervenga y sin tocar el resto del layout de la app. */
+  imprimirEtiquetas(event: Event): void {
+    // CLAVE: este <form> no tiene [formGroup], y el componente solo
+    // importa ReactiveFormsModule (no FormsModule) — así que no hay
+    // ninguna directiva de Angular que reconozca (ngSubmit) aquí. Por eso
+    // se usa el evento nativo (submit) con preventDefault() explícito; sin
+    // esto, el navegador hace un envío de formulario real (navegación GET
+    // a la misma URL), que es justo lo que causaba que "no pasara nada".
+    event.preventDefault();
+
+    const seleccionados = this.productos().filter((p) => this.seleccionEtiquetas().has(p.id));
+    if (seleccionados.length === 0) {
+      this.toast.advertencia('Elige al menos un producto.');
+      return;
+    }
+
+    const conCodigo = seleccionados.filter((p) => !!p.codigo);
+    const sinCodigo = seleccionados.length - conCodigo.length;
+    if (sinCodigo > 0) {
+      this.toast.advertencia(`${sinCodigo} producto(s) elegido(s) no tiene(n) código — se omiten de la impresión.`);
+    }
+    if (conCodigo.length === 0) return;
+
+    // Importante: el iframe necesita un tamaño REAL (no 0x0) — con 0x0,
+    // Chrome/Edge recientes lo tratan como "sin contenido que imprimir" y
+    // descartan la llamada a print() en silencio, sin ningún error. Por eso
+    // se posiciona fuera de la pantalla (left/top muy negativos) en vez de
+    // ponerle tamaño cero: así sigue siendo invisible para el usuario pero
+    // el navegador sí lo considera imprimible.
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.style.position = 'fixed';
+    iframe.style.left = '-10000px';
+    iframe.style.top = '0';
+    iframe.style.width = '900px';
+    iframe.style.height = '700px';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const quitarIframe = () => {
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    };
+
+    try {
+      const doc = iframe.contentDocument;
+      if (!doc) throw new Error('El navegador no permitió preparar el documento de impresión.');
+
+      // Una entrada por cada copia pedida (ver cantidadEtiquetaDe()).
+      const etiquetas = conCodigo.flatMap((p) => Array.from({ length: this.cantidadEtiquetaDe(p.id) }, () => p));
+
+      const htmlEtiquetas = etiquetas
+        .map(
+          (p) => `
+        <div class="etiqueta">
+          ${this.dibujarCodigoBarras(p.codigo ?? '')}
+          <div class="nombre">${this.escaparHtml(p.nombre)}</div>
+          <div class="precio">${this.escaparHtml(formatMoneda(p.precioUnitario))}</div>
+        </div>`,
+        )
+        .join('');
+
+      doc.open();
+      doc.write(`<!doctype html>
+      <html lang="es">
+        <head>
+          <meta charset="utf-8" />
+          <title>Etiquetas</title>
+          <style>
+            * { box-sizing: border-box; }
+            body { margin: 0; font-family: Arial, Helvetica, sans-serif; }
+            .etiquetas-grid { display: flex; flex-wrap: wrap; }
+            .etiqueta {
+              width: 63.5mm; height: 29.6mm; padding: 3mm; overflow: hidden;
+              display: flex; flex-direction: column; align-items: center; justify-content: center;
+              border: 1px dashed #999; text-align: center;
+            }
+            .etiqueta svg { width: 100%; height: 11mm; }
+            .etiqueta .nombre { font-size: 9px; font-weight: 700; line-height: 1.2; max-width: 100%; overflow: hidden; margin-top: 1mm; }
+            .etiqueta .precio { font-size: 11px; font-weight: 800; margin-top: 1mm; }
+            @media print { .etiqueta { border: none; } }
+          </style>
+        </head>
+        <body>
+          <div class="etiquetas-grid">${htmlEtiquetas}</div>
+        </body>
+      </html>`);
+      doc.close();
+
+      const ventana = iframe.contentWindow;
+      if (!ventana) throw new Error('El navegador no permitió preparar la ventana de impresión.');
+
+      // CLAVE: print() se llama de forma SÍNCRONA aquí, en la misma cadena
+      // de ejecución que el clic/submit del usuario — nada de setTimeout
+      // antes. Algunos navegadores (confirmado: Brave) exigen que print()
+      // se invoque dentro del mismo "gesto de usuario" (misma activación
+      // síncrona) o lo descartan en silencio sin ningún error ni aviso, que
+      // es justo el síntoma que se vio: ni ventana, ni error, ni consola.
+      // document.write()/close() ya son síncronos, así que el documento
+      // está listo en este punto sin necesidad de esperar.
+      try {
+        ventana.focus();
+        ventana.print();
+      } catch (errPrint) {
+        console.error('Error al imprimir:', errPrint);
+      } finally {
+        // La limpieza del iframe SÍ puede ir con retraso — quitar el DOM no
+        // necesita ninguna activación de usuario, solo se espera a que el
+        // diálogo de impresión ya se haya mostrado.
+        setTimeout(quitarIframe, 1000);
+      }
+    } catch (error) {
+      // Antes, cualquier falla aquí se quedaba en silencio y no pasaba nada
+      // visible — ahora se avisa con el motivo real.
+      console.error('Error al generar las etiquetas de impresión:', error);
+      quitarIframe();
+      const motivo = error instanceof Error ? error.message : String(error);
+      this.toast.error(`No se pudieron generar las etiquetas: ${motivo}`);
+    }
+  }
+
+  private escaparHtml(texto: string): string {
+    const div = document.createElement('div');
+    div.textContent = texto;
+    return div.innerHTML;
   }
 }

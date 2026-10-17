@@ -5,13 +5,17 @@ import { firstValueFrom } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ToastService } from '../../../shared/services/toast.service';
 import { SelectBuscableComponent, OpcionBuscable } from '../../../shared/components/select-buscable/select-buscable.component';
+import { EscaneoCodigoComponent } from '../../../shared/components/escaneo-codigo/escaneo-codigo.component';
 import { Producto } from '../productos/producto.model';
 import { Bodega } from '../bodegas/bodega.model';
 import { ExistenciaBodega } from './existencia-bodega.model';
 import { MovimientoInventario } from './movimiento-inventario.model';
 import { MovimientoInventarioService } from './movimiento-inventario.service';
+import { exportarCsv } from '../../../shared/utils/csv.util';
+import { exportarTablaPdf } from '../../../shared/utils/pdf-tabla.util';
 
 type TipoMovimiento = 'entrada' | 'traspaso' | 'salida';
+type TabMovimientosBodega = 'existencia' | 'historial' | 'transito';
 
 interface FilaSinAsignar {
   productoId: number;
@@ -25,6 +29,7 @@ interface FilaExistencia {
   productoNombre: string;
   bodegaNombre: string;
   existencia: number;
+  ubicacion: string | null;
 }
 
 interface FilaHistorial {
@@ -39,6 +44,10 @@ interface FilaHistorial {
   tipo: TipoMovimiento;
   cantidad: number;
   nota: string | null;
+  /** Ver MovimientoInventario.enTransito/fechaRecepcion — solo aplica a
+   *  tipo === 'traspaso'. */
+  enTransito: boolean;
+  fechaRecepcion: string | null;
 }
 
 /**
@@ -58,7 +67,7 @@ interface FilaHistorial {
 @Component({
   selector: 'app-movimientos-bodega',
   standalone: true,
-  imports: [ReactiveFormsModule, SelectBuscableComponent, DatePipe],
+  imports: [ReactiveFormsModule, SelectBuscableComponent, EscaneoCodigoComponent, DatePipe],
   templateUrl: './movimientos-bodega.component.html',
   styleUrl: './movimientos-bodega.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -79,6 +88,11 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
   protected readonly movimientos = signal<MovimientoInventario[]>([]);
   protected readonly cargando = signal(false);
   protected readonly guardando = signal(false);
+  protected readonly tabActiva = signal<TabMovimientosBodega>('existencia');
+
+  seleccionarTab(tab: TabMovimientosBodega): void {
+    this.tabActiva.set(tab);
+  }
 
   /** Solo productos físicos (existencia !== null) y activos — mismo criterio
    *  que Valor de stock (ver valor-stock.component.ts). */
@@ -125,9 +139,25 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
         productoNombre: this.nombreProducto(e.productoId),
         bodegaNombre: this.nombreBodega(e.bodegaId) ?? '—',
         existencia: e.existencia,
+        ubicacion: e.ubicacion ?? null,
       }))
       .sort((a, b) => a.productoNombre.localeCompare(b.productoNombre) || a.bodegaNombre.localeCompare(b.bodegaNombre)),
   );
+
+  /** Guarda la ubicación física (pasillo/anaquel, texto libre) de una fila
+   *  de ExistenciaBodega ya existente — se edita inline en la tabla, sin
+   *  modal (ver movimientos-bodega.component.html). Puramente informativo:
+   *  no afecta cantidades ni movimientos. */
+  async actualizarUbicacion(filaId: number, texto: string): Promise<void> {
+    const original = this.existenciasBodega().find((e) => e.id === filaId);
+    if (!original) return;
+    const nuevaUbicacion = texto.trim() || null;
+    if (nuevaUbicacion === (original.ubicacion ?? null)) return; // sin cambio real, no gasta una escritura
+    await firstValueFrom(
+      this.data.modificacion<ExistenciaBodega>('ExistenciaBodega', { ...original, ubicacion: nuevaUbicacion }),
+    );
+    this.existenciasBodega.update((lista) => lista.map((e) => (e.id === filaId ? { ...e, ubicacion: nuevaUbicacion } : e)));
+  }
 
   protected readonly historial = computed<FilaHistorial[]>(() =>
     this.movimientos()
@@ -145,6 +175,8 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
           tipo,
           cantidad: m.cantidad,
           nota: m.nota,
+          enTransito: m.enTransito ?? false,
+          fechaRecepcion: m.fechaRecepcion ?? null,
         };
       })
       .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id),
@@ -181,6 +213,27 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
     this.filtroHasta.set('');
   }
 
+  /** Traspasos enviados pero sin confirmar recepción todavía — ver
+   *  MovimientoInventarioService.enviarEnTransito(). Más viejo primero,
+   *  para que lo que lleva más tiempo esperando se vea arriba. */
+  protected readonly transitosPendientes = computed(() =>
+    this.historial()
+      .filter((f) => f.tipo === 'traspaso' && f.enTransito)
+      .sort((a, b) => a.fecha.localeCompare(b.fecha)),
+  );
+
+  protected readonly confirmandoRecepcionId = signal<number | null>(null);
+
+  /** Suma a la bodega destino lo que ya se restó de origen al enviarlo, y
+   *  marca el traspaso como recibido (ver confirmarRecepcionTransito()). */
+  async confirmarRecepcion(movimientoId: number): Promise<void> {
+    this.confirmandoRecepcionId.set(movimientoId);
+    await this.movimientoService.confirmarRecepcionTransito(movimientoId);
+    this.confirmandoRecepcionId.set(null);
+    this.toast.exito('Recepción confirmada — se sumó a la bodega destino.');
+    this.cargar();
+  }
+
   protected readonly modalAbierto = signal(false);
 
   protected readonly form = this.fb.nonNullable.group({
@@ -190,6 +243,10 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
     bodegaDestinoId: [0],
     cantidad: [1, [Validators.required, Validators.min(1)]],
     nota: [''],
+    /** Solo tiene sentido con tipo === 'traspaso' (ver guardar()) — se
+     *  oculta y se ignora en cualquier otro tipo. Ver
+     *  MovimientoInventario.enTransito. */
+    enTransito: [false],
   });
 
   /** Cuánto hay disponible para traspasar/dar de salida con el producto y la
@@ -223,6 +280,24 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** Busca el producto cuyo código coincida (exacto, sin distinguir
+   *  mayúsculas) con lo escaneado/capturado en app-escaneo-codigo y lo
+   *  selecciona en el formulario — mismo criterio de "atajo" que
+   *  asignarABodega(): el usuario sigue siendo quien revisa el resto del
+   *  formulario antes de guardar. Solo busca entre productos físicos
+   *  activos (los mismos que ofrece el selector de producto). */
+  seleccionarPorCodigo(codigo: string): void {
+    const encontrado = this.productosFisicosActivos().find(
+      (p) => (p.codigo ?? '').trim().toLowerCase() === codigo.trim().toLowerCase(),
+    );
+    if (!encontrado) {
+      this.toast.advertencia(`No se encontró ningún producto activo con el código "${codigo}".`);
+      return;
+    }
+    this.form.patchValue({ productoId: encontrado.id });
+    this.toast.exito(`Producto seleccionado: ${encontrado.nombre}.`);
+  }
+
   nuevoMovimiento(tipo: TipoMovimiento = 'traspaso'): void {
     if (this.productosFisicosActivos().length === 0) {
       this.toast.advertencia('No hay productos físicos activos — da de alta alguno en Productos y servicios.');
@@ -232,7 +307,7 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
       this.toast.advertencia('Antes crea al menos una Bodega activa (Inventario → Bodegas).');
       return;
     }
-    this.form.reset({ tipo, productoId: 0, bodegaOrigenId: 0, bodegaDestinoId: 0, cantidad: 1, nota: '' });
+    this.form.reset({ tipo, productoId: 0, bodegaOrigenId: 0, bodegaDestinoId: 0, cantidad: 1, nota: '', enTransito: false });
     this.modalAbierto.set(true);
   }
 
@@ -251,6 +326,7 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
       bodegaDestinoId: 0,
       cantidad: fila.cantidad,
       nota: 'Asignación inicial',
+      enTransito: false,
     });
     this.modalAbierto.set(true);
   }
@@ -293,21 +369,81 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
 
     const bodegaOrigenId = valor.tipo === 'traspaso' || valor.tipo === 'salida' ? valor.bodegaOrigenId : null;
     const bodegaDestinoId = valor.tipo === 'salida' ? null : valor.bodegaDestinoId;
+    const enTransito = valor.tipo === 'traspaso' && valor.enTransito;
+
+    const registro = {
+      productoId: valor.productoId,
+      bodegaOrigenId,
+      bodegaDestinoId,
+      cantidad: valor.cantidad,
+      nota: valor.nota || null,
+    };
 
     this.guardando.set(true);
-    this.movimientoService
-      .registrar({
-        productoId: valor.productoId,
-        bodegaOrigenId,
-        bodegaDestinoId,
-        cantidad: valor.cantidad,
-        nota: valor.nota || null,
-      })
-      .then(() => {
-        this.guardando.set(false);
-        this.toast.exito('Movimiento registrado.');
-        this.modalAbierto.set(false);
-        this.cargar();
-      });
+    // "Marcar como en tránsito" solo aplica a Traspaso — resta de origen
+    // ahora, pero el destino se abona después al confirmar la recepción
+    // (ver MovimientoInventarioService.enviarEnTransito()). Cualquier otro
+    // caso sigue igual que siempre, con registrar().
+    (enTransito ? this.movimientoService.enviarEnTransito(registro) : this.movimientoService.registrar(registro)).then(() => {
+      this.guardando.set(false);
+      this.toast.exito(enTransito ? 'Traspaso enviado — pendiente de confirmar recepción.' : 'Movimiento registrado.');
+      this.modalAbierto.set(false);
+      this.cargar();
+    });
+  }
+
+  private nombreTipoHistorial(fila: FilaHistorial): string {
+    if (fila.tipo === 'traspaso') return fila.enTransito ? 'Traspaso (en tránsito)' : 'Traspaso';
+    return fila.tipo === 'entrada' ? 'Entrada' : 'Salida/Ajuste';
+  }
+
+  exportarCsvHistorial(): void {
+    exportarCsv(
+      'movimientos_bodega.csv',
+      [
+        { clave: 'fecha', etiqueta: 'Fecha' },
+        { clave: 'productoNombre', etiqueta: 'Producto' },
+        { clave: 'tipo', etiqueta: 'Tipo' },
+        { clave: 'origenNombre', etiqueta: 'Origen' },
+        { clave: 'destinoNombre', etiqueta: 'Destino' },
+        { clave: 'cantidad', etiqueta: 'Cantidad' },
+        { clave: 'nota', etiqueta: 'Nota' },
+      ],
+      this.historialFiltrado().map((f) => ({
+        fecha: f.fecha,
+        productoNombre: f.productoNombre,
+        tipo: this.nombreTipoHistorial(f),
+        origenNombre: f.origenNombre ?? '',
+        destinoNombre: f.destinoNombre ?? '',
+        cantidad: f.cantidad,
+        nota: f.nota ?? '',
+      })),
+    );
+  }
+
+  exportarPdfHistorial(): void {
+    exportarTablaPdf({
+      nombreArchivo: 'movimientos_bodega.pdf',
+      titulo: 'Historial de movimientos entre bodegas',
+      subtitulo: this.hayFiltrosActivos() ? 'Con filtros aplicados' : undefined,
+      columnas: [
+        { etiqueta: 'Fecha', ancho: 32 },
+        { etiqueta: 'Producto' },
+        { etiqueta: 'Tipo', ancho: 38 },
+        { etiqueta: 'Origen', ancho: 32 },
+        { etiqueta: 'Destino', ancho: 32 },
+        { etiqueta: 'Cantidad', ancho: 20 },
+        { etiqueta: 'Nota', ancho: 40 },
+      ],
+      filas: this.historialFiltrado().map((f) => [
+        new Date(f.fecha).toLocaleString('es-MX'),
+        f.productoNombre,
+        this.nombreTipoHistorial(f),
+        f.origenNombre ?? '—',
+        f.destinoNombre ?? '—',
+        String(f.cantidad),
+        f.nota ?? '',
+      ]),
+    });
   }
 }

@@ -15,4 +15,10 @@ export interface ExistenciaBodega {
   productoId: number;
   bodegaId: number;
   existencia: number;
+  /** Ubicación física dentro de la bodega (pasillo/anaquel/nivel, texto
+   *  libre) — opcional, puramente informativa para agilizar el surtido o
+   *  el conteo físico. NULL = sin ubicación capturada. Se edita inline
+   *  desde la pestaña "Existencia por bodega" de Movimientos entre
+   *  bodegas (ver movimientos-bodega.component.ts). */
+  ubicacion: string | null;
 }

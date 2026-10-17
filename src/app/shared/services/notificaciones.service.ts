@@ -10,9 +10,12 @@ import { CuentaPresupuesto } from '../../features/presupuesto/cuenta-presupuesto
 import { MovimientoPresupuesto } from '../../features/presupuesto/movimientos/movimiento.model';
 import { formatMoneda, infoTarjeta } from '../../features/presupuesto/shared/wallet.util';
 import { Producto } from '../../features/inventario/productos/producto.model';
-import { existenciaTotal } from '../../features/inventario/productos/producto.util';
+import { alertasStockBajo } from '../../features/inventario/productos/producto.util';
 import { ExistenciaBodega } from '../../features/inventario/movimientos-bodega/existencia-bodega.model';
+import { NivelMinimoBodega } from '../../features/inventario/productos/nivel-minimo-bodega.model';
 import { AvisoStockBajo } from '../../features/inventario/valor-stock/aviso-stock-bajo.model';
+import { OrdenCompra } from '../../features/inventario/compras/orden-compra.model';
+import { AvisoOrdenVencida } from '../../features/inventario/compras/aviso-orden-vencida.model';
 
 const ENTIDAD = 'Notificacion';
 
@@ -271,13 +274,14 @@ export class NotificacionesService {
   }
 
   /**
-   * Alerta de stock bajo: productos físicos activos con nivelMinimo
-   * definido cuya existencia (ExistenciaBodega + fallback legado, ver
-   * existenciaTotal()) ya cayó por debajo de ese mínimo — mismo criterio
-   * que `stockBajo` en valor-stock.component.ts, pero llevado a una
-   * notificación real en la campanita (antes solo se veía si entrabas a
-   * esa pantalla). Dedupe por día vía AvisoStockBajo (ver ese modelo):
-   * si el producto sigue bajo al día siguiente, se vuelve a avisar.
+   * Alerta de stock bajo: productos físicos activos con al menos una
+   * alerta (global O por bodega, ver alertasStockBajo() en producto.util.ts)
+   * ya por debajo de su mínimo — mismo criterio que `stockBajo` en
+   * valor-stock.component.ts, pero llevado a una notificación real en la
+   * campanita (antes solo se veía si entrabas a esa pantalla). Dedupe por
+   * día Y por bodega vía AvisoStockBajo (ver ese modelo): si el producto
+   * sigue bajo al día siguiente, o sigue bajo en otra bodega distinta, se
+   * vuelve a avisar.
    */
   async revisarAlertasStockBajo(): Promise<void> {
     const usuarioId = this.auth.usuarioActual()?.id;
@@ -286,32 +290,78 @@ export class NotificacionesService {
       const hoy = new Date();
       const dia = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
 
-      const [productos, existenciasBodega, avisos] = await Promise.all([
+      const [productos, existenciasBodega, nivelesMinimoBodega, avisos] = await Promise.all([
         firstValueFrom(this.data.list<Producto>('Producto')),
         firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega')),
+        firstValueFrom(this.data.list<NivelMinimoBodega>('NivelMinimoBodega')),
         firstValueFrom(this.data.list<AvisoStockBajo>('AvisoStockBajo', { usuarioId, dia })),
       ]);
-      const yaAvisado = (productoId: number) => avisos.some((a) => Number(a.productoId) === productoId);
+      // Dedupe por producto Y bodega (bodegaId null = evaluación global
+      // heredada) — un mismo producto puede tener varias bodegas bajas a la
+      // vez, cada una con su propio aviso. Ver alertasStockBajo() en
+      // producto.util.ts y el comentario en aviso-stock-bajo.model.ts.
+      const yaAvisado = (productoId: number, bodegaId: number | null) =>
+        avisos.some((a) => Number(a.productoId) === productoId && (a.bodegaId ?? null) === bodegaId);
 
       for (const producto of productos) {
-        // typeof === 'number' (no === null): ver mismo comentario en valor-stock.component.ts.
-        if (!producto.activo || producto.existencia === null || typeof producto.nivelMinimo !== 'number') continue;
-        if (yaAvisado(producto.id)) continue;
+        if (!producto.activo) continue;
 
-        const existencia = existenciaTotal(producto, existenciasBodega);
-        if (existencia >= producto.nivelMinimo) continue;
+        for (const alerta of alertasStockBajo(producto, existenciasBodega, nivelesMinimoBodega)) {
+          if (yaAvisado(producto.id, alerta.bodegaId)) continue;
 
-        this.notificar(
-          usuarioId,
-          `📉 "${producto.nombre}" tiene ${existencia} de existencia, por debajo de su mínimo (${producto.nivelMinimo}).`,
-          '/inventario/valor-stock',
-        );
-        this.data.alta<AvisoStockBajo>('AvisoStockBajo', { productoId: producto.id, usuarioId, dia }).subscribe({
-          error: (error) => console.warn('No se pudo registrar el aviso de stock bajo:', error),
-        });
+          this.notificar(
+            usuarioId,
+            `📉 "${producto.nombre}" tiene ${alerta.existencia} de existencia, por debajo de su mínimo (${alerta.nivelMinimo}).`,
+            '/inventario/valor-stock',
+          );
+          this.data
+            .alta<AvisoStockBajo>('AvisoStockBajo', { productoId: producto.id, bodegaId: alerta.bodegaId, usuarioId, dia })
+            .subscribe({
+              error: (error) => console.warn('No se pudo registrar el aviso de stock bajo:', error),
+            });
+        }
       }
     } catch (error) {
       console.warn('No se pudo revisar las alertas de stock bajo:', error);
+    }
+  }
+
+  /**
+   * Alerta de orden de compra vencida: 'pendiente' o 'recibida_parcial' con
+   * fechaEntregaEstimada ya pasada — mismo patrón de dedupe diario que
+   * revisarAlertasStockBajo (ver AvisoOrdenVencida), así que si sigue
+   * vencida al día siguiente se vuelve a avisar una vez por día en vez de
+   * en cada ciclo del intervalo. Una orden 'recibida_completa' o
+   * 'cancelada' nunca entra aquí, y una sin fechaEntregaEstimada capturada
+   * tampoco (no hay con qué comparar).
+   */
+  async revisarOrdenesVencidas(): Promise<void> {
+    const usuarioId = this.auth.usuarioActual()?.id;
+    if (!usuarioId) return;
+    try {
+      const hoy = new Date();
+      const dia = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+      const hoyTexto = dia;
+
+      const [ordenes, avisos] = await Promise.all([
+        firstValueFrom(this.data.list<OrdenCompra>('OrdenCompra')),
+        firstValueFrom(this.data.list<AvisoOrdenVencida>('AvisoOrdenVencida', { usuarioId, dia })),
+      ]);
+      const yaAvisado = (ordenCompraId: number) => avisos.some((a) => Number(a.ordenCompraId) === ordenCompraId);
+
+      for (const orden of ordenes) {
+        if (orden.estado !== 'pendiente' && orden.estado !== 'recibida_parcial') continue;
+        if (!orden.fechaEntregaEstimada) continue;
+        if (orden.fechaEntregaEstimada.slice(0, 10) >= hoyTexto) continue; // todavía no vence
+        if (yaAvisado(orden.id)) continue;
+
+        this.notificar(usuarioId, `📦 La orden ${orden.folio} ya pasó su fecha de entrega estimada y sigue sin completarse.`, '/inventario/ordenes-compra');
+        this.data.alta<AvisoOrdenVencida>('AvisoOrdenVencida', { ordenCompraId: orden.id, usuarioId, dia }).subscribe({
+          error: (error) => console.warn('No se pudo registrar el aviso de orden vencida:', error),
+        });
+      }
+    } catch (error) {
+      console.warn('No se pudo revisar las órdenes de compra vencidas:', error);
     }
   }
 }

@@ -1,0 +1,173 @@
+<div class="page-header">
+  <h1>Historial de ventas</h1>
+</div>
+
+<div class="grid-toolbar">
+  <input
+    type="search"
+    placeholder="Buscar por folio o cliente…"
+    [value]="busqueda()"
+    (input)="busqueda.set($any($event.target).value)"
+  />
+
+  <div class="grid-filter">
+    <label class="board-filter-field" style="margin:0;">
+      Desde
+      <input type="date" [value]="fechaDesde()" (change)="fechaDesde.set($any($event.target).value)" />
+    </label>
+    <label class="board-filter-field" style="margin:0;">
+      Hasta
+      <input type="date" [value]="fechaHasta()" (change)="fechaHasta.set($any($event.target).value)" />
+    </label>
+    <label class="board-filter-field" style="margin:0;">
+      Estado
+      <select [value]="filtroEstado()" (change)="filtroEstado.set($any($event.target).value)">
+        <option value="Todas">Todas</option>
+        <option value="Completada">Completada</option>
+        <option value="Cancelada">Cancelada</option>
+      </select>
+    </label>
+  </div>
+</div>
+
+<app-data-table
+  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+  [columnas]="columnas"
+  [filas]="ventasFiltradas()"
+  [cargando]="cargando()"
+  [ocultarEditarEliminar]="true"
+  accionExtraEtiqueta="Ver detalle"
+  accionExtraTitulo="Ver renglones, pagos y acciones de esta venta"
+  (accionExtra)="verDetalle($event)"
+/>
+
+@if (ventaDetalle(); as venta) {
+  <div class="modal-overlay show" (click)="cerrarDetalle()">
+    <div class="modal-box" style="max-width: 640px; width: 94%;" (click)="$event.stopPropagation()">
+      <div class="page-header" style="margin-bottom: 12px;">
+        <h3>Venta {{ venta.folio }}</h3>
+        <span class="grid-badge" [class]="venta.estado === 'Completada' ? 'grid-badge-success' : 'grid-badge-muted'">
+          {{ venta.estado }}
+        </span>
+      </div>
+
+      <p class="hint" style="margin-top:-6px;">
+        {{ nombreCliente(venta.clienteId) }} · Atendió {{ nombreVendedor(venta.vendedorUsuarioId) }}
+      </p>
+
+      @if (cargandoDetalle()) {
+        <p class="empty">Cargando…</p>
+      } @else {
+        <div class="pos-ticket-lineas" style="margin-bottom: 14px;">
+          @for (item of itemsDetalle(); track item.id) {
+            <div class="pos-ticket-item">
+              <div class="pos-ticket-item-info">
+                <span class="pos-ticket-item-desc">{{ item.cantidad }} x {{ item.descripcion }}</span>
+                <span class="pos-ticket-item-precio">{{ formatMoneda(item.precioUnitario) }} c/u</span>
+              </div>
+              <span class="pos-ticket-item-subtotal">{{ formatMoneda(item.subtotal) }}</span>
+            </div>
+          }
+        </div>
+
+        <div class="pos-ticket-totales" style="margin-bottom: 14px;">
+          @if (venta.descuento > 0) {
+            <div class="pos-ticket-total-linea"><span>Subtotal</span><span>{{ formatMoneda(venta.subtotal) }}</span></div>
+            <div class="pos-ticket-total-linea"><span>Descuento</span><span>-{{ formatMoneda(venta.descuento) }}</span></div>
+          }
+          <div class="pos-ticket-total-linea pos-ticket-total-grande"><span>Total</span><span>{{ formatMoneda(venta.total) }}</span></div>
+          @if (totalDevueltoDetalle() > 0) {
+            <div class="pos-ticket-total-linea" style="color: var(--danger);"><span>Devuelto</span><span>-{{ formatMoneda(totalDevueltoDetalle()) }}</span></div>
+          }
+        </div>
+
+        <p class="hint" style="margin-bottom:6px;">Pagos</p>
+        <div class="pos-ticket-lineas" style="margin-bottom: 14px;">
+          @for (pago of pagosDetalle(); track pago.id) {
+            <div class="pos-ticket-item">
+              <div class="pos-ticket-item-info">
+                <span class="pos-ticket-item-desc">{{ pago.metodoPago }}</span>
+                @if (pago.cambio) {
+                  <span class="pos-ticket-item-precio">Cambio: {{ formatMoneda(pago.cambio) }}</span>
+                }
+              </div>
+              <span class="pos-ticket-item-subtotal">{{ formatMoneda(pago.monto) }}</span>
+            </div>
+          }
+        </div>
+      }
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="cerrarDetalle()">Cerrar</button>
+        <button type="button" class="btn-secondary" (click)="imprimirTicket(venta, itemsDetalle(), pagosDetalle())">🖨️ Imprimir ticket</button>
+        @if (puedeDevolverDetalle()) {
+          <button type="button" class="btn-secondary" (click)="abrirDevolucion()">↩️ Devolver</button>
+        }
+        @if (puedeCancelarDetalle()) {
+          <button type="button" class="btn-primary" style="background: var(--danger);" (click)="pedirCancelar(venta)">Cancelar venta</button>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (modalDevolucionAbierto()) {
+  <div class="modal-overlay show" (click)="cerrarDevolucion()">
+    <form class="modal-box" style="max-width: 560px; width: 94%;" [formGroup]="devolucionForm" (click)="$event.stopPropagation()" (ngSubmit)="confirmarDevolucion()">
+      <h3>Devolver productos</h3>
+      <p class="hint" style="margin-top:-6px;">
+        Indica cuánto se devuelve de cada renglón — repone la existencia y refleja el reembolso en el método que elijas.
+      </p>
+
+      <div class="pos-ticket-lineas" style="margin-bottom: 14px;">
+        @for (item of itemsDevolvibles(); track item.id) {
+          <div class="pos-ticket-item">
+            <div class="pos-ticket-item-info">
+              <span class="pos-ticket-item-desc">{{ item.descripcion }}</span>
+              <span class="pos-ticket-item-precio">Disponible para devolver: {{ disponibleParaDevolver(item) }}</span>
+            </div>
+            <input
+              type="number"
+              min="0"
+              [max]="disponibleParaDevolver(item)"
+              step="1"
+              style="width: 64px;"
+              [value]="cantidadDevolucion(item.id)"
+              (change)="actualizarCantidadDevolucion(item, $any($event.target).value)"
+            />
+          </div>
+        }
+      </div>
+
+      <div class="edit-form" style="margin-bottom: 14px;">
+        <label>
+          Método de reembolso
+          <select formControlName="metodoReembolso">
+            @for (metodo of metodosPago; track metodo) {
+              <option [value]="metodo">{{ metodo }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          Motivo (opcional)
+          <input type="text" formControlName="motivo" placeholder="p.ej. producto dañado, cambio de opinión…" />
+        </label>
+      </div>
+
+      <p class="hint" style="margin-bottom:14px;">Total a reembolsar: <strong>{{ formatMoneda(totalDevolucionActual()) }}</strong></p>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="cerrarDevolucion()">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="guardandoDevolucion()">{{ guardandoDevolucion() ? 'Guardando…' : 'Confirmar devolución' }}</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="ventaACancelar() !== null"
+  titulo="Cancelar venta"
+  [mensaje]="'¿Cancelar la venta ' + (ventaACancelar()?.folio ?? '') + '? Se repondrá la existencia de los productos vendidos. Esta acción no se puede deshacer.'"
+  (confirmar)="confirmarCancelar()"
+  (cancelar)="ventaACancelar.set(null)"
+/>

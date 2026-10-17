@@ -1,0 +1,72 @@
+<div class="page-header">
+  <h1>Cierre de caja</h1>
+</div>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else if (!turno()) {
+  <p class="empty">No tienes un turno de caja abierto.</p>
+  <a class="btn-primary" routerLink="/ventas/apertura-turno" style="display:inline-block; text-decoration:none;">Abrir turno</a>
+} @else if (turnoCerrado()) {
+  <div class="catalog-group">
+    <h2 class="catalog-group-title">Turno cerrado</h2>
+    <div class="dashboard-stats" style="margin-bottom: 24px;">
+      <div class="dashboard-stat-card">
+        <div class="num">{{ formatMoneda(turnoCerrado()!.montoCierreEsperado ?? 0) }}</div>
+        <div class="label">Efectivo esperado</div>
+      </div>
+      <div class="dashboard-stat-card">
+        <div class="num">{{ formatMoneda(turnoCerrado()!.montoCierreContado ?? 0) }}</div>
+        <div class="label">Efectivo contado</div>
+      </div>
+      <div
+        class="dashboard-stat-card"
+        [class.dashboard-stat-danger]="(turnoCerrado()!.diferenciaCierre ?? 0) < 0"
+        [class.dashboard-stat-warning]="(turnoCerrado()!.diferenciaCierre ?? 0) > 0"
+      >
+        <div class="num">{{ formatMoneda(turnoCerrado()!.diferenciaCierre ?? 0) }}</div>
+        <div class="label">
+          {{ (turnoCerrado()!.diferenciaCierre ?? 0) < 0 ? 'Faltante' : (turnoCerrado()!.diferenciaCierre ?? 0) > 0 ? 'Sobrante' : 'Sin diferencia' }}
+        </div>
+      </div>
+    </div>
+
+    <button type="button" class="btn-primary" (click)="irAModulos()">Entendido</button>
+  </div>
+} @else {
+  <p class="hint" style="margin-top:-6px;">
+    Turno abierto desde {{ turno()!.fechaApertura | date: 'dd/MM/yyyy HH:mm' }}. Cuenta el efectivo físico
+    que hay en caja ahora mismo y captúralo abajo — se comparará contra lo que el sistema esperaba.
+  </p>
+
+  <div class="dashboard-stats" style="margin-bottom: 24px;">
+    <div class="dashboard-stat-card">
+      <div class="num">{{ resumen()!.numeroVentas }}</div>
+      <div class="label">Ventas registradas</div>
+    </div>
+    <div class="dashboard-stat-card">
+      <div class="num">{{ formatMoneda(resumen()!.totalVentas) }}</div>
+      <div class="label">Total vendido</div>
+    </div>
+    <div class="dashboard-stat-card">
+      <div class="num">{{ formatMoneda(resumen()!.efectivoEsperado) }}</div>
+      <div class="label">Efectivo esperado en caja ahora</div>
+    </div>
+  </div>
+
+  <form class="edit-form" style="max-width: 420px;" [formGroup]="form" (ngSubmit)="cerrar()">
+    <label>
+      Efectivo contado físicamente
+      <input type="number" step="0.01" min="0" formControlName="montoContado" />
+    </label>
+
+    <label>
+      Notas (opcional)
+      <textarea rows="3" formControlName="notas"></textarea>
+    </label>
+
+    <div class="modal-actions" style="justify-content: flex-start;">
+      <button type="submit" class="btn-primary">Cerrar turno</button>
+    </div>
+  </form>
+}

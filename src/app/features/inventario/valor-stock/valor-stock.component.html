@@ -39,66 +39,130 @@
         <div class="label">Stock bajo (por debajo del mínimo)</div>
       </div>
     }
-  </div>
-
-  <h2 class="catalog-group-title" style="margin-top:28px;">Valor por categoría</h2>
-  <div style="margin-bottom:28px;">
-    @for (cat of porCategoria(); track cat.id) {
-      <div class="wallet-cat-bar-row">
-        <span class="wallet-cat-bar-name" [title]="cat.nombre">{{ cat.nombre }}</span>
-        <div class="wallet-cat-bar-track">
-          <div class="wallet-cat-bar-fill" [style.width.%]="(cat.valor / maxCategoria()) * 100" [style.background]="cat.color"></div>
-        </div>
-        <span class="wallet-cat-bar-amount">{{ formatMoneda(cat.valor) }} · {{ cat.pct | number: '1.0-0' }}%</span>
+    @if (sobreStock() > 0) {
+      <div class="dashboard-stat-card dashboard-stat-warning">
+        <div class="num">{{ sobreStock() }}</div>
+        <div class="label">Sobre-stock (por encima del máximo)</div>
       </div>
     }
   </div>
 
-  <h2 class="catalog-group-title">Valor por bodega</h2>
-  <div style="margin-bottom:28px;">
-    @for (bod of porBodega(); track bod.id) {
-      <div class="wallet-cat-bar-row">
-        <span class="wallet-cat-bar-name" [title]="bod.nombre">{{ bod.nombre }}</span>
-        <div class="wallet-cat-bar-track">
-          <div class="wallet-cat-bar-fill" [style.width.%]="(bod.valor / maxBodega()) * 100" [style.background]="bod.color"></div>
-        </div>
-        <span class="wallet-cat-bar-amount">{{ formatMoneda(bod.valor) }} · {{ bod.pct | number: '1.0-0' }}%</span>
-      </div>
-    }
+  <div class="tab-bar" style="margin:18px 0;">
+    <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'resumen'" (click)="seleccionarTab('resumen')">
+      📊 Resumen
+    </button>
+    <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'productos'" (click)="seleccionarTab('productos')">
+      📦 Productos
+    </button>
+    <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'rotacion'" (click)="seleccionarTab('rotacion')">
+      🐌 Rotación
+    </button>
   </div>
 
-  <div class="grid-toolbar">
-    <div class="grid-filter">
-      <input type="search" placeholder="Buscar por nombre o código…" [value]="busqueda()" (input)="busqueda.set($any($event.target).value)" />
+  @if (tabActiva() === 'resumen') {
+    <h2 class="catalog-group-title">Valor por categoría</h2>
+    <div style="margin-bottom:28px;">
+      @for (cat of porCategoria(); track cat.id) {
+        <div class="wallet-cat-bar-row">
+          <span class="wallet-cat-bar-name" [title]="cat.nombre">{{ cat.nombre }}</span>
+          <div class="wallet-cat-bar-track">
+            <div class="wallet-cat-bar-fill" [style.width.%]="(cat.valor / maxCategoria()) * 100" [style.background]="cat.color"></div>
+          </div>
+          <span class="wallet-cat-bar-amount">{{ formatMoneda(cat.valor) }} · {{ cat.pct | number: '1.0-0' }}%</span>
+        </div>
+      }
     </div>
-  </div>
 
-  <div class="grid-table-scroll">
-    <table class="grid-table">
-      <thead>
-        <tr><th>Código</th><th>Nombre</th><th>Categoría</th><th>Existencia</th><th>Costo</th><th>Valor</th></tr>
-      </thead>
-      <tbody>
-        @for (fila of filasFiltradas(); track fila.productoId) {
-          <tr>
-            <td data-label="Código">{{ fila.codigo || '—' }}</td>
-            <td data-label="Nombre">{{ fila.nombre }}</td>
-            <td data-label="Categoría">{{ fila.categoriaNombre }}</td>
-            <td data-label="Existencia">
-              {{ fila.existencia }}
-              @if (fila.existencia === 0) {
-                <span class="tag" style="background:var(--danger-soft); color:var(--danger); margin-left:6px;">Sin existencia</span>
-              } @else if (fila.stockBajo) {
-                <span class="tag" style="background:var(--amber-soft); color:var(--amber); margin-left:6px;">Stock bajo</span>
-              }
-            </td>
-            <td data-label="Costo">{{ formatMoneda(fila.costo) }}</td>
-            <td data-label="Valor">{{ formatMoneda(fila.valor) }}</td>
-          </tr>
-        } @empty {
-          <tr><td colspan="6"><p class="empty">Sin resultados para "{{ busqueda() }}".</p></td></tr>
-        }
-      </tbody>
-    </table>
-  </div>
+    <h2 class="catalog-group-title">Valor por bodega</h2>
+    <div style="margin-bottom:28px;">
+      @for (bod of porBodega(); track bod.id) {
+        <div class="wallet-cat-bar-row">
+          <span class="wallet-cat-bar-name" [title]="bod.nombre">{{ bod.nombre }}</span>
+          <div class="wallet-cat-bar-track">
+            <div class="wallet-cat-bar-fill" [style.width.%]="(bod.valor / maxBodega()) * 100" [style.background]="bod.color"></div>
+          </div>
+          <span class="wallet-cat-bar-amount">{{ formatMoneda(bod.valor) }} · {{ bod.pct | number: '1.0-0' }}%</span>
+        </div>
+      }
+    </div>
+  } @else if (tabActiva() === 'productos') {
+    <div class="grid-toolbar">
+      <div class="grid-filter">
+        <input type="search" placeholder="Buscar por nombre o código…" [value]="busqueda()" (input)="busqueda.set($any($event.target).value)" />
+      </div>
+      <button type="button" class="btn-secondary small" (click)="exportarCsvProductos()">⬇ Exportar CSV</button>
+      <button type="button" class="btn-secondary small" (click)="exportarPdfProductos()">⬇ Exportar PDF</button>
+    </div>
+
+    <div class="grid-table-scroll">
+      <table class="grid-table">
+        <thead>
+          <tr><th>Código</th><th>Nombre</th><th>Categoría</th><th>Existencia</th><th>Costo</th><th>Valor</th></tr>
+        </thead>
+        <tbody>
+          @for (fila of filasFiltradas(); track fila.productoId) {
+            <tr>
+              <td data-label="Código">{{ fila.codigo || '—' }}</td>
+              <td data-label="Nombre">{{ fila.nombre }}</td>
+              <td data-label="Categoría">{{ fila.categoriaNombre }}</td>
+              <td data-label="Existencia">
+                {{ fila.existencia }}
+                @if (fila.existencia === 0) {
+                  <span class="tag" style="background:var(--danger-soft); color:var(--danger); margin-left:6px;">Sin existencia</span>
+                } @else if (fila.stockBajo) {
+                  <span class="tag" style="background:var(--amber-soft); color:var(--amber); margin-left:6px;">Stock bajo</span>
+                } @else if (fila.sobreStock) {
+                  <span class="tag" style="background:var(--amber-soft); color:var(--amber); margin-left:6px;">Sobre-stock</span>
+                }
+              </td>
+              <td data-label="Costo">{{ formatMoneda(fila.costo) }}</td>
+              <td data-label="Valor">{{ formatMoneda(fila.valor) }}</td>
+            </tr>
+          } @empty {
+            <tr><td colspan="6"><p class="empty">Sin resultados para "{{ busqueda() }}".</p></td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else {
+    <p class="hint" style="margin:0 0 14px;">
+      Productos físicos activos sin ningún movimiento (entrada, traspaso o salida) en los últimos
+      <input
+        type="number"
+        step="1"
+        min="1"
+        style="width:70px; display:inline-block;"
+        [value]="umbralDias()"
+        (change)="umbralDias.set(+$any($event.target).value || 1)"
+      />
+      días — capital posiblemente inmovilizado. "Nunca" significa que jamás tuvo un movimiento registrado.
+    </p>
+
+    <div class="grid-table-scroll">
+      <table class="grid-table">
+        <thead>
+          <tr><th>Código</th><th>Nombre</th><th>Existencia</th><th>Último movimiento</th><th>Días sin moverse</th></tr>
+        </thead>
+        <tbody>
+          @for (fila of rotacionFiltrada(); track fila.productoId) {
+            <tr>
+              <td data-label="Código">{{ fila.codigo || '—' }}</td>
+              <td data-label="Nombre">{{ fila.nombre }}</td>
+              <td data-label="Existencia">{{ fila.existencia }}</td>
+              <td data-label="Último movimiento">{{ fila.ultimoMovimiento ? (fila.ultimoMovimiento | date: 'dd/MM/yyyy') : 'Nunca' }}</td>
+              <td data-label="Días sin moverse">
+                @if (fila.diasSinMovimiento === null) {
+                  <span class="tag" style="background:var(--danger-soft); color:var(--danger);">Nunca</span>
+                } @else {
+                  <span class="tag" style="background:var(--amber-soft); color:var(--amber);">{{ fila.diasSinMovimiento }} días</span>
+                }
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="5"><p class="empty">Ningún producto lleva {{ umbralDias() }} días o más sin movimiento.</p></td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
 }

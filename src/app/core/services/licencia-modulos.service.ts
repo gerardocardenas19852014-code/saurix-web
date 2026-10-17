@@ -7,7 +7,7 @@ import { SupabaseService } from './supabase.service';
  *  que usan las políticas RESTRICTIVE de Supabase (ver
  *  supabase/migrations/15_licencias_modulos.sql). Seguridad y Panel de
  *  control NO están aquí: son base del sistema, siempre habilitados. */
-export const MODULOS_VENDIBLES = ['wikidocs', 'presupuesto', 'proyectos', 'familia', 'inventario'] as const;
+export const MODULOS_VENDIBLES = ['wikidocs', 'presupuesto', 'proyectos', 'familia', 'inventario', 'ventas'] as const;
 export type ModuloVendible = (typeof MODULOS_VENDIBLES)[number];
 
 function esModuloVendible(clave: string): clave is ModuloVendible {

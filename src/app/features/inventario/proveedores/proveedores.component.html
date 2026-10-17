@@ -24,6 +24,9 @@
   [columnas]="columnas"
   [filas]="proveedoresFiltrados()"
   [cargando]="cargando()"
+  accionExtraEtiqueta="Ver productos"
+  accionExtraTitulo="Precio de compra y tiempo de entrega de cada producto con este proveedor"
+  (accionExtra)="verProductos($event)"
   (editar)="editar($event)"
   (eliminar)="pedirEliminar($event)"
 />

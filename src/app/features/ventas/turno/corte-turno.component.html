@@ -1,0 +1,47 @@
+<div class="page-header">
+  <h1>Corte de caja</h1>
+</div>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else if (!resumen()) {
+  <p class="empty">No tienes un turno de caja abierto.</p>
+  <a class="btn-primary" routerLink="/ventas/apertura-turno" style="display:inline-block; text-decoration:none;">Abrir turno</a>
+} @else {
+  <p class="hint" style="margin-top:-6px;">
+    Turno abierto desde {{ resumen()!.turno.fechaApertura | date: 'dd/MM/yyyy HH:mm' }}. Este reporte es
+    solo informativo — el turno sigue abierto y se puede seguir vendiendo.
+  </p>
+
+  <div class="dashboard-stats" style="margin-bottom: 24px;">
+    <div class="dashboard-stat-card">
+      <div class="num">{{ resumen()!.numeroVentas }}</div>
+      <div class="label">Ventas registradas</div>
+    </div>
+    <div class="dashboard-stat-card">
+      <div class="num">{{ formatMoneda(resumen()!.totalVentas) }}</div>
+      <div class="label">Total vendido</div>
+    </div>
+    <div class="dashboard-stat-card">
+      <div class="num">{{ formatMoneda(resumen()!.efectivoEsperado) }}</div>
+      <div class="label">Efectivo esperado en caja ahora</div>
+    </div>
+  </div>
+
+  <div class="catalog-group">
+    <h2 class="catalog-group-title">Ventas por método de pago</h2>
+    <div class="grid-table-scroll">
+      <table class="grid-table">
+        <thead><tr><th>Método</th><th>Total</th></tr></thead>
+        <tbody>
+          @for (fila of resumen()!.totalPorMetodo; track fila.metodoPago) {
+            <tr>
+              <td data-label="Método">{{ fila.metodoPago }}</td>
+              <td data-label="Total">{{ formatMoneda(fila.total) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}

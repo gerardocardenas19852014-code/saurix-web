@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -8,7 +9,11 @@ import { PreferenciasGridService } from '../../../shared/services/preferencias-g
 import { Proveedor } from './proveedor.model';
 
 /** Catálogo "Proveedor" (Inventario) — mismo patrón exacto que BodegasComponent
- *  (ver bodegas.component.ts). */
+ *  (ver bodegas.component.ts). El botón extra "Ver productos" de cada renglón
+ *  navega a la pantalla de Productos de este proveedor (ver
+ *  proveedor-productos.component.ts), donde se le asignan precio de compra y
+ *  tiempo de entrega por producto — mismo patrón que "Ver precios" en
+ *  TiposListaPrecioComponent. */
 @Component({
   selector: 'app-proveedores',
   standalone: true,
@@ -27,6 +32,7 @@ export class ProveedoresComponent implements OnInit, OnDestroy {
   protected readonly toast = inject(ToastService);
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
   private readonly fb = inject(FormBuilder);
+  private readonly router = inject(Router);
 
   protected readonly proveedores = signal<Proveedor[]>([]);
   protected readonly cargando = signal(false);
@@ -122,6 +128,10 @@ export class ProveedoresComponent implements OnInit, OnDestroy {
         this.cargar();
       },
     });
+  }
+
+  verProductos(proveedor: Proveedor): void {
+    this.router.navigate(['/inventario/proveedores', proveedor.id]);
   }
 
   pedirEliminar(proveedor: Proveedor): void {

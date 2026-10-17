@@ -1,0 +1,44 @@
+<div class="page-header">
+  <h1>Clientes</h1>
+</div>
+
+<div class="grid-toolbar">
+  <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo</button>
+
+  <div class="grid-filter">
+    <input
+      type="search"
+      placeholder="Buscar por nombre o RFC…"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value)"
+    />
+    <label class="board-filter-field board-filter-checkbox" style="margin:0;">
+      <input type="checkbox" [checked]="mostrarInactivos()" (change)="mostrarInactivos.set($any($event.target).checked)" />
+      Mostrar inactivos
+    </label>
+  </div>
+</div>
+
+<app-data-table
+  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+  [columnas]="columnas"
+  [filas]="clientesFiltrados()"
+  [cargando]="cargando()"
+  (editar)="editar($event)"
+  (eliminar)="pedirEliminar($event)"
+/>
+
+<app-cliente-form-modal
+  [visible]="modalAbierto()"
+  [clienteEnEdicion]="clienteEnEdicion()"
+  (guardado)="alGuardar()"
+  (cancelado)="modalAbierto.set(false)"
+/>
+
+<app-confirm-dialog
+  [visible]="clienteAEliminar() !== null"
+  titulo="Eliminar cliente"
+  [mensaje]="'¿Eliminar ' + (clienteAEliminar()?.nombre ?? '') + '?'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="clienteAEliminar.set(null)"
+/>

@@ -30,6 +30,15 @@ export interface Producto {
    *  sentido para productos físicos (existencia !== null); se ignora en
    *  servicios. */
   nivelMinimo: number | null;
+  /** Nivel MÁXIMO deseado de existencia (lo opuesto a nivelMinimo) — para
+   *  avisar cuando hay demasiado capital inmovilizado en un producto, no
+   *  solo cuando falta. NULL = sin máximo definido (no participa en la
+   *  alerta de sobre-stock). Igual que nivelMinimo, es un valor GLOBAL
+   *  (no por bodega — a diferencia de NivelMinimoBodega, no se justificó
+   *  todavía un "NivelMaximoBodega" propio, ya que sobre-stock es una
+   *  alerta de bajo uso que no necesita tanta granularidad). Solo aplica a
+   *  productos físicos; se ignora en servicios. */
+  nivelMaximo: number | null;
   /** Proveedor preferido para reabastecer este producto — NULL = sin asignar
    *  (ver proveedor.model.ts). Útil para Sugerencia de reposición, que
    *  muestra a quién comprarle cuando el producto está por debajo de su
@@ -37,6 +46,24 @@ export interface Producto {
    *  a nivel de tipo porque algún servicio podría igual tener un proveedor
    *  habitual (p.ej. quien lo subcontrata). */
   proveedorId: number | null;
+  /** Unidad "de compra" alterna, distinta de unidadMedidaId (la unidad BASE
+   *  en la que se lleva la existencia) — p.ej. existencia en Pieza pero se
+   *  compra en Caja. NULL = no tiene unidad de compra alterna (se compra en
+   *  la misma unidad base, como hasta ahora). Ver factorConversionCompra. */
+  unidadCompraId: number | null;
+  /** Opt-in: true si este producto se controla por lotes con fecha de
+   *  caducidad (ver lote-producto.model.ts) — pensado para perecederos.
+   *  Por default false: la gran mayoría de productos NO necesita esto, y
+   *  activarlo no cambia nada del flujo normal de existencia/movimientos
+   *  (LoteProducto es un registro informativo aparte, no reemplaza a
+   *  ExistenciaBodega — ver el comentario completo en ese modelo). Solo
+   *  aplica a productos físicos; se ignora en servicios. */
+  manejaLotes: boolean;
+  /** Cuántas unidadMedidaId (base) equivale CADA unidadCompraId — p.ej. 12
+   *  si "Caja" trae 12 "Pieza". NULL junto con unidadCompraId = null (sin
+   *  unidad de compra alterna). Ver factorConversionUnidad() en
+   *  producto.util.ts, que es donde de verdad se usa este factor. */
+  factorConversionCompra: number | null;
   /** Foto del producto en base64 (data URL), ya redimensionada/comprimida en
    *  el navegador antes de guardarse — mismo patrón que Miembro.foto (ver
    *  miembro-familia.model.ts). Opcional: sin foto se muestra un placeholder

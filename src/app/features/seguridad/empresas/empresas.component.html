@@ -47,9 +47,11 @@
       <h3 class="modal-title mb-3">{{ empresaEnEdicion() ? 'Editar empresa' : 'Nueva empresa' }}</h3>
       <div class="edit-form">
         <label>
-          Clave
+          <span class="label-con-tip">
+            Clave
+            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Minúsculas, números o guiones. No se puede cambiar después.</span></button>
+          </span>
           <input type="text" class="form-control" formControlName="clave" placeholder="p.ej. acme" />
-          <span class="hint">Minúsculas, números o guiones. No se puede cambiar después.</span>
         </label>
         <label>
           Nombre
@@ -60,9 +62,11 @@
           Activa (si la desactivas, sus usuarios dejan de ver datos)
         </label>
         <label>
-          Máximo de usuarios
+          <span class="label-con-tip">
+            Máximo de usuarios
+            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Vacío = sin límite. Al llegar al tope, no se pueden dar de alta más usuarios.</span></button>
+          </span>
           <input type="number" class="form-control" formControlName="maxUsuarios" min="1" placeholder="Sin límite" />
-          <span class="hint">Vacío = sin límite. Al llegar al tope, no se pueden dar de alta más usuarios.</span>
         </label>
       </div>
       <div class="modal-actions">
@@ -119,9 +123,11 @@
           <input type="email" class="form-control" formControlName="email" autocomplete="off" />
         </label>
         <label class="full-span">
-          Contraseña inicial
+          <span class="label-con-tip">
+            Contraseña inicial
+            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Mínimo 8 caracteres. Compártela con el cliente; podrá cambiarla en Mi perfil.</span></button>
+          </span>
           <input type="password" class="form-control" formControlName="password" autocomplete="new-password" />
-          <span class="hint">Mínimo 8 caracteres. Compártela con el cliente; podrá cambiarla en Mi perfil.</span>
         </label>
       </div>
       <div class="modal-actions">

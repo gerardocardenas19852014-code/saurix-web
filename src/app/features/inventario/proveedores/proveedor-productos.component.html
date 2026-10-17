@@ -1,0 +1,102 @@
+<div class="page-header">
+  <div>
+    <button type="button" class="btn-secondary small" (click)="volver()" style="margin-bottom: 8px;">← Volver</button>
+    <h1>{{ proveedor()?.nombre ?? 'Proveedor' }}</h1>
+  </div>
+</div>
+
+<p class="hint" style="margin-top:-6px;">
+  Precio de compra y tiempo de entrega de cada producto con este proveedor. "★ Preferido" marca a este proveedor como el que usan Sugerencia de reposición y Compras por default para ese producto — se guarda de inmediato al hacer clic, sin esperar a "Guardar cambios".
+</p>
+
+<div class="grid-toolbar">
+  <div class="grid-filter">
+    <input
+      type="search"
+      placeholder="Buscar por nombre o código…"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value)"
+    />
+  </div>
+
+  @if (filasModificadas().length > 0) {
+    <span class="hint" style="margin:0 10px;">
+      ✏️ {{ filasModificadas().length }} cambio{{ filasModificadas().length === 1 ? '' : 's' }} sin guardar
+    </span>
+    <button type="button" class="btn-secondary small" [disabled]="guardando()" (click)="descartarCambios()">Descartar</button>
+    <button type="button" class="btn-primary small" [disabled]="guardando()" (click)="guardarCambios()">
+      {{ guardando() ? progresoGuardado() || 'Guardando…' : 'Guardar cambios' }}
+    </button>
+  }
+</div>
+
+<div class="grid-table-scroll">
+  <table class="grid-table">
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Nombre</th>
+        <th>Categoría</th>
+        <th>Precio de compra</th>
+        <th>Tiempo de entrega (días)</th>
+        <th>Preferido</th>
+      </tr>
+    </thead>
+    <tbody>
+      @if (cargando()) {
+        <tr>
+          <td colspan="6"><p class="empty">Cargando…</p></td>
+        </tr>
+      } @else {
+        @for (fila of filasFiltradas(); track fila.productoId) {
+          <tr>
+            <td data-label="Código">{{ fila.codigo || '—' }}</td>
+            <td data-label="Nombre">{{ fila.nombre }}</td>
+            <td data-label="Categoría">{{ fila.categoriaNombre }}</td>
+            <td data-label="Precio de compra">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                class="precio-lista-input"
+                [class.precio-lista-input-modificado]="fila.precioCompraTexto.trim() !== fila.precioCompraOriginalTexto"
+                placeholder="0.00"
+                [value]="fila.precioCompraTexto"
+                (input)="cambiarPrecio(fila.productoId, $any($event.target).value)"
+              />
+            </td>
+            <td data-label="Tiempo de entrega (días)">
+              <input
+                type="number"
+                step="1"
+                min="0"
+                class="precio-lista-input"
+                [class.precio-lista-input-modificado]="fila.tiempoEntregaTexto.trim() !== fila.tiempoEntregaOriginalTexto"
+                placeholder="—"
+                [value]="fila.tiempoEntregaTexto"
+                (input)="cambiarTiempoEntrega(fila.productoId, $any($event.target).value)"
+              />
+            </td>
+            <td data-label="Preferido">
+              @if (fila.preferido) {
+                <span class="grid-badge-success">★ Preferido</span>
+              } @else {
+                <button type="button" class="btn-secondary small" [disabled]="guardando()" (click)="marcarPreferido(fila)">
+                  Marcar preferido
+                </button>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="6">
+              <div class="empty-state-block">
+                <p>No hay productos activos. Da de alta productos en Inventario → Productos y servicios.</p>
+              </div>
+            </td>
+          </tr>
+        }
+      }
+    </tbody>
+  </table>
+</div>

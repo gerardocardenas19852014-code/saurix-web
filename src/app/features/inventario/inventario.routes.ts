@@ -9,6 +9,15 @@ export const INVENTARIO_ROUTES: Routes = [
     path: 'productos',
     loadComponent: () => import('./productos/productos.component').then((m) => m.ProductosComponent),
   },
+  {
+    path: 'dashboard',
+    loadComponent: () => import('./dashboard/dashboard.component').then((m) => m.InventarioDashboardComponent),
+  },
+  {
+    path: 'productos/:id/nivel-minimo',
+    loadComponent: () =>
+      import('./productos/nivel-minimo-bodega/nivel-minimo-bodega.component').then((m) => m.NivelMinimoBodegaComponent),
+  },
 
   // Catálogos propios de Inventario.
   {
@@ -18,6 +27,11 @@ export const INVENTARIO_ROUTES: Routes = [
   {
     path: 'proveedores',
     loadComponent: () => import('./proveedores/proveedores.component').then((m) => m.ProveedoresComponent),
+  },
+  {
+    path: 'proveedores/:id',
+    loadComponent: () =>
+      import('./proveedores/proveedor-productos.component').then((m) => m.ProveedorProductosComponent),
   },
   {
     path: 'categorias-producto',
@@ -49,6 +63,10 @@ export const INVENTARIO_ROUTES: Routes = [
       import('./movimientos-bodega/movimientos-bodega.component').then((m) => m.MovimientosBodegaComponent),
   },
   {
+    path: 'ordenes-compra',
+    loadComponent: () => import('./compras/ordenes-compra.component').then((m) => m.OrdenesCompraComponent),
+  },
+  {
     path: 'sugerencia-reposicion',
     loadComponent: () =>
       import('./sugerencia-reposicion/sugerencia-reposicion.component').then((m) => m.SugerenciaReposicionComponent),
@@ -56,5 +74,14 @@ export const INVENTARIO_ROUTES: Routes = [
   {
     path: 'conteo-fisico',
     loadComponent: () => import('./conteo-fisico/conteo-fisico.component').then((m) => m.ConteoFisicoComponent),
+  },
+  {
+    path: 'kardex',
+    loadComponent: () => import('./kardex/kardex.component').then((m) => m.KardexComponent),
+  },
+  {
+    path: 'lotes-caducidad',
+    loadComponent: () =>
+      import('./lotes-caducidad/lotes-caducidad.component').then((m) => m.LotesCaducidadComponent),
   },
 ];

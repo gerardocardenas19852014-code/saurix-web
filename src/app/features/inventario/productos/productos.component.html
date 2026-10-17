@@ -11,6 +11,7 @@
       ⬆️
       <input type="file" accept="text/csv,.csv" style="display:none;" (change)="archivoSeleccionado($event)" />
     </label>
+    <button type="button" class="btn-secondary small" title="Imprimir etiquetas con código de barras" (click)="abrirModalEtiquetas()">🏷️ Imprimir etiquetas</button>
   </div>
 
   <div class="grid-filter">
@@ -32,16 +33,25 @@
   [columnas]="columnas"
   [filas]="productosFiltrados()"
   [cargando]="cargando()"
+  accionExtraEtiqueta="Nivel mínimo"
+  accionExtraTitulo="Nivel mínimo de existencia por bodega para este producto"
+  (accionExtra)="verNivelMinimoBodega($event)"
   (editar)="editar($event)"
   (eliminar)="pedirEliminar($event)"
 />
 
 @if (modalAbierto()) {
   <div class="modal-overlay show" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
-    <form class="modal-box" style="max-width: 980px;" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
-      <h3>{{ productoEnEdicion() ? 'Editar producto' : 'Nuevo producto' }}</h3>
+    <form class="modal-box" style="max-width: 1180px; width: 95%;" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <div class="page-header" style="margin-bottom: 12px;">
+        <h3>{{ productoEnEdicion() ? 'Editar producto' : 'Nuevo producto' }}</h3>
+        <div class="page-actions">
+          <button type="button" class="btn-secondary small" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">Cerrar</button>
+          <button type="submit" class="btn-primary small">Guardar</button>
+        </div>
+      </div>
 
-      <div class="edit-form form-grid-3col" style="margin-bottom: 18px;">
+      <div class="edit-form form-grid-3col" style="margin-bottom: 18px; max-width: 1180px; gap: 18px 32px;">
         <div class="full-span foto-producto-campo">
           <span class="foto-producto-etiqueta">Foto del producto</span>
           <div class="foto-producto-fila">
@@ -73,6 +83,11 @@
         <label>
           Código / SKU (opcional)
           <input type="text" formControlName="codigo" />
+        </label>
+
+        <label>
+          Escanear código de barras
+          <app-escaneo-codigo [limpiarDespues]="false" (codigoEscaneado)="asignarCodigoEscaneado($event)" />
         </label>
 
         <label>
@@ -108,17 +123,52 @@
 
         @if (!form.controls.esServicio.value) {
           <label>
-            Existencia inicial
+            <span class="label-con-tip">
+              Existencia inicial
+              @if (existenciaBloqueada()) {
+                <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Ya tiene bodega asignada — cámbiala desde Inventario → Movimientos entre bodegas.</span></button>
+              }
+            </span>
             <input type="number" step="1" min="0" formControlName="existencia" />
-            @if (existenciaBloqueada()) {
-              <span class="hint" style="margin:4px 0 0; display:block;">Ya tiene bodega asignada — cámbiala desde Inventario → Movimientos entre bodegas.</span>
-            }
           </label>
 
           <label>
-            Nivel mínimo (opcional)
+            <span class="label-con-tip">
+              Nivel mínimo (opcional)
+              <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Si la existencia cae por debajo, se avisa en Valor de stock.</span></button>
+            </span>
             <input type="number" step="1" min="0" formControlName="nivelMinimo" placeholder="Sin mínimo definido" />
-            <span class="hint" style="margin:4px 0 0; display:block;">Si la existencia cae por debajo, se avisa en Valor de stock.</span>
+          </label>
+
+          <label>
+            <span class="label-con-tip">
+              Nivel máximo (opcional)
+              <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Si la existencia lo supera, se avisa sobre-stock en Valor de stock.</span></button>
+            </span>
+            <input type="number" step="1" min="0" formControlName="nivelMaximo" placeholder="Sin máximo definido" />
+          </label>
+
+          <label>
+            <span class="label-con-tip">
+              Unidad de compra (opcional)
+              <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Si se compra en una unidad distinta a la base (p. ej. Caja en vez de Pieza).</span></button>
+            </span>
+            <app-select-buscable [opciones]="opcionesUnidadCompra()" formControlName="unidadCompraId" placeholder="Buscar unidad…" />
+          </label>
+
+          @if (form.controls.unidadCompraId.value) {
+            <label>
+              <span class="label-con-tip">
+                Equivale a (factor de conversión)
+                <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Cuántas unidades base trae cada unidad de compra.</span></button>
+              </span>
+              <input type="number" step="0.0001" min="0.0001" formControlName="factorConversionCompra" placeholder="Ej. 12" />
+            </label>
+          }
+
+          <label class="checkbox-inline">
+            <input type="checkbox" formControlName="manejaLotes" />
+            Maneja lotes y caducidad
           </label>
         }
 
@@ -136,11 +186,6 @@
           <input type="checkbox" formControlName="activo" />
           Activo
         </label>
-      </div>
-
-      <div class="modal-actions">
-        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">Cancelar</button>
-        <button type="submit" class="btn-primary">Guardar</button>
       </div>
     </form>
   </div>
@@ -235,3 +280,68 @@
     </div>
   </div>
 }
+
+@if (modalEtiquetasAbierto()) {
+  <div class="modal-overlay show" (click)="modalEtiquetasAbierto.set(false)">
+    <form class="modal-box" style="max-width: 720px; width: 92%;" (click)="$event.stopPropagation()" (submit)="imprimirEtiquetas($event)">
+      <h3>Imprimir etiquetas con código de barras</h3>
+      <p class="hint" style="margin-top:-6px;">
+        Elige los productos (solo los que tienen código/SKU) y cuántas copias de cada etiqueta
+        necesitas. Cada etiqueta trae el código de barras, el nombre y el precio.
+      </p>
+
+      <div class="grid-filter" style="margin-bottom:12px;">
+        <input
+          type="search"
+          placeholder="Buscar por nombre o código…"
+          [value]="busquedaEtiquetas()"
+          (input)="busquedaEtiquetas.set($any($event.target).value)"
+        />
+      </div>
+
+      <div class="grid-table-scroll" style="max-height:360px;">
+        <table class="grid-table">
+          <thead><tr><th></th><th>Código</th><th>Nombre</th><th>Copias</th></tr></thead>
+          <tbody>
+            @for (p of productosParaEtiquetas(); track p.id) {
+              <tr>
+                <td>
+                  <input
+                    type="checkbox"
+                    [checked]="estaSeleccionadoParaEtiqueta(p.id)"
+                    [disabled]="!p.codigo"
+                    (change)="toggleSeleccionEtiqueta(p.id)"
+                  />
+                </td>
+                <td data-label="Código">{{ p.codigo || 'Sin código' }}</td>
+                <td data-label="Nombre">{{ p.nombre }}</td>
+                <td data-label="Copias">
+                  @if (estaSeleccionadoParaEtiqueta(p.id)) {
+                    <input
+                      type="number"
+                      step="1"
+                      min="1"
+                      style="width:70px;"
+                      [value]="cantidadEtiquetaDe(p.id)"
+                      (change)="actualizarCantidadEtiqueta(p.id, $any($event.target).value)"
+                    />
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="4"><p class="empty">Sin resultados.</p></td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalEtiquetasAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="totalEtiquetasSeleccionadas() === 0">
+          Imprimir {{ totalEtiquetasSeleccionadas() }} etiqueta{{ totalEtiquetasSeleccionadas() === 1 ? '' : 's' }}
+        </button>
+      </div>
+    </form>
+  </div>
+}
+

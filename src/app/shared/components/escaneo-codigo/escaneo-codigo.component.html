@@ -1,0 +1,26 @@
+<div class="escaneo-codigo-fila">
+  <input
+    type="text"
+    [placeholder]="placeholder"
+    [value]="texto()"
+    (input)="texto.set($any($event.target).value)"
+    (keyup.enter)="confirmarTexto()"
+  />
+  <button type="button" class="btn-secondary small" title="Escanear con la cámara" aria-label="Escanear con la cámara" (click)="abrirCamara()">📷</button>
+</div>
+
+@if (camaraAbierta()) {
+  <div class="modal-overlay show" (click)="cerrarCamara()">
+    <div class="modal-box escaneo-camara-box" style="max-width: 420px;" (click)="$event.stopPropagation()">
+      <h3>Escanear código</h3>
+      @if (iniciandoCamara()) {
+        <p class="hint">Iniciando cámara…</p>
+      }
+      <video #video class="escaneo-camara-video" autoplay muted playsinline></video>
+      <p class="hint" style="margin:10px 0 0;">Apunta la cámara al código de barras o QR.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="cerrarCamara()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+}

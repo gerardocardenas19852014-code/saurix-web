@@ -1,0 +1,157 @@
+// Layout de dos columnas para la pantalla de Cobro (POS táctil/móvil):
+// cuadrícula de productos a la izquierda, ticket fijo a la derecha. En
+// pantallas angostas (celular) se apilan: primero el ticket (para que
+// cobrar no obligue a hacer scroll hasta abajo), luego el catálogo.
+.pos-layout {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.pos-productos {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pos-ticket {
+  flex: 0 0 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  position: sticky;
+  top: 16px;
+}
+
+.pos-toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.pos-buscador {
+  flex: 1 1 auto;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.pos-categorias {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.pos-chip {
+  flex: 0 0 auto;
+  padding: 7px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: var(--paper-raised);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pos-chip-activo { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.pos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.pos-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--paper-raised);
+  cursor: pointer;
+  text-align: center;
+  min-height: 92px;
+  justify-content: center;
+}
+.pos-tile:hover { border-color: var(--accent); background: var(--accent-soft); }
+.pos-tile:active { transform: scale(0.97); }
+
+.pos-tile-nombre { font-weight: 600; font-size: 13.5px; line-height: 1.3; }
+.pos-tile-precio { font-size: 13px; color: var(--accent); font-weight: 700; }
+.pos-tile-existencia { font-size: 11px; color: var(--ink-soft); }
+.pos-tile-existencia-baja { color: var(--danger); font-weight: 700; }
+
+.pos-ticket-config {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pos-ticket-config label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; font-weight: 600; }
+.pos-ticket-config select {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  font-size: 13.5px;
+}
+
+.pos-cliente-row { display: flex; gap: 6px; align-items: center; }
+.pos-cliente-row > app-select-buscable { flex: 1 1 auto; }
+
+/* .pos-ticket-lineas, .pos-ticket-item, .pos-ticket-item-info,
+ * .pos-ticket-item-desc, .pos-ticket-item-precio, .pos-ticket-item-subtotal,
+ * .pos-ticket-totales, .pos-ticket-total-linea y .pos-ticket-total-grande
+ * viven en src/styles.scss (global) — las reutiliza también el modal de
+ * detalle de HistorialVentasComponent, ver historial-ventas.component.html. */
+
+.pos-ticket-item-cantidad { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.pos-qty-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--paper-raised);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.pos-ticket-item-descuento {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  flex: 0 0 auto;
+}
+.pos-ticket-item-descuento input {
+  width: 36px;
+  padding: 2px 4px;
+  font-size: 11.5px;
+  text-align: right;
+}
+
+.pos-ticket-item-quitar {
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 13px;
+  flex: 0 0 auto;
+}
+.pos-ticket-item-quitar:hover { color: var(--danger); }
+
+.pos-ticket-acciones { display: flex; gap: 10px; }
+.pos-ticket-acciones .btn-secondary, .pos-ticket-acciones .btn-primary { flex: 1 1 0; }
+
+@media (max-width: 860px) {
+  .pos-layout { flex-direction: column; }
+  .pos-ticket { flex: 1 1 auto; width: 100%; position: static; order: -1; }
+}

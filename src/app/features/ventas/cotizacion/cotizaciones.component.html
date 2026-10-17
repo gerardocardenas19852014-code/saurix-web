@@ -1,0 +1,207 @@
+<div class="page-header">
+  <h1>Cotizaciones</h1>
+</div>
+
+<p class="hint" style="margin-top:-6px;">
+  Una propuesta de precio para el cliente — no descuenta existencia ni afecta caja hasta que se
+  convierte en venta.
+</p>
+
+<div class="grid-toolbar">
+  <button type="button" class="toolbar-btn" (click)="abrirNueva()">+ Nueva</button>
+</div>
+
+<app-data-table
+  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+  [columnas]="columnas"
+  [filas]="cotizaciones()"
+  [cargando]="cargando()"
+  [ocultarEditarEliminar]="true"
+  accionExtraEtiqueta="Ver detalle"
+  accionExtraTitulo="Ver renglones y convertir/cancelar esta cotización"
+  (accionExtra)="verDetalle($event)"
+/>
+
+@if (modalNuevaAbierto()) {
+  <div class="modal-overlay show" (click)="cerrarNueva()">
+    <form class="modal-box" style="max-width: 680px; width: 94%;" [formGroup]="cotizacionForm" (click)="$event.stopPropagation()" (ngSubmit)="guardarNueva()">
+      <h3>Nueva cotización</h3>
+
+      <div class="edit-form form-grid-2col" style="margin-bottom: 14px;">
+        <label>
+          Cliente
+          <app-select-buscable [opciones]="opcionesClientes()" [value]="clienteNuevaId()" placeholder="Buscar cliente…" (valueChange)="clienteNuevaId.set($event ? +$event : null)" />
+        </label>
+        <label>
+          Vigente hasta (opcional)
+          <input type="date" formControlName="fechaVigencia" />
+        </label>
+        <label class="full-span">
+          Notas (opcional)
+          <input type="text" formControlName="notas" />
+        </label>
+      </div>
+
+      <p class="hint" style="margin-bottom:6px;">Agregar línea</p>
+      <div class="edit-form form-grid-5col" style="margin-bottom: 14px;" [formGroup]="lineaForm">
+        <label class="full-span">
+          Producto (opcional — déjalo en "Texto libre" para un renglón sin producto del catálogo)
+          <app-select-buscable [opciones]="opcionesProductos()" [value]="lineaForm.controls.productoId.value" placeholder="Buscar producto…" (valueChange)="elegirProductoLinea($event)" />
+        </label>
+        <label class="full-span">
+          Descripción
+          <input type="text" formControlName="descripcion" />
+        </label>
+        <label>
+          Cantidad
+          <input type="number" min="1" step="1" formControlName="cantidad" />
+        </label>
+        <label>
+          Precio unitario
+          <input type="number" min="0" step="0.01" formControlName="precioUnitario" />
+        </label>
+        <label>
+          Descuento %
+          <input type="number" min="0" max="100" step="1" formControlName="descuentoPct" />
+        </label>
+        <label class="full-span" style="justify-content: flex-end;">
+          <button type="button" class="btn-secondary" (click)="agregarLinea()">+ Agregar línea</button>
+        </label>
+      </div>
+
+      @if (lineasNuevas().length > 0) {
+        <div class="pos-ticket-lineas" style="margin-bottom: 14px;">
+          @for (linea of lineasNuevas(); track $index) {
+            <div class="pos-ticket-item">
+              <div class="pos-ticket-item-info">
+                <span class="pos-ticket-item-desc">{{ linea.cantidad }} x {{ linea.descripcion }}</span>
+                <span class="pos-ticket-item-precio">{{ formatMoneda(linea.precioUnitario) }} c/u @if (linea.descuentoPct > 0) { · {{ linea.descuentoPct }}% desc. }</span>
+              </div>
+              <span class="pos-ticket-item-subtotal">{{ formatMoneda(linea.cantidad * linea.precioUnitario * (1 - linea.descuentoPct / 100)) }}</span>
+              <button type="button" class="pos-ticket-item-quitar" title="Quitar" (click)="quitarLineaNueva($index)">✕</button>
+            </div>
+          }
+        </div>
+
+        <div class="pos-ticket-totales" style="margin-bottom: 14px;">
+          @if (descuentoNueva() > 0) {
+            <div class="pos-ticket-total-linea"><span>Subtotal</span><span>{{ formatMoneda(subtotalNueva()) }}</span></div>
+            <div class="pos-ticket-total-linea"><span>Descuento</span><span>-{{ formatMoneda(descuentoNueva()) }}</span></div>
+          }
+          <div class="pos-ticket-total-linea pos-ticket-total-grande"><span>Total</span><span>{{ formatMoneda(totalNueva()) }}</span></div>
+        </div>
+      } @else {
+        <p class="empty" style="margin-bottom:14px;">Todavía no agregas ninguna línea.</p>
+      }
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="cerrarNueva()">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="guardandoNueva()">{{ guardandoNueva() ? 'Guardando…' : 'Generar cotización' }}</button>
+      </div>
+    </form>
+  </div>
+}
+
+@if (cotizacionDetalle(); as cotizacion) {
+  <div class="modal-overlay show" (click)="cerrarDetalle()">
+    <div class="modal-box" style="max-width: 600px; width: 94%;" (click)="$event.stopPropagation()">
+      <div class="page-header" style="margin-bottom: 12px;">
+        <h3>Cotización {{ cotizacion.folio }}</h3>
+        <span
+          class="grid-badge"
+          [class]="cotizacion.estado === 'Vigente' ? 'grid-badge-success' : cotizacion.estado === 'Convertida' ? 'grid-badge-neutral' : 'grid-badge-muted'"
+        >
+          {{ cotizacion.estado }}
+        </span>
+      </div>
+
+      <p class="hint" style="margin-top:-6px;">
+        {{ nombreCliente(cotizacion.clienteId) }}
+        @if (cotizacion.fechaVigencia) { · Vigente hasta {{ cotizacion.fechaVigencia }} }
+      </p>
+      @if (cotizacion.notas) {
+        <p class="hint">{{ cotizacion.notas }}</p>
+      }
+      @if (ventaConvertidaDetalle(); as venta) {
+        <p class="hint" style="color: var(--client);">Convertida en la venta {{ venta.folio }} — ver Historial de ventas.</p>
+      }
+
+      @if (cargandoDetalle()) {
+        <p class="empty">Cargando…</p>
+      } @else {
+        <div class="pos-ticket-lineas" style="margin-bottom: 14px;">
+          @for (item of itemsDetalle(); track item.id) {
+            <div class="pos-ticket-item">
+              <div class="pos-ticket-item-info">
+                <span class="pos-ticket-item-desc">{{ item.cantidad }} x {{ item.descripcion }}</span>
+                <span class="pos-ticket-item-precio">{{ formatMoneda(item.precioUnitario) }} c/u</span>
+              </div>
+              <span class="pos-ticket-item-subtotal">{{ formatMoneda(item.subtotal) }}</span>
+            </div>
+          }
+        </div>
+
+        <div class="pos-ticket-totales" style="margin-bottom: 14px;">
+          @if (cotizacion.descuento > 0) {
+            <div class="pos-ticket-total-linea"><span>Subtotal</span><span>{{ formatMoneda(cotizacion.subtotal) }}</span></div>
+            <div class="pos-ticket-total-linea"><span>Descuento</span><span>-{{ formatMoneda(cotizacion.descuento) }}</span></div>
+          }
+          <div class="pos-ticket-total-linea pos-ticket-total-grande"><span>Total</span><span>{{ formatMoneda(cotizacion.total) }}</span></div>
+        </div>
+      }
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="cerrarDetalle()">Cerrar</button>
+        @if (cotizacion.estado === 'Vigente') {
+          <button type="button" class="btn-secondary" style="background: var(--danger-soft); color: var(--danger);" (click)="pedirCancelar(cotizacion)">Cancelar cotización</button>
+          <button type="button" class="btn-primary" (click)="abrirConvertir()">Convertir a venta</button>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (modalConvertirAbierto()) {
+  <div class="modal-overlay show" (click)="cerrarConvertir()">
+    <form class="modal-box" style="max-width: 420px;" [formGroup]="conversionForm" (click)="$event.stopPropagation()" (ngSubmit)="confirmarConvertir()">
+      <h3>Convertir a venta</h3>
+      <p class="hint" style="margin-top:-6px;">Se descontará existencia y se registrará el cobro por el total de la cotización.</p>
+
+      <div class="edit-form" style="margin-bottom: 14px;">
+        @if (requiereBodegaConversion()) {
+          <label>
+            Bodega de venta
+            <select [value]="bodegaConversionId()" (change)="bodegaConversionId.set(+$any($event.target).value)">
+              @for (bodega of bodegas(); track bodega.id) {
+                <option [value]="bodega.id">{{ bodega.nombre }}</option>
+              }
+            </select>
+          </label>
+        }
+        <label>
+          Método de pago
+          <select formControlName="metodoPago">
+            @for (metodo of metodosPago; track metodo) {
+              <option [value]="metodo">{{ metodo }}</option>
+            }
+          </select>
+        </label>
+      </div>
+
+      <p class="hint" style="margin-bottom:14px;">Total a cobrar: <strong>{{ formatMoneda(cotizacionDetalle()?.total ?? 0) }}</strong></p>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="cerrarConvertir()">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="convirtiendo()">{{ convirtiendo() ? 'Convirtiendo…' : 'Confirmar' }}</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="cotizacionACancelar() !== null"
+  titulo="Cancelar cotización"
+  [mensaje]="'¿Cancelar la cotización ' + (cotizacionACancelar()?.folio ?? '') + '?'"
+  (confirmar)="confirmarCancelar()"
+  (cancelar)="cotizacionACancelar.set(null)"
+/>

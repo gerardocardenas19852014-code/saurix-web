@@ -14,125 +14,190 @@
 @if (cargando()) {
   <p class="empty">Cargando…</p>
 } @else {
-  @if (productosSinAsignar().length > 0) {
-    <div class="empty-state-block" style="text-align:left; margin-bottom:28px;">
-      <p>
-        <strong>{{ productosSinAsignar().length }}</strong>
-        producto{{ productosSinAsignar().length === 1 ? '' : 's' }} con existencia heredada que todavía
-        no se asignó a ninguna bodega — se sigue viendo normal en Productos y Valor de stock, pero no
-        se puede traspasar ni dar de salida hasta asignarlo.
-      </p>
+  <div class="tab-bar" style="margin:0 0 18px;">
+    <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'existencia'" (click)="seleccionarTab('existencia')">
+      📦 Existencia por bodega
+    </button>
+    <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'historial'" (click)="seleccionarTab('historial')">
+      📜 Historial de movimientos
+    </button>
+    <button type="button" class="tab-btn" [class.is-active]="tabActiva() === 'transito'" (click)="seleccionarTab('transito')">
+      🚚 En tránsito{{ transitosPendientes().length > 0 ? ' (' + transitosPendientes().length + ')' : '' }}
+    </button>
+  </div>
+
+  @if (tabActiva() === 'existencia') {
+    @if (productosSinAsignar().length > 0) {
+      <div class="empty-state-block" style="text-align:left; margin-bottom:28px;">
+        <p>
+          <strong>{{ productosSinAsignar().length }}</strong>
+          producto{{ productosSinAsignar().length === 1 ? '' : 's' }} con existencia heredada que todavía
+          no se asignó a ninguna bodega — se sigue viendo normal en Productos y Valor de stock, pero no
+          se puede traspasar ni dar de salida hasta asignarlo.
+        </p>
+        <div class="grid-table-scroll">
+          <table class="grid-table">
+            <thead><tr><th>Código</th><th>Producto</th><th>Existencia</th><th></th></tr></thead>
+            <tbody>
+              @for (fila of productosSinAsignar(); track fila.productoId) {
+                <tr>
+                  <td data-label="Código">{{ fila.codigo || '—' }}</td>
+                  <td data-label="Producto">{{ fila.nombre }}</td>
+                  <td data-label="Existencia">{{ fila.cantidad }}</td>
+                  <td><button type="button" class="btn-secondary small" (click)="asignarABodega(fila)">Asignar a bodega</button></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+
+    @if (filasExistencia().length === 0) {
+      <p class="hint" style="margin:0 0 28px;">Todavía no hay existencia asignada a ninguna bodega.</p>
+    } @else {
       <div class="grid-table-scroll">
         <table class="grid-table">
-          <thead><tr><th>Código</th><th>Producto</th><th>Existencia</th><th></th></tr></thead>
+          <thead><tr><th>Producto</th><th>Bodega</th><th>Existencia</th><th>Ubicación</th></tr></thead>
           <tbody>
-            @for (fila of productosSinAsignar(); track fila.productoId) {
+            @for (fila of filasExistencia(); track fila.id) {
               <tr>
-                <td data-label="Código">{{ fila.codigo || '—' }}</td>
-                <td data-label="Producto">{{ fila.nombre }}</td>
-                <td data-label="Existencia">{{ fila.cantidad }}</td>
-                <td><button type="button" class="btn-secondary small" (click)="asignarABodega(fila)">Asignar a bodega</button></td>
+                <td data-label="Producto">{{ fila.productoNombre }}</td>
+                <td data-label="Bodega">{{ fila.bodegaNombre }}</td>
+                <td data-label="Existencia">{{ fila.existencia }}</td>
+                <td data-label="Ubicación">
+                  <input
+                    type="text"
+                    class="precio-lista-input"
+                    placeholder="p.ej. Pasillo 3, anaquel B"
+                    [value]="fila.ubicacion ?? ''"
+                    (change)="actualizarUbicacion(fila.id, $any($event.target).value)"
+                  />
+                </td>
               </tr>
             }
           </tbody>
         </table>
       </div>
-    </div>
-  }
-
-  <h2 class="catalog-group-title">Existencia actual por bodega</h2>
-  @if (filasExistencia().length === 0) {
-    <p class="hint" style="margin:0 0 28px;">Todavía no hay existencia asignada a ninguna bodega.</p>
-  } @else {
-    <div class="grid-table-scroll" style="margin-bottom:28px;">
-      <table class="grid-table">
-        <thead><tr><th>Producto</th><th>Bodega</th><th>Existencia</th></tr></thead>
-        <tbody>
-          @for (fila of filasExistencia(); track fila.id) {
-            <tr>
-              <td data-label="Producto">{{ fila.productoNombre }}</td>
-              <td data-label="Bodega">{{ fila.bodegaNombre }}</td>
-              <td data-label="Existencia">{{ fila.existencia }}</td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
-  }
-
-  <h2 class="catalog-group-title">Historial de movimientos</h2>
-
-  <div class="board-filters" style="margin:12px 0 18px;">
-    <label class="board-filter-field">
-      Producto
-      <select [value]="filtroProductoId()" (change)="filtroProductoId.set(+$any($event.target).value)">
-        <option [value]="0">Todos</option>
-        @for (p of productosFisicosActivos(); track p.id) {
-          <option [value]="p.id">{{ p.nombre }}</option>
-        }
-      </select>
-    </label>
-
-    <label class="board-filter-field">
-      Bodega
-      <select [value]="filtroBodegaId()" (change)="filtroBodegaId.set(+$any($event.target).value)">
-        <option [value]="0">Todas</option>
-        @for (b of bodegasActivas(); track b.id) {
-          <option [value]="b.id">{{ b.nombre }}</option>
-        }
-      </select>
-    </label>
-
-    <label class="board-filter-field">
-      Desde
-      <input type="date" [value]="filtroDesde()" (change)="filtroDesde.set($any($event.target).value)" />
-    </label>
-
-    <label class="board-filter-field">
-      Hasta
-      <input type="date" [value]="filtroHasta()" (change)="filtroHasta.set($any($event.target).value)" />
-    </label>
-
-    @if (hayFiltrosActivos()) {
-      <button type="button" class="btn-secondary small" (click)="limpiarFiltros()">Limpiar filtros</button>
     }
-  </div>
-
-  @if (historialFiltrado().length === 0) {
-    <div class="empty-state-block">
-      <p>{{ hayFiltrosActivos() ? 'Ningún movimiento coincide con estos filtros.' : 'Todavía no hay movimientos registrados.' }}</p>
-    </div>
-  } @else {
-    <div class="grid-table-scroll">
-      <table class="grid-table">
-        <thead><tr><th>Fecha</th><th>Producto</th><th>Tipo</th><th>Origen</th><th>Destino</th><th>Cantidad</th><th>Nota</th></tr></thead>
-        <tbody>
-          @for (fila of historialFiltrado(); track fila.id) {
-            <tr>
-              <td data-label="Fecha">{{ fila.fecha | date: 'dd/MM/yyyy HH:mm' }}</td>
-              <td data-label="Producto">{{ fila.productoNombre }}</td>
-              <td data-label="Tipo">
-                @switch (fila.tipo) {
-                  @case ('entrada') {
-                    <span class="tag" style="background:var(--client-soft); color:var(--client);">Entrada</span>
-                  }
-                  @case ('salida') {
-                    <span class="tag" style="background:var(--danger-soft); color:var(--danger);">Salida/Ajuste</span>
-                  }
-                  @default {
-                    <span class="tag">Traspaso</span>
-                  }
-                }
-              </td>
-              <td data-label="Origen">{{ fila.origenNombre ?? '—' }}</td>
-              <td data-label="Destino">{{ fila.destinoNombre ?? '—' }}</td>
-              <td data-label="Cantidad">{{ fila.cantidad }}</td>
-              <td data-label="Nota">{{ fila.nota ?? '—' }}</td>
-            </tr>
+  } @else if (tabActiva() === 'historial') {
+    <div class="board-filters" style="margin:0 0 18px;">
+      <label class="board-filter-field">
+        Producto
+        <select [value]="filtroProductoId()" (change)="filtroProductoId.set(+$any($event.target).value)">
+          <option [value]="0">Todos</option>
+          @for (p of productosFisicosActivos(); track p.id) {
+            <option [value]="p.id">{{ p.nombre }}</option>
           }
-        </tbody>
-      </table>
+        </select>
+      </label>
+
+      <label class="board-filter-field">
+        Bodega
+        <select [value]="filtroBodegaId()" (change)="filtroBodegaId.set(+$any($event.target).value)">
+          <option [value]="0">Todas</option>
+          @for (b of bodegasActivas(); track b.id) {
+            <option [value]="b.id">{{ b.nombre }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="board-filter-field">
+        Desde
+        <input type="date" [value]="filtroDesde()" (change)="filtroDesde.set($any($event.target).value)" />
+      </label>
+
+      <label class="board-filter-field">
+        Hasta
+        <input type="date" [value]="filtroHasta()" (change)="filtroHasta.set($any($event.target).value)" />
+      </label>
+
+      @if (hayFiltrosActivos()) {
+        <button type="button" class="btn-secondary small" (click)="limpiarFiltros()">Limpiar filtros</button>
+      }
+
+      <button type="button" class="btn-secondary small" (click)="exportarCsvHistorial()">⬇ Exportar CSV</button>
+      <button type="button" class="btn-secondary small" (click)="exportarPdfHistorial()">⬇ Exportar PDF</button>
     </div>
+
+    @if (historialFiltrado().length === 0) {
+      <div class="empty-state-block">
+        <p>{{ hayFiltrosActivos() ? 'Ningún movimiento coincide con estos filtros.' : 'Todavía no hay movimientos registrados.' }}</p>
+      </div>
+    } @else {
+      <div class="grid-table-scroll">
+        <table class="grid-table">
+          <thead><tr><th>Fecha</th><th>Producto</th><th>Tipo</th><th>Origen</th><th>Destino</th><th>Cantidad</th><th>Nota</th></tr></thead>
+          <tbody>
+            @for (fila of historialFiltrado(); track fila.id) {
+              <tr>
+                <td data-label="Fecha">{{ fila.fecha | date: 'dd/MM/yyyy HH:mm' }}</td>
+                <td data-label="Producto">{{ fila.productoNombre }}</td>
+                <td data-label="Tipo">
+                  @switch (fila.tipo) {
+                    @case ('entrada') {
+                      <span class="tag" style="background:var(--client-soft); color:var(--client);">Entrada</span>
+                    }
+                    @case ('salida') {
+                      <span class="tag" style="background:var(--danger-soft); color:var(--danger);">Salida/Ajuste</span>
+                    }
+                    @default {
+                      @if (fila.enTransito) {
+                        <span class="tag" style="background:var(--amber-soft); color:var(--amber);">Traspaso (en tránsito)</span>
+                      } @else {
+                        <span class="tag">Traspaso</span>
+                      }
+                    }
+                  }
+                </td>
+                <td data-label="Origen">{{ fila.origenNombre ?? '—' }}</td>
+                <td data-label="Destino">{{ fila.destinoNombre ?? '—' }}</td>
+                <td data-label="Cantidad">{{ fila.cantidad }}</td>
+                <td data-label="Nota">{{ fila.nota ?? '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  } @else {
+    @if (transitosPendientes().length === 0) {
+      <div class="empty-state-block">
+        <p>No hay ningún traspaso en tránsito pendiente de confirmar recepción.</p>
+      </div>
+    } @else {
+      <p class="hint" style="margin-top:-6px;">
+        Estos traspasos ya se restaron de su bodega de origen, pero todavía no se suman a la bodega
+        destino hasta que confirmes que de verdad llegó la mercancía.
+      </p>
+      <div class="grid-table-scroll">
+        <table class="grid-table">
+          <thead><tr><th>Fecha</th><th>Producto</th><th>Origen</th><th>Destino</th><th>Cantidad</th><th>Nota</th><th></th></tr></thead>
+          <tbody>
+            @for (fila of transitosPendientes(); track fila.id) {
+              <tr>
+                <td data-label="Fecha">{{ fila.fecha | date: 'dd/MM/yyyy HH:mm' }}</td>
+                <td data-label="Producto">{{ fila.productoNombre }}</td>
+                <td data-label="Origen">{{ fila.origenNombre ?? '—' }}</td>
+                <td data-label="Destino">{{ fila.destinoNombre ?? '—' }}</td>
+                <td data-label="Cantidad">{{ fila.cantidad }}</td>
+                <td data-label="Nota">{{ fila.nota ?? '—' }}</td>
+                <td>
+                  <button
+                    type="button"
+                    class="btn-secondary small"
+                    [disabled]="confirmandoRecepcionId() === fila.id"
+                    (click)="confirmarRecepcion(fila.id)"
+                  >
+                    {{ confirmandoRecepcionId() === fila.id ? 'Confirmando…' : 'Confirmar recepción' }}
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
   }
 }
 
@@ -162,6 +227,11 @@
           <app-select-buscable [opciones]="opcionesProducto()" formControlName="productoId" placeholder="Buscar producto…" />
         </label>
 
+        <label class="full-span">
+          O escanea el código de barras
+          <app-escaneo-codigo (codigoEscaneado)="seleccionarPorCodigo($event)" />
+        </label>
+
         @if (form.controls.tipo.value === 'traspaso' || form.controls.tipo.value === 'salida') {
           <label>
             Bodega de origen
@@ -173,6 +243,13 @@
           <label>
             Bodega de destino
             <app-select-buscable [opciones]="opcionesBodega()" formControlName="bodegaDestinoId" placeholder="Buscar bodega…" />
+          </label>
+        }
+
+        @if (form.controls.tipo.value === 'traspaso') {
+          <label class="checkbox-inline full-span">
+            <input type="checkbox" formControlName="enTransito" />
+            Marcar como en tránsito (resta de origen ahora; el destino se suma hasta confirmar recepción, en la pestaña "En tránsito")
           </label>
         }
 

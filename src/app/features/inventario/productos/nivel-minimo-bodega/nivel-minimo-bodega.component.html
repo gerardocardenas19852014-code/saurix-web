@@ -1,0 +1,83 @@
+<div class="page-header">
+  <div>
+    <button type="button" class="btn-secondary small" (click)="volver()" style="margin-bottom: 8px;">← Volver</button>
+    <h1>{{ producto()?.nombre ?? 'Producto' }}</h1>
+  </div>
+</div>
+
+@if (producto() && producto()!.existencia === null) {
+  <div class="empty-state-block">
+    <p>Este producto es un servicio (sin inventario) — el nivel mínimo por bodega no aplica.</p>
+  </div>
+} @else {
+  <p class="hint" style="margin-top:-6px;">
+    Nivel mínimo de existencia PROPIO de cada bodega para este producto. Mientras una bodega se deje vacía, sigue usando
+    el mínimo global del producto ({{ nivelMinimoHeredado() ?? 'sin definir' }}) contra la existencia TOTAL, no la de
+    esa bodega sola — en cuanto se le pone un número aquí, esa bodega se evalúa por su cuenta.
+  </p>
+
+  @if (tieneMinimosPropios()) {
+    <p class="hint" style="margin-top:-6px;">
+      ⚠️ Como ya hay al menos una bodega con mínimo propio, el mínimo global del producto deja de usarse para las demás
+      bodegas de este producto — déjalas también con un número si quieres que sigan vigiladas.
+    </p>
+  }
+
+  <div class="grid-toolbar">
+    @if (filasModificadas().length > 0) {
+      <span class="hint" style="margin:0 10px;">
+        ✏️ {{ filasModificadas().length }} cambio{{ filasModificadas().length === 1 ? '' : 's' }} sin guardar
+      </span>
+      <button type="button" class="btn-secondary small" [disabled]="guardando()" (click)="descartarCambios()">Descartar</button>
+      <button type="button" class="btn-primary small" [disabled]="guardando()" (click)="guardarCambios()">
+        {{ guardando() ? progresoGuardado() || 'Guardando…' : 'Guardar cambios' }}
+      </button>
+    }
+  </div>
+
+  <div class="grid-table-scroll">
+    <table class="grid-table">
+      <thead>
+        <tr>
+          <th>Bodega</th>
+          <th>Existencia actual</th>
+          <th>Nivel mínimo propio</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (cargando()) {
+          <tr>
+            <td colspan="3"><p class="empty">Cargando…</p></td>
+          </tr>
+        } @else {
+          @for (fila of filas(); track fila.bodegaId) {
+            <tr>
+              <td data-label="Bodega">{{ fila.bodegaNombre }}</td>
+              <td data-label="Existencia actual">{{ fila.existencia }}</td>
+              <td data-label="Nivel mínimo propio">
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  class="precio-lista-input"
+                  [class.precio-lista-input-modificado]="fila.nivelMinimoTexto.trim() !== fila.nivelMinimoOriginalTexto"
+                  placeholder="Usar mínimo global"
+                  [value]="fila.nivelMinimoTexto"
+                  (input)="cambiarNivelMinimo(fila.bodegaId, $any($event.target).value)"
+                />
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="3">
+                <div class="empty-state-block">
+                  <p>No hay bodegas activas. Da de alta bodegas en Inventario → Bodegas.</p>
+                </div>
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+}

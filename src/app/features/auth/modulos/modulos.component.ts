@@ -21,6 +21,7 @@ const MODULOS: ModuloTile[] = [
   { ruta: '/proyectos', icono: '📋', etiqueta: 'Gestión de Proyectos', clase: 'module-tile-indigo', clave: 'proyectos' },
   { ruta: '/familia', icono: '👪', etiqueta: 'Familia', clase: 'module-tile-amber', clave: 'familia' },
   { ruta: '/inventario', icono: '📦', etiqueta: 'Inventario', clase: 'module-tile-accent', clave: 'inventario' },
+  { ruta: '/ventas', icono: '🧾', etiqueta: 'Ventas', clase: 'module-tile-danger', clave: 'ventas' },
 ];
 
 @Component({

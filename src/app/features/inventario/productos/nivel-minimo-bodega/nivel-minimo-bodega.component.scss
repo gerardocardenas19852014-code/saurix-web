@@ -1,0 +1,22 @@
+// Mismos estilos que proveedor-productos.component.scss (el resto —
+// page-header, grid-toolbar, grid-table, hint, empty-state-block — vienen
+// de src/styles.scss).
+.precio-lista-input {
+  width: 140px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  background: var(--paper-raised);
+  color: var(--text-strong);
+}
+.precio-lista-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.precio-lista-input-modificado {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}

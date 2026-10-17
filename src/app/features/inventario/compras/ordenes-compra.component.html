@@ -1,0 +1,240 @@
+@if (vista() === 'lista') {
+  <div class="page-header">
+    <h1>Órdenes de compra</h1>
+    <div class="page-actions">
+      <button type="button" class="toolbar-btn" (click)="nuevaOrden()">+ Nueva orden</button>
+    </div>
+  </div>
+
+  <div class="grid-toolbar">
+    <div class="grid-filter">
+      <input
+        type="search"
+        placeholder="Buscar por folio o proveedor…"
+        [value]="busqueda()"
+        (input)="busqueda.set($any($event.target).value)"
+      />
+    </div>
+  </div>
+
+  <app-data-table
+    [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+    [columnas]="columnas"
+    [filas]="filasFiltradas()"
+    [cargando]="cargando()"
+    (editar)="abrirOrden($event)"
+    (eliminar)="pedirEliminar($event)"
+  />
+
+  <app-confirm-dialog
+    [visible]="ordenAEliminar() !== null"
+    titulo="Eliminar orden de compra"
+    [mensaje]="'¿Eliminar ' + (ordenAEliminar()?.folio ?? '') + '? Solo se puede si no tiene nada recibido.'"
+    (confirmar)="confirmarEliminar()"
+    (cancelar)="ordenAEliminar.set(null)"
+  />
+} @else {
+  <div class="page-header">
+    <h1>{{ ordenActiva() ? ordenActiva()!.folio : 'Nueva orden de compra' }}</h1>
+    <div class="page-actions">
+      <button type="button" class="btn-primary small" [disabled]="guardando()" (click)="guardar()">
+        {{ guardando() ? 'Guardando…' : 'Guardar' }}
+      </button>
+      <button type="button" class="btn-secondary small" (click)="volverALista()">← Volver</button>
+    </div>
+  </div>
+
+  @if (ordenActiva(); as orden) {
+    <span [class]="claseEstado[orden.estado]" style="display:inline-block; padding:4px 10px; border-radius:999px; font-size:12.5px; font-weight:600; margin:-10px 0 18px;">
+      {{ etiquetaEstado[orden.estado] }}
+    </span>
+  }
+
+  <form [formGroup]="form" class="edit-form form-grid-4col" style="margin-bottom:24px;">
+    <label>
+      Proveedor
+      <app-select-buscable [opciones]="opcionesProveedor()" formControlName="proveedorId" placeholder="Buscar proveedor…" />
+    </label>
+    <label>
+      Bodega destino
+      <app-select-buscable [opciones]="opcionesBodega()" formControlName="bodegaDestinoId" placeholder="Buscar bodega…" />
+    </label>
+    <label>
+      Fecha
+      <input type="date" formControlName="fecha" />
+    </label>
+    <label>
+      Fecha de entrega estimada (opcional)
+      <input type="date" formControlName="fechaEntregaEstimada" />
+    </label>
+    <label style="grid-column: 1 / -1;">
+      Notas (opcional)
+      <textarea formControlName="notas" rows="2"></textarea>
+    </label>
+  </form>
+
+  <h2 class="catalog-group-title">Productos</h2>
+  @if (!puedeEditarItems()) {
+    <p class="hint" style="margin:0 0 12px;">Esta orden ya tiene mercancía recibida — las cantidades y costos de las líneas ya no se pueden editar.</p>
+  } @else {
+    <div style="max-width:420px; margin-bottom:12px;">
+      <label class="board-filter-field" style="width:100%;">
+        Escanear producto (agrega la línea o suma 1 a la cantidad)
+        <app-escaneo-codigo (codigoEscaneado)="escanearLinea($event)" />
+      </label>
+    </div>
+  }
+
+  <div class="grid-table-scroll" style="margin-bottom:12px;">
+    <table class="grid-table">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Unidad</th>
+          <th>Cantidad</th>
+          <th>Costo unitario</th>
+          <th>Subtotal</th>
+          @if (ordenActiva()) {
+            <th>Recibido</th>
+          }
+          @if (puedeEditarItems()) {
+            <th></th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (linea of itemsForm(); track $index) {
+          <tr>
+            <td data-label="Producto">
+              @if (puedeEditarItems()) {
+                <app-select-buscable
+                  [opciones]="opcionesProducto()"
+                  [value]="linea.productoId"
+                  placeholder="Buscar producto…"
+                  (valueChange)="seleccionarProductoEnLinea($index, +($event ?? 0))"
+                />
+              } @else {
+                {{ nombreProducto(linea.productoId) }}
+              }
+            </td>
+            <td data-label="Unidad">
+              @if (puedeEditarItems() && tieneUnidadCompraAlterna(linea.productoId)) {
+                <select
+                  class="precio-lista-input"
+                  [value]="linea.unidadId ?? 0"
+                  (change)="cambiarUnidadLinea($index, +$any($event.target).value)"
+                >
+                  @for (opcion of opcionesUnidadLinea(linea.productoId); track opcion.valor) {
+                    <option [value]="opcion.valor">{{ opcion.etiqueta }}</option>
+                  }
+                </select>
+              } @else {
+                {{ nombreUnidadLinea(linea) }}
+              }
+            </td>
+            <td data-label="Cantidad">
+              @if (puedeEditarItems()) {
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  class="precio-lista-input"
+                  [value]="linea.cantidadTexto"
+                  (input)="cambiarLinea($index, { cantidadTexto: $any($event.target).value })"
+                />
+              } @else {
+                {{ linea.cantidadTexto }}
+              }
+            </td>
+            <td data-label="Costo unitario">
+              @if (puedeEditarItems()) {
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="precio-lista-input"
+                  [value]="linea.costoUnitarioTexto"
+                  (input)="cambiarLinea($index, { costoUnitarioTexto: $any($event.target).value })"
+                />
+              } @else {
+                {{ formatMoneda(+linea.costoUnitarioTexto) }}
+              }
+            </td>
+            <td data-label="Subtotal">{{ formatMoneda((+linea.cantidadTexto || 0) * (+linea.costoUnitarioTexto || 0)) }}</td>
+            @if (ordenActiva()) {
+              <td data-label="Recibido">{{ linea.cantidadRecibida }} / {{ linea.cantidadTexto }}</td>
+            }
+            @if (puedeEditarItems()) {
+              <td><button type="button" class="btn-secondary small" (click)="quitarLinea($index)">Quitar</button></td>
+            }
+          </tr>
+        } @empty {
+          <tr>
+            <td [attr.colspan]="colspanItems()"><p class="empty">Sin líneas todavía.</p></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (puedeEditarItems()) {
+    <button type="button" class="btn-secondary small" (click)="agregarLinea()">+ Agregar línea</button>
+  }
+
+  <p class="hint" style="text-align:right; font-weight:600; margin-top:16px;">Total: {{ formatMoneda(totalOrden()) }}</p>
+
+  @if (ordenActiva(); as orden) {
+    @if (orden.estado === 'pendiente' || orden.estado === 'recibida_parcial') {
+      <h2 class="catalog-group-title">Recibir mercancía</h2>
+      <p class="hint" style="margin:0 0 12px;">Captura cuánto llegó de cada producto (puede ser menos de lo pedido — se puede volver a recibir después para completar).</p>
+
+      <div class="grid-table-scroll" style="margin-bottom:12px;">
+        <table class="grid-table">
+          <thead><tr><th>Producto</th><th>Pendiente</th><th>A recibir ahora</th></tr></thead>
+          <tbody>
+            @for (fila of filasRecepcion(); track fila.item.id) {
+              <tr>
+                <td data-label="Producto">{{ fila.productoNombre }}</td>
+                <td data-label="Pendiente">{{ fila.pendiente }}</td>
+                <td data-label="A recibir ahora">
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    [max]="fila.pendiente"
+                    class="precio-lista-input"
+                    [value]="fila.aRecibirTexto"
+                    (input)="cambiarARecibir($index, $any($event.target).value)"
+                  />
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <button type="button" class="btn-primary small" [disabled]="recibiendo()" (click)="confirmarRecepcion()">
+        {{ recibiendo() ? 'Registrando…' : 'Registrar recepción' }}
+      </button>
+    }
+
+    @if (movimientosDeOrden().length > 0) {
+      <h2 class="catalog-group-title" style="margin-top:28px;">Historial de recepciones</h2>
+      <div class="grid-table-scroll">
+        <table class="grid-table">
+          <thead><tr><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Costo unitario</th></tr></thead>
+          <tbody>
+            @for (m of movimientosDeOrden(); track m.id) {
+              <tr>
+                <td data-label="Fecha">{{ m.fecha | date: 'short' }}</td>
+                <td data-label="Producto">{{ nombreProducto(m.productoId) }}</td>
+                <td data-label="Cantidad">{{ m.cantidad }}</td>
+                <td data-label="Costo unitario">{{ m.costoUnitario != null ? formatMoneda(m.costoUnitario) : '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+}

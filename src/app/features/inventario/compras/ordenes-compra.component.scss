@@ -1,0 +1,16 @@
+// Mismo input compacto que lista-precio-detalle.component.scss / proveedor-productos.component.scss.
+.precio-lista-input {
+  width: 100px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  background: var(--paper-raised);
+  color: var(--text-strong);
+}
+.precio-lista-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}

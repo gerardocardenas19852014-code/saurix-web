@@ -1,0 +1,254 @@
+<div class="page-header">
+  <h1>Cobro</h1>
+  @if (turno()) {
+    <span class="hint" style="margin-left:auto;">Folio sugerido: {{ proximoFolio() || '—' }}</span>
+  }
+</div>
+
+@if (cargando()) {
+  <p class="empty">Cargando…</p>
+} @else {
+  <div class="pos-layout">
+    <!-- ── Columna izquierda: búsqueda, categorías y cuadrícula de productos ── -->
+    <div class="pos-productos">
+      <div class="pos-toolbar">
+        <input
+          type="search"
+          placeholder="Buscar producto por nombre o código…"
+          class="pos-buscador"
+          [value]="busquedaProducto()"
+          (input)="busquedaProducto.set($any($event.target).value)"
+        />
+        <app-escaneo-codigo [limpiarDespues]="true" (codigoEscaneado)="seleccionarProductoPorCodigo($event)" />
+        <button type="button" class="toolbar-btn" (click)="abrirVentaSimple()">+ Venta simple</button>
+      </div>
+
+      <div class="pos-categorias">
+        <button type="button" class="pos-chip" [class.pos-chip-activo]="categoriaFiltro() === null" (click)="categoriaFiltro.set(null)">
+          Todas
+        </button>
+        @for (cat of categorias(); track cat.id) {
+          <button type="button" class="pos-chip" [class.pos-chip-activo]="categoriaFiltro() === cat.id" (click)="categoriaFiltro.set(cat.id)">
+            {{ cat.nombre }}
+          </button>
+        }
+      </div>
+
+      <div class="pos-grid">
+        @for (producto of productosFiltrados(); track producto.id) {
+          <button type="button" class="pos-tile" (click)="agregarProducto(producto)">
+            <span class="pos-tile-nombre">{{ producto.nombre }}</span>
+            <span class="pos-tile-precio">{{ formatMoneda(precioProducto(producto)) }}</span>
+            @if (existenciaDisponible(producto) !== null) {
+              <span class="pos-tile-existencia" [class.pos-tile-existencia-baja]="(existenciaDisponible(producto) ?? 0) <= 0">
+                {{ existenciaDisponible(producto) }} disp.
+              </span>
+            }
+          </button>
+        } @empty {
+          <p class="empty">No se encontraron productos.</p>
+        }
+      </div>
+    </div>
+
+    <!-- ── Columna derecha: ticket ── -->
+    <div class="pos-ticket">
+      <div class="pos-ticket-config">
+        <label>
+          Cliente
+          <span class="pos-cliente-row">
+            <app-select-buscable
+              [opciones]="opcionesClientes()"
+              [value]="clienteId()"
+              placeholder="Buscar cliente…"
+              (valueChange)="elegirCliente($event)"
+            />
+            <button type="button" class="toolbar-btn" title="Nuevo cliente" (click)="abrirNuevoCliente()">+</button>
+          </span>
+        </label>
+
+        @if (bodegas().length > 0) {
+          <label>
+            Bodega de venta
+            <select [value]="bodegaVentaId()" (change)="bodegaVentaId.set(+$any($event.target).value)">
+              @for (bodega of bodegas(); track bodega.id) {
+                <option [value]="bodega.id">{{ bodega.nombre }}</option>
+              }
+            </select>
+          </label>
+        }
+
+        @if (listasPrecio().length > 0) {
+          <label>
+            Lista de precio
+            <select [value]="listaPrecioId() ?? ''" (change)="listaPrecioId.set($any($event.target).value ? +$any($event.target).value : null)">
+              <option value="">— Precio general —</option>
+              @for (lista of listasPrecio(); track lista.id) {
+                <option [value]="lista.id">{{ lista.nombre }}</option>
+              }
+            </select>
+          </label>
+        }
+      </div>
+
+      <div class="pos-ticket-lineas">
+        @for (item of carrito(); track $index) {
+          <div class="pos-ticket-item">
+            <div class="pos-ticket-item-info">
+              <span class="pos-ticket-item-desc">{{ item.descripcion }}</span>
+              <span class="pos-ticket-item-precio">{{ formatMoneda(item.precioUnitario) }} c/u</span>
+            </div>
+            <div class="pos-ticket-item-cantidad">
+              <button type="button" class="pos-qty-btn" (click)="decrementar($index)">−</button>
+              <span>{{ item.cantidad }}</span>
+              <button type="button" class="pos-qty-btn" (click)="incrementar($index)">+</button>
+            </div>
+            <label class="pos-ticket-item-descuento" title="Descuento de este renglón">
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                [value]="item.descuentoPct"
+                (change)="actualizarDescuento($index, $any($event.target).value)"
+              />%
+            </label>
+            <span class="pos-ticket-item-subtotal">{{ formatMoneda(item.cantidad * item.precioUnitario * (1 - item.descuentoPct / 100)) }}</span>
+            <button type="button" class="pos-ticket-item-quitar" title="Quitar" (click)="quitarLinea($index)">✕</button>
+          </div>
+        } @empty {
+          <p class="empty">El ticket está vacío — toca un producto o agrega una venta simple.</p>
+        }
+      </div>
+
+      <div class="pos-ticket-totales">
+        @if (descuentoCarrito() > 0) {
+          <div class="pos-ticket-total-linea"><span>Subtotal</span><span>{{ formatMoneda(subtotalCarrito()) }}</span></div>
+          <div class="pos-ticket-total-linea"><span>Descuento</span><span>-{{ formatMoneda(descuentoCarrito()) }}</span></div>
+        }
+        <div class="pos-ticket-total-linea pos-ticket-total-grande"><span>Total</span><span>{{ formatMoneda(totalCarrito()) }}</span></div>
+      </div>
+
+      <div class="pos-ticket-acciones">
+        <button type="button" class="btn-secondary" (click)="cancelarVentaActual()">Cancelar venta</button>
+        <button type="button" class="btn-primary" (click)="abrirPago()">Cobrar</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (modalVentaSimpleAbierto()) {
+  <div class="modal-overlay show" (click)="modalVentaSimpleAbierto.set(false)">
+    <form class="modal-box" style="max-width: 420px;" [formGroup]="ventaSimpleForm" (click)="$event.stopPropagation()" (ngSubmit)="agregarVentaSimple()">
+      <h3>Venta simple</h3>
+      <p class="hint" style="margin-top:-6px;">Para cobrar algo sin capturar un producto del catálogo.</p>
+
+      <div class="edit-form" style="margin-bottom: 18px;">
+        <label>
+          Descripción
+          <input type="text" formControlName="descripcion" placeholder="p.ej. Servicio / Varios" />
+        </label>
+        <label>
+          Monto
+          <input type="number" step="0.01" min="0.01" formControlName="monto" />
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalVentaSimpleAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary">Agregar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-cliente-form-modal
+  [visible]="modalClienteAbierto()"
+  [clienteEnEdicion]="null"
+  (guardado)="alGuardarCliente($event)"
+  (cancelado)="modalClienteAbierto.set(false)"
+/>
+
+@if (ventaRecienCobrada(); as venta) {
+  <div class="modal-overlay show" (click)="cerrarPanelVentaRegistrada()">
+    <div class="modal-box" style="max-width: 380px;" (click)="$event.stopPropagation()">
+      <h3>✅ Venta {{ venta.folio }} registrada</h3>
+      <p class="hint" style="margin-top:-6px;">Total: {{ formatMoneda(venta.total) }}</p>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="cerrarPanelVentaRegistrada()">Nueva venta</button>
+        <button type="button" class="btn-primary" (click)="imprimirTicketRecien()">🖨️ Imprimir ticket</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (modalPagoAbierto()) {
+  <div class="modal-overlay show" (click)="modalPagoAbierto.set(false)">
+    <div class="modal-box" style="max-width: 460px;" (click)="$event.stopPropagation()">
+      <h3>Cobrar</h3>
+
+      <div class="pos-ticket-totales" style="margin-bottom: 14px;">
+        <div class="pos-ticket-total-linea"><span>Total de la venta</span><span>{{ formatMoneda(totalCarrito()) }}</span></div>
+        <div class="pos-ticket-total-linea"><span>Pagado</span><span>{{ formatMoneda(totalPagado()) }}</span></div>
+        <div class="pos-ticket-total-linea pos-ticket-total-grande">
+          <span>{{ faltantePorPagar() > 0.01 ? 'Falta' : 'Cambio' }}</span>
+          <span>{{ formatMoneda(faltantePorPagar() > 0.01 ? faltantePorPagar() : 0) }}</span>
+        </div>
+      </div>
+
+      @if (pagos().length > 0) {
+        <div class="pos-ticket-lineas" style="margin-bottom: 14px;">
+          @for (pago of pagos(); track $index) {
+            <div class="pos-ticket-item">
+              <div class="pos-ticket-item-info">
+                <span class="pos-ticket-item-desc">{{ pago.metodoPago }}</span>
+                @if (pago.cambio) {
+                  <span class="pos-ticket-item-precio">Cambio: {{ formatMoneda(pago.cambio) }}</span>
+                }
+              </div>
+              <span class="pos-ticket-item-subtotal">{{ formatMoneda(pago.monto) }}</span>
+              <button type="button" class="pos-ticket-item-quitar" title="Quitar" (click)="quitarPago($index)">✕</button>
+            </div>
+          }
+        </div>
+      }
+
+      @if (faltantePorPagar() > 0.01) {
+        <form class="edit-form" [formGroup]="pagoForm" (ngSubmit)="agregarPago()" style="margin-bottom: 14px;">
+          <label>
+            Método de pago
+            <select formControlName="metodoPago">
+              @for (metodo of metodosPago; track metodo) {
+                <option [value]="metodo">{{ metodo }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            Monto a aplicar con este método
+            <input type="number" step="0.01" min="0.01" formControlName="monto" />
+          </label>
+          @if (montoRecibidoVisible) {
+            <label>
+              Efectivo recibido (opcional, para calcular cambio)
+              <input type="number" step="0.01" min="0" formControlName="montoRecibido" />
+            </label>
+            @if (cambioEstimado()) {
+              <p class="hint">Cambio a entregar: {{ formatMoneda(cambioEstimado() ?? 0) }}</p>
+            }
+          }
+          <div class="modal-actions" style="justify-content: flex-start;">
+            <button type="submit" class="btn-secondary">+ Agregar pago</button>
+          </div>
+        </form>
+      }
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="modalPagoAbierto.set(false)">Seguir editando</button>
+        <button type="button" class="btn-primary" [disabled]="faltantePorPagar() > 0.01 || procesandoVenta()" (click)="confirmarCobro()">
+          Confirmar cobro
+        </button>
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,15 @@
+.escaneo-codigo-fila {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+
+  input {
+    flex: 1;
+  }
+}
+
+.escaneo-camara-video {
+  width: 100%;
+  border-radius: 8px;
+  background: #000;
+}

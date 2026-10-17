@@ -14,7 +14,10 @@
     } @else {
       <form [formGroup]="form" (ngSubmit)="guardar()">
         <label>
-          Contraseña nueva
+          <span class="label-con-tip">
+            Contraseña nueva
+            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Mínimo 8 caracteres, con una mayúscula y un número.</span></button>
+          </span>
           <span class="password-campo">
             <input [type]="verPassword() ? 'text' : 'password'" formControlName="password" autocomplete="new-password" />
             <button type="button" class="password-ojo" (click)="verPassword.set(!verPassword())"
@@ -22,7 +25,6 @@
               {{ verPassword() ? '🙈' : '👁️' }}
             </button>
           </span>
-          <span class="hint">Mínimo 8 caracteres, con una mayúscula y un número.</span>
         </label>
         <label>
           Confirmar contraseña

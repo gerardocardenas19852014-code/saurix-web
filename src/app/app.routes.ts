@@ -65,6 +65,12 @@ export const routes: Routes = [
         loadChildren: () =>
           import('./features/inventario/inventario.routes').then((m) => m.INVENTARIO_ROUTES),
       },
+
+      {
+        path: 'ventas',
+        canActivate: [moduloGuard('ventas')],
+        loadChildren: () => import('./features/ventas/ventas.routes').then((m) => m.VENTAS_ROUTES),
+      },
     ],
   },
   { path: '**', redirectTo: 'modulos' },
