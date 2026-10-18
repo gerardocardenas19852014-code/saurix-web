@@ -66,6 +66,24 @@
     </p>
   </div>
 
+  <!-- ── Barra inferior fija (estilo "Ir a pagar" de apps de pedidos): se
+       queda SIEMPRE visible mientras haya algo en el carrito, para que el
+       cliente pueda seguir viendo el catálogo y abrir su pedido cuando
+       quiera, sin que "Agregar" lo saque de la pantalla — ver el comentario
+       en agregarLineaAlCarrito(). Se oculta solo mientras el panel ya está
+       abierto, para no duplicar el mismo total en pantalla. ── -->
+  @if (cantidadArticulos() > 0 && !carritoAbierto()) {
+    <div class="tienda-barra-inferior">
+      <div class="tienda-barra-inferior-info">
+        <span class="tienda-barra-inferior-cantidad">{{ cantidadArticulos() }} artículo{{ cantidadArticulos() === 1 ? '' : 's' }}</span>
+        <strong>${{ totalCarrito().toFixed(2) }}</strong>
+      </div>
+      <button type="button" class="tienda-barra-inferior-boton" (click)="carritoAbierto.set(true)">
+        Ver pedido
+      </button>
+    </div>
+  }
+
   <!-- ── Panel del carrito: NO bloquea el catálogo — el cliente debe poder
        seguir agregando productos mientras lo tiene abierto, a diferencia de
        los modales de abajo (opciones/datos de envío), que sí son pasos que

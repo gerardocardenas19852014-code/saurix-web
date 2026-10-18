@@ -213,7 +213,10 @@ export class CatalogoTiendaComponent implements OnInit {
         },
       ];
     });
-    this.carritoAbierto.set(true);
+    // A propósito NO se abre el panel aquí (antes sí, y tapaba el catálogo
+    // en celular en cada "Agregar") — el cliente sigue viendo la cuadrícula
+    // y usa la barra inferior fija (.tienda-barra-inferior, siempre visible
+    // mientras haya algo en el carrito) para abrir el pedido cuando quiera.
   }
 
   cambiarCantidadLinea(claveLinea: string, delta: number): void {
