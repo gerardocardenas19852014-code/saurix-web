@@ -147,6 +147,7 @@
       aspect-ratio: auto;
       flex-shrink: 0;
       border-radius: 8px;
+      object-fit: contain;
 
       &-vacia {
         font-size: 1.4rem;
@@ -206,7 +207,13 @@
 .tienda-tarjeta-foto {
   width: 100%;
   aspect-ratio: 1 / 1;
-  object-fit: cover;
+  /* contain (no cover): las fotos de los productos no siempre tienen la
+   * misma proporción (hay bolis angostos y alargados, otros más cuadrados).
+   * Con "cover" cada foto se recorta distinto según su forma original y
+   * algunas terminan mostrando solo un pedazo/zoom irreconocible; con
+   * "contain" siempre se ve la foto completa, igual que la original,
+   * nomás con el fondo rellenando los espacios sobrantes. */
+  object-fit: contain;
   background: var(--fondo-sutil, #f3f4f6);
 
   &-vacia {
