@@ -43,6 +43,10 @@ export const VENTAS_ROUTES: Routes = [
     loadComponent: () => import('./cotizacion/cotizaciones.component').then((m) => m.CotizacionesComponent),
   },
   {
+    path: 'pedidos-tienda',
+    loadComponent: () => import('./pedidos-tienda/pedidos-tienda.component').then((m) => m.PedidosTiendaComponent),
+  },
+  {
     path: 'cuentas-por-cobrar',
     loadComponent: () =>
       import('./cuenta-por-cobrar/cuentas-por-cobrar.component').then((m) => m.CuentasPorCobrarComponent),

@@ -1,0 +1,125 @@
+<div class="page-header">
+  <h1>Pedidos web</h1>
+</div>
+
+<p class="hint" style="margin-top:-6px;">
+  Pedidos enviados desde tu tienda pública — el pedido real se manda por WhatsApp, esto es solo
+  para no volver a teclearlo: confírmalo para registrar la venta o descártalo si no aplica.
+</p>
+
+<app-data-table
+  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+  [columnas]="columnas"
+  [filas]="pedidos()"
+  [cargando]="cargando()"
+  [ocultarEditarEliminar]="true"
+  accionExtraEtiqueta="Ver detalle"
+  accionExtraTitulo="Ver productos y confirmar/descartar este pedido"
+  (accionExtra)="verDetalle($event)"
+/>
+
+@if (pedidoDetalle(); as pedido) {
+  <div class="modal-overlay show" (click)="cerrarDetalle()">
+    <div class="modal-box" style="max-width: 600px; width: 94%;" (click)="$event.stopPropagation()">
+      <div class="page-header" style="margin-bottom: 12px;">
+        <h3>Pedido de {{ pedido.nombreCliente }}</h3>
+        <span
+          class="grid-badge"
+          [class]="pedido.estado === 'Pendiente' ? 'grid-badge-warning' : pedido.estado === 'Confirmado' ? 'grid-badge-success' : 'grid-badge-muted'"
+        >
+          {{ pedido.estado }}
+        </span>
+      </div>
+
+      <p class="hint" style="margin-top:-6px;">
+        {{ pedido.telefonoCliente }} · {{ pedido.fechaCreacion | date: 'short' }}
+      </p>
+      @if (pedido.notasCliente) {
+        <p class="hint">Nota: {{ pedido.notasCliente }}</p>
+      }
+      @if (pedido.ubicacionLat !== null && pedido.ubicacionLng !== null) {
+        <p class="hint">
+          <a [href]="'https://www.google.com/maps?q=' + pedido.ubicacionLat + ',' + pedido.ubicacionLng" target="_blank" rel="noopener">
+            📍 Ver ubicación del cliente
+          </a>
+        </p>
+      }
+      @if (pedido.ventaId !== null) {
+        <p class="hint" style="color: var(--client);">Confirmado como venta — ver Historial de ventas.</p>
+      }
+
+      <div class="pos-ticket-lineas" style="margin-bottom: 14px;">
+        @for (item of pedido.items; track $index) {
+          <div class="pos-ticket-item">
+            <div class="pos-ticket-item-info">
+              <span class="pos-ticket-item-desc">
+                {{ item.cantidad }} x {{ item.nombreProducto }}
+                @for (o of item.opcionesElegidas; track o.valorNombre) {
+                  <br /><small>— {{ o.grupoNombre }}: {{ o.valorNombre }}</small>
+                }
+              </span>
+              <span class="pos-ticket-item-precio">
+                {{ formatMoneda(item.precioBase + item.opcionesElegidas.reduce((acc, o) => acc + o.precioAdicional, 0)) }} c/u
+              </span>
+            </div>
+          </div>
+        }
+      </div>
+
+      <div class="pos-ticket-totales" style="margin-bottom: 14px;">
+        <div class="pos-ticket-total-linea pos-ticket-total-grande"><span>Total</span><span>{{ formatMoneda(pedido.total) }}</span></div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="cerrarDetalle()">Cerrar</button>
+        @if (pedido.estado === 'Pendiente') {
+          <button type="button" class="btn-secondary" style="background: var(--danger-soft); color: var(--danger);" (click)="pedirDescartar(pedido)">Descartar</button>
+          <button type="button" class="btn-primary" (click)="abrirConfirmar()">Confirmar venta</button>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+@if (modalConfirmarAbierto()) {
+  <div class="modal-overlay show" (click)="cerrarConfirmar()">
+    <form class="modal-box" style="max-width: 420px;" [formGroup]="confirmarForm" (click)="$event.stopPropagation()" (ngSubmit)="confirmarConfirmar()">
+      <h3>Confirmar venta</h3>
+      <p class="hint" style="margin-top:-6px;">Se descontará existencia y se registrará el cobro por el total del pedido.</p>
+
+      <div class="edit-form" style="margin-bottom: 14px;">
+        <label>
+          Bodega de venta
+          <select [value]="bodegaConversionId()" (change)="bodegaConversionId.set(+$any($event.target).value)">
+            @for (bodega of bodegas(); track bodega.id) {
+              <option [value]="bodega.id">{{ bodega.nombre }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          Método de pago
+          <select formControlName="metodoPago">
+            @for (metodo of metodosPago; track metodo) {
+              <option [value]="metodo">{{ metodo }}</option>
+            }
+          </select>
+        </label>
+      </div>
+
+      <p class="hint" style="margin-bottom:14px;">Total a cobrar: <strong>{{ formatMoneda(pedidoDetalle()?.total ?? 0) }}</strong></p>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="cerrarConfirmar()">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="confirmando()">{{ confirmando() ? 'Confirmando…' : 'Confirmar' }}</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="pedidoADescartar() !== null"
+  titulo="Descartar pedido"
+  [mensaje]="'¿Descartar el pedido de ' + (pedidoADescartar()?.nombreCliente ?? '') + '?'"
+  (confirmar)="confirmarDescartar()"
+  (cancelar)="pedidoADescartar.set(null)"
+/>

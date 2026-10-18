@@ -26,6 +26,10 @@ export class CatalogoTiendaComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly detalle = signal<TiendaDetalle | null>(null);
   protected readonly busqueda = signal('');
+  /** Cuadrícula (tarjetas) o lista (renglones compactos) — se recuerda por
+   *  navegador (localStorage) para que no se tenga que elegir cada visita;
+   *  si no está disponible (modo privado, etc.) simplemente no se recuerda. */
+  protected readonly vistaLista = signal(this.leerVistaGuardada());
 
   protected readonly carrito = signal<LineaCarritoTienda[]>([]);
   protected readonly carritoAbierto = signal(false);
@@ -100,10 +104,14 @@ export class CatalogoTiendaComponent implements OnInit {
 
   protected readonly precioUnitarioModal = computed(() => (this.productoEnModal()?.precio ?? 0) + this.precioExtraModal());
 
+  /** Clave de la tienda actual (ver ngOnInit) — se reutiliza al mandar el
+   *  pedido, para crearPedidoPendiente() (ver enviarPorWhatsapp()). */
+  private clave = '';
+
   ngOnInit(): void {
-    const clave = this.route.snapshot.paramMap.get('clave') ?? '';
+    this.clave = this.route.snapshot.paramMap.get('clave') ?? '';
     this.tiendaService
-      .tiendaDetalle(clave)
+      .tiendaDetalle(this.clave)
       .then((detalle) => {
         if (!detalle) {
           this.error.set('Esta tienda no existe o todavía no está disponible.');
@@ -118,6 +126,23 @@ export class CatalogoTiendaComponent implements OnInit {
   subtotalLinea(linea: LineaCarritoTienda): number {
     const extra = linea.opcionesElegidas.reduce((acc, o) => acc + o.precioAdicional, 0);
     return (linea.precioBase + extra) * linea.cantidad;
+  }
+
+  private leerVistaGuardada(): boolean {
+    try {
+      return localStorage.getItem('tienda-vista') === 'lista';
+    } catch {
+      return false;
+    }
+  }
+
+  cambiarVista(lista: boolean): void {
+    this.vistaLista.set(lista);
+    try {
+      localStorage.setItem('tienda-vista', lista ? 'lista' : 'grid');
+    } catch {
+      // localStorage puede no estar disponible (modo privado, etc.) — no es crítico.
+    }
   }
 
   // ── Agregar al carrito ────────────────────────────────────────────
@@ -343,7 +368,29 @@ export class CatalogoTiendaComponent implements OnInit {
     if (!telefono) return;
     const v = this.formCliente.getRawValue();
     const mensaje = this.construirMensaje(v.nombre.trim(), v.telefono.trim(), v.notas);
+    // window.open() va PRIMERO y sin await — tiene que quedar dentro del
+    // mismo gesto de clic del usuario o el navegador bloquea el popup.
     window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`, '_blank');
+
+    // Registro ligero "en segundo plano" para que el pedido también
+    // aparezca en Ventas → Pedidos web (ver tienda-publica.service.ts) —
+    // nunca bloquea ni retrasa el WhatsApp de arriba, que es el canal real:
+    // si esto falla, el cliente ya recibió igual su WhatsApp.
+    const ubicacion = this.ubicacion();
+    this.tiendaService
+      .crearPedidoPendiente(this.clave, {
+        nombre: v.nombre.trim(),
+        telefono: v.telefono.trim(),
+        notas: v.notas.trim(),
+        lat: ubicacion?.lat ?? null,
+        lng: ubicacion?.lng ?? null,
+        items: this.carrito(),
+        total: this.totalCarrito(),
+      })
+      .catch(() => {
+        /* silencioso a propósito — ver comentario arriba */
+      });
+
     this.modalEnviarAbierto.set(false);
   }
 }

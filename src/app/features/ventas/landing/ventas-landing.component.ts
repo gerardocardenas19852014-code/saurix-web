@@ -59,6 +59,13 @@ const GRUPOS: GrupoModulo[] = [
         descripcion: 'Propuestas de precio que no afectan inventario/caja hasta convertirse en venta.',
       },
       {
+        ruta: 'pedidos-tienda',
+        icono: '🛍️',
+        color: 'accent',
+        titulo: 'Pedidos web',
+        descripcion: 'Pedidos recibidos desde tu tienda pública — confirma para registrar la venta o descarta.',
+      },
+      {
         ruta: 'cuentas-por-cobrar',
         icono: '💳',
         color: 'accent',

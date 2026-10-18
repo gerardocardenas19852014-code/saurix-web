@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { SupabaseService } from '../../core/services/supabase.service';
-import { TiendaActiva, TiendaDetalle } from './tienda.model';
+import { LineaCarritoTienda, TiendaActiva, TiendaDetalle } from './tienda.model';
 
 /**
  * Acceso a las 2 únicas funciones RPC públicas del sistema (ver
@@ -26,5 +26,37 @@ export class TiendaPublicaService {
     const { data, error } = await this.sb.schema('seguridad').rpc('tienda_detalle', { p_clave: clave });
     if (error) throw new Error(error.message);
     return (data as TiendaDetalle | null) ?? null;
+  }
+
+  /** Guarda un registro LIGERO del pedido (ver migración 30_pedidos_tienda.sql)
+   *  para que también aparezca en Ventas → Pedidos web — el canal real
+   *  sigue siendo el WhatsApp que arma enviarPorWhatsapp() en
+   *  catalogo-tienda.component.ts, esto es solo para no tener que volver a
+   *  teclearlo. Se llama "en segundo plano" (sin esperar/bloquear el envío
+   *  del WhatsApp) — si falla, el cliente de todas formas ya recibió su
+   *  WhatsApp, que es lo que de verdad importa. */
+  async crearPedidoPendiente(
+    clave: string,
+    datos: {
+      nombre: string;
+      telefono: string;
+      notas: string;
+      lat: number | null;
+      lng: number | null;
+      items: LineaCarritoTienda[];
+      total: number;
+    },
+  ): Promise<void> {
+    const { error } = await this.sb.schema('seguridad').rpc('crear_pedido_tienda', {
+      p_clave: clave,
+      p_nombre: datos.nombre,
+      p_telefono: datos.telefono,
+      p_notas: datos.notas || null,
+      p_lat: datos.lat,
+      p_lng: datos.lng,
+      p_items: datos.items,
+      p_total: datos.total,
+    });
+    if (error) throw new Error(error.message);
   }
 }

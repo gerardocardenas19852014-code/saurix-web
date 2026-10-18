@@ -205,13 +205,38 @@
   </div>
 }
 
-<app-confirm-dialog
-  [visible]="aEliminar() !== null"
-  titulo="Eliminar empresa"
-  [mensaje]="'¿Eliminar la empresa \'' + (aEliminar()?.nombre ?? '') + '\'? Solo es posible si aún no tiene usuarios ni datos.'"
-  (confirmar)="confirmarEliminar()"
-  (cancelar)="aEliminar.set(null)"
-/>
+@if (aEliminar(); as empresa) {
+  <div class="modal-overlay modal show d-block" (click)="cancelarEliminar()">
+    <div class="modal-box modal-dialog modal-content" (click)="$event.stopPropagation()">
+      <h3 class="modal-title mb-3">Eliminar empresa</h3>
+      <p class="hint" style="margin-top:-6px; color: var(--danger);">
+        Esto borra TODO lo de "{{ empresa.nombre }}" — usuarios, inventario, ventas, proyectos, wikidocs,
+        presupuesto, familia, todo — de forma permanente. No hay forma de deshacerlo.
+      </p>
+      <label>
+        Para confirmar, escribe la clave de la empresa: <strong>{{ empresa.clave }}</strong>
+        <input
+          type="text"
+          class="form-control"
+          autocomplete="off"
+          [value]="textoConfirmacionEliminar()"
+          (input)="textoConfirmacionEliminar.set($any($event.target).value)"
+        />
+      </label>
+      <div class="modal-actions" style="margin-top: 14px;">
+        <button type="button" class="btn-secondary" (click)="cancelarEliminar()">Cancelar</button>
+        <button
+          type="button"
+          class="btn-danger"
+          [disabled]="!eliminarHabilitado() || eliminando()"
+          (click)="confirmarEliminar()"
+        >
+          {{ eliminando() ? 'Eliminando…' : 'Eliminar todo' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
 
 <app-confirm-dialog
   [visible]="empresaParaEntrar() !== null"

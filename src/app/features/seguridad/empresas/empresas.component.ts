@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -84,6 +84,16 @@ export class EmpresasComponent implements OnInit, OnDestroy {
   protected readonly empresaEnEdicion = signal<Empresa | null>(null);
   protected readonly modalEmpresa = signal(false);
   protected readonly aEliminar = signal<Empresa | null>(null);
+  /** Eliminar una empresa ahora SÍ borra todo lo suyo (ver eliminar_empresa()
+   *  en la migración 31) — por lo irreversible/destructivo que es, se pide
+   *  teclear la CLAVE de la empresa para habilitar el botón, en vez de un
+   *  simple sí/no (mismo criterio que confirmaciones de borrado masivo en
+   *  otras plataformas: GitHub, etc.). */
+  protected readonly textoConfirmacionEliminar = signal('');
+  protected readonly eliminando = signal(false);
+  protected readonly eliminarHabilitado = computed(
+    () => this.textoConfirmacionEliminar().trim().toLowerCase() === (this.aEliminar()?.clave ?? '').toLowerCase(),
+  );
   protected readonly empresaParaAdmin = signal<Empresa | null>(null);
   protected readonly empresaParaEntrar = signal<Empresa | null>(null);
   protected readonly guardando = signal(false);
@@ -244,23 +254,37 @@ export class EmpresasComponent implements OnInit, OnDestroy {
   }
 
   pedirEliminar(empresa: Empresa): void {
+    this.textoConfirmacionEliminar.set('');
     this.aEliminar.set(empresa);
   }
 
-  /** Borra la empresa con lo que se le crea solo (listas sembradas,
-   *  apariencia). Si ya tiene usuarios o datos, la base lo impide y avisa
-   *  (función seguridad.eliminar_empresa). */
+  cancelarEliminar(): void {
+    this.aEliminar.set(null);
+    this.textoConfirmacionEliminar.set('');
+  }
+
+  /** Borra la empresa Y TODO LO SUYO (inventario, ventas, proyectos,
+   *  wikidocs, presupuesto, familia, usuarios — cualquier tabla con
+   *  empresa_id) — ver seguridad.eliminar_empresa(), migración 31.
+   *  Irreversible; por eso eliminarHabilitado() exige teclear la clave
+   *  exacta antes de poder llamar esto (el botón ya viene deshabilitado
+   *  en el template, esta comprobación es solo por si acaso). */
   async confirmarEliminar(): Promise<void> {
     const empresa = this.aEliminar();
-    if (!empresa || !this.sb) return;
-    this.aEliminar.set(null);
-    const { error } = await this.sb.schema('seguridad').rpc('eliminar_empresa', { p_empresa: empresa.id });
-    if (error) {
-      this.toast.error(error.message);
-      return;
+    if (!empresa || !this.sb || !this.eliminarHabilitado()) return;
+    this.eliminando.set(true);
+    try {
+      const { error } = await this.sb.schema('seguridad').rpc('eliminar_empresa', { p_empresa: empresa.id });
+      if (error) {
+        this.toast.error(error.message);
+        return;
+      }
+      this.toast.exito(`Empresa "${empresa.nombre}" y todos sus datos fueron eliminados.`);
+      this.cancelarEliminar();
+      this.cargar();
+    } finally {
+      this.eliminando.set(false);
     }
-    this.toast.exito(`Empresa "${empresa.nombre}" eliminada.`);
-    this.cargar();
   }
 
   // ── Primer admin ──────────────────────────────────────────────────

@@ -65,6 +65,7 @@ const MAPA: Record<string, [string, string, string]> = {
   ComisionVendedor: ['ventas', 'comision_vendedor', 'id:n,usuario_id:n,tipo:t,valor:n,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   ConfiguracionLealtad: ['ventas', 'configuracion_lealtad', 'id:n,programa_activo:b,pesos_por_punto:n,pesos_descuento_por_punto:n,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   MovimientoPuntosCliente: ['ventas', 'movimiento_puntos_cliente', 'id:n,cliente_id:n,fecha:h,puntos:n,tipo:t,venta_id:n,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
+  PedidoTienda: ['ventas', 'pedido_tienda', 'id:n,empresa_id:n,nombre_cliente:t,telefono_cliente:t,notas_cliente:t,ubicacion_lat:n,ubicacion_lng:n,items:j,total:n,estado:t,venta_id:n,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   ConfiguracionApariencia: ['panel_control', 'configuracion_apariencia', 'id:n,usuario_id:n,tema:t,asistente_ia_activo:b,tamano_pagina_grid:n,vista_proyectos_preferida:t,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   ValorLista: ['panel_control', 'valor_lista', 'id:n,grupo:t,clave:t,etiqueta:t,orden:n,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   AvisoTarjetaCiclo: ['presupuesto', 'aviso_tarjeta_ciclo', 'id:n,cuenta_presupuesto_id:n,usuario_id:n,tipo_aviso:t,ciclo:t,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],

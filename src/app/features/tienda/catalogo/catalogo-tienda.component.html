@@ -29,12 +29,18 @@
         [value]="busqueda()"
         (input)="busqueda.set($any($event.target).value)"
       />
+      <!-- Cuadrícula (tarjetas) ↔ lista (renglones compactos) — ver
+           vistaLista()/cambiarVista() en catalogo-tienda.component.ts. -->
+      <div class="tienda-vista-toggle" role="group" aria-label="Forma de ver el catálogo">
+        <button type="button" [class.activo]="!vistaLista()" title="Ver en cuadrícula" aria-label="Ver en cuadrícula" (click)="cambiarVista(false)">▦</button>
+        <button type="button" [class.activo]="vistaLista()" title="Ver en lista" aria-label="Ver en lista" (click)="cambiarVista(true)">☰</button>
+      </div>
     </div>
 
     @for (grupo of productosPorCategoria(); track grupo.categoriaId) {
       <section class="tienda-categoria">
         <h2 class="tienda-categoria-titulo">{{ grupo.categoriaNombre }}</h2>
-        <div class="tienda-grid">
+        <div class="tienda-grid" [class.tienda-grid-lista]="vistaLista()">
           @for (producto of grupo.productos; track producto.id) {
             <div class="tienda-tarjeta" [class.tienda-tarjeta-agotada]="!producto.disponible">
               @if (producto.foto) {

@@ -62,13 +62,45 @@
 
 .tienda-busqueda {
   margin-bottom: 16px;
+  display: flex;
+  gap: 8px;
 
   input {
-    width: 100%;
+    flex: 1;
+    min-width: 0;
     padding: 10px 14px;
     border-radius: 10px;
     border: 1px solid var(--borde, #e5e7eb);
     font-size: 0.95rem;
+  }
+}
+
+/* Interruptor cuadrícula/lista — mismo tipo de par de botones que
+ * .tienda-ubicacion-boton, pero agrupados en una sola píldora. */
+.tienda-vista-toggle {
+  display: flex;
+  flex-shrink: 0;
+  border: 1px solid var(--borde, #e5e7eb);
+  border-radius: 10px;
+  overflow: hidden;
+
+  button {
+    border: none;
+    background: var(--fondo-tarjeta, #fff);
+    padding: 0 14px;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--texto-tenue, #6b7280);
+
+    &:first-child {
+      border-right: 1px solid var(--borde, #e5e7eb);
+    }
+
+    &.activo {
+      background: var(--fondo-sutil, #f3f4f6);
+      color: inherit;
+    }
   }
 }
 
@@ -94,6 +126,68 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 14px;
+
+  /* Lista: una sola columna de renglones compactos (foto chica a la
+   * izquierda, nombre/precio a la derecha) en vez de tarjetas — mismo
+   * contenido, nomás más denso para hojear muchos productos rápido. Pisa
+   * las reglas de .tienda-tarjeta-* de abajo por especificidad de
+   * descendiente, sin tocarlas (la cuadrícula las sigue usando tal cual). */
+  &-lista {
+    grid-template-columns: 1fr;
+    gap: 8px;
+
+    .tienda-tarjeta {
+      flex-direction: row;
+      align-items: center;
+    }
+
+    .tienda-tarjeta-foto {
+      width: 64px;
+      height: 64px;
+      aspect-ratio: auto;
+      flex-shrink: 0;
+      border-radius: 8px;
+
+      &-vacia {
+        font-size: 1.4rem;
+      }
+    }
+
+    .tienda-tarjeta-cuerpo {
+      flex-direction: row;
+      align-items: center;
+      padding: 8px 12px;
+      gap: 10px;
+
+      strong {
+        flex-shrink: 0;
+        max-width: 45%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      p {
+        flex: 1;
+        min-width: 0;
+        margin: 0;
+        -webkit-line-clamp: 1;
+      }
+    }
+
+    .tienda-tarjeta-pie {
+      margin-top: 0;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    .tienda-tarjeta-agregar {
+      width: auto;
+      white-space: nowrap;
+      padding: 8px 14px;
+      font-size: 0.9rem;
+    }
+  }
 }
 
 .tienda-tarjeta {

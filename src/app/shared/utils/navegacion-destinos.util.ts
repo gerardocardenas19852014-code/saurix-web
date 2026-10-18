@@ -107,6 +107,7 @@ export const DESTINOS: DestinoPaleta[] = [
   { label: 'Historial de ventas', grupo: 'Ventas', ruta: '/ventas/historial', icono: '🧾' },
   { label: 'Dashboard de ventas', grupo: 'Ventas', ruta: '/ventas/dashboard', icono: '📊' },
   { label: 'Cotizaciones', grupo: 'Ventas', ruta: '/ventas/cotizaciones', icono: '📝' },
+  { label: 'Pedidos web', grupo: 'Ventas', ruta: '/ventas/pedidos-tienda', icono: '🛍️' },
   { label: 'Cuentas por cobrar', grupo: 'Ventas', ruta: '/ventas/cuentas-por-cobrar', icono: '💳' },
   { label: 'Comisiones de vendedores', grupo: 'Ventas', ruta: '/ventas/comisiones-vendedores', icono: '🤝' },
   { label: 'Programa de lealtad', grupo: 'Ventas', ruta: '/ventas/configuracion-lealtad', icono: '🎁' },
