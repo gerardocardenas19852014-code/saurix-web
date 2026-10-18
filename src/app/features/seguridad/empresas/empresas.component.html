@@ -124,6 +124,16 @@
           <input type="checkbox" formControlName="volverPedirActivo" />
           Ofrecer "¿Pedir lo mismo que la última vez?" cuando el cliente vuelva a entrar
         </label>
+        <label class="checkbox-inline full-span">
+          <input type="checkbox" formControlName="colorAcentoActivo" />
+          Usar un color de marca propio (si no, se usa el azul por defecto)
+        </label>
+        @if (formEmpresa.controls.colorAcentoActivo.value) {
+          <label>
+            Color de marca
+            <input type="color" class="form-control" formControlName="colorAcento" style="height:38px; padding:4px;" />
+          </label>
+        }
 
         <hr class="full-span" style="width:100%; margin:4px 0;" />
         <p class="hint full-span" style="margin:0;">

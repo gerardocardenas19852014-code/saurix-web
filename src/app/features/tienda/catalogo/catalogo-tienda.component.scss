@@ -2,6 +2,24 @@
   display: block;
 }
 
+/* Modo oscuro de la tienda pública — el resto del archivo ya usa
+ * var(--texto-tenue, …)/var(--borde, …)/var(--fondo-tarjeta, …)/
+ * var(--fondo-sutil, …)/var(--color-error, …) con un valor de respaldo
+ * para claro; aquí nomás se definen esas mismas variables para que el
+ * navegador del cliente (no el panel admin, que tiene su propio tema) las
+ * use cuando el sistema está en oscuro — sin tocar ninguna regla de abajo. */
+@media (prefers-color-scheme: dark) {
+  :host {
+    --texto-tenue: #9ca3af;
+    --borde: #374151;
+    --fondo-tarjeta: #1f2937;
+    --fondo-sutil: #111827;
+    --color-error: #f87171;
+    background: #111827;
+    color: #f3f4f6;
+  }
+}
+
 .tienda-estado {
   text-align: center;
   color: var(--texto-tenue, #6b7280);
@@ -19,45 +37,107 @@
   padding: 20px 16px 80px;
 }
 
-.tienda-catalogo-header {
+/* ── Banner de portada: degradado del color de marca (color-acento de la
+ * empresa, o el azul por defecto) con el logo "montado" sobre su borde
+ * inferior — ver el comentario grande en el .html. Las esquinas redondeadas
+ * y el overflow:hidden del banner son justo por lo que el logo NO puede ir
+ * adentro de él (se recortaría); va en .tienda-banner-logo-fila, aparte. ── */
+.tienda-banner {
+  margin: -20px -16px 0;
+  padding: 16px;
+  padding-bottom: 36px;
+  background: linear-gradient(
+    135deg,
+    var(--color-primario, #2563eb),
+    color-mix(in srgb, var(--color-primario, #2563eb) 100%, black 28%)
+  );
+  border-radius: 0 0 24px 24px;
+  color: #fff;
+}
+
+.tienda-banner-acciones {
   display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 18px;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.tienda-banner-nombre {
+  text-align: center;
+  padding: 0 8px;
 
   h1 {
     margin: 0;
-    font-size: 1.4rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   }
 
   p {
-    margin: 2px 0 0;
-    color: var(--texto-tenue, #6b7280);
+    margin: 4px 0 0;
     font-size: 0.9rem;
-  }
-
-  > div {
-    flex: 1;
-    min-width: 0;
+    opacity: 0.9;
   }
 }
 
-.tienda-catalogo-logo {
-  width: 52px;
-  height: 52px;
-  border-radius: 10px;
+.tienda-banner-logo-fila {
+  display: flex;
+  justify-content: center;
+  /* Lo "monta" sobre el borde inferior redondeado del banner, jalándolo
+   * hacia arriba sin que el overflow:hidden de .tienda-banner lo recorte
+   * (es un elemento hermano, no un hijo de .tienda-banner). */
+  margin-top: -32px;
+  margin-bottom: 14px;
+}
+
+.tienda-banner-logo {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
   object-fit: cover;
-  flex-shrink: 0;
+  border: 3px solid var(--fondo-tarjeta, #fff);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  background: var(--fondo-tarjeta, #fff);
 }
 
-.tienda-carrito-boton {
-  border: 1px solid var(--borde, #e5e7eb);
-  background: var(--fondo-tarjeta, #fff);
+.tienda-banner-logo-vacia {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+}
+
+.tienda-carrito-boton,
+.tienda-compartir-boton {
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
   border-radius: 10px;
   padding: 10px 14px;
   font-size: 0.95rem;
   cursor: pointer;
   flex-shrink: 0;
+  backdrop-filter: blur(4px);
+  transition: transform 0.15s ease;
+}
+
+/* Pulso breve al agregar algo al carrito — ver dispararPulsoCarrito() en
+ * el .ts, se enciende y apaga solo medio segundo después. */
+.tienda-carrito-boton-pulso {
+  animation: tienda-pulso-carrito 0.5s ease;
+}
+
+@keyframes tienda-pulso-carrito {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.18);
+    background: rgba(255, 255, 255, 0.35);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .tienda-busqueda {
@@ -294,9 +374,107 @@
   background: var(--fondo-tarjeta, #fff);
   display: flex;
   flex-direction: column;
+  /* Sombra más marcada (antes no tenía) — le da un aire más "premium",
+   * separando mejor las tarjetas del fondo de la página. */
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+  transition: box-shadow 0.15s ease;
+
+  &:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  }
 
   &-agotada {
     opacity: 0.55;
+  }
+}
+
+.tienda-tarjeta-insignias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.tienda-insignia {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+
+  &-nuevo {
+    background: #dcfce7;
+    color: #15803d;
+  }
+
+  &-pocas {
+    background: #fef3c7;
+    color: #b45309;
+  }
+}
+
+// ── Carrusel "⭐ Destacados" — fila horizontal con scroll táctil, arriba
+// del buscador. Tarjetas angostas, pensadas para "ver varias y deslizar"
+// más que para leer descripción (esa vive en la tarjeta normal de abajo). ──
+.tienda-destacados {
+  margin-bottom: 18px;
+}
+
+.tienda-destacados-titulo {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+}
+
+.tienda-destacados-fila {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tienda-destacado-tarjeta {
+  flex: 0 0 auto;
+  width: 120px;
+  scroll-snap-align: start;
+  border: 1px solid var(--borde, #e5e7eb);
+  border-radius: 12px;
+  background: var(--fondo-tarjeta, #fff);
+  padding: 8px;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+
+  strong {
+    display: block;
+    margin-top: 6px;
+    font-size: 0.82rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--color-primario, #2563eb);
+    font-weight: 600;
+  }
+}
+
+.tienda-destacado-foto {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  background: var(--fondo-sutil, #f3f4f6);
+  border-radius: 8px;
+
+  &-vacia {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
   }
 }
 
@@ -864,17 +1042,9 @@
   cursor: pointer;
 }
 
-// ── Compartir, horario, métodos de pago, volver a pedir, mínimo, resumen ──
-.tienda-compartir-boton {
-  /* Mismo "look" que .tienda-carrito-boton (su hermano en el header). */
-  border: 1px solid var(--borde, #e5e7eb);
-  background: var(--fondo-tarjeta, #fff);
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 0.95rem;
-  cursor: pointer;
-  flex-shrink: 0;
-}
+// ── Horario, métodos de pago, volver a pedir, mínimo, resumen ──
+// (el "look" de .tienda-compartir-boton/.tienda-carrito-boton ya se definió
+// arriba, junto con .tienda-banner, porque ahora viven dentro del banner).
 
 .tienda-horario-badge {
   display: inline-block;
@@ -1006,5 +1176,41 @@
 
   &.tienda-envio-fuera-zona {
     color: var(--color-error, #b91c1c);
+  }
+}
+
+// ── Confeti al mandar el pedido (ver mostrarConfeti() en el .ts) — cada
+// pieza cae desde arriba con su propia posición horizontal y retraso
+// (nth-child, sin JS/aleatoriedad), puramente decorativo. ──────────────
+.tienda-confeti {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 500;
+}
+
+.tienda-confeti-pieza {
+  position: absolute;
+  top: -40px;
+  font-size: 1.8rem;
+  animation: tienda-confeti-caer 1.8s ease-in forwards;
+
+  @for $i from 1 through 8 {
+    &:nth-child(#{$i}) {
+      left: #{$i * 11}%;
+      animation-delay: #{$i * 0.07}s;
+    }
+  }
+}
+
+@keyframes tienda-confeti-caer {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(360deg);
+    opacity: 0;
   }
 }

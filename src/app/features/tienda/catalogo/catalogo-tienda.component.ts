@@ -117,6 +117,28 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
   // ── Ver imagen grande (botón "+" sobre la foto del producto). ────────
   protected readonly imagenAmpliada = signal<string | null>(null);
 
+  // ── Pulso del botón del carrito al agregar algo (micro-interacción) —
+  //    se enciende en dispararPulsoCarrito() y se apaga solo medio segundo
+  //    después; ver agregarLineaAlCarrito() y cambiarCantidadProducto(). ──
+  protected readonly pulsoCarrito = signal(false);
+
+  private dispararPulsoCarrito(): void {
+    this.pulsoCarrito.set(false);
+    setTimeout(() => this.pulsoCarrito.set(true));
+    setTimeout(() => this.pulsoCarrito.set(false), 500);
+  }
+
+  // ── Confeti al mandar el pedido por WhatsApp (ver enviarPorWhatsapp()) ──
+  //    Fijo (no aleatorio) para que sea el mismo array de siempre — nomás
+  //    la posición/retraso de cada pieza varía por CSS (nth-child). ──────
+  protected readonly confetiPiezas = ['🎉', '🎊', '✨', '🎉', '🎊', '✨', '🎉', '🎊'];
+  protected readonly confetiVisible = signal(false);
+
+  private mostrarConfeti(): void {
+    this.confetiVisible.set(true);
+    setTimeout(() => this.confetiVisible.set(false), 1800);
+  }
+
   protected readonly productosFiltrados = computed<ProductoTienda[]>(() => {
     const texto = this.busqueda().trim().toLowerCase();
     const productos = this.detalle()?.productos ?? [];
@@ -125,6 +147,21 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
       (p) => p.nombre.toLowerCase().includes(texto) || (p.descripcion ?? '').toLowerCase().includes(texto),
     );
   });
+
+  /** Carrusel "⭐ Destacados" arriba del catálogo — los que la empresa marcó
+   *  como destacado() en Productos y que sigan disponibles. A propósito NO
+   *  se filtran por la búsqueda (busqueda()): es una vitrina fija, no otra
+   *  lista de resultados; si se vacía, el carrusel completo desaparece. */
+  protected readonly productosDestacados = computed<ProductoTienda[]>(() =>
+    (this.detalle()?.productos ?? []).filter((p) => p.destacado && p.disponible),
+  );
+
+  /** "🆕 Nuevo" en la tarjeta si se dio de alta hace 14 días o menos (no hay
+   *  "más vendido": el RPC público no tiene acceso a datos de ventas). */
+  protected esNuevo(fechaCreacion: string): boolean {
+    const dias = (Date.now() - new Date(fechaCreacion).getTime()) / 86_400_000;
+    return dias >= 0 && dias <= 14;
+  }
 
   /** Catálogo agrupado por categoría o por precio (en vez de una sola rejilla
    *  plana) según agruparPorPrecio() — ver cambiarAgrupacion(). Por categoría,
@@ -448,6 +485,9 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
     // en celular en cada "Agregar") — el cliente sigue viendo la cuadrícula
     // y usa la barra inferior fija (.tienda-barra-inferior, siempre visible
     // mientras haya algo en el carrito) para abrir el pedido cuando quiera.
+    // En vez de eso, el botón del carrito del banner "pulsa" un instante
+    // para confirmar que sí se agregó — ver dispararPulsoCarrito().
+    this.dispararPulsoCarrito();
   }
 
   cambiarCantidadLinea(claveLinea: string, delta: number): void {
@@ -628,6 +668,7 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
 
     this.guardarUltimoPedido();
     this.modalEnviarAbierto.set(false);
+    this.mostrarConfeti();
   }
 
   // ── "Volver a pedir lo mismo" ─────────────────────────────────────

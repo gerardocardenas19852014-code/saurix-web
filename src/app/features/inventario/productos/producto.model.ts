@@ -69,5 +69,9 @@ export interface Producto {
    *  miembro-familia.model.ts). Opcional: sin foto se muestra un placeholder
    *  en el formulario. */
   foto?: string;
+  /** Lo marca la empresa para resaltarlo en la sección "⭐ Destacados" del
+   *  catálogo público (/tienda/:clave) — no afecta nada del inventario en
+   *  sí, es puramente de presentación. Default false. */
+  destacado: boolean;
   activo: boolean;
 }

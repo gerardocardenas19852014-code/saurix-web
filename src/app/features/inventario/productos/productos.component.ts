@@ -189,6 +189,9 @@ export class ProductosComponent implements OnInit, OnDestroy {
      *  guardar() (no con Validators, porque depende de otro control) y se
      *  fuerza a null si unidadCompraId vuelve a "Sin unidad de compra alterna". */
     factorConversionCompra: [null as number | null, [Validators.min(0.0001)]],
+    /** Resalta el producto en la sección "⭐ Destacados" del catálogo
+     *  público (/tienda/:clave) — puramente de presentación. */
+    destacado: [false],
     activo: [true],
   });
 
@@ -243,6 +246,7 @@ export class ProductosComponent implements OnInit, OnDestroy {
       proveedorId: 0,
       unidadCompraId: 0,
       factorConversionCompra: null,
+      destacado: false,
       activo: true,
     });
     this.modalAbierto.set(true);
@@ -281,6 +285,7 @@ export class ProductosComponent implements OnInit, OnDestroy {
       proveedorId: producto.proveedorId ?? 0,
       unidadCompraId: producto.unidadCompraId ?? 0,
       factorConversionCompra: producto.factorConversionCompra ?? null,
+      destacado: producto.destacado ?? false,
       activo: producto.activo !== false,
     });
     this.modalAbierto.set(true);
@@ -533,6 +538,7 @@ export class ProductosComponent implements OnInit, OnDestroy {
         nivelMinimo: null, // el CSV no trae esta columna — se define luego, por producto, en Productos.
         nivelMaximo: null, // idem — se asigna después, en Productos.
         manejaLotes: false, // idem — se activa después, por producto, en Productos.
+        destacado: false, // idem — se marca después, por producto, en Productos.
         proveedorId: null, // idem — se asigna después, en Productos.
         unidadCompraId: null, // idem — se asigna después, en Productos.
         factorConversionCompra: null,

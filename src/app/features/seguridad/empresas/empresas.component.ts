@@ -78,6 +78,9 @@ export interface Empresa {
    *  el cliente tenga un pedido anterior guardado en su navegador. Default
    *  true (no cambia el comportamiento de tiendas ya configuradas). */
   volverPedirActivo?: boolean;
+  /** Hex (p.ej. "#e11d48") para los botones/insignias de SU tienda pública
+   *  — null/vacío = usa el azul por defecto del frontend. */
+  colorAcento?: string | null;
   // ── Envío por distancia (línea recta) — ver catalogo-tienda.component.ts ──
   /** Ubicación del negocio; null = envío por distancia desactivado. */
   envioOrigenLat?: number | null;
@@ -193,6 +196,11 @@ export class EmpresasComponent implements OnInit, OnDestroy {
     // Apagarlo no borra el pedido guardado en el navegador del cliente,
     // solo deja de ofrecer el banner — ver guardarEmpresa().
     volverPedirActivo: [true],
+    // Vacío = sin color propio (usa el azul por defecto) — <input type=color>
+    // siempre manda un hex, así que el campo vacío se controla con un
+    // checkbox aparte (colorAcentoActivo) en vez de un valor especial.
+    colorAcentoActivo: [false],
+    colorAcento: ['#2563eb'],
     // ── Envío por distancia (línea recta) — null/vacío en origen o precio
     // por km = desactivado, ver catalogo-tienda.component.ts. ──────────
     envioOrigenLat: this.fb.control<number | null>(null),
@@ -261,6 +269,8 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       metodosPagoTexto: '',
       horarioActivo: false,
       volverPedirActivo: true,
+      colorAcentoActivo: false,
+      colorAcento: '#2563eb',
       envioOrigenLat: null,
       envioOrigenLng: null,
       envioPrecioKm: null,
@@ -291,6 +301,8 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       metodosPagoTexto: (empresa.metodosPago ?? []).join(', '),
       horarioActivo: horarioGuardado.length > 0,
       volverPedirActivo: empresa.volverPedirActivo ?? true,
+      colorAcentoActivo: !!empresa.colorAcento,
+      colorAcento: empresa.colorAcento ?? '#2563eb',
       envioOrigenLat: empresa.envioOrigenLat ?? null,
       envioOrigenLng: empresa.envioOrigenLng ?? null,
       envioPrecioKm: empresa.envioPrecioKm ?? null,
@@ -369,6 +381,7 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       metodosPago: metodosPago.length > 0 ? metodosPago : null,
       horarioAtencion: valor.horarioActivo ? this.horarioFilas() : null,
       volverPedirActivo: valor.volverPedirActivo,
+      colorAcento: valor.colorAcentoActivo ? valor.colorAcento : null,
       envioOrigenLat: valor.envioOrigenLat,
       envioOrigenLng: valor.envioOrigenLng,
       envioPrecioKm: valor.envioPrecioKm,

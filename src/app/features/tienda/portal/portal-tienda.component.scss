@@ -4,6 +4,25 @@
   padding: 32px 16px 64px;
 }
 
+/* Modo oscuro — mismo criterio que catalogo-tienda.component.scss: nomás
+ * se definen las variables que el resto del archivo ya consume con
+ * var(--x, respaldo-claro). */
+:host {
+  display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+  :host {
+    --texto-tenue: #9ca3af;
+    --borde: #374151;
+    --fondo-tarjeta: #1f2937;
+    --fondo-sutil: #111827;
+    --color-error: #f87171;
+    background: #111827;
+    color: #f3f4f6;
+  }
+}
+
 .tienda-portal-header {
   text-align: center;
   margin-bottom: 28px;

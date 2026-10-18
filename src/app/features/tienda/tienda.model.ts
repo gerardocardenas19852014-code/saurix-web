@@ -46,6 +46,16 @@ export interface ProductoTienda {
   categoriaId: number;
   categoriaNombre: string;
   opciones: OpcionGrupoTienda[];
+  /** La empresa lo marcó para la sección "⭐ Destacados" del catálogo. */
+  destacado: boolean;
+  /** Para la insignia "🆕 Nuevo" — se compara contra hoy en el navegador
+   *  (nuevoCatalogoTienda(), ver catalogo-tienda.component.ts), igual
+   *  criterio que estadoHorario() con horario_atencion. */
+  fechaCreacion: string;
+  /** true = existencia baja (por debajo de su nivel mínimo configurado en
+   *  Productos) pero no agotado — para la insignia "⚡ Pocas piezas". Nunca
+   *  expone la cantidad exacta, solo esta bandera (calculada en el RPC). */
+  pocasExistencias: boolean;
 }
 
 export interface HorarioDiaTienda {
@@ -74,6 +84,11 @@ export interface EmpresaTienda {
    *  ver volverPedirActivo() de la empresa en el panel y el banner en
    *  catalogo-tienda.component.html. */
   volverPedirActivo: boolean;
+  /** Color de marca elegido por la empresa (hex, p.ej. "#e11d48") — se
+   *  aplica como la variable CSS --color-primario en toda la tienda (ver
+   *  [style.--color-primario] en catalogo-tienda.component.html). null =
+   *  usa el azul por defecto del frontend. */
+  colorAcento: string | null;
   // ── Envío por distancia (línea recta) — ver catalogo-tienda.component.ts.
   // null en origen o en precioKm = envío por distancia desactivado. ──────
   envioOrigenLat: number | null;

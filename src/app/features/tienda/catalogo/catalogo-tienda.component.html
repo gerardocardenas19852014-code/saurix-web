@@ -6,24 +6,41 @@
     <a routerLink="/tienda">← Ver todas las tiendas</a>
   </div>
 } @else if (detalle(); as d) {
-  <div class="tienda-catalogo">
-    <header class="tienda-catalogo-header">
-      @if (d.empresa.logo) {
-        <img class="tienda-catalogo-logo" [src]="d.empresa.logo" [alt]="d.empresa.nombre" />
-      }
-      <div>
+  <!-- --color-primario: el color de marca que la empresa eligió en su panel
+       (ver colorAcento) — se define aquí en la raíz para que TODA la
+       tienda lo herede (botones, stepper, banner, insignias ya usan
+       var(--color-primario, #2563eb) en vez del azul escrito a mano). Sin
+       color propio (null), se quita el estilo inline y gana el azul por
+       defecto del fallback. -->
+  <div class="tienda-catalogo" [style.--color-primario]="d.empresa.colorAcento || null">
+    <!-- Banner de portada con degradado del color de marca (en vez del
+         header plano de antes) — el logo se dibuja APARTE, debajo, para
+         poder "montarlo" encima del borde inferior del banner sin que el
+         overflow:hidden del banner (necesario para las esquinas
+         redondeadas) se lo recorte. -->
+    <div class="tienda-banner">
+      <div class="tienda-banner-acciones">
+        <button type="button" class="tienda-compartir-boton" title="Compartir esta tienda" aria-label="Compartir esta tienda" (click)="abrirCompartir()">
+          🔗
+        </button>
+        <button type="button" class="tienda-carrito-boton" [class.tienda-carrito-boton-pulso]="pulsoCarrito()" (click)="carritoAbierto.set(true)">
+          🛒 {{ cantidadArticulos() }}
+        </button>
+      </div>
+      <div class="tienda-banner-nombre">
         <h1>{{ d.empresa.nombre }}</h1>
         @if (d.empresa.descripcion) {
           <p>{{ d.empresa.descripcion }}</p>
         }
       </div>
-      <button type="button" class="tienda-compartir-boton" title="Compartir esta tienda" aria-label="Compartir esta tienda" (click)="abrirCompartir()">
-        🔗
-      </button>
-      <button type="button" class="tienda-carrito-boton" (click)="carritoAbierto.set(true)">
-        🛒 {{ cantidadArticulos() }}
-      </button>
-    </header>
+    </div>
+    <div class="tienda-banner-logo-fila">
+      @if (d.empresa.logo) {
+        <img class="tienda-banner-logo" [src]="d.empresa.logo" [alt]="d.empresa.nombre" />
+      } @else {
+        <div class="tienda-banner-logo tienda-banner-logo-vacia">🏬</div>
+      }
+    </div>
 
     <!-- Horario ("Abierto ahora"/"Cerrado…", ver estadoHorario() — null si la
          empresa no configuró horario) y métodos de pago, si los configuró. -->
@@ -50,6 +67,28 @@
         <span>¿Pedir lo mismo que la última vez?</span>
         <button type="button" (click)="volverAPedir()">Volver a pedir</button>
       </div>
+    }
+
+    <!-- Carrusel "⭐ Destacados" — los productos que la empresa marcó como
+         destacado() en Productos (ver productosDestacados() en el .ts). No
+         se filtra por la búsqueda a propósito: es una vitrina fija. -->
+    @if (productosDestacados().length > 0) {
+      <section class="tienda-destacados">
+        <h2 class="tienda-destacados-titulo">⭐ Destacados</h2>
+        <div class="tienda-destacados-fila">
+          @for (producto of productosDestacados(); track producto.id) {
+            <div class="tienda-destacado-tarjeta" (click)="abrirModal(producto)">
+              @if (producto.foto; as foto) {
+                <img class="tienda-destacado-foto" [src]="foto" [alt]="producto.nombre" />
+              } @else {
+                <div class="tienda-destacado-foto tienda-destacado-foto-vacia">📦</div>
+              }
+              <strong>{{ producto.nombre }}</strong>
+              <span>${{ producto.precio | number: '1.0-0' }}</span>
+            </div>
+          }
+        </div>
+      </section>
     }
 
     <div class="tienda-busqueda">
@@ -100,6 +139,16 @@
                 }
               </div>
               <div class="tienda-tarjeta-cuerpo">
+                @if (producto.disponible && (esNuevo(producto.fechaCreacion) || producto.pocasExistencias)) {
+                  <div class="tienda-tarjeta-insignias">
+                    @if (esNuevo(producto.fechaCreacion)) {
+                      <span class="tienda-insignia tienda-insignia-nuevo">🆕 Nuevo</span>
+                    }
+                    @if (producto.pocasExistencias) {
+                      <span class="tienda-insignia tienda-insignia-pocas">⚡ Pocas piezas</span>
+                    }
+                  </div>
+                }
                 <strong>{{ producto.nombre }}</strong>
                 @if (producto.descripcion) {
                   <p>{{ producto.descripcion }}</p>
@@ -444,6 +493,17 @@
         <button type="button" class="tienda-imagen-ampliada-cerrar" aria-label="Cerrar" (click)="cerrarImagenAmpliada()">✕</button>
         <img [src]="url" alt="Imagen ampliada del producto" />
       </div>
+    </div>
+  }
+
+  <!-- Confeti al mandar el pedido por WhatsApp — puramente decorativo, no
+       bloquea nada (ver mostrarConfeti() en enviarPorWhatsapp()); se apaga
+       solo. pointer-events:none para no estorbar ningún clic debajo. -->
+  @if (confetiVisible()) {
+    <div class="tienda-confeti" aria-hidden="true">
+      @for (pieza of confetiPiezas; track $index) {
+        <span class="tienda-confeti-pieza">{{ pieza }}</span>
+      }
     </div>
   }
 }
