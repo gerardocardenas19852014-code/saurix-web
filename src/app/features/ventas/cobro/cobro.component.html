@@ -67,6 +67,19 @@
           </span>
         </label>
 
+        <label>
+          <span class="label-con-tip">
+            Canal (opcional)
+            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">De dónde vino la venta — texto libre. Déjalo vacío para mostrador normal; escribe algo como "Tienda en línea" si vienes de capturar a mano un pedido recibido por /tienda.</span></button>
+          </span>
+          <input type="text" class="form-control" list="canales-sugeridos" [value]="canalVenta()" (input)="canalVenta.set($any($event.target).value)" placeholder="Mostrador" />
+          <datalist id="canales-sugeridos">
+            @for (c of canalesSugeridos; track c) {
+              <option [value]="c"></option>
+            }
+          </datalist>
+        </label>
+
         @if (bodegas().length > 0) {
           <label>
             Bodega de venta

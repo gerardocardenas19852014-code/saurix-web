@@ -97,6 +97,7 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
       etiqueta: 'Estado',
       claseValor: (v) => (v.estado === 'Completada' ? 'grid-badge-success' : 'grid-badge-muted'),
     },
+    { campo: 'canal', etiqueta: 'Canal', formatear: (v) => v.canal || 'Mostrador' },
   ];
 
   protected readonly ventaDetalle = signal<Venta | null>(null);

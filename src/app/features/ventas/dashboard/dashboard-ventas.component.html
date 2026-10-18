@@ -64,6 +64,30 @@
     </div>
   </div>
 
+  <div class="catalog-group" style="margin-bottom:24px;">
+    <h2 class="catalog-group-title">Ventas de hoy por canal</h2>
+    <p class="hint" style="margin:0 0 10px;">
+      "Mostrador" agrupa lo que se vendió sin capturar ningún canal — incluye lo que llegó por
+      /tienda una vez que se validó y se capturó aquí a mano (ver el campo Canal en Cobro).
+    </p>
+    <div class="grid-table-scroll">
+      <table class="grid-table">
+        <thead><tr><th>Canal</th><th>Ventas</th><th>Total</th></tr></thead>
+        <tbody>
+          @for (fila of totalPorCanalHoy(); track fila.canal) {
+            <tr>
+              <td data-label="Canal">{{ fila.canal }}</td>
+              <td data-label="Ventas">{{ fila.cantidad }}</td>
+              <td data-label="Total">{{ formatMoneda(fila.total) }}</td>
+            </tr>
+          } @empty {
+            <tr><td colspan="3" class="empty">Sin ventas hoy.</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <div class="catalog-group">
     <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
       <h2 class="catalog-group-title" style="margin:0; border-bottom:none; padding-bottom:0;">Productos más vendidos (últimos 30 días)</h2>

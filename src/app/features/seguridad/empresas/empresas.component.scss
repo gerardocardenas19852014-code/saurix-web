@@ -1,0 +1,7 @@
+/* El sistema visual global (.modal-box, .edit-form, .form-grid-3col, etc.)
+ * vive en src/styles.scss. Lo único propio de este componente es ensanchar
+ * el modal de Editar/Nueva empresa (mismo patrón que
+ * .modal-box.plantilla-modal en plantillas-list.component.scss) para que
+ * quepan las 3 columnas de .form-grid-3col sin que .modal-box lo recorte a
+ * su max-width por default (400px). */
+.modal-box.empresa-modal { max-width: 980px; }

@@ -18,6 +18,11 @@ export const INVENTARIO_ROUTES: Routes = [
     loadComponent: () =>
       import('./productos/nivel-minimo-bodega/nivel-minimo-bodega.component').then((m) => m.NivelMinimoBodegaComponent),
   },
+  {
+    path: 'productos/:id/opciones',
+    loadComponent: () =>
+      import('./productos/opciones-producto/opciones-producto.component').then((m) => m.OpcionesProductoComponent),
+  },
 
   // Catálogos propios de Inventario.
   {

@@ -110,6 +110,7 @@ export class CotizacionService {
       clienteId: cotizacion.clienteId,
       vendedorUsuarioId: cotizacion.vendedorUsuarioId,
       notas: `Convertida de cotización ${cotizacion.folio}`,
+      canal: 'Cotización',
       lineas,
       pagos: [params.pago],
     });

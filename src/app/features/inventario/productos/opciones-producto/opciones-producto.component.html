@@ -1,0 +1,145 @@
+<div class="page-header">
+  <div>
+    <button type="button" class="btn-secondary small" (click)="volver()" style="margin-bottom: 8px;">← Volver</button>
+    <h1>{{ producto()?.nombre ?? 'Producto' }} — Opciones</h1>
+  </div>
+</div>
+
+<p class="hint" style="margin-top:-6px;">
+  Variantes con costo adicional (p.ej. "Elige el sabor") — al estilo combo de cine. Solo se usan en la
+  <strong>tienda pública</strong> (/tienda) para que el cliente las elija al armar su pedido; si este producto no
+  necesita variantes, déjalo sin ningún grupo y se vende igual que siempre.
+</p>
+
+<div class="grid-toolbar">
+  <button type="button" class="toolbar-btn" (click)="nuevoGrupo()">+ Nuevo grupo</button>
+</div>
+
+@if (cargando()) {
+  <p class="hint">Cargando…</p>
+} @else if (grupos().length === 0) {
+  <div class="empty-state-block">
+    <p>Este producto todavía no tiene grupos de opciones.</p>
+  </div>
+} @else {
+  @for (grupo of grupos(); track grupo.id) {
+    <div class="catalog-group" style="margin-bottom:18px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <h2 class="catalog-group-title" style="margin:0; border-bottom:none; padding-bottom:0;">
+          {{ grupo.nombre }}
+          <span class="hint" style="font-weight:normal;">
+            ({{ grupo.tipoSeleccion === 'unica' ? 'selección única' : 'selección múltiple (' + grupo.minimo + '–' + grupo.maximo + ')' }}{{ grupo.requerido ? ', obligatorio' : ', opcional' }})
+          </span>
+        </h2>
+        <div class="grid-filter">
+          <button type="button" class="btn-secondary small" (click)="nuevoValor(grupo)">+ Valor</button>
+          <button type="button" class="btn-secondary small" (click)="editarGrupo(grupo)">Editar grupo</button>
+          <button type="button" class="btn-secondary small" (click)="pedirEliminarGrupo(grupo)">Eliminar grupo</button>
+        </div>
+      </div>
+
+      @if (grupo.valores.length === 0) {
+        <p class="hint" style="margin:8px 0 0;">Sin valores todavía — agrega al menos uno con "+ Valor".</p>
+      } @else {
+        <div class="grid-table-scroll" style="margin-top:8px;">
+          <table class="grid-table">
+            <thead><tr><th>Valor</th><th>Costo adicional</th><th></th></tr></thead>
+            <tbody>
+              @for (valor of grupo.valores; track valor.id) {
+                <tr>
+                  <td data-label="Valor">{{ valor.nombre }}</td>
+                  <td data-label="Costo adicional">{{ valor.precioAdicional.toFixed(2) }}</td>
+                  <td style="text-align:right; white-space:nowrap;">
+                    <button type="button" class="btn-secondary small" (click)="editarValor(grupo, valor)">Editar</button>
+                    <button type="button" class="btn-secondary small" (click)="pedirEliminarValor(valor)">Eliminar</button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+}
+
+@if (modalGrupoAbierto()) {
+  <div class="modal-overlay modal show d-block" (click)="modalGrupoAbierto.set(false)">
+    <form class="modal-box modal-dialog modal-content" [formGroup]="formGrupo" (click)="$event.stopPropagation()" (ngSubmit)="guardarGrupo()">
+      <h3 class="modal-title mb-3">{{ grupoEnEdicion() ? 'Editar grupo' : 'Nuevo grupo' }}</h3>
+      <div class="edit-form">
+        <label>
+          Nombre
+          <input type="text" class="form-control" formControlName="nombre" placeholder="p.ej. Elige el sabor" />
+        </label>
+        <label>
+          Tipo de selección
+          <select class="form-control" formControlName="tipoSeleccion">
+            @for (tipo of tiposSeleccion; track tipo.valor) {
+              <option [value]="tipo.valor">{{ tipo.etiqueta }}</option>
+            }
+          </select>
+        </label>
+        <label class="checkbox-inline">
+          <input type="checkbox" formControlName="requerido" />
+          Obligatorio (el cliente debe elegir algo antes de agregar al carrito)
+        </label>
+        @if (formGrupo.controls.tipoSeleccion.value === 'multiple') {
+          <label>
+            Mínimo de valores a elegir
+            <input type="number" class="form-control" formControlName="minimo" min="0" />
+          </label>
+          <label>
+            Máximo de valores a elegir
+            <input type="number" class="form-control" formControlName="maximo" min="1" />
+          </label>
+        }
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="modalGrupoAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary btn btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+@if (modalValorAbierto()) {
+  <div class="modal-overlay modal show d-block" (click)="modalValorAbierto.set(false)">
+    <form class="modal-box modal-dialog modal-content" [formGroup]="formValor" (click)="$event.stopPropagation()" (ngSubmit)="guardarValor()">
+      <h3 class="modal-title mb-3">{{ valorEnEdicion() ? 'Editar valor' : 'Nuevo valor' }} — {{ grupoDelValor()?.nombre }}</h3>
+      <div class="edit-form">
+        <label>
+          Nombre
+          <input type="text" class="form-control" formControlName="nombre" placeholder="p.ej. Fresa" />
+        </label>
+        <label>
+          <span class="label-con-tip">
+            Costo adicional
+            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Se suma al precio base del producto si el cliente elige este valor. 0 = sin costo extra.</span></button>
+          </span>
+          <input type="number" step="0.01" class="form-control" formControlName="precioAdicional" />
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="modalValorAbierto.set(false)">Cancelar</button>
+        <button type="submit" class="btn-primary btn btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+}
+
+<app-confirm-dialog
+  [visible]="grupoAEliminar() !== null"
+  titulo="Eliminar grupo"
+  [mensaje]="'¿Eliminar el grupo \'' + (grupoAEliminar()?.nombre ?? '') + '\' y todos sus valores?'"
+  (confirmar)="confirmarEliminarGrupo()"
+  (cancelar)="grupoAEliminar.set(null)"
+/>
+
+<app-confirm-dialog
+  [visible]="valorAEliminar() !== null"
+  titulo="Eliminar valor"
+  [mensaje]="'¿Eliminar el valor \'' + (valorAEliminar()?.nombre ?? '') + '\'?'"
+  (confirmar)="confirmarEliminarValor()"
+  (cancelar)="valorAEliminar.set(null)"
+/>

@@ -23,7 +23,7 @@ import { ClienteService } from '../clientes/cliente.service';
 import { ClienteFormModalComponent } from '../clientes/cliente-form-modal.component';
 import { TurnoCaja } from '../turno/turno-caja.model';
 import { TurnoCajaService } from '../turno/turno-caja.service';
-import { folioSugeridoVenta, VentaService } from '../venta/venta.service';
+import { CANALES_SUGERIDOS, folioSugeridoVenta, VentaService } from '../venta/venta.service';
 import { MetodoPago, METODOS_PAGO, Venta } from '../venta/venta.model';
 
 /** Un renglón del carrito, antes de convertirse en VentaItem (ver venta.model.ts).
@@ -114,6 +114,11 @@ export class CobroComponent implements OnInit, OnDestroy {
   protected readonly bodegaVentaId = signal<number | null>(null);
   protected readonly listaPrecioId = signal<number | null>(null);
   protected readonly clienteId = signal<number | null>(null);
+  /** Texto libre (ver venta.model.ts) — vacío = mostrador normal. Útil
+   *  sobre todo para capturar a mano una venta que llegó por /tienda
+   *  (pedido recibido por WhatsApp/correo) una vez que ya se validó. */
+  protected readonly canalVenta = signal('');
+  protected readonly canalesSugeridos = CANALES_SUGERIDOS;
 
   protected readonly carrito = signal<ItemCarrito[]>([]);
 
@@ -481,6 +486,7 @@ export class CobroComponent implements OnInit, OnDestroy {
         clienteId,
         vendedorUsuarioId: usuario.id,
         notas: null,
+        canal: this.canalVenta(),
         lineas: this.carrito().map((i) => ({
           productoId: i.productoId,
           descripcion: i.descripcion,
@@ -497,6 +503,7 @@ export class CobroComponent implements OnInit, OnDestroy {
       this.carrito.set([]);
       this.pagos.set([]);
       this.puntosACanjear.set(0);
+      this.canalVenta.set('');
       this.modalPagoAbierto.set(false);
 
       this.ventaRecienCobrada.set(venta);

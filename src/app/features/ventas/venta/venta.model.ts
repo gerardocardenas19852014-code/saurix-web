@@ -35,6 +35,12 @@ export interface Venta {
   total: number;
   estado: EstadoVenta;
   notas: string | null;
+  /** Texto LIBRE (sin catálogo cerrado, a propósito) de dónde vino la
+   *  venta — null/"" = mostrador normal. Lo captura el cajero a mano
+   *  (p.ej. al pasar un pedido recibido por /tienda a Cobro, escribe
+   *  "Tienda en línea" o el nombre que use esa empresa) — ver
+   *  CANALES_SUGERIDOS en venta.service.ts para el autocompletado. */
+  canal: string | null;
   activo: boolean;
 }
 

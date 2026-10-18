@@ -112,6 +112,23 @@ export class DashboardVentasComponent implements OnInit {
     }));
   });
 
+  /** Desglose de hoy por canal — ver Venta.canal (texto libre). Las
+   *  ventas sin canal capturado (mostrador normal) se agrupan como
+   *  "Mostrador" para no dejar un hueco en blanco en la tarjeta. */
+  protected readonly totalPorCanalHoy = computed<{ canal: string; total: number; cantidad: number }[]>(() => {
+    const porCanal = new Map<string, { total: number; cantidad: number }>();
+    for (const venta of this.ventasHoy()) {
+      const clave = venta.canal?.trim() || 'Mostrador';
+      const actual = porCanal.get(clave) ?? { total: 0, cantidad: 0 };
+      actual.total += venta.total;
+      actual.cantidad += 1;
+      porCanal.set(clave, actual);
+    }
+    return Array.from(porCanal.entries())
+      .map(([canal, v]) => ({ canal, ...v }))
+      .sort((a, b) => b.total - a.total);
+  });
+
   protected readonly productosMasVendidos = computed<ProductoVendido[]>(() => {
     const limiteISO = new Date(Date.now() - DIAS_TOP_PRODUCTOS * 86400000).toISOString().slice(0, 10);
     const idsVentasEnRango = new Set(

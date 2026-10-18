@@ -16,6 +16,11 @@ export function folioSugeridoVenta(ventas: Venta[]): string {
   return `VTA-${String(siguiente).padStart(4, '0')}`;
 }
 
+/** Sugerencias para el <datalist> de Cobro — Venta.canal es texto LIBRE a
+ *  propósito (ver venta.model.ts), esto es solo para no escribir siempre
+ *  lo mismo a mano; el cajero puede teclear cualquier otro valor. */
+export const CANALES_SUGERIDOS: string[] = ['Mostrador', 'Tienda en línea', 'WhatsApp', 'Teléfono', 'Facebook/Instagram'];
+
 export interface LineaVentaEntrada {
   /** null = renglón de "Venta simple" (texto libre, sin producto del catálogo). */
   productoId: number | null;
@@ -54,6 +59,8 @@ export class VentaService {
     clienteId: number;
     vendedorUsuarioId: number;
     notas: string | null;
+    /** Texto libre, igual que Venta.canal — null/"" = mostrador normal. */
+    canal: string | null;
     lineas: LineaVentaEntrada[];
     pagos: PagoEntrada[];
     /** Puntos del programa de lealtad que el cliente canjea en ESTA venta
@@ -97,6 +104,7 @@ export class VentaService {
         total,
         estado: 'Completada',
         notas: params.notas,
+        canal: params.canal?.trim() || null,
         activo: true,
       }),
     );

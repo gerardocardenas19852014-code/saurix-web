@@ -10,7 +10,7 @@
 export type TipoColumna = 't' | 'u' | 'n' | 'f' | 'h' | 'b' | 'j';
 
 const MAPA: Record<string, [string, string, string]> = {
-  Empresa: ['seguridad', 'empresa', 'id:n,clave:t,nombre:t,max_usuarios:n,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
+  Empresa: ['seguridad', 'empresa', 'id:n,clave:t,nombre:t,max_usuarios:n,descripcion_publica:t,telefono_pedidos:t,correo_pedidos:t,logo_publico:t,catalogo_publico_activo:b,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   EmpresaModulo: ['seguridad', 'empresa_modulo', 'id:n,empresa_id:n,modulo_clave:t,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   CitaMedicaMiembro: ['familia', 'cita_medica_miembro', 'id:n,miembro_familia_id:n,motivo:t,especialidad:t,fecha:f,lugar:t,notas:t,completada:b,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   CitaMedicaMiembroAdjunto: ['familia', 'cita_medica_miembro_adjunto', 'id:n,cita_medica_miembro_id:n,nombre_archivo:t,tipo_contenido:t,ruta_storage:t,tamano_bytes:n,comentario:t,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
@@ -40,6 +40,8 @@ const MAPA: Record<string, [string, string, string]> = {
   Producto: ['inventario', 'producto', 'id:n,nombre:t,codigo:t,categoria_producto_id:n,unidad_medida_id:n,descripcion:t,costo:n,precio_unitario:n,existencia:n,nivel_minimo:n,nivel_maximo:n,proveedor_id:n,unidad_compra_id:n,factor_conversion_compra:n,maneja_lotes:b,foto:t,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   Proveedor: ['inventario', 'proveedor', 'id:n,nombre:t,contacto:t,telefono:t,correo:t,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   ProductoProveedor: ['inventario', 'producto_proveedor', 'id:n,producto_id:n,proveedor_id:n,precio_compra:n,tiempo_entrega_dias:n,preferido:b,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
+  ProductoOpcionGrupo: ['inventario', 'producto_opcion_grupo', 'id:n,producto_id:n,nombre:t,tipo_seleccion:t,requerido:b,minimo:n,maximo:n,orden:n,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
+  ProductoOpcionValor: ['inventario', 'producto_opcion_valor', 'id:n,grupo_id:n,nombre:t,precio_adicional:n,orden:n,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   OrdenCompra: ['inventario', 'orden_compra', 'id:n,folio:t,proveedor_id:n,bodega_destino_id:n,estado:t,fecha:f,fecha_entrega_estimada:f,notas:t,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   OrdenCompraItem: ['inventario', 'orden_compra_item', 'id:n,orden_compra_id:n,producto_id:n,cantidad:n,costo_unitario:n,cantidad_recibida:n,unidad_id:n,factor_conversion:n,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   TipoListaPrecio: ['inventario', 'tipo_lista_precio', 'id:n,nombre:t,clave:t,descripcion:t,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
@@ -49,7 +51,7 @@ const MAPA: Record<string, [string, string, string]> = {
   UnidadMedida: ['inventario', 'unidad_medida', 'id:n,nombre:t,clave:t,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   Cliente: ['ventas', 'cliente', 'id:n,nombre:t,rfc:t,es_extranjero:b,regimen_fiscal_clave:t,pais:t,codigo_postal:t,colonia:t,calle:t,numero_exterior:t,numero_interior:t,estado:t,municipio:t,localidad:t,correo:t,telefono:t,lista_precio_predeterminada_id:n,es_generico:b,puntos_acumulados:n,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   TurnoCaja: ['ventas', 'turno_caja', 'id:n,usuario_id:n,fecha_apertura:h,monto_apertura:n,notas_apertura:t,fecha_cierre:h,monto_cierre_contado:n,monto_cierre_esperado:n,diferencia_cierre:n,notas_cierre:t,estado:t,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
-  Venta: ['ventas', 'venta', 'id:n,folio:t,fecha:h,turno_caja_id:n,cliente_id:n,vendedor_usuario_id:n,subtotal:n,descuento:n,total:n,estado:t,notas:t,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
+  Venta: ['ventas', 'venta', 'id:n,folio:t,fecha:h,turno_caja_id:n,cliente_id:n,vendedor_usuario_id:n,subtotal:n,descuento:n,total:n,estado:t,notas:t,canal:t,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   VentaItem: ['ventas', 'venta_item', 'id:n,venta_id:n,producto_id:n,descripcion:t,cantidad:n,precio_unitario:n,descuento_pct:n,subtotal:n,bodega_id:n,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   VentaPago: ['ventas', 'venta_pago', 'id:n,venta_id:n,metodo_pago:t,monto:n,monto_recibido:n,cambio:n,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   Devolucion: ['ventas', 'devolucion', 'id:n,folio:t,venta_id:n,fecha:h,usuario_id:n,motivo:t,total_reembolsado:n,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],

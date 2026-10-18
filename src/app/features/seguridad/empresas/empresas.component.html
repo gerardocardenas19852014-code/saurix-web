@@ -43,9 +43,9 @@
 
 @if (modalEmpresa()) {
   <div class="modal-overlay modal show d-block" (click)="modalEmpresa.set(false)">
-    <form class="modal-box modal-dialog modal-content" [formGroup]="formEmpresa" (click)="$event.stopPropagation()" (ngSubmit)="guardarEmpresa()">
+    <form class="modal-box modal-dialog modal-content empresa-modal" [formGroup]="formEmpresa" (click)="$event.stopPropagation()" (ngSubmit)="guardarEmpresa()">
       <h3 class="modal-title mb-3">{{ empresaEnEdicion() ? 'Editar empresa' : 'Nueva empresa' }}</h3>
-      <div class="edit-form">
+      <div class="edit-form form-grid-3col">
         <label>
           <span class="label-con-tip">
             Clave
@@ -68,12 +68,77 @@
           </span>
           <input type="number" class="form-control" formControlName="maxUsuarios" min="1" placeholder="Sin límite" />
         </label>
+
+        <hr class="full-span" style="width:100%; margin:4px 0;" />
+        <p class="hint full-span" style="margin:0;">
+          <strong>Tienda pública</strong> — catálogo sin login para que un cliente arme su pedido y lo
+          envíe por WhatsApp/correo; tú lo validas y lo capturas manualmente en Ventas.
+        </p>
+
+        <label class="checkbox-inline full-span">
+          <input type="checkbox" formControlName="catalogoPublicoActivo" />
+          Activar catálogo público
+        </label>
+
+        @if (formEmpresa.controls.catalogoPublicoActivo.value) {
+          <p class="hint full-span" style="margin:0;">
+            Disponible en <code>/tienda/{{ formEmpresa.controls.clave.value || '…' }}</code>
+            (y listada en el portal <code>/tienda</code>).
+          </p>
+        }
+
+        <label class="full-span">
+          Descripción corta (para el portal)
+          <input type="text" class="form-control" formControlName="descripcionPublica" maxlength="200" placeholder="p.ej. Ferretería y materiales de construcción" />
+        </label>
+        <label>
+          <span class="label-con-tip">
+            Teléfono para pedidos (WhatsApp)
+            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Incluye código de país, sin espacios ni signos, para que el enlace de WhatsApp funcione (p.ej. 521xxxxxxxxxx para México).</span></button>
+          </span>
+          <input type="text" class="form-control" formControlName="telefonoPedidos" maxlength="30" placeholder="p.ej. 521xxxxxxxxxx" />
+        </label>
+        <label>
+          Correo para pedidos (opcional)
+          <input type="text" class="form-control" formControlName="correoPedidos" maxlength="120" placeholder="p.ej. pedidos@miempresa.com" />
+        </label>
+
+        <div class="full-span foto-producto-campo">
+          <span class="foto-producto-etiqueta">Logo de la tienda</span>
+          <div class="foto-producto-fila">
+            @if (logoActual()) {
+              <button type="button" class="foto-producto-preview-boton" title="Ver en tamaño completo" (click)="logoAmpliado.set(true)">
+                <img class="foto-producto-preview" [src]="logoActual()" alt="Logo de la tienda" />
+              </button>
+            } @else {
+              <div class="foto-producto-preview foto-producto-preview-vacia">🏬</div>
+            }
+            <div class="foto-producto-acciones">
+              <label class="btn-secondary small foto-producto-boton">
+                {{ logoActual() ? 'Cambiar logo' : 'Subir logo' }}
+                <input #logoInput type="file" accept="image/*" hidden (change)="onLogoSeleccionado($event)" />
+              </label>
+              @if (logoActual()) {
+                <button type="button" class="btn-secondary small" (click)="quitarLogo(logoInput)">Quitar logo</button>
+              }
+            </div>
+          </div>
+        </div>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="modalEmpresa.set(false)">Cancelar</button>
         <button type="submit" class="btn-primary btn btn-primary">Guardar</button>
       </div>
     </form>
+  </div>
+}
+
+@if (logoAmpliado() && logoActual()) {
+  <div class="modal-overlay show foto-producto-lightbox-overlay" (click)="logoAmpliado.set(false)">
+    <div class="foto-producto-lightbox" (click)="$event.stopPropagation()">
+      <button type="button" class="foto-producto-lightbox-cerrar" title="Cerrar" (click)="logoAmpliado.set(false)">✕</button>
+      <img [src]="logoActual()" alt="Logo de la tienda en tamaño completo" />
+    </div>
   </div>
 }
 

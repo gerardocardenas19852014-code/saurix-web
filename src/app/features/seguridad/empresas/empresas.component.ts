@@ -36,6 +36,18 @@ export interface Empresa {
   /** Tope de usuarios activos para esta empresa; null/undefined = sin límite. */
   maxUsuarios?: number | null;
   fechaCreacion?: string;
+  // ── Tienda pública (ver /tienda y /tienda/:clave) ──────────────────
+  /** Texto corto para el portal/catálogo público; null = sin descripción. */
+  descripcionPublica?: string | null;
+  /** Teléfono (WhatsApp) al que llega el pedido armado por el cliente. */
+  telefonoPedidos?: string | null;
+  /** Correo alterno/adicional al que también puede llegar el pedido. */
+  correoPedidos?: string | null;
+  /** Logo en base64 (data URL) para el portal — mismo criterio que Producto.foto. */
+  logoPublico?: string | null;
+  /** Si está en false, /tienda/:clave de esta empresa no muestra nada (y no
+   *  aparece en el portal /tienda), aunque la empresa esté activa. */
+  catalogoPublicoActivo?: boolean;
 }
 
 /**
@@ -54,6 +66,7 @@ export interface Empresa {
   standalone: true,
   imports: [ReactiveFormsModule, DataTableComponent, ConfirmDialogComponent],
   templateUrl: './empresas.component.html',
+  styleUrl: './empresas.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EmpresasComponent implements OnInit, OnDestroy {
@@ -99,6 +112,12 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       etiqueta: 'Alta',
       formatear: (f) => (f.fechaCreacion ? f.fechaCreacion.slice(0, 10) : ''),
     },
+    {
+      campo: 'catalogoPublicoActivo',
+      etiqueta: 'Tienda pública',
+      formatear: (f) => (f.catalogoPublicoActivo ? `/tienda/${f.clave}` : 'Apagada'),
+      claseValor: (f) => (f.catalogoPublicoActivo ? 'grid-badge-success' : 'grid-badge-muted'),
+    },
   ];
 
   protected readonly formEmpresa = this.fb.nonNullable.group({
@@ -107,7 +126,16 @@ export class EmpresasComponent implements OnInit, OnDestroy {
     activo: [true],
     // Vacío = sin límite de usuarios.
     maxUsuarios: this.fb.control<number | null>(null, [Validators.min(1)]),
+    // ── Tienda pública ────────────────────────────────────────────────
+    catalogoPublicoActivo: [false],
+    descripcionPublica: ['', [Validators.maxLength(200)]],
+    telefonoPedidos: ['', [Validators.maxLength(30)]],
+    correoPedidos: ['', [Validators.maxLength(120)]],
   });
+
+  // ── Logo de la tienda pública (mismo patrón que fotoActual en productos.component.ts) ──
+  protected readonly logoActual = signal<string>('');
+  protected readonly logoAmpliado = signal(false);
 
   protected readonly formAdmin = this.fb.nonNullable.group({
     nombreUsuario: ['', [Validators.required, Validators.minLength(4)]],
@@ -141,7 +169,18 @@ export class EmpresasComponent implements OnInit, OnDestroy {
   // ── Alta / edición ────────────────────────────────────────────────
   nueva(): void {
     this.empresaEnEdicion.set(null);
-    this.formEmpresa.reset({ clave: '', nombre: '', activo: true, maxUsuarios: null });
+    this.formEmpresa.reset({
+      clave: '',
+      nombre: '',
+      activo: true,
+      maxUsuarios: null,
+      catalogoPublicoActivo: false,
+      descripcionPublica: '',
+      telefonoPedidos: '',
+      correoPedidos: '',
+    });
+    this.logoActual.set('');
+    this.logoAmpliado.set(false);
     this.formEmpresa.controls.clave.enable();
     this.modalEmpresa.set(true);
   }
@@ -153,7 +192,13 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       nombre: empresa.nombre,
       activo: empresa.activo,
       maxUsuarios: empresa.maxUsuarios ?? null,
+      catalogoPublicoActivo: empresa.catalogoPublicoActivo ?? false,
+      descripcionPublica: empresa.descripcionPublica ?? '',
+      telefonoPedidos: empresa.telefonoPedidos ?? '',
+      correoPedidos: empresa.correoPedidos ?? '',
     });
+    this.logoActual.set(empresa.logoPublico ?? '');
+    this.logoAmpliado.set(false);
     // La clave identifica a la empresa (p.ej. en ?conexion= o subdominios): no se cambia.
     this.formEmpresa.controls.clave.disable();
     this.modalEmpresa.set(true);
@@ -167,18 +212,27 @@ export class EmpresasComponent implements OnInit, OnDestroy {
     }
     const valor = this.formEmpresa.getRawValue();
     const edicion = this.empresaEnEdicion();
+    const tiendaPublica = {
+      catalogoPublicoActivo: valor.catalogoPublicoActivo,
+      descripcionPublica: valor.descripcionPublica.trim() || null,
+      telefonoPedidos: valor.telefonoPedidos.trim() || null,
+      correoPedidos: valor.correoPedidos.trim() || null,
+      logoPublico: this.logoActual() || null,
+    };
     const peticion = edicion
       ? this.data.modificacion<Empresa>('Empresa', {
           id: edicion.id,
           nombre: valor.nombre.trim(),
           activo: valor.activo,
           maxUsuarios: valor.maxUsuarios,
+          ...tiendaPublica,
         })
       : this.data.alta<Empresa>('Empresa', {
           clave: valor.clave.trim(),
           nombre: valor.nombre.trim(),
           activo: valor.activo,
           maxUsuarios: valor.maxUsuarios,
+          ...tiendaPublica,
         });
     peticion.subscribe({
       next: (empresa) => {
@@ -321,4 +375,69 @@ export class EmpresasComponent implements OnInit, OnDestroy {
 
   /** Para el botón de la tabla: "Entrar" a la empresa. */
   etiquetaEntrar = (): string => 'Entrar';
+
+  // ── Logo de la tienda pública ───────────────────────────────────────
+  /** Igual que redimensionarFoto() en productos.component.ts (FileReader →
+   *  <canvas> → JPEG comprimido). */
+  private redimensionarLogo(archivo: File): Promise<string> {
+    const MAX_LADO = 480;
+    return new Promise((resolve, reject) => {
+      const lector = new FileReader();
+      lector.onload = () => {
+        const imagen = new Image();
+        imagen.onload = () => {
+          let { width, height } = imagen;
+          if (width > height && width > MAX_LADO) {
+            height = Math.round((height * MAX_LADO) / width);
+            width = MAX_LADO;
+          } else if (height >= width && height > MAX_LADO) {
+            width = Math.round((width * MAX_LADO) / height);
+            height = MAX_LADO;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const contexto = canvas.getContext('2d');
+          if (!contexto) {
+            reject(new Error('Sin contexto de canvas.'));
+            return;
+          }
+          contexto.drawImage(imagen, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
+        };
+        imagen.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+        imagen.src = lector.result as string;
+      };
+      lector.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+      lector.readAsDataURL(archivo);
+    });
+  }
+
+  onLogoSeleccionado(evento: Event): void {
+    const input = evento.target as HTMLInputElement;
+    const archivo = input.files?.[0];
+    if (!archivo) return;
+    if (!archivo.type.startsWith('image/')) {
+      this.toast.advertencia('Elige un archivo de imagen (JPG, PNG, etc.).');
+      input.value = '';
+      return;
+    }
+    if (archivo.size > 8 * 1024 * 1024) {
+      this.toast.advertencia('La imagen no puede pesar más de 8 MB.');
+      input.value = '';
+      return;
+    }
+    this.redimensionarLogo(archivo)
+      .then((dataUrl) => this.logoActual.set(dataUrl))
+      .catch(() => this.toast.error('No se pudo procesar la imagen. Intenta con otra.'))
+      .finally(() => {
+        input.value = '';
+      });
+  }
+
+  quitarLogo(input: HTMLInputElement): void {
+    this.logoActual.set('');
+    this.logoAmpliado.set(false);
+    input.value = '';
+  }
 }

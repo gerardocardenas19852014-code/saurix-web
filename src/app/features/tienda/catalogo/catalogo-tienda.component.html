@@ -1,0 +1,213 @@
+@if (cargando()) {
+  <p class="tienda-estado">Cargando…</p>
+} @else if (error()) {
+  <div class="tienda-estado">
+    <p>{{ error() }}</p>
+    <a routerLink="/tienda">← Ver todas las tiendas</a>
+  </div>
+} @else if (detalle(); as d) {
+  <div class="tienda-catalogo">
+    <header class="tienda-catalogo-header">
+      @if (d.empresa.logo) {
+        <img class="tienda-catalogo-logo" [src]="d.empresa.logo" [alt]="d.empresa.nombre" />
+      }
+      <div>
+        <h1>{{ d.empresa.nombre }}</h1>
+        @if (d.empresa.descripcion) {
+          <p>{{ d.empresa.descripcion }}</p>
+        }
+      </div>
+      <button type="button" class="tienda-carrito-boton" (click)="carritoAbierto.set(true)">
+        🛒 {{ cantidadArticulos() }}
+      </button>
+    </header>
+
+    <div class="tienda-busqueda">
+      <input
+        type="text"
+        placeholder="Buscar producto…"
+        [value]="busqueda()"
+        (input)="busqueda.set($any($event.target).value)"
+      />
+    </div>
+
+    <div class="tienda-grid">
+      @for (producto of productosFiltrados(); track producto.id) {
+        <div class="tienda-tarjeta" [class.tienda-tarjeta-agotada]="!producto.disponible">
+          @if (producto.foto) {
+            <img class="tienda-tarjeta-foto" [src]="producto.foto" [alt]="producto.nombre" />
+          } @else {
+            <div class="tienda-tarjeta-foto tienda-tarjeta-foto-vacia">📦</div>
+          }
+          <div class="tienda-tarjeta-cuerpo">
+            <strong>{{ producto.nombre }}</strong>
+            @if (producto.descripcion) {
+              <p>{{ producto.descripcion }}</p>
+            }
+            <div class="tienda-tarjeta-pie">
+              <span class="tienda-tarjeta-precio">${{ producto.precio.toFixed(2) }}</span>
+              @if (!producto.disponible) {
+                <span class="tienda-tarjeta-agotado-badge">Agotado</span>
+              } @else {
+                <button type="button" class="tienda-tarjeta-agregar" (click)="agregar(producto)">
+                  {{ producto.opciones.length > 0 ? 'Elegir' : 'Agregar' }}
+                </button>
+              }
+            </div>
+          </div>
+        </div>
+      } @empty {
+        <p class="tienda-estado">No hay productos que coincidan con tu búsqueda.</p>
+      }
+    </div>
+
+    <p class="tienda-pie-portal">
+      <a routerLink="/tienda">← Ver todas las tiendas</a>
+    </p>
+  </div>
+
+  <!-- ── Panel del carrito ── -->
+  @if (carritoAbierto()) {
+    <div class="tienda-overlay" (click)="carritoAbierto.set(false)">
+      <aside class="tienda-carrito-panel" (click)="$event.stopPropagation()">
+        <div class="tienda-carrito-panel-header">
+          <h2>Tu pedido</h2>
+          <button type="button" class="tienda-cerrar" (click)="carritoAbierto.set(false)">✕</button>
+        </div>
+
+        @if (carrito().length === 0) {
+          <p class="tienda-estado">Tu carrito está vacío.</p>
+        } @else {
+          <div class="tienda-carrito-lineas">
+            @for (linea of carrito(); track linea.claveLinea) {
+              <div class="tienda-carrito-linea">
+                <div class="tienda-carrito-linea-info">
+                  <strong>{{ linea.nombreProducto }}</strong>
+                  @for (o of linea.opcionesElegidas; track o.valorNombre) {
+                    <span class="tienda-carrito-linea-opcion">
+                      {{ o.grupoNombre }}: {{ o.valorNombre }}{{ o.precioAdicional > 0 ? ' (+$' + o.precioAdicional.toFixed(2) + ')' : '' }}
+                    </span>
+                  }
+                  <span class="tienda-carrito-linea-subtotal">${{ subtotalLinea(linea).toFixed(2) }}</span>
+                </div>
+                <div class="tienda-carrito-linea-acciones">
+                  <button type="button" (click)="cambiarCantidadLinea(linea.claveLinea, -1)">−</button>
+                  <span>{{ linea.cantidad }}</span>
+                  <button type="button" (click)="cambiarCantidadLinea(linea.claveLinea, 1)">+</button>
+                  <button type="button" class="tienda-carrito-linea-quitar" (click)="quitarLinea(linea.claveLinea)">Quitar</button>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="tienda-carrito-total">
+            <span>Total</span>
+            <strong>${{ totalCarrito().toFixed(2) }}</strong>
+          </div>
+
+          <button type="button" class="tienda-enviar-boton" (click)="abrirEnvio()">Enviar pedido</button>
+          <p class="tienda-nota-manual">
+            Al enviar, se abre WhatsApp o tu correo con el pedido ya armado — {{ d.empresa.nombre }} lo recibe,
+            lo confirma contigo y lo captura por su cuenta. Esto no hace ningún cobro ni reserva de stock.
+          </p>
+        }
+      </aside>
+    </div>
+  }
+
+  <!-- ── Modal: elegir opciones de un producto ── -->
+  @if (productoEnModal(); as producto) {
+    <div class="tienda-overlay" (click)="cerrarModal()">
+      <div class="tienda-modal" (click)="$event.stopPropagation()">
+        <div class="tienda-modal-header">
+          <h3>{{ producto.nombre }}</h3>
+          <button type="button" class="tienda-cerrar" (click)="cerrarModal()">✕</button>
+        </div>
+
+        @for (grupo of producto.opciones; track grupo.id) {
+          <div class="tienda-modal-grupo">
+            <h4>
+              {{ grupo.nombre }}
+              @if (grupo.requerido) {
+                <span class="tienda-modal-requerido">· obligatorio</span>
+              }
+            </h4>
+            @for (valor of grupo.valores; track valor.id) {
+              <label class="tienda-modal-valor">
+                @if (grupo.tipoSeleccion === 'unica') {
+                  <input
+                    type="radio"
+                    [name]="'grupo-' + grupo.id"
+                    [checked]="(seleccionModal()[grupo.id] ?? []).includes(valor.id)"
+                    (change)="elegirUnica(grupo.id, valor.id)"
+                  />
+                } @else {
+                  <input
+                    type="checkbox"
+                    [checked]="(seleccionModal()[grupo.id] ?? []).includes(valor.id)"
+                    (change)="toggleMultiple(grupo.id, valor.id, grupo)"
+                  />
+                }
+                <span>{{ valor.nombre }}</span>
+                @if (valor.precioAdicional > 0) {
+                  <span class="tienda-modal-valor-precio">+${{ valor.precioAdicional.toFixed(2) }}</span>
+                }
+              </label>
+            }
+          </div>
+        }
+
+        <div class="tienda-modal-cantidad">
+          <span>Cantidad</span>
+          <div class="tienda-modal-cantidad-stepper">
+            <button type="button" (click)="disminuirCantidadModal()">−</button>
+            <span>{{ cantidadModal() }}</span>
+            <button type="button" (click)="aumentarCantidadModal()">+</button>
+          </div>
+        </div>
+
+        <div class="tienda-modal-footer">
+          <span class="tienda-modal-precio-total">${{ (precioUnitarioModal() * cantidadModal()).toFixed(2) }}</span>
+          <button type="button" class="tienda-enviar-boton" [disabled]="!modalValido()" (click)="confirmarModal()">
+            Agregar al carrito
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ── Modal: datos del cliente antes de enviar ── -->
+  @if (modalEnviarAbierto()) {
+    <div class="tienda-overlay" (click)="modalEnviarAbierto.set(false)">
+      <form class="tienda-modal" [formGroup]="formCliente" (click)="$event.stopPropagation()" (ngSubmit)="enviarPorWhatsapp()">
+        <div class="tienda-modal-header">
+          <h3>Tus datos</h3>
+          <button type="button" class="tienda-cerrar" (click)="modalEnviarAbierto.set(false)">✕</button>
+        </div>
+
+        <label class="tienda-campo">
+          Tu nombre
+          <input type="text" formControlName="nombre" placeholder="¿Cómo te llamas?" />
+        </label>
+        <label class="tienda-campo">
+          Tu teléfono (opcional)
+          <input type="text" formControlName="telefono" placeholder="Para que te contacten" />
+        </label>
+
+        <div class="tienda-modal-footer tienda-modal-footer-envio">
+          @if (d.empresa.telefono) {
+            <button type="submit" class="tienda-enviar-boton">Enviar por WhatsApp</button>
+          }
+          @if (d.empresa.correo) {
+            <button type="button" class="tienda-enviar-boton tienda-enviar-boton-secundario" (click)="enviarPorCorreo()">
+              Enviar por correo
+            </button>
+          }
+          @if (!d.empresa.telefono && !d.empresa.correo) {
+            <p class="tienda-estado">Esta tienda todavía no configuró a dónde enviar los pedidos.</p>
+          }
+        </div>
+      </form>
+    </div>
+  }
+}

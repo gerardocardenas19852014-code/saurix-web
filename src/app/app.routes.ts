@@ -16,6 +16,13 @@ export const routes: Routes = [
       import('./features/auth/restablecer/restablecer.component').then((m) => m.RestablecerComponent),
   },
   {
+    // Tienda pública (SIN login) — portal /tienda y catálogo /tienda/:clave,
+    // ver tienda.routes.ts. Mismo nivel que login/restablecer a propósito:
+    // NO va dentro de ShellComponent/authGuard.
+    path: 'tienda',
+    loadChildren: () => import('./features/tienda/tienda.routes').then((m) => m.TIENDA_ROUTES),
+  },
+  {
     path: 'modulos',
     canActivate: [authGuard],
     loadComponent: () => import('./features/auth/modulos/modulos.component').then((m) => m.ModulosComponent),

@@ -1,0 +1,32 @@
+<div class="tienda-portal">
+  <header class="tienda-portal-header">
+    <h1>Tiendas</h1>
+    <p>Elige un negocio para ver su catálogo y armar tu pedido.</p>
+  </header>
+
+  @if (cargando()) {
+    <p class="tienda-portal-estado">Cargando…</p>
+  } @else if (error()) {
+    <p class="tienda-portal-estado tienda-portal-error">{{ error() }}</p>
+  } @else if (tiendas().length === 0) {
+    <p class="tienda-portal-estado">Todavía no hay tiendas disponibles.</p>
+  } @else {
+    <div class="tienda-portal-grid">
+      @for (tienda of tiendas(); track tienda.clave) {
+        <a class="tienda-portal-card" [routerLink]="['/tienda', tienda.clave]">
+          @if (tienda.logo) {
+            <img class="tienda-portal-card-logo" [src]="tienda.logo" [alt]="tienda.nombre" />
+          } @else {
+            <div class="tienda-portal-card-logo tienda-portal-card-logo-vacio">🏬</div>
+          }
+          <div class="tienda-portal-card-texto">
+            <strong>{{ tienda.nombre }}</strong>
+            @if (tienda.descripcion) {
+              <span>{{ tienda.descripcion }}</span>
+            }
+          </div>
+        </a>
+      }
+    </div>
+  }
+</div>

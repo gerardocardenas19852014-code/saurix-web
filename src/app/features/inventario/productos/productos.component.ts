@@ -352,6 +352,14 @@ export class ProductosComponent implements OnInit, OnDestroy {
     this.router.navigate(['/inventario/productos', producto.id, 'nivel-minimo']);
   }
 
+  /** Navega a la pantalla de opciones/variantes con costo de este producto
+   *  (ver opciones-producto.component.ts) — mismo patrón de ruta que
+   *  verNivelMinimoBodega() arriba. Solo importan si la empresa usa
+   *  /tienda (tienda pública). */
+  verOpciones(producto: Producto): void {
+    this.router.navigate(['/inventario/productos', producto.id, 'opciones']);
+  }
+
   pedirEliminar(producto: Producto): void {
     this.productoAEliminar.set(producto);
   }
