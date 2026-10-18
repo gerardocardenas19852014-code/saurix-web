@@ -5,3 +5,31 @@
  * quepan las 3 columnas de .form-grid-3col sin que .modal-box lo recorte a
  * su max-width por default (400px). */
 .modal-box.empresa-modal { max-width: 980px; }
+
+/* Las 7 filas del horario de atención (ver horarioFilas() en el .ts) — una
+ * fila por día: nombre, checkbox "Cerrado" y, si no está cerrado, 2
+ * selectores de hora. */
+.horario-tienda-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0;
+}
+
+.horario-tienda-fila {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+
+  .horario-tienda-dia {
+    width: 90px;
+    flex-shrink: 0;
+    font-weight: 600;
+    font-size: 0.85rem;
+  }
+
+  input[type='time'] {
+    width: auto;
+  }
+}

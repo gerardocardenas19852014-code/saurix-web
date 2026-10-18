@@ -102,6 +102,55 @@
           Correo para pedidos (opcional)
           <input type="text" class="form-control" formControlName="correoPedidos" maxlength="120" placeholder="p.ej. pedidos@miempresa.com" />
         </label>
+        <label>
+          <span class="label-con-tip">
+            Pedido mínimo (opcional)
+            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Vacío = sin mínimo. Si lo pones, el cliente no puede enviar su pedido hasta llegar a ese total.</span></button>
+          </span>
+          <input type="number" class="form-control" formControlName="pedidoMinimo" min="0" step="0.01" placeholder="Sin mínimo" />
+        </label>
+        <label class="full-span">
+          Métodos de pago que aceptas (separados por coma, opcional)
+          <input type="text" class="form-control" formControlName="metodosPagoTexto" maxlength="200" placeholder="p.ej. Efectivo, Transferencia" />
+        </label>
+
+        <label class="checkbox-inline full-span">
+          <input type="checkbox" formControlName="horarioActivo" />
+          Mostrar horario de atención en la tienda ("Abierto ahora"/"Cerrado")
+        </label>
+
+        @if (formEmpresa.controls.horarioActivo.value) {
+          <div class="full-span horario-tienda-grid">
+            @for (fila of horarioFilas(); track fila.dia) {
+              <div class="horario-tienda-fila">
+                <span class="horario-tienda-dia">{{ nombresDias[fila.dia] }}</span>
+                <label class="checkbox-inline">
+                  <input
+                    type="checkbox"
+                    [checked]="fila.cerrado"
+                    (change)="actualizarHorarioFila(fila.dia, { cerrado: $any($event.target).checked })"
+                  />
+                  Cerrado
+                </label>
+                @if (!fila.cerrado) {
+                  <input
+                    type="time"
+                    class="form-control"
+                    [value]="fila.abre"
+                    (input)="actualizarHorarioFila(fila.dia, { abre: $any($event.target).value })"
+                  />
+                  <span>a</span>
+                  <input
+                    type="time"
+                    class="form-control"
+                    [value]="fila.cierra"
+                    (input)="actualizarHorarioFila(fila.dia, { cierra: $any($event.target).value })"
+                  />
+                }
+              </div>
+            }
+          </div>
+        }
 
         <div class="full-span foto-producto-campo">
           <span class="foto-producto-etiqueta">Logo de la tienda</span>

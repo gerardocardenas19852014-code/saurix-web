@@ -10,6 +10,25 @@ import { ColumnaTabla, DataTableComponent } from '../../../shared/components/dat
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { hashPassword } from '../../../shared/utils/password.util';
 
+/** Nombre de cada día, en el mismo orden/índice que Date.getDay() en JS
+ *  (0 = domingo) — así horarioAtencion[].dia se puede usar directo para
+ *  comparar contra "hoy" en el navegador (ver catalogo-tienda.component.ts). */
+const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+export interface HorarioDiaEmpresa {
+  dia: number;
+  abre: string;
+  cierra: string;
+  cerrado: boolean;
+}
+
+/** Fila por defecto para los 7 días al abrir "Nueva empresa" o si una
+ *  empresa existente no tiene horario guardado todavía — cerrado domingo,
+ *  9 a 6 el resto, nomás como punto de partida razonable para editar. */
+function horarioPorDefecto(): HorarioDiaEmpresa[] {
+  return DIAS_SEMANA.map((_, dia) => ({ dia, abre: '09:00', cierra: '18:00', cerrado: dia === 0 }));
+}
+
 /** Los 5 módulos que se venden por separado (ver licencia-modulos.service.ts
  *  en el frontend y supabase/migrations/15_licencias_modulos.sql en la base).
  *  Seguridad y Panel de control no aparecen aquí: son base del sistema. */
@@ -48,6 +67,13 @@ export interface Empresa {
   /** Si está en false, /tienda/:clave de esta empresa no muestra nada (y no
    *  aparece en el portal /tienda), aunque la empresa esté activa. */
   catalogoPublicoActivo?: boolean;
+  /** null/vacío = sin horario configurado (la tienda no muestra el badge de
+   *  abierto/cerrado). Un arreglo con los 7 días = horario completo. */
+  horarioAtencion?: HorarioDiaEmpresa[] | null;
+  /** Texto libre (p.ej. "Efectivo", "Transferencia") — sin catálogo cerrado. */
+  metodosPago?: string[] | null;
+  /** null/0 = sin pedido mínimo. */
+  pedidoMinimo?: number | null;
 }
 
 /**
@@ -141,11 +167,26 @@ export class EmpresasComponent implements OnInit, OnDestroy {
     descripcionPublica: ['', [Validators.maxLength(200)]],
     telefonoPedidos: ['', [Validators.maxLength(30)]],
     correoPedidos: ['', [Validators.maxLength(120)]],
+    // Vacío = sin pedido mínimo.
+    pedidoMinimo: this.fb.control<number | null>(null, [Validators.min(0)]),
+    // Texto libre separado por comas (p.ej. "Efectivo, Transferencia") — se
+    // parte a un arreglo al guardar, ver guardarEmpresa().
+    metodosPagoTexto: ['', [Validators.maxLength(200)]],
+    // Interruptor del horario — si está apagado, horarioFilas() NO se manda
+    // (la tienda no muestra el badge de abierto/cerrado), aunque las filas
+    // ya tengan valores de antes de apagarlo.
+    horarioActivo: [false],
   });
 
   // ── Logo de la tienda pública (mismo patrón que fotoActual en productos.component.ts) ──
   protected readonly logoActual = signal<string>('');
   protected readonly logoAmpliado = signal(false);
+
+  // ── Horario de atención (ver HorarioDiaEmpresa arriba) — vive en un
+  // signal aparte (no en el FormGroup) porque son 7 filas editables, mismo
+  // criterio que logoActual: se arma al abrir el modal y se lee al guardar. ──
+  protected readonly nombresDias = DIAS_SEMANA;
+  protected readonly horarioFilas = signal<HorarioDiaEmpresa[]>(horarioPorDefecto());
 
   protected readonly formAdmin = this.fb.nonNullable.group({
     nombreUsuario: ['', [Validators.required, Validators.minLength(4)]],
@@ -188,15 +229,20 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       descripcionPublica: '',
       telefonoPedidos: '',
       correoPedidos: '',
+      pedidoMinimo: null,
+      metodosPagoTexto: '',
+      horarioActivo: false,
     });
     this.logoActual.set('');
     this.logoAmpliado.set(false);
+    this.horarioFilas.set(horarioPorDefecto());
     this.formEmpresa.controls.clave.enable();
     this.modalEmpresa.set(true);
   }
 
   editar(empresa: Empresa): void {
     this.empresaEnEdicion.set(empresa);
+    const horarioGuardado = empresa.horarioAtencion ?? [];
     this.formEmpresa.reset({
       clave: empresa.clave,
       nombre: empresa.nombre,
@@ -206,12 +252,25 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       descripcionPublica: empresa.descripcionPublica ?? '',
       telefonoPedidos: empresa.telefonoPedidos ?? '',
       correoPedidos: empresa.correoPedidos ?? '',
+      pedidoMinimo: empresa.pedidoMinimo ?? null,
+      metodosPagoTexto: (empresa.metodosPago ?? []).join(', '),
+      horarioActivo: horarioGuardado.length > 0,
     });
     this.logoActual.set(empresa.logoPublico ?? '');
     this.logoAmpliado.set(false);
+    // Rellena los 7 días — si falta alguno en lo guardado (dato viejo/
+    // incompleto), se completa con el valor por defecto de ese día.
+    const porDia = new Map(horarioGuardado.map((f) => [f.dia, f]));
+    this.horarioFilas.set(horarioPorDefecto().map((d) => porDia.get(d.dia) ?? d));
     // La clave identifica a la empresa (p.ej. en ?conexion= o subdominios): no se cambia.
     this.formEmpresa.controls.clave.disable();
     this.modalEmpresa.set(true);
+  }
+
+  /** Actualiza una fila del horario (ver horarioFilas arriba) — no usa un
+   *  FormArray porque son siempre exactamente 7 filas fijas, más simple así. */
+  actualizarHorarioFila(dia: number, cambios: Partial<HorarioDiaEmpresa>): void {
+    this.horarioFilas.update((filas) => filas.map((f) => (f.dia === dia ? { ...f, ...cambios } : f)));
   }
 
   guardarEmpresa(): void {
@@ -222,12 +281,19 @@ export class EmpresasComponent implements OnInit, OnDestroy {
     }
     const valor = this.formEmpresa.getRawValue();
     const edicion = this.empresaEnEdicion();
+    const metodosPago = valor.metodosPagoTexto
+      .split(',')
+      .map((m) => m.trim())
+      .filter((m) => m.length > 0);
     const tiendaPublica = {
       catalogoPublicoActivo: valor.catalogoPublicoActivo,
       descripcionPublica: valor.descripcionPublica.trim() || null,
       telefonoPedidos: valor.telefonoPedidos.trim() || null,
       correoPedidos: valor.correoPedidos.trim() || null,
       logoPublico: this.logoActual() || null,
+      pedidoMinimo: valor.pedidoMinimo,
+      metodosPago: metodosPago.length > 0 ? metodosPago : null,
+      horarioAtencion: valor.horarioActivo ? this.horarioFilas() : null,
     };
     const peticion = edicion
       ? this.data.modificacion<Empresa>('Empresa', {

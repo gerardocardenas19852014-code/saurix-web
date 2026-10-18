@@ -1,13 +1,18 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Meta, Title } from '@angular/platform-browser';
 import { TiendaPublicaService } from '../tienda-publica.service';
-import { LineaCarritoTienda, ProductoTienda, TiendaDetalle } from '../tienda.model';
+import { EmpresaTienda, LineaCarritoTienda, ProductoTienda, TiendaDetalle } from '../tienda.model';
 
 /** Selección en curso dentro del modal de un producto: por cada grupo de
  *  opciones, los id de valor marcados (radio = 1 elemento, checkbox =
  *  varios). Vive solo mientras el modal está abierto. */
 type SeleccionOpciones = Record<number, number[]>;
+
+/** Nombres largos de los 7 días, en el mismo orden que Date.getDay() (0 =
+ *  domingo) — para armar el texto "Cerrado · abre el martes a las…". */
+const NOMBRES_DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 
 @Component({
   selector: 'app-catalogo-tienda',
@@ -17,10 +22,19 @@ type SeleccionOpciones = Record<number, number[]>;
   styleUrl: './catalogo-tienda.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class CatalogoTiendaComponent implements OnInit {
+export class CatalogoTiendaComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly tiendaService = inject(TiendaPublicaService);
   private readonly fb = inject(FormBuilder);
+  private readonly titleService = inject(Title);
+  private readonly metaService = inject(Meta);
+
+  // Elementos de <head> que esta pantalla agrega para "Agregar a pantalla de
+  // inicio" (ver actualizarAccesoDirecto()) — se quitan en ngOnDestroy() para
+  // no dejarle su manifest/ícono a otra pantalla de la app.
+  private linkManifest: HTMLLinkElement | null = null;
+  private linkIcono: HTMLLinkElement | null = null;
+  private urlManifestAnterior: string | null = null;
 
   protected readonly cargando = signal(true);
   protected readonly error = signal<string | null>(null);
@@ -30,6 +44,10 @@ export class CatalogoTiendaComponent implements OnInit {
    *  navegador (localStorage) para que no se tenga que elegir cada visita;
    *  si no está disponible (modo privado, etc.) simplemente no se recuerda. */
   protected readonly vistaLista = signal(this.leerVistaGuardada());
+  /** Agrupar las secciones del catálogo por categoría (como siempre) o por
+   *  precio — igual que vistaLista(), es un interruptor tipo lista/cuadrícula
+   *  y también se recuerda por navegador. */
+  protected readonly agruparPorPrecio = signal(this.leerAgrupacionGuardada());
 
   protected readonly carrito = signal<LineaCarritoTienda[]>([]);
   protected readonly carritoAbierto = signal(false);
@@ -54,6 +72,15 @@ export class CatalogoTiendaComponent implements OnInit {
   protected readonly obteniendoUbicacion = signal(false);
   protected readonly ubicacionError = signal<string | null>(null);
 
+  // ── Compartir (copiar link / código QR) ──────────────────────────────
+  protected readonly modalCompartirAbierto = signal(false);
+  protected readonly linkCopiado = signal(false);
+
+  // ── "Volver a pedir lo mismo" — el último pedido enviado desde este
+  //    navegador en ESTA tienda, guardado en localStorage (sin cuenta, ver
+  //    guardarUltimoPedido()/volverAPedir()). ──────────────────────────
+  protected readonly ultimoPedidoDisponible = signal(false);
+
   protected readonly productosFiltrados = computed<ProductoTienda[]>(() => {
     const texto = this.busqueda().trim().toLowerCase();
     const productos = this.detalle()?.productos ?? [];
@@ -63,23 +90,41 @@ export class CatalogoTiendaComponent implements OnInit {
     );
   });
 
-  /** Catálogo agrupado por categoría (en vez de una sola rejilla plana) —
-   *  el RPC ya devuelve los productos ordenados por categoriaNombre y
-   *  luego por nombre (ver migración 29), así que basta con juntar
-   *  consecutivos en el mismo grupo, sin volver a ordenar aquí. */
-  protected readonly productosPorCategoria = computed<
-    { categoriaId: number; categoriaNombre: string; productos: ProductoTienda[] }[]
-  >(() => {
-    const grupos: { categoriaId: number; categoriaNombre: string; productos: ProductoTienda[] }[] = [];
-    for (const producto of this.productosFiltrados()) {
+  /** Catálogo agrupado por categoría o por precio (en vez de una sola rejilla
+   *  plana) según agruparPorPrecio() — ver cambiarAgrupacion(). Por categoría,
+   *  el RPC ya devuelve los productos ordenados por categoriaNombre y luego
+   *  por nombre (ver migración 29), así que basta con juntar consecutivos en
+   *  el mismo grupo; por precio se ordenan aquí mismo de menor a mayor. */
+  protected readonly gruposProductos = computed<{ clave: string; titulo: string; productos: ProductoTienda[] }[]>(() => {
+    const productos = this.productosFiltrados();
+    const porPrecio = this.agruparPorPrecio();
+    const ordenados = porPrecio
+      ? [...productos].sort((a, b) => a.precio - b.precio || a.nombre.localeCompare(b.nombre))
+      : productos;
+
+    const grupos: { clave: string; titulo: string; productos: ProductoTienda[] }[] = [];
+    for (const producto of ordenados) {
+      const clave = porPrecio ? producto.precio.toFixed(2) : String(producto.categoriaId);
+      const titulo = porPrecio ? `$${producto.precio.toFixed(2)}` : producto.categoriaNombre;
       const grupoActual = grupos[grupos.length - 1];
-      if (grupoActual && grupoActual.categoriaId === producto.categoriaId) {
+      if (grupoActual && grupoActual.clave === clave) {
         grupoActual.productos.push(producto);
       } else {
-        grupos.push({ categoriaId: producto.categoriaId, categoriaNombre: producto.categoriaNombre, productos: [producto] });
+        grupos.push({ clave, titulo, productos: [producto] });
       }
     }
     return grupos;
+  });
+
+  /** Cuántas unidades de cada producto (sumando todas sus variantes/opciones)
+   *  ya están en el carrito — para mostrar el botón 🗑 junto a "Agregar" en el
+   *  catálogo solo cuando aplica (ver quitarProductoDelCarrito()). */
+  protected readonly cantidadesEnCarrito = computed<Record<number, number>>(() => {
+    const totales: Record<number, number> = {};
+    for (const linea of this.carrito()) {
+      totales[linea.productoId] = (totales[linea.productoId] ?? 0) + linea.cantidad;
+    }
+    return totales;
   });
 
   protected readonly totalCarrito = computed(() =>
@@ -104,12 +149,56 @@ export class CatalogoTiendaComponent implements OnInit {
 
   protected readonly precioUnitarioModal = computed(() => (this.productoEnModal()?.precio ?? 0) + this.precioExtraModal());
 
+  /** "Abierto ahora"/"Cerrado · abre…" calculado con la hora LOCAL del
+   *  navegador contra detalle().empresa.horario — null si la empresa no
+   *  configuró horario (no se muestra ningún badge en ese caso). */
+  protected readonly estadoHorario = computed<{ abierto: boolean; texto: string } | null>(() => {
+    const horario = this.detalle()?.empresa.horario ?? [];
+    if (horario.length === 0) return null;
+    const ahora = new Date();
+    const diaHoy = ahora.getDay();
+    const horaActual = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
+    const porDia = new Map(horario.map((h) => [h.dia, h]));
+
+    const hoy = porDia.get(diaHoy);
+    if (hoy && !hoy.cerrado && horaActual >= hoy.abre && horaActual < hoy.cierra) {
+      return { abierto: true, texto: `Abierto ahora · cierra a las ${hoy.cierra}` };
+    }
+
+    // Busca el próximo día con horario (empezando hoy, si es que todavía no abre hoy).
+    for (let i = 0; i < 7; i++) {
+      const dia = (diaHoy + i) % 7;
+      const fila = porDia.get(dia);
+      if (!fila || fila.cerrado) continue;
+      if (i === 0 && horaActual >= fila.abre) continue; // hoy ya cerró
+      const cuando = i === 0 ? `hoy a las ${fila.abre}` : i === 1 ? `mañana a las ${fila.abre}` : `el ${NOMBRES_DIAS[dia]} a las ${fila.abre}`;
+      return { abierto: false, texto: `Cerrado · abre ${cuando}` };
+    }
+    return { abierto: false, texto: 'Cerrado' };
+  });
+
+  /** null = sin pedido mínimo configurado. */
+  protected readonly pedidoMinimo = computed(() => this.detalle()?.empresa.pedidoMinimo ?? null);
+  /** Cuánto falta para llegar al mínimo — 0 si ya se alcanzó o no hay mínimo. */
+  protected readonly faltaParaMinimo = computed(() => {
+    const minimo = this.pedidoMinimo();
+    if (!minimo) return 0;
+    const falta = minimo - this.totalCarrito();
+    return falta > 0 ? falta : 0;
+  });
+  protected readonly cumpleMinimo = computed(() => this.faltaParaMinimo() === 0);
+
   /** Clave de la tienda actual (ver ngOnInit) — se reutiliza al mandar el
    *  pedido, para crearPedidoPendiente() (ver enviarPorWhatsapp()). */
   private clave = '';
 
   ngOnInit(): void {
     this.clave = this.route.snapshot.paramMap.get('clave') ?? '';
+    try {
+      this.ultimoPedidoDisponible.set(!!localStorage.getItem(this.claveUltimoPedido()));
+    } catch {
+      this.ultimoPedidoDisponible.set(false);
+    }
     this.tiendaService
       .tiendaDetalle(this.clave)
       .then((detalle) => {
@@ -118,9 +207,25 @@ export class CatalogoTiendaComponent implements OnInit {
           return;
         }
         this.detalle.set(detalle);
+        this.actualizarMetadatos(detalle.empresa);
       })
       .catch(() => this.error.set('No se pudo cargar el catálogo. Intenta de nuevo en un momento.'))
       .finally(() => this.cargando.set(false));
+  }
+
+  ngOnDestroy(): void {
+    // No deja el título/metadatos de ESTA tienda puestos si el navegador
+    // sigue vivo (SPA) y el cliente navega a otra pantalla.
+    this.titleService.setTitle('Saurix');
+    for (const propiedad of ['og:title', 'og:description', 'og:type', 'og:url', 'og:image']) {
+      this.metaService.removeTag(`property="${propiedad}"`);
+    }
+    for (const nombre of ['description', 'twitter:card', 'twitter:title', 'twitter:description', 'twitter:image']) {
+      this.metaService.removeTag(`name="${nombre}"`);
+    }
+    this.linkManifest?.remove();
+    this.linkIcono?.remove();
+    if (this.urlManifestAnterior) URL.revokeObjectURL(this.urlManifestAnterior);
   }
 
   subtotalLinea(linea: LineaCarritoTienda): number {
@@ -140,6 +245,23 @@ export class CatalogoTiendaComponent implements OnInit {
     this.vistaLista.set(lista);
     try {
       localStorage.setItem('tienda-vista', lista ? 'lista' : 'grid');
+    } catch {
+      // localStorage puede no estar disponible (modo privado, etc.) — no es crítico.
+    }
+  }
+
+  private leerAgrupacionGuardada(): boolean {
+    try {
+      return localStorage.getItem('tienda-agrupacion') === 'precio';
+    } catch {
+      return false;
+    }
+  }
+
+  cambiarAgrupacion(porPrecio: boolean): void {
+    this.agruparPorPrecio.set(porPrecio);
+    try {
+      localStorage.setItem('tienda-agrupacion', porPrecio ? 'precio' : 'categoria');
     } catch {
       // localStorage puede no estar disponible (modo privado, etc.) — no es crítico.
     }
@@ -283,6 +405,13 @@ export class CatalogoTiendaComponent implements OnInit {
     this.carrito.update((lineas) => lineas.filter((l) => l.claveLinea !== claveLinea));
   }
 
+  /** Botón 🗑 junto a "Agregar" en el catálogo (no en el carrito): quita de
+   *  un jalón TODAS las líneas de este producto, sin importar sus variantes
+   *  elegidas — para corregir rápido sin tener que abrir el carrito. */
+  quitarProductoDelCarrito(productoId: number): void {
+    this.carrito.update((lineas) => lineas.filter((l) => l.productoId !== productoId));
+  }
+
   // ── Enviar pedido (WhatsApp/correo) — NO se guarda nada en la base, ver
   //    el comentario grande en 27_tienda_publica.sql. La empresa recibe el
   //    mensaje, valida con el cliente y ella captura la venta a mano en
@@ -363,6 +492,9 @@ export class CatalogoTiendaComponent implements OnInit {
       this.formCliente.markAllAsTouched();
       return;
     }
+    // Defensa extra — el botón ya viene deshabilitado en el template si no
+    // se alcanza el mínimo (ver cumpleMinimo()).
+    if (!this.cumpleMinimo()) return;
     const empresa = this.detalle()?.empresa;
     const telefono = (empresa?.telefono ?? '').replace(/\D/g, '');
     if (!telefono) return;
@@ -391,6 +523,152 @@ export class CatalogoTiendaComponent implements OnInit {
         /* silencioso a propósito — ver comentario arriba */
       });
 
+    this.guardarUltimoPedido();
     this.modalEnviarAbierto.set(false);
+  }
+
+  // ── "Volver a pedir lo mismo" ─────────────────────────────────────
+  private claveUltimoPedido(): string {
+    return `tienda-ultimo-pedido-${this.clave}`;
+  }
+
+  private guardarUltimoPedido(): void {
+    try {
+      localStorage.setItem(this.claveUltimoPedido(), JSON.stringify(this.carrito()));
+      this.ultimoPedidoDisponible.set(true);
+    } catch {
+      // localStorage puede no estar disponible (modo privado, etc.) — no es crítico.
+    }
+  }
+
+  /** Carga el último pedido guardado DE VUELTA al carrito actual (lo
+   *  reemplaza, no lo suma) — el cliente lo puede seguir editando antes de
+   *  mandarlo de nuevo, igual que cualquier otro carrito armado a mano. */
+  volverAPedir(): void {
+    try {
+      const guardado = localStorage.getItem(this.claveUltimoPedido());
+      if (!guardado) return;
+      this.carrito.set(JSON.parse(guardado) as LineaCarritoTienda[]);
+    } catch {
+      // dato corrupto o de una versión vieja del carrito — se ignora.
+    }
+  }
+
+  // ── Compartir (copiar link / código QR) ───────────────────────────
+  protected linkTienda(): string {
+    return window.location.href;
+  }
+
+  protected qrTienda(): string {
+    return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(this.linkTienda())}`;
+  }
+
+  abrirCompartir(): void {
+    this.linkCopiado.set(false);
+    this.modalCompartirAbierto.set(true);
+  }
+
+  async copiarLink(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(this.linkTienda());
+      this.linkCopiado.set(true);
+      setTimeout(() => this.linkCopiado.set(false), 2000);
+    } catch {
+      // Sin permiso/soporte de portapapeles — el link ya está visible en el
+      // modal para copiarlo a mano.
+    }
+  }
+
+  /** Descarga el PNG del QR como archivo en vez de solo abrirlo — si el
+   *  navegador bloquea el fetch (CORS raro, sin red, etc.) cae a abrirlo en
+   *  una pestaña nueva, donde igual se puede guardar con clic derecho. */
+  async descargarQr(): Promise<void> {
+    try {
+      const respuesta = await fetch(this.qrTienda());
+      const blob = await respuesta.blob();
+      const url = URL.createObjectURL(blob);
+      const enlace = document.createElement('a');
+      enlace.href = url;
+      enlace.download = `qr-tienda-${this.clave}.png`;
+      enlace.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      window.open(this.qrTienda(), '_blank');
+    }
+  }
+
+  // ── Metadatos (título/Open Graph) y "Agregar a pantalla de inicio" ──
+  /** Pone el título de la pestaña y las etiquetas Open Graph/Twitter con
+   *  los datos de ESTA empresa — ayuda cuando el link se abre directo o en
+   *  apps que sí renderizan la página antes de armar la vista previa.
+   *  OJO: WhatsApp/Facebook arman su tarjeta leyendo el HTML tal cual lo
+   *  sirve el hosting, SIN ejecutar JavaScript — como este sitio es una SPA
+   *  de Angular en GitHub Pages (sin server-side rendering), esas apps en
+   *  particular van a seguir mostrando el título/ícono genérico de Saurix
+   *  en la vista previa del link, aunque esto sí corrija el título de la
+   *  pestaña y sirva si algún día se agrega prerenderizado por ruta. */
+  private actualizarMetadatos(empresa: EmpresaTienda): void {
+    const titulo = `${empresa.nombre} · Tienda en línea`;
+    const descripcion = empresa.descripcion || `Arma tu pedido en ${empresa.nombre} y mándalo por WhatsApp.`;
+    this.titleService.setTitle(titulo);
+    this.metaService.updateTag({ name: 'description', content: descripcion });
+    this.metaService.updateTag({ property: 'og:title', content: titulo });
+    this.metaService.updateTag({ property: 'og:description', content: descripcion });
+    this.metaService.updateTag({ property: 'og:type', content: 'website' });
+    this.metaService.updateTag({ property: 'og:url', content: window.location.href });
+    this.metaService.updateTag({ name: 'twitter:title', content: titulo });
+    this.metaService.updateTag({ name: 'twitter:description', content: descripcion });
+    if (empresa.logo) {
+      this.metaService.updateTag({ property: 'og:image', content: empresa.logo });
+      this.metaService.updateTag({ name: 'twitter:card', content: 'summary_large_image' });
+      this.metaService.updateTag({ name: 'twitter:image', content: empresa.logo });
+    }
+    this.actualizarAccesoDirecto(empresa);
+  }
+
+  /** Manifest + ícono dinámicos (por tienda) para que "Agregar a pantalla
+   *  de inicio" use el nombre/logo del negocio en vez del genérico de
+   *  Saurix — sin service worker (eso es harina de otro costal, afecta a
+   *  toda la app): nomás el ícono/nombre al agregarlo a mano desde el menú
+   *  del navegador, no el banner automático de "Instalar" de Android. */
+  private actualizarAccesoDirecto(empresa: EmpresaTienda): void {
+    try {
+      const manifest = {
+        name: empresa.nombre,
+        short_name: empresa.nombre.slice(0, 30),
+        start_url: window.location.pathname,
+        display: 'standalone',
+        background_color: '#ffffff',
+        theme_color: '#2563eb',
+        icons: empresa.logo
+          ? [
+              { src: empresa.logo, sizes: '192x192', type: 'image/jpeg' },
+              { src: empresa.logo, sizes: '512x512', type: 'image/jpeg' },
+            ]
+          : [],
+      };
+      if (this.urlManifestAnterior) URL.revokeObjectURL(this.urlManifestAnterior);
+      const url = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/json' }));
+      this.urlManifestAnterior = url;
+
+      if (!this.linkManifest) {
+        this.linkManifest = document.createElement('link');
+        this.linkManifest.rel = 'manifest';
+        document.head.appendChild(this.linkManifest);
+      }
+      this.linkManifest.href = url;
+
+      if (empresa.logo) {
+        if (!this.linkIcono) {
+          this.linkIcono = document.createElement('link');
+          this.linkIcono.rel = 'apple-touch-icon';
+          document.head.appendChild(this.linkIcono);
+        }
+        this.linkIcono.href = empresa.logo;
+      }
+    } catch {
+      // Navegador sin soporte de Blob/manifest dinámico — el catálogo sigue
+      // funcionando igual, nomás sin el ícono personalizado al agregarlo.
+    }
   }
 }

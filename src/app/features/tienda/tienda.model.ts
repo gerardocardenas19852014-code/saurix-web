@@ -48,6 +48,14 @@ export interface ProductoTienda {
   opciones: OpcionGrupoTienda[];
 }
 
+export interface HorarioDiaTienda {
+  /** 0 = domingo … 6 = sábado, igual que Date.getDay() en JS. */
+  dia: number;
+  abre: string;
+  cierra: string;
+  cerrado: boolean;
+}
+
 export interface EmpresaTienda {
   clave: string;
   nombre: string;
@@ -55,6 +63,12 @@ export interface EmpresaTienda {
   telefono: string | null;
   correo: string | null;
   logo: string | null;
+  /** Arreglo vacío = sin horario configurado (no se muestra el badge de
+   *  abierto/cerrado). */
+  horario: HorarioDiaTienda[];
+  metodosPago: string[];
+  /** null = sin pedido mínimo. */
+  pedidoMinimo: number | null;
 }
 
 export interface TiendaDetalle {

@@ -17,10 +17,37 @@
           <p>{{ d.empresa.descripcion }}</p>
         }
       </div>
+      <button type="button" class="tienda-compartir-boton" title="Compartir esta tienda" aria-label="Compartir esta tienda" (click)="abrirCompartir()">
+        🔗
+      </button>
       <button type="button" class="tienda-carrito-boton" (click)="carritoAbierto.set(true)">
         🛒 {{ cantidadArticulos() }}
       </button>
     </header>
+
+    <!-- Horario ("Abierto ahora"/"Cerrado…", ver estadoHorario() — null si la
+         empresa no configuró horario) y métodos de pago, si los configuró. -->
+    @if (estadoHorario(); as horario) {
+      <p class="tienda-horario-badge" [class.tienda-horario-cerrado]="!horario.abierto">
+        {{ horario.abierto ? '🟢' : '🔴' }} {{ horario.texto }}
+      </p>
+    }
+    @if (d.empresa.metodosPago.length > 0) {
+      <p class="tienda-metodos-pago">
+        💳 Formas de pago: {{ d.empresa.metodosPago.join(' · ') }}
+      </p>
+    }
+
+    <!-- "Volver a pedir lo mismo" — ver ultimoPedidoDisponible()/volverAPedir()
+         en el .ts; solo aparece si hay un pedido anterior guardado en ESTE
+         navegador para ESTA tienda y el carrito actual sigue vacío (si ya
+         trae algo agregado, no tiene caso ofrecer reemplazarlo). -->
+    @if (ultimoPedidoDisponible() && carrito().length === 0) {
+      <div class="tienda-volver-pedir">
+        <span>¿Pedir lo mismo que la última vez?</span>
+        <button type="button" (click)="volverAPedir()">Volver a pedir</button>
+      </div>
+    }
 
     <div class="tienda-busqueda">
       <input
@@ -37,9 +64,17 @@
       </div>
     </div>
 
-    @for (grupo of productosPorCategoria(); track grupo.categoriaId) {
+    <!-- Agrupar el catálogo por categoría (como siempre) o por precio — mismo
+         patrón de interruptor que el de cuadrícula/lista de arriba. -->
+    <div class="tienda-agrupar-toggle" role="group" aria-label="Agrupar productos por">
+      <span class="tienda-agrupar-etiqueta">Agrupar por:</span>
+      <button type="button" [class.activo]="!agruparPorPrecio()" (click)="cambiarAgrupacion(false)">Categoría</button>
+      <button type="button" [class.activo]="agruparPorPrecio()" (click)="cambiarAgrupacion(true)">Precio</button>
+    </div>
+
+    @for (grupo of gruposProductos(); track grupo.clave) {
       <section class="tienda-categoria">
-        <h2 class="tienda-categoria-titulo">{{ grupo.categoriaNombre }}</h2>
+        <h2 class="tienda-categoria-titulo">{{ grupo.titulo }}</h2>
         <div class="tienda-grid" [class.tienda-grid-lista]="vistaLista()">
           @for (producto of grupo.productos; track producto.id) {
             <div class="tienda-tarjeta" [class.tienda-tarjeta-agotada]="!producto.disponible">
@@ -58,12 +93,30 @@
                     <span class="tienda-tarjeta-precio">${{ producto.precio.toFixed(2) }}</span>
                     <span class="tienda-tarjeta-agotado-badge">Agotado</span>
                   } @else {
-                    <!-- Precio y acción en un solo botón (en vez de precio aparte
-                         + botón chico) — mismo patrón que el modal de variantes,
-                         para que sea igual de fácil de usar en toda la tienda. -->
-                    <button type="button" class="tienda-tarjeta-agregar" (click)="agregar(producto)">
-                      {{ producto.opciones.length > 0 ? 'Elegir' : 'Agregar' }} &bull; ${{ producto.precio.toFixed(2) }}
-                    </button>
+                    <div
+                      class="tienda-tarjeta-acciones"
+                      [class.tienda-tarjeta-acciones-con-quitar]="cantidadesEnCarrito()[producto.id]"
+                    >
+                      <!-- Precio y acción en un solo botón (en vez de precio aparte
+                           + botón chico) — mismo patrón que el modal de variantes,
+                           para que sea igual de fácil de usar en toda la tienda. -->
+                      <button type="button" class="tienda-tarjeta-agregar" (click)="agregar(producto)">
+                        {{ producto.opciones.length > 0 ? 'Elegir' : 'Agregar' }} &bull; ${{ producto.precio.toFixed(2) }}
+                      </button>
+                      <!-- Debajo de Agregar (no al lado) — así nunca compiten por
+                           ancho ni se ven chuecos entre sí. -->
+                      @if (cantidadesEnCarrito()[producto.id]; as cantidad) {
+                        <button
+                          type="button"
+                          class="tienda-tarjeta-quitar"
+                          title="Quitar del carrito"
+                          aria-label="Quitar del carrito"
+                          (click)="quitarProductoDelCarrito(producto.id)"
+                        >
+                          🗑 Quitar
+                        </button>
+                      }
+                    </div>
                   }
                 </div>
               </div>
@@ -140,7 +193,12 @@
             <strong>${{ totalCarrito().toFixed(2) }}</strong>
           </div>
 
-          <button type="button" class="tienda-enviar-boton" (click)="abrirEnvio()">Enviar pedido</button>
+          @if (faltaParaMinimo() > 0) {
+            <p class="tienda-minimo-aviso">
+              Te faltan ${{ faltaParaMinimo().toFixed(2) }} para llegar al pedido mínimo de ${{ pedidoMinimo()!.toFixed(2) }}.
+            </p>
+          }
+          <button type="button" class="tienda-enviar-boton" [disabled]="!cumpleMinimo()" (click)="abrirEnvio()">Enviar pedido</button>
           <p class="tienda-nota-manual">
             Al enviar, se abre WhatsApp o tu correo con el pedido ya armado — {{ d.empresa.nombre }} lo recibe,
             lo confirma contigo y lo captura por su cuenta. Esto no hace ningún cobro ni reserva de stock.
@@ -262,6 +320,29 @@
           }
         </div>
 
+        <!-- Resumen del pedido — para que el cliente lo revise ANTES de que se
+             abra WhatsApp (evita errores de dedo: producto equivocado,
+             cantidad de más, etc.). Mismos datos que arma construirMensaje(),
+             nomás en lista en vez de texto plano. -->
+        <div class="tienda-campo tienda-resumen">
+          <span>Revisa tu pedido</span>
+          <div class="tienda-resumen-lineas">
+            @for (linea of carrito(); track linea.claveLinea) {
+              <div class="tienda-resumen-linea">
+                <span>{{ linea.cantidad }}&times; {{ linea.nombreProducto }}</span>
+                <span>${{ subtotalLinea(linea).toFixed(2) }}</span>
+              </div>
+              @for (o of linea.opcionesElegidas; track o.valorNombre) {
+                <span class="tienda-resumen-opcion">{{ o.grupoNombre }}: {{ o.valorNombre }}</span>
+              }
+            }
+          </div>
+          <div class="tienda-resumen-total">
+            <span>Total</span>
+            <strong>${{ totalCarrito().toFixed(2) }}</strong>
+          </div>
+        </div>
+
         <div class="tienda-modal-footer tienda-modal-footer-envio">
           @if (d.empresa.telefono) {
             <button type="submit" class="tienda-enviar-boton">Enviar por WhatsApp</button>
@@ -270,6 +351,27 @@
           }
         </div>
       </form>
+    </div>
+  }
+
+  <!-- ── Modal: compartir esta tienda (copiar link / código QR) ── -->
+  @if (modalCompartirAbierto()) {
+    <div class="tienda-overlay" (click)="modalCompartirAbierto.set(false)">
+      <div class="tienda-modal" (click)="$event.stopPropagation()">
+        <div class="tienda-modal-header">
+          <h3>Compartir tienda</h3>
+          <button type="button" class="tienda-cerrar" (click)="modalCompartirAbierto.set(false)">✕</button>
+        </div>
+
+        <p class="tienda-compartir-link">{{ linkTienda() }}</p>
+        <button type="button" class="tienda-ubicacion-boton" (click)="copiarLink()">
+          {{ linkCopiado() ? '✅ Link copiado' : '📋 Copiar link' }}
+        </button>
+
+        <img class="tienda-compartir-qr" [src]="qrTienda()" alt="Código QR de esta tienda" />
+        <button type="button" class="tienda-ubicacion-boton" (click)="descargarQr()">⬇️ Descargar código QR</button>
+        <p class="hint" style="text-align:center;">Imprímelo y pégalo en tu local o en tus empaques.</p>
+      </div>
     </div>
   }
 }

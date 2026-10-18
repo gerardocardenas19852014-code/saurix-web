@@ -75,6 +75,45 @@
   }
 }
 
+/* Interruptor categoría/precio — mismo patrón de píldora que
+ * .tienda-vista-toggle de abajo, nomás con texto en vez de iconos. */
+.tienda-agrupar-toggle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tienda-agrupar-etiqueta {
+  font-size: 0.85rem;
+  color: var(--texto-tenue, #6b7280);
+}
+
+.tienda-agrupar-toggle button {
+  border: 1px solid var(--borde, #e5e7eb);
+  background: var(--fondo-tarjeta, #fff);
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--texto-tenue, #6b7280);
+
+  &:first-of-type {
+    border-radius: 8px 0 0 8px;
+    border-right: none;
+  }
+
+  &:last-of-type {
+    border-radius: 0 8px 8px 0;
+  }
+
+  &.activo {
+    background: var(--color-primario, #2563eb);
+    border-color: var(--color-primario, #2563eb);
+    color: #fff;
+  }
+}
+
 /* Interruptor cuadrícula/lista — mismo tipo de par de botones que
  * .tienda-ubicacion-boton, pero agrupados en una sola píldora. */
 .tienda-vista-toggle {
@@ -104,9 +143,9 @@
   }
 }
 
-/* Un bloque .tienda-categoria por cada categoría de producto (ver
- * productosPorCategoria() en catalogo-tienda.component.ts) — separa
- * visualmente el catálogo en vez de una sola rejilla plana. */
+/* Un bloque .tienda-categoria por cada grupo (categoría o precio, ver
+ * gruposProductos() en catalogo-tienda.component.ts) — separa visualmente
+ * el catálogo en vez de una sola rejilla plana. */
 .tienda-categoria {
   margin-bottom: 28px;
 
@@ -126,6 +165,14 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 14px;
+
+  /* En celular, minmax(190px) solo deja entrar 1 columna y cada tarjeta
+   * termina ocupando toda la pantalla (foto gigante, se ve "perdida") — se
+   * fuerzan 2 columnas angostas, igual que se ven en escritorio. */
+  @media (max-width: 480px) {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
 
   /* Lista: una sola columna de renglones compactos (foto chica a la
    * izquierda, nombre/precio a la derecha) en vez de tarjetas — mismo
@@ -264,10 +311,18 @@
   color: var(--texto-tenue, #6b7280);
 }
 
+.tienda-tarjeta-acciones {
+  /* Agregar y Quitar (cuando aplica) uno debajo del otro, nunca lado a lado
+   * — así nunca compiten por ancho ni terminan con alturas distintas entre
+   * sí (antes, lado a lado, "Agregar • $25.00" se envolvía a 2 líneas en
+   * tarjetas angostas y el 🗑 se quedaba chico junto a él). */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
 .tienda-tarjeta-agregar {
-  /* Ancho completo, precio incluido en el texto — mismo patrón que
-   * .tienda-modal-boton-agregar (ver el modal de variantes), para que el
-   * precio y la acción de agregar siempre estén juntos en toda la tienda. */
   width: 100%;
   border: none;
   background: var(--color-primario, #2563eb);
@@ -275,6 +330,21 @@
   border-radius: 8px;
   padding: 10px 12px;
   font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tienda-tarjeta-quitar {
+  /* Mismo "look" que .tienda-tarjeta-agregar (relleno, sin borde, mismas
+   * esquinas) nomás que en rojo — para que se vea como un botón hermano del
+   * de Agregar, ahora justo debajo. */
+  width: 100%;
+  border: none;
+  background: var(--color-error, #b91c1c);
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
 }
@@ -622,4 +692,122 @@
   font-weight: 600;
   font-size: 1rem;
   cursor: pointer;
+}
+
+// ── Compartir, horario, métodos de pago, volver a pedir, mínimo, resumen ──
+.tienda-compartir-boton {
+  /* Mismo "look" que .tienda-carrito-boton (su hermano en el header). */
+  border: 1px solid var(--borde, #e5e7eb);
+  background: var(--fondo-tarjeta, #fff);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.tienda-horario-badge {
+  display: inline-block;
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  color: var(--texto-tenue, #6b7280);
+
+  &.tienda-horario-cerrado {
+    color: var(--color-error, #b91c1c);
+  }
+}
+
+.tienda-metodos-pago {
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  color: var(--texto-tenue, #6b7280);
+}
+
+.tienda-volver-pedir {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--fondo-sutil, #f3f4f6);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+
+  button {
+    flex-shrink: 0;
+    border: none;
+    background: var(--color-primario, #2563eb);
+    color: #fff;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+}
+
+.tienda-minimo-aviso {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  color: var(--color-error, #b91c1c);
+  text-align: center;
+}
+
+.tienda-resumen {
+  background: var(--fondo-sutil, #f3f4f6);
+  border-radius: 8px;
+  padding: 10px 12px;
+
+  > span:first-child {
+    font-weight: 600;
+  }
+}
+
+.tienda-resumen-lineas {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0;
+}
+
+.tienda-resumen-linea {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.tienda-resumen-opcion {
+  font-size: 0.78rem;
+  color: var(--texto-tenue, #6b7280);
+  padding-left: 12px;
+}
+
+.tienda-resumen-total {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--borde, #e5e7eb);
+  padding-top: 6px;
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+.tienda-compartir-link {
+  background: var(--fondo-sutil, #f3f4f6);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 0.85rem;
+  word-break: break-all;
+  text-align: center;
+  margin: 0 0 10px;
+}
+
+.tienda-compartir-qr {
+  display: block;
+  width: 180px;
+  height: 180px;
+  margin: 14px auto;
+  border-radius: 8px;
+  border: 1px solid var(--borde, #e5e7eb);
 }
