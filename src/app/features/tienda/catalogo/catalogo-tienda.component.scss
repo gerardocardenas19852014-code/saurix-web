@@ -188,17 +188,32 @@
       align-items: center;
     }
 
-    .tienda-tarjeta-foto {
+    .tienda-tarjeta-foto-contenedor {
       width: 64px;
       height: 64px;
-      aspect-ratio: auto;
       flex-shrink: 0;
       border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .tienda-tarjeta-foto {
+      width: 100%;
+      height: 100%;
+      aspect-ratio: auto;
       object-fit: contain;
 
       &-vacia {
         font-size: 1.4rem;
       }
+    }
+
+    // En lista la foto es chica — el botón "+" también, para no taparla.
+    .tienda-tarjeta-foto-ampliar {
+      width: 18px;
+      height: 18px;
+      top: 2px;
+      right: 2px;
+      font-size: 0.65rem;
     }
 
     .tienda-tarjeta-cuerpo {
@@ -235,6 +250,11 @@
       padding: 8px 14px;
       font-size: 0.9rem;
     }
+
+    .tienda-tarjeta-stepper {
+      width: auto;
+      min-width: 150px;
+    }
   }
 }
 
@@ -249,6 +269,11 @@
   &-agotada {
     opacity: 0.55;
   }
+}
+
+.tienda-tarjeta-foto-contenedor {
+  position: relative;
+  width: 100%;
 }
 
 .tienda-tarjeta-foto {
@@ -269,6 +294,27 @@
     justify-content: center;
     font-size: 2rem;
   }
+}
+
+.tienda-tarjeta-foto-ampliar {
+  /* Sobre la esquina de la foto (no sobre el botón Agregar) — un "+" chico
+   * y semitransparente para no estorbar, que abre la imagen en grande. */
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 1rem;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .tienda-tarjeta-cuerpo {
@@ -347,6 +393,54 @@
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
+}
+
+.tienda-tarjeta-stepper {
+  /* +/- con el precio (cantidad × precio) en el centro, en vez de Agregar +
+   * Quitar apilados — mismo ancho que ocupaban antes pero con los botones
+   * de los extremos bien grandes (44px, tamaño mínimo recomendado de toque
+   * en celular) y el centro mostrando de un vistazo cuánto lleva de ese
+   * producto. Solo aparece para productos SIN variantes, ver el comentario
+   * en cambiarCantidadProducto() del componente. */
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-primario, #2563eb);
+}
+
+.tienda-tarjeta-stepper-boton {
+  flex: 0 0 44px;
+  min-height: 44px;
+  border: none;
+  background: var(--color-primario, #2563eb);
+  color: #fff;
+  font-size: 1.4rem;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tienda-tarjeta-stepper-centro {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 6px;
+  background: var(--fondo-tarjeta, #fff);
+  color: var(--color-primario, #2563eb);
+  font-weight: 600;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  strong {
+    font-size: 0.95rem;
+  }
 }
 
 .tienda-pie-portal {
@@ -513,6 +607,37 @@
 
   h3 {
     margin: 0;
+  }
+}
+
+.tienda-imagen-ampliada {
+  position: relative;
+  margin: auto;
+  max-width: 92vw;
+  max-height: 92vh;
+
+  img {
+    display: block;
+    max-width: 92vw;
+    max-height: 92vh;
+    border-radius: 12px;
+    object-fit: contain;
+    background: var(--fondo-tarjeta, #fff);
+  }
+
+  &-cerrar {
+    position: absolute;
+    top: -14px;
+    right: -14px;
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    border: none;
+    background: #fff;
+    color: #111827;
+    font-size: 1rem;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
   }
 }
 
@@ -718,9 +843,26 @@
 }
 
 .tienda-metodos-pago {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   margin: 0 0 10px;
+}
+
+.tienda-metodos-pago-etiqueta {
   font-size: 0.85rem;
   color: var(--texto-tenue, #6b7280);
+}
+
+.tienda-metodo-pago-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--fondo-sutil, #f3f4f6);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.85rem;
 }
 
 .tienda-volver-pedir {
@@ -810,4 +952,14 @@
   margin: 14px auto;
   border-radius: 8px;
   border: 1px solid var(--borde, #e5e7eb);
+}
+
+.tienda-envio-info {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: var(--texto-tenue, #6b7280);
+
+  &.tienda-envio-fuera-zona {
+    color: var(--color-error, #b91c1c);
+  }
 }

@@ -14,6 +14,38 @@ type SeleccionOpciones = Record<number, number[]>;
  *  domingo) — para armar el texto "Cerrado · abre el martes a las…". */
 const NOMBRES_DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 
+/** Distancia en línea recta entre 2 puntos (fórmula de Haversine, km) — NO
+ *  es distancia real por calles (eso necesitaría contratar un servicio
+ *  externo tipo Google Maps), pero alcanza para estimar un envío sin
+ *  depender de ninguna cuenta/llave de API. */
+function distanciaKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const radianes = Math.PI / 180;
+  const dLat = (lat2 - lat1) * radianes;
+  const dLng = (lng2 - lng1) * radianes;
+  const a =
+    Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * radianes) * Math.cos(lat2 * radianes) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/** metodosPago es texto libre (lo captura la empresa en Seguridad →
+ *  Empresas, sin catálogo cerrado — ver 32_tienda_horario_pago_minimo.sql),
+ *  así que el icono se adivina por palabras clave en vez de un catálogo
+ *  fijo de opciones. Si no coincide con ninguna, se muestra sin icono (solo
+ *  el texto tal cual lo escribió la empresa). */
+function calcularIconoMetodoPago(metodo: string): string {
+  const texto = metodo
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  if (texto.includes('efectivo')) return '💵';
+  if (texto.includes('tarjeta') || texto.includes('credito') || texto.includes('debito')) return '💳';
+  if (texto.includes('transfer') || texto.includes('deposito') || texto.includes('spei')) return '🏦';
+  if (texto.includes('paypal')) return '🅿️';
+  if (texto.includes('mercado pago') || texto.includes('mercadopago')) return '🅼';
+  return '🏷️';
+}
+
 @Component({
   selector: 'app-catalogo-tienda',
   standalone: true,
@@ -80,6 +112,9 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
   //    navegador en ESTA tienda, guardado en localStorage (sin cuenta, ver
   //    guardarUltimoPedido()/volverAPedir()). ──────────────────────────
   protected readonly ultimoPedidoDisponible = signal(false);
+
+  // ── Ver imagen grande (botón "+" sobre la foto del producto). ────────
+  protected readonly imagenAmpliada = signal<string | null>(null);
 
   protected readonly productosFiltrados = computed<ProductoTienda[]>(() => {
     const texto = this.busqueda().trim().toLowerCase();
@@ -187,6 +222,27 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
     return falta > 0 ? falta : 0;
   });
   protected readonly cumpleMinimo = computed(() => this.faltaParaMinimo() === 0);
+
+  /** Envío estimado según la distancia en línea recta entre el negocio y la
+   *  ubicación que el cliente comparte (ver ubicacion()/compartirUbicacion())
+   *  — null si la empresa no configuró envío por distancia o el cliente
+   *  todavía no comparte su ubicación. fueraDeZona es solo informativo, NO
+   *  bloquea el envío (la empresa de todas formas valida el pedido a mano). */
+  protected readonly envioInfo = computed<{ km: number; costo: number; fueraDeZona: boolean } | null>(() => {
+    const empresa = this.detalle()?.empresa;
+    const miUbicacion = this.ubicacion();
+    if (!empresa || !miUbicacion || empresa.envioOrigenLat == null || empresa.envioOrigenLng == null || !empresa.envioPrecioKm) {
+      return null;
+    }
+    const km = distanciaKm(empresa.envioOrigenLat, empresa.envioOrigenLng, miUbicacion.lat, miUbicacion.lng);
+    const costo = Math.max(km * empresa.envioPrecioKm, empresa.envioMinimo ?? 0);
+    const fueraDeZona = empresa.envioDistanciaMaximaKm != null && km > empresa.envioDistanciaMaximaKm;
+    return { km, costo, fueraDeZona };
+  });
+
+  /** Total del carrito + envío estimado (si aplica) — lo que de verdad se
+   *  manda como "Total" en el mensaje de WhatsApp cuando hay envío. */
+  protected readonly totalConEnvio = computed(() => this.totalCarrito() + (this.envioInfo()?.costo ?? 0));
 
   /** Clave de la tienda actual (ver ngOnInit) — se reutiliza al mandar el
    *  pedido, para crearPedidoPendiente() (ver enviarPorWhatsapp()). */
@@ -412,6 +468,38 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
     this.carrito.update((lineas) => lineas.filter((l) => l.productoId !== productoId));
   }
 
+  /** +/- del catálogo (stepper): solo aplica a productos SIN variantes
+   *  (opciones.length === 0), donde hay como máximo una línea de carrito
+   *  por producto y su clave es siempre la misma (sin opciones elegidas).
+   *  Para productos CON variantes no hay un +/- simple porque un mismo
+   *  producto puede tener varias líneas (una por combinación de opciones
+   *  elegida) y no hay forma de saber cuál debe bajar — esos productos
+   *  siguen usando "Elegir" (abre el modal) + el botón 🗑 Quitar. */
+  cambiarCantidadProducto(producto: ProductoTienda, delta: number): void {
+    if (delta > 0) {
+      this.agregarLineaAlCarrito(producto, [], 1);
+      return;
+    }
+    const claveLinea = this.claveLineaDe(producto.id, []);
+    this.cambiarCantidadLinea(claveLinea, delta);
+  }
+
+  /** Botón "+" sobre la foto del producto (catálogo) — abre la imagen en
+   *  grande encima de todo (ver imagenAmpliada()/.tienda-imagen-ampliada en
+   *  el HTML/SCSS). Solo la vista, no cambia nada del carrito. */
+  ampliarImagen(url: string): void {
+    this.imagenAmpliada.set(url);
+  }
+
+  cerrarImagenAmpliada(): void {
+    this.imagenAmpliada.set(null);
+  }
+
+  /** Wrapper del template: ver calcularIconoMetodoPago() arriba del archivo. */
+  protected iconoMetodoPago(metodo: string): string {
+    return calcularIconoMetodoPago(metodo);
+  }
+
   // ── Enviar pedido (WhatsApp/correo) — NO se guarda nada en la base, ver
   //    el comentario grande en 27_tienda_publica.sql. La empresa recibe el
   //    mensaje, valida con el cliente y ella captura la venta a mano en
@@ -470,13 +558,18 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
       .join('\n\n');
 
     const ubicacion = this.ubicacion();
+    const envio = this.envioInfo();
 
     return [
       `Pedido para ${empresa?.nombre ?? ''}`,
       '',
       lineas,
       '',
-      `Total: $${this.totalCarrito().toFixed(2)}`,
+      `Subtotal: $${this.totalCarrito().toFixed(2)}`,
+      envio
+        ? `Envío estimado (${envio.km.toFixed(1)} km): $${envio.costo.toFixed(2)}${envio.fueraDeZona ? ' ⚠️ fuera del radio de entrega habitual' : ''}`
+        : '',
+      envio ? `Total con envío: $${this.totalConEnvio().toFixed(2)}` : '',
       '',
       `Cliente: ${nombreCliente}`,
       `Teléfono: ${telefonoCliente}`,

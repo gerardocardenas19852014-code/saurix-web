@@ -10,7 +10,7 @@
 export type TipoColumna = 't' | 'u' | 'n' | 'f' | 'h' | 'b' | 'j';
 
 const MAPA: Record<string, [string, string, string]> = {
-  Empresa: ['seguridad', 'empresa', 'id:n,clave:t,nombre:t,max_usuarios:n,descripcion_publica:t,telefono_pedidos:t,correo_pedidos:t,logo_publico:t,catalogo_publico_activo:b,horario_atencion:j,metodos_pago:j,pedido_minimo:n,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
+  Empresa: ['seguridad', 'empresa', 'id:n,clave:t,nombre:t,max_usuarios:n,descripcion_publica:t,telefono_pedidos:t,correo_pedidos:t,logo_publico:t,catalogo_publico_activo:b,horario_atencion:j,metodos_pago:j,pedido_minimo:n,envio_origen_lat:n,envio_origen_lng:n,envio_precio_km:n,envio_minimo:n,envio_distancia_maxima_km:n,volver_pedir_activo:b,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   EmpresaModulo: ['seguridad', 'empresa_modulo', 'id:n,empresa_id:n,modulo_clave:t,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   CitaMedicaMiembro: ['familia', 'cita_medica_miembro', 'id:n,miembro_familia_id:n,motivo:t,especialidad:t,fecha:f,lugar:t,notas:t,completada:b,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],
   CitaMedicaMiembroAdjunto: ['familia', 'cita_medica_miembro_adjunto', 'id:n,cita_medica_miembro_id:n,nombre_archivo:t,tipo_contenido:t,ruta_storage:t,tamano_bytes:n,comentario:t,fecha_creacion:h,fecha_modificacion:h,creado_por:n,modificado_por:n,activo:b'],

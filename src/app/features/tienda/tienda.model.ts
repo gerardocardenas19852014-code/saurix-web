@@ -69,6 +69,18 @@ export interface EmpresaTienda {
   metodosPago: string[];
   /** null = sin pedido mínimo. */
   pedidoMinimo: number | null;
+  /** Si está en false, no se muestra el banner "¿Pedir lo mismo que la
+   *  última vez?" aunque el navegador tenga un pedido anterior guardado —
+   *  ver volverPedirActivo() de la empresa en el panel y el banner en
+   *  catalogo-tienda.component.html. */
+  volverPedirActivo: boolean;
+  // ── Envío por distancia (línea recta) — ver catalogo-tienda.component.ts.
+  // null en origen o en precioKm = envío por distancia desactivado. ──────
+  envioOrigenLat: number | null;
+  envioOrigenLng: number | null;
+  envioPrecioKm: number | null;
+  envioMinimo: number | null;
+  envioDistanciaMaximaKm: number | null;
 }
 
 export interface TiendaDetalle {

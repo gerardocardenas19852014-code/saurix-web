@@ -74,6 +74,20 @@ export interface Empresa {
   metodosPago?: string[] | null;
   /** null/0 = sin pedido mínimo. */
   pedidoMinimo?: number | null;
+  /** Si está en false, la tienda no ofrece "volver a pedir lo mismo" aunque
+   *  el cliente tenga un pedido anterior guardado en su navegador. Default
+   *  true (no cambia el comportamiento de tiendas ya configuradas). */
+  volverPedirActivo?: boolean;
+  // ── Envío por distancia (línea recta) — ver catalogo-tienda.component.ts ──
+  /** Ubicación del negocio; null = envío por distancia desactivado. */
+  envioOrigenLat?: number | null;
+  envioOrigenLng?: number | null;
+  /** null/0 junto con lo anterior = desactivado. */
+  envioPrecioKm?: number | null;
+  /** Cargo mínimo de envío; null = sin mínimo. */
+  envioMinimo?: number | null;
+  /** Radio de entrega; null = sin límite (no bloquea, solo advierte). */
+  envioDistanciaMaximaKm?: number | null;
 }
 
 /**
@@ -176,6 +190,16 @@ export class EmpresasComponent implements OnInit, OnDestroy {
     // (la tienda no muestra el badge de abierto/cerrado), aunque las filas
     // ya tengan valores de antes de apagarlo.
     horarioActivo: [false],
+    // Apagarlo no borra el pedido guardado en el navegador del cliente,
+    // solo deja de ofrecer el banner — ver guardarEmpresa().
+    volverPedirActivo: [true],
+    // ── Envío por distancia (línea recta) — null/vacío en origen o precio
+    // por km = desactivado, ver catalogo-tienda.component.ts. ──────────
+    envioOrigenLat: this.fb.control<number | null>(null),
+    envioOrigenLng: this.fb.control<number | null>(null),
+    envioPrecioKm: this.fb.control<number | null>(null, [Validators.min(0)]),
+    envioMinimo: this.fb.control<number | null>(null, [Validators.min(0)]),
+    envioDistanciaMaximaKm: this.fb.control<number | null>(null, [Validators.min(0)]),
   });
 
   // ── Logo de la tienda pública (mismo patrón que fotoActual en productos.component.ts) ──
@@ -187,6 +211,10 @@ export class EmpresasComponent implements OnInit, OnDestroy {
   // criterio que logoActual: se arma al abrir el modal y se lee al guardar. ──
   protected readonly nombresDias = DIAS_SEMANA;
   protected readonly horarioFilas = signal<HorarioDiaEmpresa[]>(horarioPorDefecto());
+
+  // ── "Usar mi ubicación actual" para el origen del envío ─────────────
+  protected readonly obteniendoUbicacionEnvio = signal(false);
+  protected readonly errorUbicacionEnvio = signal<string | null>(null);
 
   protected readonly formAdmin = this.fb.nonNullable.group({
     nombreUsuario: ['', [Validators.required, Validators.minLength(4)]],
@@ -232,10 +260,17 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       pedidoMinimo: null,
       metodosPagoTexto: '',
       horarioActivo: false,
+      volverPedirActivo: true,
+      envioOrigenLat: null,
+      envioOrigenLng: null,
+      envioPrecioKm: null,
+      envioMinimo: null,
+      envioDistanciaMaximaKm: null,
     });
     this.logoActual.set('');
     this.logoAmpliado.set(false);
     this.horarioFilas.set(horarioPorDefecto());
+    this.errorUbicacionEnvio.set(null);
     this.formEmpresa.controls.clave.enable();
     this.modalEmpresa.set(true);
   }
@@ -255,7 +290,14 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       pedidoMinimo: empresa.pedidoMinimo ?? null,
       metodosPagoTexto: (empresa.metodosPago ?? []).join(', '),
       horarioActivo: horarioGuardado.length > 0,
+      volverPedirActivo: empresa.volverPedirActivo ?? true,
+      envioOrigenLat: empresa.envioOrigenLat ?? null,
+      envioOrigenLng: empresa.envioOrigenLng ?? null,
+      envioPrecioKm: empresa.envioPrecioKm ?? null,
+      envioMinimo: empresa.envioMinimo ?? null,
+      envioDistanciaMaximaKm: empresa.envioDistanciaMaximaKm ?? null,
     });
+    this.errorUbicacionEnvio.set(null);
     this.logoActual.set(empresa.logoPublico ?? '');
     this.logoAmpliado.set(false);
     // Rellena los 7 días — si falta alguno en lo guardado (dato viejo/
@@ -271,6 +313,38 @@ export class EmpresasComponent implements OnInit, OnDestroy {
    *  FormArray porque son siempre exactamente 7 filas fijas, más simple así. */
   actualizarHorarioFila(dia: number, cambios: Partial<HorarioDiaEmpresa>): void {
     this.horarioFilas.update((filas) => filas.map((f) => (f.dia === dia ? { ...f, ...cambios } : f)));
+  }
+
+  /** Llena envioOrigenLat/Lng con la ubicación del dispositivo DESDE EL QUE
+   *  SE CONFIGURA (pensado para usarse estando físicamente en el negocio) —
+   *  mismo patrón que compartirUbicacion() en catalogo-tienda.component.ts.
+   *  Los campos se pueden seguir editando a mano después, por si el GPS no
+   *  cae exacto o se configura desde otro lugar. */
+  usarUbicacionActualEnvio(): void {
+    if (!('geolocation' in navigator)) {
+      this.errorUbicacionEnvio.set('Tu navegador no permite compartir ubicación.');
+      return;
+    }
+    this.obteniendoUbicacionEnvio.set(true);
+    this.errorUbicacionEnvio.set(null);
+    navigator.geolocation.getCurrentPosition(
+      (posicion) => {
+        this.formEmpresa.patchValue({
+          envioOrigenLat: Number(posicion.coords.latitude.toFixed(6)),
+          envioOrigenLng: Number(posicion.coords.longitude.toFixed(6)),
+        });
+        this.obteniendoUbicacionEnvio.set(false);
+      },
+      (error) => {
+        this.obteniendoUbicacionEnvio.set(false);
+        this.errorUbicacionEnvio.set(
+          error.code === error.PERMISSION_DENIED
+            ? 'No autorizaste compartir tu ubicación — puedes escribir las coordenadas a mano.'
+            : 'No se pudo obtener tu ubicación. Intenta de nuevo o escríbela a mano.',
+        );
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
   }
 
   guardarEmpresa(): void {
@@ -294,6 +368,12 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       pedidoMinimo: valor.pedidoMinimo,
       metodosPago: metodosPago.length > 0 ? metodosPago : null,
       horarioAtencion: valor.horarioActivo ? this.horarioFilas() : null,
+      volverPedirActivo: valor.volverPedirActivo,
+      envioOrigenLat: valor.envioOrigenLat,
+      envioOrigenLng: valor.envioOrigenLng,
+      envioPrecioKm: valor.envioPrecioKm,
+      envioMinimo: valor.envioMinimo,
+      envioDistanciaMaximaKm: valor.envioDistanciaMaximaKm,
     };
     const peticion = edicion
       ? this.data.modificacion<Empresa>('Empresa', {

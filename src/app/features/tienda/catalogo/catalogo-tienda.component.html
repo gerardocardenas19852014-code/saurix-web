@@ -33,16 +33,19 @@
       </p>
     }
     @if (d.empresa.metodosPago.length > 0) {
-      <p class="tienda-metodos-pago">
-        💳 Formas de pago: {{ d.empresa.metodosPago.join(' · ') }}
-      </p>
+      <div class="tienda-metodos-pago">
+        <span class="tienda-metodos-pago-etiqueta">Formas de pago:</span>
+        @for (metodo of d.empresa.metodosPago; track metodo) {
+          <span class="tienda-metodo-pago-item">{{ iconoMetodoPago(metodo) }} {{ metodo }}</span>
+        }
+      </div>
     }
 
     <!-- "Volver a pedir lo mismo" — ver ultimoPedidoDisponible()/volverAPedir()
          en el .ts; solo aparece si hay un pedido anterior guardado en ESTE
          navegador para ESTA tienda y el carrito actual sigue vacío (si ya
          trae algo agregado, no tiene caso ofrecer reemplazarlo). -->
-    @if (ultimoPedidoDisponible() && carrito().length === 0) {
+    @if (ultimoPedidoDisponible() && carrito().length === 0 && d.empresa.volverPedirActivo) {
       <div class="tienda-volver-pedir">
         <span>¿Pedir lo mismo que la última vez?</span>
         <button type="button" (click)="volverAPedir()">Volver a pedir</button>
@@ -78,11 +81,24 @@
         <div class="tienda-grid" [class.tienda-grid-lista]="vistaLista()">
           @for (producto of grupo.productos; track producto.id) {
             <div class="tienda-tarjeta" [class.tienda-tarjeta-agotada]="!producto.disponible">
-              @if (producto.foto) {
-                <img class="tienda-tarjeta-foto" [src]="producto.foto" [alt]="producto.nombre" />
-              } @else {
-                <div class="tienda-tarjeta-foto tienda-tarjeta-foto-vacia">📦</div>
-              }
+              <div class="tienda-tarjeta-foto-contenedor">
+                @if (producto.foto; as foto) {
+                  <img class="tienda-tarjeta-foto" [src]="foto" [alt]="producto.nombre" />
+                  <!-- "+" sobre la foto (no sobre Agregar) — abre la imagen en
+                       grande, ver imagenAmpliada()/ampliarImagen() en el .ts. -->
+                  <button
+                    type="button"
+                    class="tienda-tarjeta-foto-ampliar"
+                    title="Ver imagen grande"
+                    aria-label="Ver imagen grande de {{ producto.nombre }}"
+                    (click)="ampliarImagen(foto)"
+                  >
+                    +
+                  </button>
+                } @else {
+                  <div class="tienda-tarjeta-foto tienda-tarjeta-foto-vacia">📦</div>
+                }
+              </div>
               <div class="tienda-tarjeta-cuerpo">
                 <strong>{{ producto.nombre }}</strong>
                 @if (producto.descripcion) {
@@ -92,20 +108,46 @@
                   @if (!producto.disponible) {
                     <span class="tienda-tarjeta-precio">${{ producto.precio.toFixed(2) }}</span>
                     <span class="tienda-tarjeta-agotado-badge">Agotado</span>
+                  } @else if (producto.opciones.length === 0 && cantidadesEnCarrito()[producto.id]; as cantidad) {
+                    <!-- Producto simple (sin variantes) ya en el carrito: +/-
+                         con el precio (cantidad × precio) en el centro, en vez
+                         de Agregar + Quitar apilados — ocupa el mismo ancho
+                         pero con botones más grandes para tocar en celular. -->
+                    <div class="tienda-tarjeta-stepper">
+                      <button
+                        type="button"
+                        class="tienda-tarjeta-stepper-boton"
+                        aria-label="Quitar uno de {{ producto.nombre }}"
+                        (click)="cambiarCantidadProducto(producto, -1)"
+                      >
+                        −
+                      </button>
+                      <span class="tienda-tarjeta-stepper-centro">
+                        <strong>{{ cantidad }}</strong> &bull; ${{ (cantidad * producto.precio).toFixed(2) }}
+                      </span>
+                      <button
+                        type="button"
+                        class="tienda-tarjeta-stepper-boton"
+                        aria-label="Agregar uno de {{ producto.nombre }}"
+                        (click)="cambiarCantidadProducto(producto, 1)"
+                      >
+                        +
+                      </button>
+                    </div>
                   } @else {
-                    <div
-                      class="tienda-tarjeta-acciones"
-                      [class.tienda-tarjeta-acciones-con-quitar]="cantidadesEnCarrito()[producto.id]"
-                    >
+                    <div class="tienda-tarjeta-acciones">
                       <!-- Precio y acción en un solo botón (en vez de precio aparte
                            + botón chico) — mismo patrón que el modal de variantes,
                            para que sea igual de fácil de usar en toda la tienda. -->
                       <button type="button" class="tienda-tarjeta-agregar" (click)="agregar(producto)">
                         {{ producto.opciones.length > 0 ? 'Elegir' : 'Agregar' }} &bull; ${{ producto.precio.toFixed(2) }}
                       </button>
-                      <!-- Debajo de Agregar (no al lado) — así nunca compiten por
-                           ancho ni se ven chuecos entre sí. -->
-                      @if (cantidadesEnCarrito()[producto.id]; as cantidad) {
+                      <!-- Solo productos con variantes llegan aquí ya en el
+                           carrito (los simples usan el stepper de arriba): no
+                           hay un +/- de una sola línea porque puede haber varias
+                           combinaciones de opciones, así que este botón quita
+                           TODAS de un jalón — ver quitarProductoDelCarrito(). -->
+                      @if (producto.opciones.length > 0 && cantidadesEnCarrito()[producto.id]; as cantidad) {
                         <button
                           type="button"
                           class="tienda-tarjeta-quitar"
@@ -305,6 +347,14 @@
               <span>📍 Ubicación compartida</span>
               <button type="button" (click)="quitarUbicacion()">Quitar</button>
             </div>
+            @if (envioInfo(); as envio) {
+              <p class="tienda-envio-info" [class.tienda-envio-fuera-zona]="envio.fueraDeZona">
+                🚚 Envío estimado: ${{ envio.costo.toFixed(2) }} ({{ envio.km.toFixed(1) }} km)
+                @if (envio.fueraDeZona) {
+                  <br />⚠️ Estás fuera del radio de entrega habitual — confirma con el negocio.
+                }
+              </p>
+            }
           } @else {
             <button
               type="button"
@@ -337,9 +387,15 @@
               }
             }
           </div>
+          @if (envioInfo(); as envio) {
+            <div class="tienda-resumen-linea">
+              <span>Envío ({{ envio.km.toFixed(1) }} km)</span>
+              <span>${{ envio.costo.toFixed(2) }}</span>
+            </div>
+          }
           <div class="tienda-resumen-total">
             <span>Total</span>
-            <strong>${{ totalCarrito().toFixed(2) }}</strong>
+            <strong>${{ (envioInfo() ? totalConEnvio() : totalCarrito()).toFixed(2) }}</strong>
           </div>
         </div>
 
@@ -371,6 +427,16 @@
         <img class="tienda-compartir-qr" [src]="qrTienda()" alt="Código QR de esta tienda" />
         <button type="button" class="tienda-ubicacion-boton" (click)="descargarQr()">⬇️ Descargar código QR</button>
         <p class="hint" style="text-align:center;">Imprímelo y pégalo en tu local o en tus empaques.</p>
+      </div>
+    </div>
+  }
+
+  <!-- ── Ver imagen grande del producto (botón "+" sobre la foto) ── -->
+  @if (imagenAmpliada(); as url) {
+    <div class="tienda-overlay" (click)="cerrarImagenAmpliada()">
+      <div class="tienda-imagen-ampliada" (click)="$event.stopPropagation()">
+        <button type="button" class="tienda-imagen-ampliada-cerrar" aria-label="Cerrar" (click)="cerrarImagenAmpliada()">✕</button>
+        <img [src]="url" alt="Imagen ampliada del producto" />
       </div>
     </div>
   }
