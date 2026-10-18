@@ -73,6 +73,14 @@
     margin: 0;
     font-size: 1.5rem;
     font-weight: 700;
+    /* Con "color" nomás no bastaba: hay una regla global "h1, h2 { color:
+     * var(--heading-navy); }" (src/styles.scss) que, aunque el banner
+     * declara su propio color, GANA porque un valor heredado siempre
+     * pierde contra cualquier regla explícita (aunque sea de un simple
+     * "h1") — por eso el título se seguía viendo en azul marino fijo,
+     * sin importar lo que el .tienda-banner trajera. Hay que pisarla aquí
+     * mismo, explícitamente, con el color configurable del banner. */
+    color: var(--color-texto-banner, #fff);
     /* La sombra ayuda sobre todo con el blanco por defecto; con un color
      * de letra propio elegido a propósito no estorba, así que se deja
      * siempre encendida. */
@@ -464,7 +472,7 @@
   span {
     display: block;
     font-size: 0.8rem;
-    color: var(--color-primario, #2563eb);
+    color: var(--color-texto-banner, var(--color-primario, #2563eb));
     font-weight: 600;
   }
 }
@@ -636,7 +644,7 @@
   border-radius: 8px;
   border: 1px solid var(--borde, #e5e7eb);
   background: var(--fondo-tarjeta, #fff);
-  color: var(--color-primario, #2563eb);
+  color: var(--color-texto-banner, var(--color-primario, #2563eb));
   font-size: 1.2rem;
   line-height: 1;
   font-weight: 700;
@@ -663,7 +671,7 @@
   flex-shrink: 0;
   font-weight: 700;
   font-size: 1.1rem;
-  color: var(--color-primario, #2563eb);
+  color: var(--color-texto-banner, var(--color-primario, #2563eb));
   white-space: nowrap;
 
   sup {
