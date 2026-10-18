@@ -196,7 +196,7 @@
   &.activo {
     background: var(--color-primario, #2563eb);
     border-color: var(--color-primario, #2563eb);
-    color: #fff;
+    color: var(--color-texto-banner, #fff);
   }
 }
 
@@ -585,7 +585,7 @@
   width: 100%;
   border: none;
   background: var(--color-primario, #2563eb);
-  color: #fff;
+  color: var(--color-texto-banner, #fff);
   border-radius: 8px;
   padding: 10px 12px;
   font-size: 0.9rem;
@@ -795,7 +795,7 @@
 .tienda-enviar-boton {
   border: none;
   background: var(--color-primario, #2563eb);
-  color: #fff;
+  color: var(--color-texto-banner, #fff);
   border-radius: 10px;
   padding: 12px;
   font-size: 1rem;
@@ -1042,7 +1042,7 @@
   border-radius: 8px;
   padding: 14px 20px;
   background: var(--color-primario, #2563eb);
-  color: #fff;
+  color: var(--color-texto-banner, #fff);
   font-weight: 600;
   font-size: 1rem;
   cursor: pointer;
@@ -1101,7 +1101,7 @@
     flex-shrink: 0;
     border: none;
     background: var(--color-primario, #2563eb);
-    color: #fff;
+    color: var(--color-texto-banner, #fff);
     border-radius: 8px;
     padding: 8px 12px;
     font-size: 0.85rem;
