@@ -11,14 +11,6 @@ export const PANEL_CONTROL_ROUTES: Routes = [
     loadComponent: () => import('./apariencia/apariencia.component').then((m) => m.AparienciaComponent),
   },
   {
-    path: 'respaldo',
-    loadComponent: () => import('./respaldo/respaldo.component').then((m) => m.RespaldoComponent),
-  },
-  {
-    path: 'rfc-curp',
-    loadComponent: () => import('./rfc-curp/rfc-curp.component').then((m) => m.RfcCurpComponent),
-  },
-  {
     path: 'parametros',
     loadComponent: () => import('./parametros/parametros.component').then((m) => m.ParametrosComponent),
   },

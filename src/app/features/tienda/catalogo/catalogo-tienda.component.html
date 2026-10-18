@@ -45,12 +45,15 @@
               <p>{{ producto.descripcion }}</p>
             }
             <div class="tienda-tarjeta-pie">
-              <span class="tienda-tarjeta-precio">${{ producto.precio.toFixed(2) }}</span>
               @if (!producto.disponible) {
+                <span class="tienda-tarjeta-precio">${{ producto.precio.toFixed(2) }}</span>
                 <span class="tienda-tarjeta-agotado-badge">Agotado</span>
               } @else {
+                <!-- Precio y acción en un solo botón (en vez de precio aparte
+                     + botón chico) — mismo patrón que el modal de variantes,
+                     para que sea igual de fácil de usar en toda la tienda. -->
                 <button type="button" class="tienda-tarjeta-agregar" (click)="agregar(producto)">
-                  {{ producto.opciones.length > 0 ? 'Elegir' : 'Agregar' }}
+                  {{ producto.opciones.length > 0 ? 'Elegir' : 'Agregar' }} &bull; ${{ producto.precio.toFixed(2) }}
                 </button>
               }
             </div>
@@ -187,9 +190,13 @@
         </div>
 
         <div class="tienda-modal-footer">
-          <span class="tienda-modal-precio-total">${{ (precioUnitarioModal() * cantidadModal()).toFixed(2) }}</span>
-          <button type="button" class="tienda-enviar-boton" [disabled]="!modalValido()" (click)="confirmarModal()">
-            Agregar al carrito
+          <button
+            type="button"
+            class="tienda-enviar-boton tienda-modal-boton-agregar"
+            [disabled]="!modalValido()"
+            (click)="confirmarModal()"
+          >
+            Agregar &bull; ${{ (precioUnitarioModal() * cantidadModal()).toFixed(2) }}
           </button>
         </div>
       </div>
@@ -210,21 +217,45 @@
           <input type="text" formControlName="nombre" placeholder="¿Cómo te llamas?" />
         </label>
         <label class="tienda-campo">
-          Tu teléfono (opcional)
-          <input type="text" formControlName="telefono" placeholder="Para que te contacten" />
+          Tu teléfono
+          <input type="tel" formControlName="telefono" placeholder="Para que te contacten" />
         </label>
+        <label class="tienda-campo">
+          Nota especial (opcional)
+          <textarea
+            formControlName="notas"
+            rows="2"
+            placeholder="Ej. sin cebolla, tocar el timbre 2 veces…"
+          ></textarea>
+        </label>
+
+        <div class="tienda-campo">
+          <span>Dirección</span>
+          @if (ubicacion()) {
+            <div class="tienda-ubicacion-lista">
+              <span>📍 Ubicación compartida</span>
+              <button type="button" (click)="quitarUbicacion()">Quitar</button>
+            </div>
+          } @else {
+            <button
+              type="button"
+              class="tienda-ubicacion-boton"
+              [disabled]="obteniendoUbicacion()"
+              (click)="compartirUbicacion()"
+            >
+              {{ obteniendoUbicacion() ? 'Obteniendo ubicación…' : '📍 Activar GPS y enviar mi ubicación' }}
+            </button>
+            @if (ubicacionError(); as err) {
+              <p class="tienda-ubicacion-error">{{ err }}</p>
+            }
+          }
+        </div>
 
         <div class="tienda-modal-footer tienda-modal-footer-envio">
           @if (d.empresa.telefono) {
             <button type="submit" class="tienda-enviar-boton">Enviar por WhatsApp</button>
-          }
-          @if (d.empresa.correo) {
-            <button type="button" class="tienda-enviar-boton tienda-enviar-boton-secundario" (click)="enviarPorCorreo()">
-              Enviar por correo
-            </button>
-          }
-          @if (!d.empresa.telefono && !d.empresa.correo) {
-            <p class="tienda-estado">Esta tienda todavía no configuró a dónde enviar los pedidos.</p>
+          } @else {
+            <p class="tienda-estado">Esta tienda todavía no configuró un teléfono para recibir pedidos.</p>
           }
         </div>
       </form>

@@ -39,8 +39,16 @@ export class CatalogoTiendaComponent implements OnInit {
   protected readonly modalEnviarAbierto = signal(false);
   protected readonly formCliente = this.fb.nonNullable.group({
     nombre: ['', [Validators.required, Validators.maxLength(80)]],
-    telefono: ['', [Validators.maxLength(30)]],
+    telefono: ['', [Validators.required, Validators.maxLength(30)]],
+    notas: ['', [Validators.maxLength(300)]],
   });
+
+  // ── Ubicación por GPS (reemplaza un campo de dirección escrita a mano:
+  //    el cliente comparte su posición real y se manda como link de Maps
+  //    en el mensaje) — opcional, no bloquea el envío si la niega o falla. ──
+  protected readonly ubicacion = signal<{ lat: number; lng: number } | null>(null);
+  protected readonly obteniendoUbicacion = signal(false);
+  protected readonly ubicacionError = signal<string | null>(null);
 
   protected readonly productosFiltrados = computed<ProductoTienda[]>(() => {
     const texto = this.busqueda().trim().toLowerCase();
@@ -237,10 +245,44 @@ export class CatalogoTiendaComponent implements OnInit {
   //    Ventas → Cobro (usando el campo "Canal" para marcarla). ────────────
   abrirEnvio(): void {
     if (this.carrito().length === 0) return;
+    // Limpio para no arrastrar nota/ubicación de un pedido anterior ya
+    // enviado en esta misma visita.
+    this.formCliente.patchValue({ notas: '' });
+    this.ubicacion.set(null);
+    this.ubicacionError.set(null);
     this.modalEnviarAbierto.set(true);
   }
 
-  private construirMensaje(nombreCliente: string, telefonoCliente: string): string {
+  // ── Ubicación por GPS ──────────────────────────────────────────────
+  compartirUbicacion(): void {
+    if (!('geolocation' in navigator)) {
+      this.ubicacionError.set('Tu navegador no permite compartir ubicación.');
+      return;
+    }
+    this.obteniendoUbicacion.set(true);
+    this.ubicacionError.set(null);
+    navigator.geolocation.getCurrentPosition(
+      (posicion) => {
+        this.ubicacion.set({ lat: posicion.coords.latitude, lng: posicion.coords.longitude });
+        this.obteniendoUbicacion.set(false);
+      },
+      (error) => {
+        this.obteniendoUbicacion.set(false);
+        this.ubicacionError.set(
+          error.code === error.PERMISSION_DENIED
+            ? 'No autorizaste compartir tu ubicación — puedes seguir sin ella.'
+            : 'No se pudo obtener tu ubicación. Intenta de nuevo.',
+        );
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }
+
+  quitarUbicacion(): void {
+    this.ubicacion.set(null);
+  }
+
+  private construirMensaje(nombreCliente: string, telefonoCliente: string, notas: string): string {
     const empresa = this.detalle()?.empresa;
     const lineas = this.carrito()
       .map((linea, i) => {
@@ -254,6 +296,8 @@ export class CatalogoTiendaComponent implements OnInit {
       })
       .join('\n\n');
 
+    const ubicacion = this.ubicacion();
+
     return [
       `Pedido para ${empresa?.nombre ?? ''}`,
       '',
@@ -262,7 +306,9 @@ export class CatalogoTiendaComponent implements OnInit {
       `Total: $${this.totalCarrito().toFixed(2)}`,
       '',
       `Cliente: ${nombreCliente}`,
-      telefonoCliente ? `Teléfono: ${telefonoCliente}` : '',
+      `Teléfono: ${telefonoCliente}`,
+      notas.trim() ? `Nota especial: ${notas.trim()}` : '',
+      ubicacion ? `Ubicación: https://www.google.com/maps?q=${ubicacion.lat},${ubicacion.lng}` : '',
     ]
       .filter((l) => l !== '' || true)
       .join('\n');
@@ -277,23 +323,8 @@ export class CatalogoTiendaComponent implements OnInit {
     const telefono = (empresa?.telefono ?? '').replace(/\D/g, '');
     if (!telefono) return;
     const v = this.formCliente.getRawValue();
-    const mensaje = this.construirMensaje(v.nombre.trim(), v.telefono.trim());
+    const mensaje = this.construirMensaje(v.nombre.trim(), v.telefono.trim(), v.notas);
     window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`, '_blank');
-    this.modalEnviarAbierto.set(false);
-  }
-
-  enviarPorCorreo(): void {
-    if (this.formCliente.invalid) {
-      this.formCliente.markAllAsTouched();
-      return;
-    }
-    const empresa = this.detalle()?.empresa;
-    const correo = empresa?.correo ?? '';
-    if (!correo) return;
-    const v = this.formCliente.getRawValue();
-    const mensaje = this.construirMensaje(v.nombre.trim(), v.telefono.trim());
-    const asunto = `Pedido — ${empresa?.nombre ?? ''}`;
-    window.open(`mailto:${correo}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(mensaje)}`, '_blank');
     this.modalEnviarAbierto.set(false);
   }
 }

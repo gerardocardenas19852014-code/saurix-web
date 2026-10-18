@@ -349,35 +349,24 @@ export class ShellComponent implements OnDestroy {
   });
 
   /** Menús laterales con muchos enlaces (Gestión de Proyectos, Catálogos,
-   *  Presupuesto Personal) agrupan sus enlaces en secciones colapsables,
-   *  igual que "Inicio" de Gestión de Proyectos ya lo hacía (grupos
-   *  "Procesos", "Configuración" y "Reportes"). La clave es `modulo:titulo`
-   *  para que un mismo nombre de grupo en dos módulos (p.ej. "Reportes" en
-   *  Proyectos y en Presupuesto) no comparta estado. Por defecto empiezan
-   *  CERRADOS (pedido explícito del usuario); no se persiste entre sesiones
-   *  (se reinicia al recargar, igual que sprintsExpandidos en Backlog). */
-  protected readonly gruposColapsados = signal<Set<string>>(
-    new Set([
-      'proyectos:Procesos',
-      'proyectos:Configuracion',
-      'proyectos:Reportes',
-      'presupuesto:Movimientos',
-      'presupuesto:Metas y límites',
-      'presupuesto:Reportes',
-      'presupuesto:Catálogos',
-      'familia:Miembros',
-      'familia:Hogar',
-      'familia:Catálogos',
-      'wikidocs:Catálogos',
-      'inventario:Catálogos',
-      'ventas:Administración',
-      'ventas:Catálogos',
-    ]),
-  );
+   *  Presupuesto Personal, Inventario, Ventas) agrupan sus enlaces en
+   *  secciones colapsables, igual que "Inicio" de Gestión de Proyectos ya
+   *  lo hacía (grupos "Procesos", "Configuración" y "Reportes"). La clave
+   *  es `modulo:titulo` para que un mismo nombre de grupo en dos módulos
+   *  (p.ej. "Reportes" en Proyectos y en Presupuesto) no comparta estado.
+   *  TODOS los grupos de TODOS los módulos empiezan CERRADOS (pedido
+   *  explícito del usuario — antes había una lista fija de excepciones que
+   *  arrancaban abiertas, p.ej. "Operación" de Inventario y "Proceso" de
+   *  Ventas; se quitó esa lista para que ninguno quede abierto por
+   *  default) — por eso este Set guarda lo OPUESTO que antes: ya no son
+   *  los grupos colapsados, son los que el usuario abrió a mano durante
+   *  esta sesión. No se persiste entre sesiones (se reinicia al recargar,
+   *  igual que sprintsExpandidos en Backlog). */
+  protected readonly gruposAbiertosManualmente = signal<Set<string>>(new Set());
 
   /** Mismo punto de corte que el @media de src/styles.scss que oculta
    *  .sidebar-group-toggle (la barra lateral pasa a ser una barra superior
-   *  horizontal). Si un grupo arranca cerrado (ver gruposColapsados) y su
+   *  horizontal). Si un grupo arranca cerrado (ver gruposAbiertosManualmente) y su
    *  único botón para abrirlo desaparece por CSS en ese ancho, sus enlaces
    *  quedan inalcanzables para siempre en pantallas angostas — por eso
    *  grupoAbierto() ignora el colapso y muestra todo expandido ahí abajo. */
@@ -407,11 +396,11 @@ export class ShellComponent implements OnDestroy {
 
   grupoAbierto(modulo: string, titulo: string): boolean {
     if (this.sidebarAngosta()) return true;
-    return !this.gruposColapsados().has(`${modulo}:${titulo}`);
+    return this.gruposAbiertosManualmente().has(`${modulo}:${titulo}`);
   }
 
   toggleGrupo(modulo: string, titulo: string): void {
-    this.gruposColapsados.update((set) => {
+    this.gruposAbiertosManualmente.update((set) => {
       const nuevo = new Set(set);
       const clave = `${modulo}:${titulo}`;
       if (nuevo.has(clave)) {

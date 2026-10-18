@@ -34,22 +34,6 @@ const GRUPOS: GrupoConfig[] = [
         grupo: 'General',
       },
       {
-        ruta: 'respaldo',
-        icono: '💾',
-        color: 'generic',
-        titulo: 'Respaldo y restauración',
-        descripcion: 'Descarga toda tu información o restáurala en otro dispositivo.',
-        grupo: 'General',
-      },
-      {
-        ruta: 'rfc-curp',
-        icono: '🆔',
-        color: 'generic',
-        titulo: 'Generación de RFC y CURP',
-        descripcion: 'Calcula el RFC (con homoclave) y el CURP a partir de nombre, apellidos y fecha de nacimiento.',
-        grupo: 'General',
-      },
-      {
         ruta: 'parametros',
         icono: '🧮',
         color: 'generic',

@@ -146,12 +146,17 @@
 }
 
 .tienda-tarjeta-agregar {
+  /* Ancho completo, precio incluido en el texto — mismo patrón que
+   * .tienda-modal-boton-agregar (ver el modal de variantes), para que el
+   * precio y la acción de agregar siempre estén juntos en toda la tienda. */
+  width: 100%;
   border: none;
   background: var(--color-primario, #2563eb);
   color: #fff;
   border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 0.85rem;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -291,12 +296,6 @@
   }
 }
 
-.tienda-enviar-boton-secundario {
-  background: var(--fondo-sutil, #f3f4f6);
-  color: inherit;
-  margin-top: 8px;
-}
-
 .tienda-nota-manual {
   font-size: 0.78rem;
   color: var(--texto-tenue, #6b7280);
@@ -392,9 +391,14 @@
   align-items: stretch;
 }
 
-.tienda-modal-precio-total {
-  font-weight: 600;
-  font-size: 1.05rem;
+.tienda-modal-boton-agregar {
+  /* Un solo botón grande "Agregar • $precio" (antes: precio aparte +
+   * botón "Agregar al carrito" más chico) — mismo .tienda-enviar-boton de
+   * siempre, solo más grande/negrita para que se note como CTA principal
+   * del modal, igual al patrón de apps de pedidos. */
+  font-size: 1.1rem;
+  font-weight: 700;
+  padding: 16px;
 }
 
 .tienda-campo {
@@ -404,10 +408,55 @@
   margin-bottom: 10px;
   font-size: 0.9rem;
 
-  input {
+  input,
+  textarea {
     padding: 9px 10px;
     border-radius: 8px;
     border: 1px solid var(--borde, #e5e7eb);
+    font: inherit;
+    resize: vertical;
+  }
+}
+
+// ── Dirección por GPS (dentro del modal "Tus datos") ────────────────
+.tienda-ubicacion-boton {
+  border: 1px dashed var(--borde, #e5e7eb);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--fondo-sutil, #f3f4f6);
+  cursor: pointer;
+  text-align: center;
+  font-size: 0.9rem;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+}
+
+.tienda-ubicacion-error {
+  margin: 0;
+  color: var(--color-error, #b91c1c);
+  font-size: 0.78rem;
+}
+
+.tienda-ubicacion-lista {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: var(--fondo-sutil, #f3f4f6);
+  font-size: 0.9rem;
+
+  button {
+    border: none;
+    background: none;
+    color: var(--color-error, #b91c1c);
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 0.8rem;
   }
 }
 

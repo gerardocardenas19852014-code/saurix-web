@@ -61,7 +61,6 @@ export const DESTINOS: DestinoPaleta[] = [
 
   { label: 'Inicio', grupo: 'Panel de Control', ruta: '/panel-control', icono: '⌂' },
   { label: 'Apariencia', grupo: 'Panel de Control', ruta: '/panel-control/apariencia', icono: '🎨' },
-  { label: 'Respaldo y restauración', grupo: 'Panel de Control', ruta: '/panel-control/respaldo', icono: '💾' },
   { label: 'Parámetros del sistema', grupo: 'Panel de Control', ruta: '/panel-control/parametros', icono: '🧮' },
 
   // Faltaba el módulo Familia completo (hallado 2026-10-10 al agregar
