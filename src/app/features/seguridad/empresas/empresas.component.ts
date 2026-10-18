@@ -548,8 +548,9 @@ export class EmpresasComponent implements OnInit, OnDestroy {
     window.location.assign(new URL('modulos', document.baseURI).toString());
   }
 
-  /** Para el botón de la tabla: "Entrar" a la empresa. */
-  etiquetaEntrar = (): string => 'Entrar';
+  /** Para el botón de la tabla: "Entrar" a la empresa — icono en vez de
+   *  texto (ver accionExtra2Titulo en el .html para el tooltip). */
+  etiquetaEntrar = (): string => '🔑';
 
   // ── Logo de la tienda pública ───────────────────────────────────────
   /** Igual que redimensionarFoto() en productos.component.ts (FileReader →

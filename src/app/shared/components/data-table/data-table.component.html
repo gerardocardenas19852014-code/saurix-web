@@ -68,6 +68,7 @@
                   <button
                     type="button"
                     class="btn-secondary small"
+                    [class.grid-action-icon]="accionExtra3Icono()"
                     [title]="accionExtra3Titulo() ?? accionExtra3Etiqueta()"
                     [attr.aria-label]="accionExtra3Titulo() ?? accionExtra3Etiqueta()"
                     (click)="accionExtra3.emit(fila)"

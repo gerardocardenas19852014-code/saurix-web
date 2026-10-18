@@ -110,6 +110,8 @@ export class DataTableComponent<T extends { id: number }> {
    *  "Módulos"). */
   readonly accionExtra3Etiqueta = input<string | undefined>(undefined);
   readonly accionExtra3Titulo = input<string | undefined>(undefined);
+  /** Mismo criterio que accionExtraIcono — ver su comentario arriba. */
+  readonly accionExtra3Icono = input<boolean>(false);
   readonly accionExtra3 = output<T>();
 
   readonly paginaActual = signal(1);

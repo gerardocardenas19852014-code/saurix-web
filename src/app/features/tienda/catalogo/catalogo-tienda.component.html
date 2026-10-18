@@ -114,25 +114,31 @@
                          de Agregar + Quitar apilados — ocupa el mismo ancho
                          pero con botones más grandes para tocar en celular. -->
                     <div class="tienda-tarjeta-stepper">
-                      <button
-                        type="button"
-                        class="tienda-tarjeta-stepper-boton"
-                        aria-label="Quitar uno de {{ producto.nombre }}"
-                        (click)="cambiarCantidadProducto(producto, -1)"
-                      >
-                        −
-                      </button>
-                      <span class="tienda-tarjeta-stepper-centro">
-                        <strong>{{ cantidad }}</strong> &bull; ${{ (cantidad * producto.precio).toFixed(2) }}
+                      <div class="tienda-tarjeta-stepper-grupo">
+                        <!-- En 1, bajar uno más lo saca del carrito — el icono
+                             de bote de basura avisa eso antes de tocarlo (en
+                             vez de un "−" que de pronto borra sin avisar). -->
+                        <button
+                          type="button"
+                          class="tienda-tarjeta-stepper-boton"
+                          [attr.aria-label]="(cantidad === 1 ? 'Quitar' : 'Restar uno de') + ' ' + producto.nombre"
+                          (click)="cambiarCantidadProducto(producto, -1)"
+                        >
+                          {{ cantidad === 1 ? '🗑' : '−' }}
+                        </button>
+                        <span class="tienda-tarjeta-stepper-cantidad">{{ cantidad }}</span>
+                        <button
+                          type="button"
+                          class="tienda-tarjeta-stepper-boton"
+                          aria-label="Agregar uno de {{ producto.nombre }}"
+                          (click)="cambiarCantidadProducto(producto, 1)"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <span class="tienda-tarjeta-stepper-precio">
+                        ${{ cantidad * producto.precio | number: '1.0-0' }}<sup>{{ centavos(cantidad * producto.precio) }}</sup>
                       </span>
-                      <button
-                        type="button"
-                        class="tienda-tarjeta-stepper-boton"
-                        aria-label="Agregar uno de {{ producto.nombre }}"
-                        (click)="cambiarCantidadProducto(producto, 1)"
-                      >
-                        +
-                      </button>
                     </div>
                   } @else {
                     <div class="tienda-tarjeta-acciones">

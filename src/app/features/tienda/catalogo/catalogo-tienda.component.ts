@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { DecimalPipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Meta, Title } from '@angular/platform-browser';
 import { TiendaPublicaService } from '../tienda-publica.service';
@@ -49,7 +50,7 @@ function calcularIconoMetodoPago(metodo: string): string {
 @Component({
   selector: 'app-catalogo-tienda',
   standalone: true,
-  imports: [RouterLink, ReactiveFormsModule],
+  imports: [RouterLink, ReactiveFormsModule, DecimalPipe],
   templateUrl: './catalogo-tienda.component.html',
   styleUrl: './catalogo-tienda.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -482,6 +483,15 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
     }
     const claveLinea = this.claveLineaDe(producto.id, []);
     this.cambiarCantidadLinea(claveLinea, delta);
+  }
+
+  /** Centavos de un monto, como texto de 2 dígitos (p.ej. 11459.4 → "40")
+   *  — para el precio del stepper del catálogo, que muestra los centavos
+   *  chicos en superíndice (mismo estilo que un precio de tienda en
+   *  línea). Con Math.round() para no arrastrar errores de punto flotante
+   *  (11459.4 * 100 puede dar 1145939.9999...). */
+  protected centavos(monto: number): string {
+    return (Math.round(monto * 100) % 100).toString().padStart(2, '0');
   }
 
   /** Botón "+" sobre la foto del producto (catálogo) — abre la imagen en

@@ -255,6 +255,35 @@
       width: auto;
       min-width: 150px;
     }
+
+    /* En celular angosto (iPhone, ~390px) el renglón "foto + nombre +
+     * descripción + botón" ya no cabe en una sola línea y el botón
+     * terminaba recortado contra el borde de la tarjeta (.tienda-tarjeta
+     * tiene overflow:hidden). En vez de forzar que quepa todo angosto, el
+     * botón de acción baja a su propio renglón, de ancho completo —
+     * mismo criterio que ya se usa en .tienda-grid (2 columnas en
+     * cuadrícula a este mismo breakpoint). */
+    @media (max-width: 480px) {
+      .tienda-tarjeta-cuerpo {
+        flex-wrap: wrap;
+      }
+
+      .tienda-tarjeta-pie {
+        margin-left: 0;
+        width: 100%;
+        margin-top: 6px;
+      }
+
+      .tienda-tarjeta-agregar {
+        width: 100%;
+        white-space: normal;
+      }
+
+      .tienda-tarjeta-stepper {
+        width: 100%;
+        min-width: 0;
+      }
+    }
   }
 }
 
@@ -396,50 +425,66 @@
 }
 
 .tienda-tarjeta-stepper {
-  /* +/- con el precio (cantidad × precio) en el centro, en vez de Agregar +
-   * Quitar apilados — mismo ancho que ocupaban antes pero con los botones
-   * de los extremos bien grandes (44px, tamaño mínimo recomendado de toque
-   * en celular) y el centro mostrando de un vistazo cuánto lleva de ese
-   * producto. Solo aparece para productos SIN variantes, ver el comentario
-   * en cambiarCantidadProducto() del componente. */
+  /* −/🗑 + cantidad + "+" agrupados a la izquierda, precio grande y en su
+   * propio color a la derecha — mismo criterio visual que un carrito de
+   * tienda en línea (icono de borrar / número / sumar / precio con
+   * centavos chicos), en vez del botón +/- con todo adentro de antes.
+   * Solo aparece para productos SIN variantes, ver el comentario en
+   * cambiarCantidadProducto() del componente. */
   display: flex;
-  align-items: stretch;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   width: 100%;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid var(--color-primario, #2563eb);
+}
+
+.tienda-tarjeta-stepper-grupo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .tienda-tarjeta-stepper-boton {
-  flex: 0 0 44px;
-  min-height: 44px;
-  border: none;
-  background: var(--color-primario, #2563eb);
-  color: #fff;
-  font-size: 1.4rem;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 1px solid var(--borde, #e5e7eb);
+  background: var(--fondo-tarjeta, #fff);
+  color: var(--color-primario, #2563eb);
+  font-size: 1.2rem;
   line-height: 1;
   font-weight: 700;
   cursor: pointer;
-}
-
-.tienda-tarjeta-stepper-centro {
-  flex: 1;
-  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 0 6px;
-  background: var(--fondo-tarjeta, #fff);
-  color: var(--color-primario, #2563eb);
-  font-weight: 600;
-  font-size: 0.85rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
 
-  strong {
-    font-size: 0.95rem;
+.tienda-tarjeta-stepper-cantidad {
+  min-width: 30px;
+  height: 38px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid var(--borde, #e5e7eb);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.tienda-tarjeta-stepper-precio {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--color-primario, #2563eb);
+  white-space: nowrap;
+
+  sup {
+    font-size: 0.6em;
+    font-weight: 600;
   }
 }
 

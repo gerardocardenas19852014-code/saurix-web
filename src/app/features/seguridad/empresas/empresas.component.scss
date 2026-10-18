@@ -33,3 +33,102 @@
     width: auto;
   }
 }
+
+// ── Logo de la tienda (mismo patrón visual que la foto de producto en
+//    productos.component.scss — ViewEncapsulation hace que esas reglas NO
+//    apliquen aquí aunque el HTML use las mismas clases, así que se
+//    redeclaran tal cual en este archivo). ───────────────────────────────
+.foto-producto-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.foto-producto-etiqueta {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.foto-producto-fila {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.foto-producto-preview {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 2px solid rgba(0, 0, 0, 0.12);
+}
+
+.foto-producto-preview-vacia {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  background: var(--paper-raised);
+}
+
+.foto-producto-acciones {
+  display: flex;
+  gap: 8px;
+}
+
+.foto-producto-boton {
+  cursor: pointer;
+}
+
+/* El thumbnail de 64x64 (.foto-producto-preview) es a propósito chico en el
+ * formulario — para verlo grande se abre este visor con el logo a su
+ * resolución real. */
+.foto-producto-preview-boton {
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: zoom-in;
+  border-radius: 10px;
+  line-height: 0;
+}
+
+.foto-producto-lightbox-overlay {
+  z-index: 400; // por encima del modal de edición (z-index: 300)
+}
+
+.foto-producto-lightbox {
+  position: relative;
+  background: var(--paper-raised);
+  border-radius: 14px;
+  padding: 20px;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 24px 48px -16px rgba(0, 0, 0, 0.4);
+}
+
+.foto-producto-lightbox img {
+  max-width: 80vw;
+  max-height: 75vh;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.foto-producto-lightbox-cerrar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+}
