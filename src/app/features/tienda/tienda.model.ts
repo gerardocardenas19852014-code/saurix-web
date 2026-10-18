@@ -41,6 +41,10 @@ export interface ProductoTienda {
   foto: string | null;
   /** false = sin existencia (no es servicio) — se muestra pero no se puede agregar al carrito. */
   disponible: boolean;
+  /** Categoría de inventario.categoria_producto — para agrupar/separar el
+   *  catálogo público por categoría (ver migración 29). */
+  categoriaId: number;
+  categoriaNombre: string;
   opciones: OpcionGrupoTienda[];
 }
 

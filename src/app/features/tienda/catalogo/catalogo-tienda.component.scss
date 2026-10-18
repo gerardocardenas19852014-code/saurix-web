@@ -72,6 +72,24 @@
   }
 }
 
+/* Un bloque .tienda-categoria por cada categoría de producto (ver
+ * productosPorCategoria() en catalogo-tienda.component.ts) — separa
+ * visualmente el catálogo en vez de una sola rejilla plana. */
+.tienda-categoria {
+  margin-bottom: 28px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.tienda-categoria-titulo {
+  font-size: 1.05rem;
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--borde, #e5e7eb);
+}
+
 .tienda-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));

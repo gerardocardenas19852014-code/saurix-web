@@ -59,6 +59,25 @@ export class CatalogoTiendaComponent implements OnInit {
     );
   });
 
+  /** Catálogo agrupado por categoría (en vez de una sola rejilla plana) —
+   *  el RPC ya devuelve los productos ordenados por categoriaNombre y
+   *  luego por nombre (ver migración 29), así que basta con juntar
+   *  consecutivos en el mismo grupo, sin volver a ordenar aquí. */
+  protected readonly productosPorCategoria = computed<
+    { categoriaId: number; categoriaNombre: string; productos: ProductoTienda[] }[]
+  >(() => {
+    const grupos: { categoriaId: number; categoriaNombre: string; productos: ProductoTienda[] }[] = [];
+    for (const producto of this.productosFiltrados()) {
+      const grupoActual = grupos[grupos.length - 1];
+      if (grupoActual && grupoActual.categoriaId === producto.categoriaId) {
+        grupoActual.productos.push(producto);
+      } else {
+        grupos.push({ categoriaId: producto.categoriaId, categoriaNombre: producto.categoriaNombre, productos: [producto] });
+      }
+    }
+    return grupos;
+  });
+
   protected readonly totalCarrito = computed(() =>
     this.carrito().reduce((acc, l) => acc + this.subtotalLinea(l), 0),
   );

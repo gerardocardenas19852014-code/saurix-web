@@ -86,6 +86,13 @@ export class DataTableComponent<T extends { id: number }> {
   readonly accionExtraEtiqueta = input<string | undefined>(undefined);
   /** Título/aria-label de esa acción extra (si no se da, se usa la etiqueta tal cual). */
   readonly accionExtraTitulo = input<string | undefined>(undefined);
+  /** true = el botón se dibuja cuadrado/compacto como los de Editar/Eliminar
+   *  (clase grid-action-icon), pensado para cuando accionExtraEtiqueta es un
+   *  solo emoji en vez de texto (p.ej. "⚙️" en vez de "Opciones") — el
+   *  texto completo sigue disponible vía accionExtraTitulo (tooltip).
+   *  Por defecto false para no afectar las pantallas que ya usan esta
+   *  acción con una etiqueta de texto normal. */
+  readonly accionExtraIcono = input<boolean>(false);
   readonly accionExtra = output<T>();
 
   /** Segundo botón de acción extra opcional por fila, con etiqueta DINÁMICA

@@ -360,6 +360,18 @@ export class ProductosComponent implements OnInit, OnDestroy {
     this.router.navigate(['/inventario/productos', producto.id, 'opciones']);
   }
 
+  /** app-data-table espera una FUNCIÓN para el texto del segundo botón
+   *  extra (accionExtra2EtiquetaFn), no un string fijo — mismo patrón que
+   *  etiquetaEntrar() en empresas.component.ts. Antes se pasaba
+   *  accionExtra2Etiqueta="Opciones" (un string suelto que ese input no
+   *  existe), así que el botón nunca aparecía y tsc no lo marcaba porque
+   *  es un atributo HTML normal, no un binding de Angular.
+   *  Icono en vez de texto (⚙️) — accionExtra2 ya se dibuja cuadrado/
+   *  compacto por defecto (grid-action-icon, ver data-table.component.html),
+   *  mismo criterio visual que accionExtraTitulo abajo. El texto completo
+   *  sigue disponible como tooltip vía accionExtra2Titulo. */
+  protected readonly etiquetaOpciones = (): string => '⚙️';
+
   pedirEliminar(producto: Producto): void {
     this.productoAEliminar.set(producto);
   }

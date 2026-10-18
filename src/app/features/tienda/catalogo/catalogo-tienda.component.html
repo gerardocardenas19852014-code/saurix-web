@@ -31,38 +31,43 @@
       />
     </div>
 
-    <div class="tienda-grid">
-      @for (producto of productosFiltrados(); track producto.id) {
-        <div class="tienda-tarjeta" [class.tienda-tarjeta-agotada]="!producto.disponible">
-          @if (producto.foto) {
-            <img class="tienda-tarjeta-foto" [src]="producto.foto" [alt]="producto.nombre" />
-          } @else {
-            <div class="tienda-tarjeta-foto tienda-tarjeta-foto-vacia">📦</div>
-          }
-          <div class="tienda-tarjeta-cuerpo">
-            <strong>{{ producto.nombre }}</strong>
-            @if (producto.descripcion) {
-              <p>{{ producto.descripcion }}</p>
-            }
-            <div class="tienda-tarjeta-pie">
-              @if (!producto.disponible) {
-                <span class="tienda-tarjeta-precio">${{ producto.precio.toFixed(2) }}</span>
-                <span class="tienda-tarjeta-agotado-badge">Agotado</span>
+    @for (grupo of productosPorCategoria(); track grupo.categoriaId) {
+      <section class="tienda-categoria">
+        <h2 class="tienda-categoria-titulo">{{ grupo.categoriaNombre }}</h2>
+        <div class="tienda-grid">
+          @for (producto of grupo.productos; track producto.id) {
+            <div class="tienda-tarjeta" [class.tienda-tarjeta-agotada]="!producto.disponible">
+              @if (producto.foto) {
+                <img class="tienda-tarjeta-foto" [src]="producto.foto" [alt]="producto.nombre" />
               } @else {
-                <!-- Precio y acción en un solo botón (en vez de precio aparte
-                     + botón chico) — mismo patrón que el modal de variantes,
-                     para que sea igual de fácil de usar en toda la tienda. -->
-                <button type="button" class="tienda-tarjeta-agregar" (click)="agregar(producto)">
-                  {{ producto.opciones.length > 0 ? 'Elegir' : 'Agregar' }} &bull; ${{ producto.precio.toFixed(2) }}
-                </button>
+                <div class="tienda-tarjeta-foto tienda-tarjeta-foto-vacia">📦</div>
               }
+              <div class="tienda-tarjeta-cuerpo">
+                <strong>{{ producto.nombre }}</strong>
+                @if (producto.descripcion) {
+                  <p>{{ producto.descripcion }}</p>
+                }
+                <div class="tienda-tarjeta-pie">
+                  @if (!producto.disponible) {
+                    <span class="tienda-tarjeta-precio">${{ producto.precio.toFixed(2) }}</span>
+                    <span class="tienda-tarjeta-agotado-badge">Agotado</span>
+                  } @else {
+                    <!-- Precio y acción en un solo botón (en vez de precio aparte
+                         + botón chico) — mismo patrón que el modal de variantes,
+                         para que sea igual de fácil de usar en toda la tienda. -->
+                    <button type="button" class="tienda-tarjeta-agregar" (click)="agregar(producto)">
+                      {{ producto.opciones.length > 0 ? 'Elegir' : 'Agregar' }} &bull; ${{ producto.precio.toFixed(2) }}
+                    </button>
+                  }
+                </div>
+              </div>
             </div>
-          </div>
+          }
         </div>
-      } @empty {
-        <p class="tienda-estado">No hay productos que coincidan con tu búsqueda.</p>
-      }
-    </div>
+      </section>
+    } @empty {
+      <p class="tienda-estado">No hay productos que coincidan con tu búsqueda.</p>
+    }
 
     <p class="tienda-pie-portal">
       <a routerLink="/tienda">← Ver todas las tiendas</a>
