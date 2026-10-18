@@ -175,23 +175,44 @@ export class CatalogoTiendaComponent implements OnInit {
     this.cerrarModal();
   }
 
+  /** Determinista a partir de producto+opciones (en vez de timestamp/random):
+   *  así dos "Agregar" del mismo producto con las MISMAS opciones elegidas
+   *  caen en la misma línea del carrito — ver agregarLineaAlCarrito(). Las
+   *  opciones se ordenan antes de armar la clave para que el orden en que
+   *  se eligieron no importe (fresa+chocolate === chocolate+fresa). */
+  private claveLineaDe(productoId: number, opcionesElegidas: LineaCarritoTienda['opcionesElegidas']): string {
+    const opciones = opcionesElegidas
+      .map((o) => `${o.grupoNombre}:${o.valorNombre}`)
+      .sort()
+      .join('|');
+    return `${productoId}::${opciones}`;
+  }
+
   private agregarLineaAlCarrito(
     producto: ProductoTienda,
     opcionesElegidas: LineaCarritoTienda['opcionesElegidas'],
     cantidad: number,
   ): void {
-    const claveLinea = `${producto.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    this.carrito.update((lineas) => [
-      ...lineas,
-      {
-        claveLinea,
-        productoId: producto.id,
-        nombreProducto: producto.nombre,
-        precioBase: producto.precio,
-        opcionesElegidas,
-        cantidad,
-      },
-    ]);
+    const claveLinea = this.claveLineaDe(producto.id, opcionesElegidas);
+    this.carrito.update((lineas) => {
+      // Mismo producto + mismas opciones ya en el carrito → se acumula la
+      // cantidad en esa línea en vez de crear una línea nueva idéntica.
+      const yaExiste = lineas.some((l) => l.claveLinea === claveLinea);
+      if (yaExiste) {
+        return lineas.map((l) => (l.claveLinea === claveLinea ? { ...l, cantidad: l.cantidad + cantidad } : l));
+      }
+      return [
+        ...lineas,
+        {
+          claveLinea,
+          productoId: producto.id,
+          nombreProducto: producto.nombre,
+          precioBase: producto.precio,
+          opcionesElegidas,
+          cantidad,
+        },
+      ];
+    });
     this.carritoAbierto.set(true);
   }
 
