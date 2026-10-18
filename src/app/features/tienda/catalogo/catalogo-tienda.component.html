@@ -66,10 +66,13 @@
     </p>
   </div>
 
-  <!-- ── Panel del carrito ── -->
+  <!-- ── Panel del carrito: NO bloquea el catálogo — el cliente debe poder
+       seguir agregando productos mientras lo tiene abierto, a diferencia de
+       los modales de abajo (opciones/datos de envío), que sí son pasos que
+       requieren su atención completa. Por eso no comparte .tienda-overlay
+       (sin backdrop que capture clics ni cierre al tocar fuera). ── -->
   @if (carritoAbierto()) {
-    <div class="tienda-overlay" (click)="carritoAbierto.set(false)">
-      <aside class="tienda-carrito-panel" (click)="$event.stopPropagation()">
+    <aside class="tienda-carrito-panel" (click)="$event.stopPropagation()">
         <div class="tienda-carrito-panel-header">
           <h2>Tu pedido</h2>
           <button type="button" class="tienda-cerrar" (click)="carritoAbierto.set(false)">✕</button>
@@ -112,7 +115,6 @@
           </p>
         }
       </aside>
-    </div>
   }
 
   <!-- ── Modal: elegir opciones de un producto ── -->

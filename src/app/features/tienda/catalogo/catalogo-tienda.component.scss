@@ -171,6 +171,14 @@
 }
 
 .tienda-carrito-panel {
+  /* Ya no vive dentro de .tienda-overlay (ver comentario en el HTML) — se
+   * posiciona solo, como panel lateral fijo que no bloquea el resto de la
+   * pantalla. La sombra reemplaza el backdrop oscuro para que siga
+   * distinguiéndose del catálogo detrás. */
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 1000;
   width: min(380px, 100%);
   height: 100%;
   background: var(--fondo-tarjeta, #fff);
@@ -178,6 +186,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.18);
 }
 
 .tienda-carrito-panel-header {

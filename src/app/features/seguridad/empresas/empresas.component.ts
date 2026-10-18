@@ -370,7 +370,12 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       return;
     }
     // Recarga completa: todas las pantallas vuelven a leer ya dentro de esa empresa.
-    window.location.assign('/modulos');
+    // '/modulos' a secas se resuelve contra la RAÍZ DEL DOMINIO, no contra
+    // el base href de este despliegue (en GitHub Pages la app vive bajo
+    // /saurix-web/, no en la raíz) — con eso daba 404. document.baseURI ya
+    // trae ese prefijo (Angular lo toma de <base href> en index.html,
+    // sobreescrito en build con --base-href), así que se resuelve ahí.
+    window.location.assign(new URL('modulos', document.baseURI).toString());
   }
 
   /** Para el botón de la tabla: "Entrar" a la empresa. */

@@ -108,6 +108,11 @@ export class IndicadorAmbienteComponent implements OnInit {
   async salirDeSoporte(): Promise<void> {
     if (!this.sb) return;
     await this.sb.schema('seguridad').rpc('cambiar_empresa_activa', { p_empresa: null });
-    window.location.assign('/modulos');
+    // '/modulos' a secas se resuelve contra la RAÍZ DEL DOMINIO, no contra
+    // el base href de este despliegue (en GitHub Pages la app vive bajo
+    // /saurix-web/, no en la raíz) — con eso daba 404. document.baseURI ya
+    // trae ese prefijo (Angular lo toma de <base href> en index.html,
+    // sobreescrito en build con --base-href), así que se resuelve ahí.
+    window.location.assign(new URL('modulos', document.baseURI).toString());
   }
 }
