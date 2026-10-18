@@ -89,6 +89,11 @@ export interface EmpresaTienda {
    *  [style.--color-primario] en catalogo-tienda.component.html). null =
    *  usa el azul por defecto del frontend. */
   colorAcento: string | null;
+  /** Color de letra del banner (hex, p.ej. "#1f2937") — independiente de
+   *  colorAcento (ese es el FONDO del banner). null = usa el blanco por
+   *  defecto del frontend; existe porque con un colorAcento claro/pastel
+   *  el texto blanco casi no se alcanza a leer. */
+  colorTextoBanner: string | null;
   // ── Envío por distancia (línea recta) — ver catalogo-tienda.component.ts.
   // null en origen o en precioKm = envío por distancia desactivado. ──────
   envioOrigenLat: number | null;

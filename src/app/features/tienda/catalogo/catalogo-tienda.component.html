@@ -12,7 +12,11 @@
        var(--color-primario, #2563eb) en vez del azul escrito a mano). Sin
        color propio (null), se quita el estilo inline y gana el azul por
        defecto del fallback. -->
-  <div class="tienda-catalogo" [style.--color-primario]="d.empresa.colorAcento || null">
+  <div
+    class="tienda-catalogo"
+    [style.--color-primario]="d.empresa.colorAcento || null"
+    [style.--color-texto-banner]="d.empresa.colorTextoBanner || null"
+  >
     <!-- Banner de portada con degradado del color de marca (en vez del
          header plano de antes) — el logo se dibuja APARTE, debajo, para
          poder "montarlo" encima del borde inferior del banner sin que el

@@ -52,7 +52,10 @@
     color-mix(in srgb, var(--color-primario, #2563eb) 100%, black 28%)
   );
   border-radius: 0 0 24px 24px;
-  color: #fff;
+  /* --color-texto-banner: ver colorTextoBanner — independiente del color
+   * de FONDO de arriba (--color-primario), para que el texto se siga
+   * leyendo bien cuando la empresa elige un color de marca claro/pastel. */
+  color: var(--color-texto-banner, #fff);
 }
 
 .tienda-banner-acciones {
@@ -70,6 +73,9 @@
     margin: 0;
     font-size: 1.5rem;
     font-weight: 700;
+    /* La sombra ayuda sobre todo con el blanco por defecto; con un color
+     * de letra propio elegido a propósito no estorba, así que se deja
+     * siempre encendida. */
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   }
 
@@ -109,9 +115,9 @@
 
 .tienda-carrito-boton,
 .tienda-compartir-boton {
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
+  border: 1px solid color-mix(in srgb, var(--color-texto-banner, #fff) 100%, transparent 50%);
+  background: color-mix(in srgb, var(--color-texto-banner, #fff) 100%, transparent 82%);
+  color: var(--color-texto-banner, #fff);
   border-radius: 10px;
   padding: 10px 14px;
   font-size: 0.95rem;

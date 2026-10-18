@@ -134,6 +134,19 @@
             <input type="color" class="form-control" formControlName="colorAcento" style="height:38px; padding:4px;" />
           </label>
         }
+        <label class="checkbox-inline full-span">
+          <input type="checkbox" formControlName="colorTextoBannerActivo" />
+          <span class="label-con-tip">
+            Usar un color de letra propio en el banner (si no, blanco)
+            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Si tu color de marca es claro (pastel), el texto blanco del banner casi no se alcanza a leer — aquí puedes elegir otro color de letra, por ejemplo uno oscuro.</span></button>
+          </span>
+        </label>
+        @if (formEmpresa.controls.colorTextoBannerActivo.value) {
+          <label>
+            Color de letra del banner
+            <input type="color" class="form-control" formControlName="colorTextoBanner" style="height:38px; padding:4px;" />
+          </label>
+        }
 
         <hr class="full-span" style="width:100%; margin:4px 0;" />
         <p class="hint full-span" style="margin:0;">
