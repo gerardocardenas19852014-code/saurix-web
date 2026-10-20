@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
-import { DataClientService } from '../../../core/services/data-client.service';
+import { DataClientService, FiltroRango } from '../../../core/services/data-client.service';
 import { exportarCsv } from '../../../shared/utils/csv.util';
 import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
 import { colorAvatar } from '../kanban/avatar.util';
@@ -28,9 +28,13 @@ interface HorasAgrupadas {
  * "Reportes de horas" (Gestión de Proyectos) — agrega TicketActividad (la
  * bitácora de tiempo trabajado) por usuario, por proyecto y por ticket.
  * Igual que el resto de pantallas de "Reportes" del sistema, toda la
- * suma/agrupación se hace en el cliente sobre los GetList ya disponibles
- * (GetListTicketActividad admite traer todas las actividades sin filtrar
- * por ticket) — no requiere ningún SP de agregación.
+ * suma/agrupación se hace en el cliente — pero TicketActividad SÍ se pide ya
+ * acotada por fecha al servidor (fechaCreacion gte/lte del periodo/rango
+ * vigente), no completa: es una tabla "multiplicador" (muchas filas por
+ * ticket) que crece sin límite, y traerla entera arriesgaba el mismo 504
+ * Gateway Timeout que ya se corrigió en el dashboard de ventas. Cambiar
+ * Periodo o Desde/Hasta dispara una nueva consulta acotada (cargarActividades()),
+ * no un filtro local — solo "todo el historial" es, a propósito, sin acotar.
  */
 @Component({
   selector: 'app-reportes-horas',
@@ -69,18 +73,47 @@ export class ReportesHorasComponent implements OnInit {
 
   ngOnInit(): void {
     document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
-    this.cargando.set(true);
     this.data.list<ProyectoOpcion>('Proyecto').subscribe((p) => this.proyectos.set(p));
     this.data.list<TicketModulo>('TicketModulo').subscribe((m) => this.modulos.set(m));
     this.data.list<Usuario>('Usuario').subscribe((u) => this.usuarios.set(u));
     this.data.list<Ticket>('Ticket').subscribe((t) => this.tickets.set(t));
-    this.data.list<TicketActividad>('TicketActividad').subscribe({
+    this.cargarActividades();
+  }
+
+  /** Vuelve a pedir TicketActividad al servidor, acotada al rango vigente
+   *  (rangoActivo(): el manual Desde/Hasta si hay, si no el preset de
+   *  Periodo). "todo el historial" es la única opción que de verdad trae
+   *  la tabla completa — a propósito, porque el usuario la eligió. */
+  private cargarActividades(): void {
+    this.cargando.set(true);
+    const rango = this.rangoActivo();
+    const filtro: Record<string, unknown> = {};
+    if (rango) {
+      const rangoFecha: FiltroRango = { gte: rango.inicio.toISOString(), lte: rango.fin.toISOString() };
+      filtro['fechaCreacion'] = rangoFecha;
+    }
+    this.data.list<TicketActividad>('TicketActividad', filtro).subscribe({
       next: (actividades) => {
         this.actividades.set(actividades);
         this.cargando.set(false);
       },
       error: () => this.cargando.set(false),
     });
+  }
+
+  protected cambiarPeriodo(id: PeriodoId): void {
+    this.periodo.set(id);
+    this.cargarActividades();
+  }
+
+  protected cambiarRangoDesde(valor: string): void {
+    this.rangoDesde.set(valor);
+    this.cargarActividades();
+  }
+
+  protected cambiarRangoHasta(valor: string): void {
+    this.rangoHasta.set(valor);
+    this.cargarActividades();
   }
 
   private rangoDe(id: PeriodoId): RangoFecha | null {
@@ -116,6 +149,7 @@ export class ReportesHorasComponent implements OnInit {
   limpiarRangoManual(): void {
     this.rangoDesde.set('');
     this.rangoHasta.set('');
+    this.cargarActividades();
   }
 
   protected readonly etiquetaPeriodo = computed(() => {

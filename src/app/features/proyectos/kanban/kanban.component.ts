@@ -799,8 +799,17 @@ export class KanbanComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** TicketEtiqueta/TicketDependencia son tablas "multiplicador" (muchas filas
+   *  por ticket, de TODOS los proyectos): se piden acotadas a solo los
+   *  ticketIds del tablero abierto, en vez de traer la tabla completa de la
+   *  empresa — mismo riesgo de 504 Gateway Timeout que ya se corrigió en el
+   *  dashboard de ventas. */
   private cargarEtiquetasDeTablero(ticketIds: number[]): void {
-    this.data.list<TicketEtiqueta>('TicketEtiqueta').subscribe({
+    if (ticketIds.length === 0) {
+      this.etiquetasPorTicket.set(new Map());
+      return;
+    }
+    this.data.list<TicketEtiqueta>('TicketEtiqueta', { ticketId: ticketIds }).subscribe({
       next: (todas) => {
         const mapa = new Map<number, TicketEtiqueta[]>();
         for (const id of ticketIds) mapa.set(id, []);
@@ -813,11 +822,24 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
 
   private cargarDependenciasDeTablero(ticketIds: number[]): void {
-    this.data.list<TicketDependencia>('TicketDependencia').subscribe({
-      next: (todas) => {
+    if (ticketIds.length === 0) {
+      this.dependenciasPorTicket.set(new Map());
+      return;
+    }
+    // Una dependencia puede apuntar HACIA un ticket del tablero desde uno que
+    // no está en él (u originarse en el tablero hacia fuera) — se necesitan
+    // ambas direcciones, así que son dos .in() (uno por columna FK) en vez de
+    // un solo filtro (el contrato de list() solo admite AND entre claves).
+    forkJoin([
+      this.data.list<TicketDependencia>('TicketDependencia', { ticketId: ticketIds }),
+      this.data.list<TicketDependencia>('TicketDependencia', { ticketRelacionadoId: ticketIds }),
+    ]).subscribe({
+      next: ([porOrigen, porDestino]) => {
+        const todasPorId = new Map<number, TicketDependencia>();
+        for (const d of [...porOrigen, ...porDestino]) todasPorId.set(d.id, d);
         const mapa = new Map<number, TicketDependencia[]>();
         for (const id of ticketIds) mapa.set(id, []);
-        for (const dependencia of todas) {
+        for (const dependencia of todasPorId.values()) {
           mapa.get(dependencia.ticketId)?.push(dependencia);
           if (dependencia.ticketRelacionadoId !== dependencia.ticketId) {
             mapa.get(dependencia.ticketRelacionadoId)?.push(dependencia);

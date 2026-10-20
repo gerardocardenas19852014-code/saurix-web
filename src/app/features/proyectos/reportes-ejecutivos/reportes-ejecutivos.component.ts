@@ -114,7 +114,6 @@ export class ReportesEjecutivosComponent implements OnInit {
     this.data.list<ProyectoOpcion>('Proyecto').subscribe((p) => this.proyectos.set(p));
     this.data.list<TableroColumna>('TableroColumna').subscribe((c) => this.columnas.set(c));
     this.data.list<Sprint>('Sprint').subscribe((s) => this.sprints.set(s));
-    this.data.list<TicketHistorialEstado>('TicketHistorialEstado').subscribe((h) => this.historial.set(h));
     this.data.list<TicketPrioridad>('TicketPrioridad').subscribe((p) => this.prioridades.set(p));
     this.data.list<TicketModulo>('TicketModulo').subscribe((m) => this.modulos.set(m));
     // 'Usuario' no trae un campo nombreCompleto propio — hay que armarlo con
@@ -125,6 +124,19 @@ export class ReportesEjecutivosComponent implements OnInit {
     this.data.list<Ticket>('Ticket').subscribe((t) => {
       this.tickets.set(t);
       this.cargando.set(false);
+      // TicketHistorialEstado es una tabla "multiplicador" (muchas filas por
+      // ticket, crece sin límite): se acota a solo los tickets que existen, en
+      // vez de traer el historial de cambios de columna de TODA la empresa —
+      // mismo riesgo de 504 Gateway Timeout que ya se corrigió en el dashboard
+      // de ventas.
+      const idsTickets = t.map((x) => x.id);
+      if (idsTickets.length === 0) {
+        this.historial.set([]);
+        return;
+      }
+      this.data
+        .list<TicketHistorialEstado>('TicketHistorialEstado', { ticketId: idsTickets })
+        .subscribe((h) => this.historial.set(h));
     });
   }
 

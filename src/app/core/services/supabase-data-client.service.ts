@@ -1,7 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, from, of } from 'rxjs';
 import { FunctionsHttpError, PostgrestError } from '@supabase/supabase-js';
-import { DataClientService } from './data-client.service';
+import { DataClientService, FiltroRango } from './data-client.service';
+
+function esFiltroRango(valor: unknown): valor is FiltroRango {
+  return typeof valor === 'object' && valor !== null && !Array.isArray(valor) && ('gte' in valor || 'lte' in valor);
+}
 import { SupabaseService } from './supabase.service';
 import { DefinicionTabla, definicionTabla, entidadExiste } from './supabase-esquema';
 import { ToastService } from '../../shared/services/toast.service';
@@ -157,6 +161,13 @@ export class SupabaseDataClientService extends DataClientService {
         if (Array.isArray(valor)) {
           if (valor.length === 0) return [];
           consulta = consulta.in(columna.snake, valor);
+          continue;
+        }
+        // {gte, lte} = acotar una tabla que crece sin límite (bitácora,
+        // movimientos) a un rango de fechas en vez de traerla completa.
+        if (esFiltroRango(valor)) {
+          if (valor.gte !== undefined) consulta = consulta.gte(columna.snake, valor.gte);
+          if (valor.lte !== undefined) consulta = consulta.lte(columna.snake, valor.lte);
           continue;
         }
         consulta =

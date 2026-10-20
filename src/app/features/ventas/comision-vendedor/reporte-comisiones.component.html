@@ -6,11 +6,11 @@
   <div class="grid-filter">
     <label class="grid-filter-fecha-label">
       Desde
-      <input type="date" [value]="fechaDesde()" (change)="fechaDesde.set($any($event.target).value)" />
+      <input type="date" [value]="fechaDesde()" (change)="cambiarFechaDesde($any($event.target).value)" />
     </label>
     <label class="grid-filter-fecha-label">
       Hasta
-      <input type="date" [value]="fechaHasta()" (change)="fechaHasta.set($any($event.target).value)" />
+      <input type="date" [value]="fechaHasta()" (change)="cambiarFechaHasta($any($event.target).value)" />
     </label>
   </div>
 </div>

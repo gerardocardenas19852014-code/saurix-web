@@ -104,7 +104,19 @@ export class MetasComponent implements OnInit, OnDestroy {
       next: (m) => {
         this.metas.set(m);
         this.cargando.set(false);
-        this.data.list<MetaPresupuestoAporte>('MetaPresupuestoAporte').subscribe((a) => this.aportes.set(a));
+        // MetaPresupuestoAporte es una tabla "multiplicador" (muchas filas
+        // por meta): se acota a solo las metas que existen, en vez de traer
+        // el historial de aportes de TODAS las metas que haya habido alguna
+        // vez — mismo riesgo de 504 Gateway Timeout que ya se corrigió en el
+        // dashboard de ventas.
+        const idsMetas = m.map((x) => x.id);
+        if (idsMetas.length === 0) {
+          this.aportes.set([]);
+          return;
+        }
+        this.data
+          .list<MetaPresupuestoAporte>('MetaPresupuestoAporte', { metaPresupuestoId: idsMetas })
+          .subscribe((a) => this.aportes.set(a));
       },
       error: () => this.cargando.set(false),
     });

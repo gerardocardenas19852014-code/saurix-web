@@ -1,6 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, from } from 'rxjs';
-import { DataClientService } from './data-client.service';
+import { DataClientService, FiltroRango } from './data-client.service';
+
+function esFiltroRango(valor: unknown): valor is FiltroRango {
+  return typeof valor === 'object' && valor !== null && !Array.isArray(valor) && ('gte' in valor || 'lte' in valor);
+}
 import { IndexedDbEngineService } from './indexeddb-engine.service';
 
 /** Coincidencia de filtro: substring (sin mayúsculas/minúsculas) en texto, igualdad exacta en el resto. */
@@ -12,6 +16,13 @@ function coincideFiltro(fila: Record<string, unknown>, filtro: Record<string, un
     // del lado Supabase (ver supabase-data-client.service.ts: listar()).
     if (Array.isArray(valor)) {
       if (!valor.includes(valorFila)) return false;
+      continue;
+    }
+    // {gte, lte} = acotar a un rango (ver supabase-data-client.service.ts).
+    if (esFiltroRango(valor)) {
+      const comparable = valorFila as string | number;
+      if (valor.gte !== undefined && comparable < valor.gte) return false;
+      if (valor.lte !== undefined && comparable > valor.lte) return false;
       continue;
     }
     if (typeof valor === 'string' && typeof valorFila === 'string') {

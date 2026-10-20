@@ -228,24 +228,39 @@ export class ValorStockComponent implements OnInit {
     this.cargar();
   }
 
-  private cargar(): void {
+  private async cargar(): Promise<void> {
     this.cargando.set(true);
-    Promise.all([
+    const [productos, categorias, bodegas, existenciasBodega, nivelesMinimoBodega] = await Promise.all([
       firstValueFrom(this.data.list<Producto>('Producto')),
       firstValueFrom(this.data.list<CategoriaProducto>('CategoriaProducto')),
       firstValueFrom(this.data.list<Bodega>('Bodega')),
       firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega')),
       firstValueFrom(this.data.list<NivelMinimoBodega>('NivelMinimoBodega')),
-      firstValueFrom(this.data.list<MovimientoInventario>('MovimientoInventario')),
-    ]).then(([productos, categorias, bodegas, existenciasBodega, nivelesMinimoBodega, movimientos]) => {
-      this.productos.set(productos);
-      this.categorias.set(categorias);
-      this.bodegas.set(bodegas);
-      this.existenciasBodega.set(existenciasBodega);
-      this.nivelesMinimoBodega.set(nivelesMinimoBodega);
-      this.movimientos.set(movimientos);
-      this.cargando.set(false);
-    });
+    ]);
+    this.productos.set(productos);
+    this.categorias.set(categorias);
+    this.bodegas.set(bodegas);
+    this.existenciasBodega.set(existenciasBodega);
+    this.nivelesMinimoBodega.set(nivelesMinimoBodega);
+
+    // MovimientoInventario es el log de TODOS los movimientos de inventario
+    // de la empresa (crece sin límite) — "rotación" necesita, por producto,
+    // la fecha del último movimiento SIN importar qué tan viejo sea (es el
+    // propósito de la pantalla: detectar capital inmovilizado), así que no
+    // se puede acotar por fecha como en otras pantallas. Se acota por lo
+    // único que sí es seguro acotar: solo productos valorizables (activos y
+    // físicos), no absolutamente todos los productos que hayan existido.
+    // NOTA para un fix completo: lo ideal a futuro es una vista/RPC en
+    // Postgres que regrese MAX(fecha) agrupado por producto_id — eso evita
+    // traer las filas de movimiento en sí, que es lo que de verdad pesa
+    // aquí; ese cambio requiere tocar el backend, fuera del alcance de este
+    // filtro (ver esquema-tablas-saurix.md).
+    const idsValorizables = this.productosValorizables().map((p) => p.id);
+    const movimientos = idsValorizables.length
+      ? await firstValueFrom(this.data.list<MovimientoInventario>('MovimientoInventario', { productoId: idsValorizables }))
+      : [];
+    this.movimientos.set(movimientos);
+    this.cargando.set(false);
   }
 
   /** Último movimiento (cualquier tipo) de cada producto físico activo, y

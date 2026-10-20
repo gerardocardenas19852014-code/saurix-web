@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { DataClientService } from '../../../core/services/data-client.service';
+import { DataClientService, FiltroRango } from '../../../core/services/data-client.service';
 import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
 import { Devolucion, DevolucionItem } from '../devolucion/devolucion.model';
 import { Venta } from '../venta/venta.model';
@@ -53,15 +53,11 @@ export class ReporteComisionesComponent implements OnInit, OnDestroy {
   private readonly comisiones = signal<ComisionVendedor[]>([]);
 
   protected readonly filas = computed<FilaReporteComision[]>(() => {
-    const desde = this.fechaDesde();
-    const hasta = this.fechaHasta();
+    // this.ventas() ya viene acotada por fechaDesde/fechaHasta desde el
+    // servidor (ver cargar()) — aquí solo falta descartar las que no están
+    // Completadas.
     const devueltoPorVenta = this.devolucionItemsPorVenta();
-
-    const ventasPeriodo = this.ventas().filter((v) => {
-      if (v.estado !== 'Completada') return false;
-      const f = v.fecha.slice(0, 10);
-      return (!desde || f >= desde) && (!hasta || f <= hasta);
-    });
+    const ventasPeriodo = this.ventas().filter((v) => v.estado === 'Completada');
 
     return this.usuarios()
       .filter((u) => u.activo !== false)
@@ -107,28 +103,75 @@ export class ReporteComisionesComponent implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     document.documentElement.setAttribute('data-wide', 'grid');
-    this.cargando.set(true);
-
-    const [usuarios, ventas, devoluciones, comisiones] = await Promise.all([
+    const [usuarios, comisiones] = await Promise.all([
       firstValueFrom(this.data.list<Usuario>('Usuario')),
-      firstValueFrom(this.data.list<Venta>('Venta')),
-      firstValueFrom(this.data.list<Devolucion>('Devolucion')),
       firstValueFrom(this.data.list<ComisionVendedor>('ComisionVendedor')),
     ]);
     this.usuarios.set(usuarios);
-    this.ventas.set(ventas);
     this.comisiones.set(comisiones);
+    await this.cargar();
+  }
 
-    const itemsPorDevolucion = await Promise.all(
-      devoluciones.map((d) => firstValueFrom(this.data.list<DevolucionItem>('DevolucionItem', { devolucionId: d.id }))),
-    );
+  /** Vuelve a pedir Venta/Devolucion/DevolucionItem al servidor, acotadas al
+   *  periodo Desde–Hasta vigente — Venta y sus devoluciones son tablas que
+   *  crecen sin límite con el tiempo, así que NUNCA se traen completas:
+   *  mismo riesgo de 504 Gateway Timeout que ya se corrigió en el dashboard
+   *  de ventas. También reemplaza el N+1 anterior (una consulta de
+   *  DevolucionItem POR CADA devolución que haya existido alguna vez) por
+   *  un solo .in() sobre los ids de devolución de SOLO las ventas del
+   *  periodo. */
+  protected async cargar(): Promise<void> {
+    this.cargando.set(true);
+    const desde = this.fechaDesde();
+    const hasta = this.fechaHasta();
+    const rangoFecha: FiltroRango = {};
+    if (desde) rangoFecha.gte = `${desde}T00:00:00`;
+    if (hasta) rangoFecha.lte = `${hasta}T23:59:59`;
+    const filtroFecha = rangoFecha.gte !== undefined || rangoFecha.lte !== undefined ? { fecha: rangoFecha } : {};
+
+    const ventas = await firstValueFrom(this.data.list<Venta>('Venta', filtroFecha));
+    this.ventas.set(ventas);
+
+    // Una devolución cuenta para "ventas netas" del periodo de la VENTA, sin
+    // importar cuándo se procesó el regreso — así que se acota por los ids
+    // de venta del periodo, no por la fecha de la propia devolución (eso
+    // cambiaría el resultado: una devolución tardía dejaría de descontarse).
+    const idsVentas = ventas.map((v) => v.id);
+    if (idsVentas.length === 0) {
+      this.devolucionItemsPorVenta.set(new Map());
+      this.cargando.set(false);
+      return;
+    }
+    const devoluciones = await firstValueFrom(this.data.list<Devolucion>('Devolucion', { ventaId: idsVentas }));
+    const idsDevoluciones = devoluciones.map((d) => d.id);
+    const items =
+      idsDevoluciones.length > 0
+        ? await firstValueFrom(this.data.list<DevolucionItem>('DevolucionItem', { devolucionId: idsDevoluciones }))
+        : [];
+
+    const itemsPorDevolucion = new Map<number, DevolucionItem[]>();
+    for (const item of items) {
+      const arr = itemsPorDevolucion.get(item.devolucionId) ?? [];
+      arr.push(item);
+      itemsPorDevolucion.set(item.devolucionId, arr);
+    }
     const mapa = new Map<number, number>();
-    devoluciones.forEach((devolucion, idx) => {
-      const totalItems = itemsPorDevolucion[idx].reduce((acc, item) => acc + item.subtotal, 0);
+    for (const devolucion of devoluciones) {
+      const totalItems = (itemsPorDevolucion.get(devolucion.id) ?? []).reduce((acc, item) => acc + item.subtotal, 0);
       mapa.set(devolucion.ventaId, (mapa.get(devolucion.ventaId) ?? 0) + totalItems);
-    });
+    }
     this.devolucionItemsPorVenta.set(mapa);
 
     this.cargando.set(false);
+  }
+
+  protected cambiarFechaDesde(valor: string): void {
+    this.fechaDesde.set(valor);
+    void this.cargar();
+  }
+
+  protected cambiarFechaHasta(valor: string): void {
+    this.fechaHasta.set(valor);
+    void this.cargar();
   }
 }

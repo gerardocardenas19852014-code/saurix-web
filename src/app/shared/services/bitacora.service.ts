@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { EMPTY, Observable, catchError } from 'rxjs';
-import { DataClientService } from '../../core/services/data-client.service';
+import { DataClientService, FiltroRango } from '../../core/services/data-client.service';
 
 export interface BitacoraCambio {
   campo: string;
@@ -39,9 +39,24 @@ const CAMPOS_SENSIBLES = new Set(['password', 'confirmacionPassword']);
 export class BitacoraService {
   private readonly data = inject(DataClientService);
 
-  listar(modulo: string): Observable<BitacoraRegistro[]> {
+  /**
+   * `desde`/`hasta` acotan la consulta a un rango de fechas (ISO,
+   * 'YYYY-MM-DD...'): Bitacora es el log de auditoría global de TODA la
+   * app (una fila por cada alta/baja/modificación/consulta en cualquier
+   * módulo) y crece sin límite, así que listarla sin acotar por fecha
+   * arriesgaba el mismo 504 Gateway Timeout que ya se corrigió en el
+   * dashboard de ventas. BitacoraComponent siempre manda un rango (por
+   * defecto, los últimos 90 días) — ver abrir()/cargar() ahí.
+   */
+  listar(modulo: string, desde?: string, hasta?: string): Observable<BitacoraRegistro[]> {
+    const rangoFecha: FiltroRango = {};
+    if (desde) rangoFecha.gte = `${desde}T00:00:00`;
+    if (hasta) rangoFecha.lte = `${hasta}T23:59:59`;
+    const filtro: Record<string, unknown> = { modulo };
+    if (rangoFecha.gte !== undefined || rangoFecha.lte !== undefined) filtro['fecha'] = rangoFecha;
+
     return new Observable<BitacoraRegistro[]>((suscriptor) => {
-      this.data.list<BitacoraRegistro>('Bitacora', { modulo }).subscribe({
+      this.data.list<BitacoraRegistro>('Bitacora', filtro).subscribe({
         next: (registros) => {
           suscriptor.next(registros.sort((a, b) => b.fecha.localeCompare(a.fecha)));
           suscriptor.complete();

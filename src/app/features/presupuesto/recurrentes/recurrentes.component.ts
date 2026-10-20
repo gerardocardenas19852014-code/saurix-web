@@ -184,10 +184,22 @@ export class RecurrentesComponent implements OnInit, OnDestroy {
         next: (r) => {
           this.recurrentes.set(r);
           this.cargando.set(false);
+          // MovimientoPresupuesto es el ledger de TODA la empresa (crece sin
+          // límite); aquí solo hacen falta los movimientos generados por un
+          // fijo (origenRecurrenteId no nulo), así que se piden acotados a
+          // los ids de los fijos que existen, en vez de traer la tabla
+          // completa y descartar el resto en el navegador — mismo riesgo de
+          // 504 Gateway Timeout que ya se corrigió en el dashboard de ventas.
+          const idsRecurrentes = r.map((x) => x.id);
+          if (idsRecurrentes.length === 0) {
+            this.movimientosOrigen.set([]);
+            this.avisarPendientes();
+            return;
+          }
           this.data
-            .list<MovimientoPresupuesto>('MovimientoPresupuesto')
+            .list<MovimientoPresupuesto>('MovimientoPresupuesto', { origenRecurrenteId: idsRecurrentes })
             .subscribe((movimientos) => {
-              this.movimientosOrigen.set(movimientos.filter((m) => m.origenRecurrenteId !== null));
+              this.movimientosOrigen.set(movimientos);
               this.avisarPendientes();
             });
         },

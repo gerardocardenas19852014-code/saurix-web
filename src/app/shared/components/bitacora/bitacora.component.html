@@ -28,18 +28,18 @@
               <strong>{{ ultimo.accion }}</strong>
               <span>{{ ultimo.entidad }} · {{ ultimo.usuario }} · {{ fecha(ultimo.fecha) }}</span>
             </div>
-            <span class="bitacora-count">{{ registros().length }} movimientos</span>
+            <span class="bitacora-count">{{ registros().length }} movimientos en el periodo</span>
           </div>
         }
         @if (registros().length > 0) {
           <div class="bitacora-filtros mb-3">
             <label class="bitacora-filtro-campo">
               <span>Desde</span>
-              <input type="date" class="form-control pill-control" [ngModel]="filtroDesde()" (ngModelChange)="filtroDesde.set($event)" />
+              <input type="date" class="form-control pill-control" [ngModel]="filtroDesde()" (ngModelChange)="cambiarDesde($event)" />
             </label>
             <label class="bitacora-filtro-campo">
               <span>Hasta</span>
-              <input type="date" class="form-control pill-control" [ngModel]="filtroHasta()" (ngModelChange)="filtroHasta.set($event)" />
+              <input type="date" class="form-control pill-control" [ngModel]="filtroHasta()" (ngModelChange)="cambiarHasta($event)" />
             </label>
             <label class="bitacora-filtro-campo">
               <span>Acción</span>

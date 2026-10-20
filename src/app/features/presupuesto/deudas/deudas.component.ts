@@ -107,7 +107,19 @@ export class DeudasComponent implements OnInit, OnDestroy {
       next: (d) => {
         this.deudas.set(d);
         this.cargando.set(false);
-        this.data.list<DeudaPresupuestoAbono>('DeudaPresupuestoAbono').subscribe((a) => this.abonos.set(a));
+        // DeudaPresupuestoAbono es una tabla "multiplicador" (muchas filas
+        // por deuda): se acota a solo las deudas que existen, en vez de
+        // traer el historial de abonos de TODAS las deudas que haya habido
+        // alguna vez — mismo riesgo de 504 Gateway Timeout que ya se
+        // corrigió en el dashboard de ventas.
+        const idsDeudas = d.map((x) => x.id);
+        if (idsDeudas.length === 0) {
+          this.abonos.set([]);
+          return;
+        }
+        this.data
+          .list<DeudaPresupuestoAbono>('DeudaPresupuestoAbono', { deudaPresupuestoId: idsDeudas })
+          .subscribe((a) => this.abonos.set(a));
       },
       error: () => this.cargando.set(false),
     });

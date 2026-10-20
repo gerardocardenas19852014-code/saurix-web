@@ -102,17 +102,33 @@ export class ResumenEjecutivoComponent implements OnInit {
     });
     this.data.list<TableroColumna>('TableroColumna').subscribe((c) => this.columnas.set(c));
     this.data.list<TicketPrioridad>('TicketPrioridad').subscribe((p) => this.prioridades.set(p));
-    this.data.list<TicketActividad>('TicketActividad').subscribe((a) => this.actividades.set(a));
-    this.data.list<TicketHistorialEstado>('TicketHistorialEstado').subscribe((h) => this.historial.set(h));
     // 'Usuario' no trae un campo nombreCompleto propio — hay que armarlo con
     // nombreCompletoUsuario(), igual que en Mi Dashboard/Kanban/Gantt.
     this.data
       .list<Usuario>('Usuario')
       .subscribe((u) => this.usuarios.set(u.map((x) => ({ id: x.id, nombreCompleto: nombreCompletoUsuario(x) }))));
+
     this.data.list<Ticket>('Ticket').subscribe({
       next: (tickets) => {
         this.tickets.set(tickets);
         this.cargando.set(false);
+        // TicketActividad/TicketHistorialEstado son tablas "multiplicador"
+        // (muchas filas por ticket, crecen sin límite con el tiempo): se piden
+        // acotadas a solo los tickets que realmente existen, en vez de traer el
+        // historial de actividad/estados de TODA la empresa — mismo riesgo de
+        // 504 Gateway Timeout que ya se corrigió en el dashboard de ventas.
+        const idsTickets = tickets.map((t) => t.id);
+        if (idsTickets.length === 0) {
+          this.actividades.set([]);
+          this.historial.set([]);
+          return;
+        }
+        this.data
+          .list<TicketActividad>('TicketActividad', { ticketId: idsTickets })
+          .subscribe((a) => this.actividades.set(a));
+        this.data
+          .list<TicketHistorialEstado>('TicketHistorialEstado', { ticketId: idsTickets })
+          .subscribe((h) => this.historial.set(h));
       },
       error: () => this.cargando.set(false),
     });

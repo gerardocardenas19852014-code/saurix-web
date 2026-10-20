@@ -7,6 +7,7 @@ import { Producto } from '../productos/producto.model';
 import { formatMoneda, existenciaTotal, alertasStockBajo, haySobreStock } from '../productos/producto.util';
 import { ExistenciaBodega } from '../movimientos-bodega/existencia-bodega.model';
 import { NivelMinimoBodega } from '../productos/nivel-minimo-bodega.model';
+import { FiltroRango } from '../../../core/services/data-client.service';
 import { MovimientoInventario } from '../movimientos-bodega/movimiento-inventario.model';
 import { OrdenCompra } from '../compras/orden-compra.model';
 import { LoteProducto } from '../lotes-caducidad/lote-producto.model';
@@ -24,6 +25,13 @@ interface FilaMovimientoReciente {
 
 /** Cuántos movimientos recientes mostrar en el resumen — ver últimosMovimientos. */
 const CANTIDAD_MOVIMIENTOS_RECIENTES = 10;
+/** MovimientoInventario es el log de TODOS los movimientos de inventario de
+ *  la empresa (ventas, recepciones, ajustes, traspasos — crece sin límite) y
+ *  aquí solo hacen falta los últimos 10 para el widget de "Movimientos
+ *  recientes": se pide acotado a esta ventana de días, no la tabla completa
+ *  — mismo riesgo de 504 Gateway Timeout que ya se corrigió en el dashboard
+ *  de ventas. */
+const DIAS_MOVIMIENTOS_RECIENTES = 14;
 /** Mismo umbral que lotes-caducidad.component.ts. */
 const UMBRAL_PROXIMOS_DIAS = 30;
 
@@ -122,11 +130,14 @@ export class InventarioDashboardComponent implements OnInit {
 
   private cargar(): void {
     this.cargando.set(true);
+    const desde = new Date();
+    desde.setDate(desde.getDate() - DIAS_MOVIMIENTOS_RECIENTES);
+    const rangoReciente: FiltroRango = { gte: desde.toISOString() };
     Promise.all([
       firstValueFrom(this.data.list<Producto>('Producto')),
       firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega')),
       firstValueFrom(this.data.list<NivelMinimoBodega>('NivelMinimoBodega')),
-      firstValueFrom(this.data.list<MovimientoInventario>('MovimientoInventario')),
+      firstValueFrom(this.data.list<MovimientoInventario>('MovimientoInventario', { fecha: rangoReciente })),
       firstValueFrom(this.data.list<OrdenCompra>('OrdenCompra')),
       firstValueFrom(this.data.list<LoteProducto>('LoteProducto')),
     ]).then(([productos, existenciasBodega, nivelesMinimoBodega, movimientos, ordenesCompra, lotes]) => {

@@ -41,7 +41,7 @@
 
     <label class="board-filter-field">
       Periodo
-      <select [value]="periodo()" (change)="periodo.set($any($event.target).value)" [disabled]="hayRangoManual()">
+      <select [value]="periodo()" (change)="cambiarPeriodo($any($event.target).value)" [disabled]="hayRangoManual()">
         <option value="mes-actual">Este mes</option>
         <option value="mes-anterior">Mes anterior</option>
         <option value="anio-actual">Este año</option>
@@ -55,11 +55,11 @@
          Hasta, manda sobre el preset de "Periodo" de arriba. -->
     <label class="board-filter-field">
       Desde
-      <input type="date" [value]="rangoDesde()" (change)="rangoDesde.set($any($event.target).value)" />
+      <input type="date" [value]="rangoDesde()" (change)="cambiarRangoDesde($any($event.target).value)" />
     </label>
     <label class="board-filter-field">
       Hasta
-      <input type="date" [value]="rangoHasta()" (change)="rangoHasta.set($any($event.target).value)" />
+      <input type="date" [value]="rangoHasta()" (change)="cambiarRangoHasta($any($event.target).value)" />
     </label>
     @if (hayRangoManual()) {
       <button type="button" class="btn-secondary small" style="align-self:flex-end;" (click)="limpiarRangoManual()">

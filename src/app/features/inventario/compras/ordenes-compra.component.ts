@@ -297,14 +297,19 @@ export class OrdenesCompraComponent implements OnInit, OnDestroy {
    *  usando sin await, como antes, porque no necesitan encadenar nada después. */
   async cargar(): Promise<void> {
     this.cargando.set(true);
-    const [ordenes, items, productos, bodegas, proveedores, unidades, movimientos] = await Promise.all([
+    // MovimientoInventario es el log de TODOS los movimientos de inventario
+    // de la empresa (ventas, recepciones, ajustes, traspasos — crece sin
+    // límite) y aquí solo se usa filtrado por la orden de compra abierta
+    // (movimientosDeOrdenActiva), así que NO se trae en este Promise.all —
+    // se pide acotada por ordenCompraId al abrir cada orden (ver
+    // abrirOrdenPorId()), igual que se corrigió en el dashboard de ventas.
+    const [ordenes, items, productos, bodegas, proveedores, unidades] = await Promise.all([
       firstValueFrom(this.data.list<OrdenCompra>('OrdenCompra')),
       firstValueFrom(this.data.list<OrdenCompraItem>('OrdenCompraItem')),
       firstValueFrom(this.data.list<Producto>('Producto')),
       firstValueFrom(this.data.list<Bodega>('Bodega')),
       firstValueFrom(this.data.list<Proveedor>('Proveedor')),
       firstValueFrom(this.data.list<UnidadMedida>('UnidadMedida')),
-      firstValueFrom(this.data.list<MovimientoInventario>('MovimientoInventario')),
     ]);
     this.ordenes.set(ordenes);
     this.items.set(items);
@@ -312,8 +317,17 @@ export class OrdenesCompraComponent implements OnInit, OnDestroy {
     this.bodegas.set(bodegas);
     this.proveedores.set(proveedores);
     this.unidades.set(unidades);
-    this.movimientos.set(movimientos);
+    this.movimientos.set([]);
     this.cargando.set(false);
+  }
+
+  /** Movimientos de inventario de ESTA orden (acotados por ordenCompraId,
+   *  ver cargar()) — se piden solo cuando el usuario realmente abre la
+   *  ficha, no al cargar la lista completa de órdenes. */
+  private cargarMovimientosDeOrden(ordenCompraId: number): void {
+    this.data.list<MovimientoInventario>('MovimientoInventario', { ordenCompraId }).subscribe((movimientos) => {
+      this.movimientos.set(movimientos);
+    });
   }
 
   volverALista(): void {
@@ -343,6 +357,7 @@ export class OrdenesCompraComponent implements OnInit, OnDestroy {
     const orden = this.ordenes().find((o) => o.id === id);
     if (!orden) return;
     this.ordenActiva.set(orden);
+    this.cargarMovimientosDeOrden(id);
     this.form.reset({
       proveedorId: orden.proveedorId,
       bodegaDestinoId: orden.bodegaDestinoId,

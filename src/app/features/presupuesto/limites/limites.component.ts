@@ -2,12 +2,12 @@ import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject
 import { DecimalPipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth.service';
-import { DataClientService } from '../../../core/services/data-client.service';
+import { DataClientService, FiltroRango } from '../../../core/services/data-client.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../../shared/services/toast.service';
 import { CategoriaPresupuesto } from '../categoria-presupuesto/categoria-presupuesto.model';
 import { MovimientoPresupuesto } from '../movimientos/movimiento.model';
-import { fechaLocalDeTexto, formatMoneda, nivelUso, opcionesCategoriasBuscable } from '../shared/wallet.util';
+import { fechaLocalDeTexto, formatMoneda, nivelUso, opcionesCategoriasBuscable, textoFechaDeLocal } from '../shared/wallet.util';
 import { LimitePresupuesto } from './limite.model';
 import { SelectBuscableComponent } from '../../../shared/components/select-buscable/select-buscable.component';
 
@@ -64,7 +64,22 @@ export class LimitesComponent implements OnInit, OnDestroy {
     // en styles.scss, mismo patrón que Movimientos).
     document.documentElement.setAttribute('data-wide', 'grid');
     this.data.list<CategoriaPresupuesto>('CategoriaPresupuesto').subscribe((c) => this.categorias.set(c));
-    this.data.list<MovimientoPresupuesto>('MovimientoPresupuesto').subscribe((m) => this.movimientos.set(m));
+    // gastoDelMes() solo mira el MES EN CURSO (nunca un histórico ni un saldo
+    // acumulado) — a diferencia de Dashboard/Reportes/Calendario (que sí
+    // necesitan el saldo de cuenta desde su origen, por eso esos NO se
+    // acotan aquí), MovimientoPresupuesto sí se puede pedir ya acotado a ese
+    // rango en vez de traer el histórico completo de la empresa — mismo
+    // riesgo de 504 Gateway Timeout que ya se corrigió en el dashboard de
+    // ventas.
+    const hoy = new Date();
+    const ultimoDiaMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+    const rangoMesActual: FiltroRango = {
+      gte: textoFechaDeLocal(hoy.getFullYear(), hoy.getMonth(), 1),
+      lte: textoFechaDeLocal(hoy.getFullYear(), hoy.getMonth(), ultimoDiaMes),
+    };
+    this.data
+      .list<MovimientoPresupuesto>('MovimientoPresupuesto', { fecha: rangoMesActual })
+      .subscribe((m) => this.movimientos.set(m));
     this.cargar();
   }
 

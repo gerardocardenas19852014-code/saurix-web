@@ -174,21 +174,31 @@ export class ProyectosDashboardComponent implements OnInit {
       next: (tickets) => {
         this.tickets.set(tickets);
         this.cargando.set(false);
+        // TicketEtiqueta es una tabla "multiplicador" (muchas filas por
+        // ticket, de TODOS los proyectos): se acota a solo los tickets que
+        // existen, en vez de traer la tabla completa de la empresa — mismo
+        // riesgo de 504 Gateway Timeout que ya se corrigió en el dashboard
+        // de ventas.
+        const idsTickets = tickets.map((t) => t.id);
+        if (idsTickets.length === 0) {
+          this.etiquetasPorTicket.set(new Map());
+          return;
+        }
+        this.data.list<TicketEtiqueta>('TicketEtiqueta', { ticketId: idsTickets }).subscribe((etiquetas) => {
+          const mapa = new Map<number, TicketEtiqueta[]>();
+          for (const e of etiquetas) {
+            const arr = mapa.get(e.ticketId) ?? [];
+            arr.push(e);
+            mapa.set(e.ticketId, arr);
+          }
+          this.etiquetasPorTicket.set(mapa);
+        });
       },
       error: () => this.cargando.set(false),
     });
     this.data
       .list<TicketSeguidor>('TicketSeguidor', { usuarioId: this.usuarioActualId })
       .subscribe((seguidos) => this.seguidos.set(seguidos));
-    this.data.list<TicketEtiqueta>('TicketEtiqueta').subscribe((etiquetas) => {
-      const mapa = new Map<number, TicketEtiqueta[]>();
-      for (const e of etiquetas) {
-        const arr = mapa.get(e.ticketId) ?? [];
-        arr.push(e);
-        mapa.set(e.ticketId, arr);
-      }
-      this.etiquetasPorTicket.set(mapa);
-    });
   }
 
   private etiquetasDe(ticketId: number): TicketEtiqueta[] {
