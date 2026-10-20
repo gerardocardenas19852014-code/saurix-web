@@ -82,20 +82,31 @@ export class ClienteFormModalComponent {
     // Carga única del catálogo de listas de precio — este componente no se
     // vuelve a crear cada vez que se abre el modal (solo cambia `visible`),
     // así que basta con pedirlo una sola vez.
-    this.data.list<TipoListaPrecio>('TipoListaPrecio').subscribe((listas) => {
-      this.opcionesListaPrecio.set([
-        { valor: 0, etiqueta: 'Precio general' },
-        ...listas.filter((l) => l.activo !== false).map((l) => ({ valor: l.id, etiqueta: l.nombre })),
-      ]);
+    // error: no-op a propósito — el DataClientService ya muestra su propio
+    // toast ante una falla (ver SupabaseDataClientService.conToast) y este
+    // catálogo es solo "nice to have" (el combo queda con su única opción
+    // por defecto); sin este callback, un error aquí quedaba como excepción
+    // no manejada (ver conToast: além del toast, siempre re-lanza).
+    this.data.list<TipoListaPrecio>('TipoListaPrecio').subscribe({
+      next: (listas) => {
+        this.opcionesListaPrecio.set([
+          { valor: 0, etiqueta: 'Precio general' },
+          ...listas.filter((l) => l.activo !== false).map((l) => ({ valor: l.id, etiqueta: l.nombre })),
+        ]);
+      },
+      error: () => {},
     });
 
-    this.data.list<RegimenFiscal>('RegimenFiscal').subscribe((regimenes) => {
-      this.opcionesRegimenFiscal.set([
-        { valor: '', etiqueta: 'Sin régimen capturado' },
-        ...regimenes
-          .filter((r) => r.activo !== false)
-          .map((r) => ({ valor: r.clave, etiqueta: r.clave + ' — ' + r.nombre })),
-      ]);
+    this.data.list<RegimenFiscal>('RegimenFiscal').subscribe({
+      next: (regimenes) => {
+        this.opcionesRegimenFiscal.set([
+          { valor: '', etiqueta: 'Sin régimen capturado' },
+          ...regimenes
+            .filter((r) => r.activo !== false)
+            .map((r) => ({ valor: r.clave, etiqueta: r.clave + ' — ' + r.nombre })),
+        ]);
+      },
+      error: () => {},
     });
 
     // País solo es editable para un contacto extranjero — para uno nacional
