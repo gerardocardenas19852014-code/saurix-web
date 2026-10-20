@@ -150,6 +150,15 @@ export class SupabaseDataClientService extends DataClientService {
         // Igual que en IndexedDB: filtrar por un campo que el registro no
         // tiene no coincide con nada.
         if (!columna) return [];
+        // Un arreglo = "está en esta lista" (ver DashboardVentasComponent:
+        // pedir VentaItem/VentaPago solo de un conjunto acotado de ventaId,
+        // en vez de traer la tabla completa y filtrar en el navegador — el
+        // patrón que causaba timeouts en el dashboard con historial largo).
+        if (Array.isArray(valor)) {
+          if (valor.length === 0) return [];
+          consulta = consulta.in(columna.snake, valor);
+          continue;
+        }
         consulta =
           typeof valor === 'string' && columna.tipo === 't'
             ? consulta.ilike(columna.snake, `%${escaparLike(valor)}%`)

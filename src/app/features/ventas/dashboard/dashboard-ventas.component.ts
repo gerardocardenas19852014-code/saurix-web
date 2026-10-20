@@ -152,20 +152,41 @@ export class DashboardVentasComponent implements OnInit {
       .slice(0, CANTIDAD_TOP_PRODUCTOS);
   });
 
-  ngOnInit(): void {
+  async ngOnInit(): Promise<void> {
     this.cargando.set(true);
-    Promise.all([
+
+    // VentaItem/VentaPago traía la tabla COMPLETA (todas las ventas desde
+    // siempre, con todos sus renglones y pagos) solo para sacar "hoy vs
+    // ayer" y el top 30 días — con historial real esto son muchísimas más
+    // filas que Venta (varios renglones/pagos por cada venta) y provocó el
+    // 504 (Gateway Timeout) reportado en consola. Ahora Venta/Producto se
+    // piden completos (una fila por venta, costo acotado) y de ahí se saca
+    // el conjunto de ventaId dentro de la ventana de DIAS_TOP_PRODUCTOS
+    // días — todo lo que este dashboard necesita cae dentro de esa ventana
+    // (Hoy/Ayer incluidos) — para pedir VentaItem/VentaPago solo de esas
+    // ventas (ver el soporte de filtro por arreglo, ".in()"/"IndexedDB.
+    // includes()", agregado en DataClientService para este caso).
+    const [ventas, productos] = await Promise.all([
       firstValueFrom(this.data.list<Venta>('Venta')),
-      firstValueFrom(this.data.list<VentaItem>('VentaItem')),
-      firstValueFrom(this.data.list<VentaPago>('VentaPago')),
       firstValueFrom(this.data.list<Producto>('Producto')),
-    ]).then(([ventas, items, pagos, productos]) => {
-      this.ventas.set(ventas);
-      this.items.set(items);
-      this.pagos.set(pagos);
-      this.productos.set(productos);
-      this.cargando.set(false);
-    });
+    ]);
+
+    const limiteISO = new Date(Date.now() - DIAS_TOP_PRODUCTOS * 86400000).toISOString().slice(0, 10);
+    const idsEnRango = ventas.filter((v) => v.fecha.slice(0, 10) >= limiteISO).map((v) => v.id);
+
+    const [items, pagos] =
+      idsEnRango.length > 0
+        ? await Promise.all([
+            firstValueFrom(this.data.list<VentaItem>('VentaItem', { ventaId: idsEnRango })),
+            firstValueFrom(this.data.list<VentaPago>('VentaPago', { ventaId: idsEnRango })),
+          ])
+        : [[], []];
+
+    this.ventas.set(ventas);
+    this.items.set(items);
+    this.pagos.set(pagos);
+    this.productos.set(productos);
+    this.cargando.set(false);
   }
 
   exportarCsv(): void {

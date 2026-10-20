@@ -8,6 +8,12 @@ function coincideFiltro(fila: Record<string, unknown>, filtro: Record<string, un
   for (const [clave, valor] of Object.entries(filtro)) {
     if (valor === null || valor === undefined || valor === '') continue;
     const valorFila = fila[clave];
+    // Un arreglo = "está en esta lista" — mismo significado que el .in()
+    // del lado Supabase (ver supabase-data-client.service.ts: listar()).
+    if (Array.isArray(valor)) {
+      if (!valor.includes(valorFila)) return false;
+      continue;
+    }
     if (typeof valor === 'string' && typeof valorFila === 'string') {
       if (!valorFila.toLowerCase().includes(valor.toLowerCase())) return false;
     } else if (valorFila !== valor) {
