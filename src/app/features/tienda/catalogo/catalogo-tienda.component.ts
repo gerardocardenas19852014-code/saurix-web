@@ -666,8 +666,21 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
         /* silencioso a propósito — ver comentario arriba */
       });
 
+    // guardarUltimoPedido() primero (guarda ESTE carrito para "volver a
+    // pedir lo mismo") y RECIÉN DESPUÉS se vacía — si no, el cliente se
+    // queda con el pedido que ya mandó todavía puesto en el carrito y no
+    // puede arrancar uno nuevo sin quitar manualmente cada línea. Las
+    // notas son del pedido que se fue, así que también se limpian; nombre
+    // y teléfono NO, para no pedírselos de nuevo si hace otro pedido
+    // seguido en la misma tienda.
     this.guardarUltimoPedido();
+    this.carrito.set([]);
+    this.formCliente.patchValue({ notas: '' });
     this.modalEnviarAbierto.set(false);
+    // También se cierra el carrito (no solo el modal de enviar) — así el
+    // cliente regresa derecho al catálogo de la tienda para agregar otro
+    // producto, en vez de quedarse viendo el panel del carrito ya vacío.
+    this.carritoAbierto.set(false);
     this.mostrarConfeti();
   }
 
