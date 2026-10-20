@@ -160,6 +160,7 @@ export class VentasLandingComponent implements OnInit {
     GRUPOS.map((grupo) => ({
       ...grupo,
       enlaces: grupo.enlaces.filter((enlace) => {
+        if (enlace.ruta === 'apertura-turno') return this.configuracionVentas.aperturaCajaActivo();
         if (enlace.ruta === 'corte-turno') return this.configuracionVentas.corteCajaActivo();
         if (enlace.ruta === 'cierre-turno') return this.configuracionVentas.cierreCajaActivo();
         return true;

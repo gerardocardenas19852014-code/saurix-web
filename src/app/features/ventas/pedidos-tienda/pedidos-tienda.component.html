@@ -7,15 +7,49 @@
   para no volver a teclearlo: confírmalo para registrar la venta o descártalo si no aplica.
 </p>
 
+<div class="grid-toolbar">
+  <div class="grid-filter">
+    <select
+      class="toolbar-select"
+      aria-label="Filtrar por estado"
+      [value]="filtroEstado()"
+      (change)="filtroEstado.set($any($event.target).value)"
+    >
+      <option value="Todos">Todos los estados</option>
+      <option value="Pendiente">Pendiente</option>
+      <option value="Confirmado">Confirmado</option>
+      <option value="Descartado">Descartado</option>
+    </select>
+    <label class="grid-filter-fecha-label">
+      Desde
+      <input type="date" [value]="fechaDesde()" (change)="fechaDesde.set($any($event.target).value)" />
+    </label>
+    <label class="grid-filter-fecha-label">
+      Hasta
+      <input type="date" [value]="fechaHasta()" (change)="fechaHasta.set($any($event.target).value)" />
+    </label>
+    <input
+      type="search"
+      placeholder="Buscar por cliente o teléfono…"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value)"
+    />
+  </div>
+</div>
+
 <app-data-table
   [tamanoPagina]="preferenciasGrid.tamanoPagina()"
   [columnas]="columnas"
-  [filas]="pedidos()"
+  [filas]="pedidosFiltrados()"
   [cargando]="cargando()"
   [ocultarEditarEliminar]="true"
   accionExtraEtiqueta="Ver detalle"
   accionExtraTitulo="Ver productos y confirmar/descartar este pedido"
   (accionExtra)="verDetalle($event)"
+  accionExtra3Etiqueta="🗑"
+  [accionExtra3Icono]="true"
+  accionExtra3Titulo="Eliminar pedido"
+  (accionExtra3)="pedirEliminar($event)"
 />
 
 @if (pedidoDetalle(); as pedido) {
@@ -122,4 +156,12 @@
   [mensaje]="'¿Descartar el pedido de ' + (pedidoADescartar()?.nombreCliente ?? '') + '?'"
   (confirmar)="confirmarDescartar()"
   (cancelar)="pedidoADescartar.set(null)"
+/>
+
+<app-confirm-dialog
+  [visible]="pedidoAEliminar() !== null"
+  titulo="Eliminar pedido"
+  [mensaje]="'¿Eliminar el pedido de ' + (pedidoAEliminar()?.nombreCliente ?? '') + '? Esta acción no se puede deshacer.'"
+  (confirmar)="confirmarEliminar()"
+  (cancelar)="pedidoAEliminar.set(null)"
 />

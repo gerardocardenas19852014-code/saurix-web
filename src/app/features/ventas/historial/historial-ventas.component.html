@@ -3,30 +3,31 @@
 </div>
 
 <div class="grid-toolbar">
-  <input
-    type="search"
-    placeholder="Buscar por folio o cliente…"
-    [value]="busqueda()"
-    (input)="busqueda.set($any($event.target).value)"
-  />
-
   <div class="grid-filter">
-    <label class="board-filter-field" style="margin:0;">
+    <select
+      class="toolbar-select"
+      aria-label="Filtrar por estado"
+      [value]="filtroEstado()"
+      (change)="filtroEstado.set($any($event.target).value)"
+    >
+      <option value="Todas">Todas</option>
+      <option value="Completada">Completada</option>
+      <option value="Cancelada">Cancelada</option>
+    </select>
+    <label class="grid-filter-fecha-label">
       Desde
       <input type="date" [value]="fechaDesde()" (change)="fechaDesde.set($any($event.target).value)" />
     </label>
-    <label class="board-filter-field" style="margin:0;">
+    <label class="grid-filter-fecha-label">
       Hasta
       <input type="date" [value]="fechaHasta()" (change)="fechaHasta.set($any($event.target).value)" />
     </label>
-    <label class="board-filter-field" style="margin:0;">
-      Estado
-      <select [value]="filtroEstado()" (change)="filtroEstado.set($any($event.target).value)">
-        <option value="Todas">Todas</option>
-        <option value="Completada">Completada</option>
-        <option value="Cancelada">Cancelada</option>
-      </select>
-    </label>
+    <input
+      type="search"
+      placeholder="Buscar por folio o cliente…"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value)"
+    />
   </div>
 
   <div class="grid-filter">

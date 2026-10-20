@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
@@ -13,7 +13,7 @@ import { ClienteService } from '../clientes/cliente.service';
 import { MetodoPago, METODOS_PAGO } from '../venta/venta.model';
 import { TurnoCajaService } from '../turno/turno-caja.service';
 import { formatMoneda } from '../ventas.util';
-import { PedidoTienda } from './pedido-tienda.model';
+import { EstadoPedidoTienda, PedidoTienda } from './pedido-tienda.model';
 import { PedidoTiendaService } from './pedido-tienda.service';
 
 /**
@@ -54,6 +54,28 @@ export class PedidosTiendaComponent implements OnInit, OnDestroy {
   protected readonly pedidos = signal<PedidoTienda[]>([]);
   protected readonly bodegas = signal<Bodega[]>([]);
 
+  // ── Filtros ─────────────────────────────────────────────────────────
+  protected readonly busqueda = signal('');
+  protected readonly fechaDesde = signal(this.hoyISO());
+  protected readonly fechaHasta = signal(this.hoyISO());
+  protected readonly filtroEstado = signal<EstadoPedidoTienda | 'Todos'>('Todos');
+
+  protected readonly pedidosFiltrados = computed(() => {
+    const texto = this.busqueda().trim().toLowerCase();
+    const desde = this.fechaDesde();
+    const hasta = this.fechaHasta();
+    const estado = this.filtroEstado();
+
+    return this.pedidos().filter((p) => {
+      const fechaPedido = p.fechaCreacion.slice(0, 10);
+      if (desde && fechaPedido < desde) return false;
+      if (hasta && fechaPedido > hasta) return false;
+      if (estado !== 'Todos' && p.estado !== estado) return false;
+      if (!texto) return true;
+      return p.nombreCliente.toLowerCase().includes(texto) || p.telefonoCliente.toLowerCase().includes(texto);
+    });
+  });
+
   protected readonly columnas: ColumnaTabla<PedidoTienda>[] = [
     { campo: 'fechaCreacion', etiqueta: 'Fecha', formatear: (p) => new Date(p.fechaCreacion).toLocaleString('es-MX') },
     { campo: 'nombreCliente', etiqueta: 'Cliente' },
@@ -72,6 +94,10 @@ export class PedidosTiendaComponent implements OnInit, OnDestroy {
     await this.cargar();
   }
 
+  private hoyISO(): string {
+    return new Date().toISOString().slice(0, 10);
+  }
+
   private async cargar(): Promise<void> {
     this.cargando.set(true);
     const [pedidos, bodegas] = await Promise.all([
@@ -87,6 +113,7 @@ export class PedidosTiendaComponent implements OnInit, OnDestroy {
   // ── Detalle / confirmación / descarte ──────────────────────────────
   protected readonly pedidoDetalle = signal<PedidoTienda | null>(null);
   protected readonly pedidoADescartar = signal<PedidoTienda | null>(null);
+  protected readonly pedidoAEliminar = signal<PedidoTienda | null>(null);
 
   protected readonly modalConfirmarAbierto = signal(false);
   protected readonly bodegaConversionId = signal<number | null>(null);
@@ -116,6 +143,21 @@ export class PedidosTiendaComponent implements OnInit, OnDestroy {
     this.toast.exito('Pedido descartado.');
     this.pedidoADescartar.set(null);
     this.pedidoDetalle.set(actualizado);
+    await this.cargar();
+  }
+
+  pedirEliminar(pedido: PedidoTienda): void {
+    this.pedidoAEliminar.set(pedido);
+  }
+
+  async confirmarEliminar(): Promise<void> {
+    const pedido = this.pedidoAEliminar();
+    if (!pedido) return;
+
+    await firstValueFrom(this.data.baja('PedidoTienda', pedido.id));
+    this.toast.exito('Pedido eliminado.');
+    this.pedidoAEliminar.set(null);
+    if (this.pedidoDetalle()?.id === pedido.id) this.pedidoDetalle.set(null);
     await this.cargar();
   }
 

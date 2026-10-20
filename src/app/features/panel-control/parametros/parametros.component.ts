@@ -39,6 +39,16 @@ export class ParametrosComponent implements OnInit {
     }
   }
 
+  async alternarAperturaCaja(activo: boolean): Promise<void> {
+    if (!this.esAdmin) return;
+    try {
+      await this.configuracionVentas.alternarAperturaCaja(activo);
+      this.toast.exito(activo ? 'Apertura de caja activada.' : 'Apertura de caja desactivada.');
+    } catch {
+      this.toast.error('No se pudo guardar el parámetro.');
+    }
+  }
+
   async alternarCorteCaja(activo: boolean): Promise<void> {
     if (!this.esAdmin) return;
     try {

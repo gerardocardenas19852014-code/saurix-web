@@ -29,8 +29,26 @@
 </div>
 
 <div class="settings-card">
-  <h2 class="settings-card-title">📋🔒 Ventas: corte y cierre de caja</h2>
+  <h2 class="settings-card-title">🔓📋🔒 Ventas: apertura, corte y cierre de caja</h2>
   <div class="toggle-row">
+    <div>
+      <p class="toggle-row-title">Habilitar "Apertura de caja"</p>
+      <p class="hint" style="margin:2px 0 0;">
+        Abre un turno de caja con el efectivo inicial, antes de poder cobrar. Si lo apagas,
+        desaparece del menú y de Inicio en Ventas.
+      </p>
+    </div>
+    <label class="toggle-switch">
+      <input
+        type="checkbox"
+        [checked]="configuracionVentas.aperturaCajaActivo()"
+        [disabled]="!esAdmin"
+        (change)="alternarAperturaCaja($any($event.target).checked)"
+      />
+      <span class="toggle-switch-track"></span>
+    </label>
+  </div>
+  <div class="toggle-row" style="margin-top:14px;">
     <div>
       <p class="toggle-row-title">Habilitar "Corte de caja"</p>
       <p class="hint" style="margin:2px 0 0;">

@@ -13,6 +13,7 @@ export const VENTAS_ROUTES: Routes = [
   {
     path: 'apertura-turno',
     loadComponent: () => import('./turno/apertura-turno.component').then((m) => m.AperturaTurnoComponent),
+    canActivate: [parametroVentasGuard('aperturaCajaActivo')],
   },
   {
     path: 'corte-turno',

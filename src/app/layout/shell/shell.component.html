@@ -227,7 +227,9 @@
         </button>
         @if (grupoAbierto('ventas', 'Proceso')) {
           <a routerLink="/ventas/cobro" routerLinkActive="active">🧾 Cobro</a>
-          <a routerLink="/ventas/apertura-turno" routerLinkActive="active">🔓 Apertura de caja</a>
+          @if (aperturaCajaActivo()) {
+            <a routerLink="/ventas/apertura-turno" routerLinkActive="active">🔓 Apertura de caja</a>
+          }
           @if (corteCajaActivo()) {
             <a routerLink="/ventas/corte-turno" routerLinkActive="active">📋 Corte de caja</a>
           }

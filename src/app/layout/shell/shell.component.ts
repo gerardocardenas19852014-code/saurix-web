@@ -228,6 +228,7 @@ export class ShellComponent implements OnDestroy {
    *  Inicio (ver VentasLandingComponent) — parámetros de Panel de Control →
    *  Parámetros del sistema, default encendidos. */
   private readonly configuracionVentas = inject(ConfiguracionVentasService);
+  protected readonly aperturaCajaActivo = this.configuracionVentas.aperturaCajaActivo;
   protected readonly corteCajaActivo = this.configuracionVentas.corteCajaActivo;
   protected readonly cierreCajaActivo = this.configuracionVentas.cierreCajaActivo;
 

@@ -1202,6 +1202,19 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
 .grid-pagesize { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft); font-family: 'Montserrat', sans-serif; }
 .pagesize-select { padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); color: var(--text-strong); font-family: inherit; font-size: 14px; flex-shrink: 0; }
 
+/* Par "Desde"/"Hasta" dentro de .grid-filter (filtro por rango de fechas en
+   pantallas como Historial de ventas/Pedidos web): la regla de arriba
+   (".grid-filter input:not([type='checkbox'])", pensada para el buscador de
+   texto) le daría a un <input type="date"> el mismo flex:1 1 200px/
+   max-width:260px del buscador — mucho más ancho de lo que necesita un
+   selector de fecha nativo, se ve "gigante" junto al select de Estado. Esta
+   clase angosta solo esos dos inputs sin tocar el resto de .grid-filter. */
+.grid-filter-fecha-label {
+  display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-soft);
+  font-family: 'Montserrat', sans-serif; flex-shrink: 0;
+}
+.grid-filter-fecha-label input[type='date'] { flex: 0 1 150px; min-width: 130px; max-width: 150px; }
+
 @media (max-width: 720px) {
   .grid-filter { margin-left: 0; width: 100%; flex-wrap: wrap; }
   .grid-filter input:not([type='checkbox']) { max-width: none; }
