@@ -20,6 +20,14 @@ export interface ConfiguracionVentas {
    *  (ver denominaciones-efectivo.util.ts). Apagado por default: es un
    *  paso extra opcional, no todas las empresas lo quieren. */
   conteoCajaPorDenominacion: boolean;
+  /** Si está en false, "Corte de caja" desaparece del menú lateral y de
+   *  Inicio en Ventas (ver ShellComponent/VentasLandingComponent) — para
+   *  negocios que no manejan turnos de caja con reporte a medio turno.
+   *  Default true: no cambia el comportamiento de empresas que ya lo
+   *  usan. */
+  corteCajaActivo: boolean;
+  /** Mismo criterio que corteCajaActivo, pero para "Cierre de caja". */
+  cierreCajaActivo: boolean;
   fechaCreacion?: string;
   fechaModificacion?: string;
   activo: boolean;
@@ -30,6 +38,8 @@ export class ConfiguracionVentasService {
   private readonly data = inject(DataClientService);
 
   readonly conteoCajaPorDenominacion = signal(false);
+  readonly corteCajaActivo = signal(true);
+  readonly cierreCajaActivo = signal(true);
 
   private registroActual: ConfiguracionVentas | null = null;
   private cargaEnCurso: Promise<void> | null = null;
@@ -46,6 +56,8 @@ export class ConfiguracionVentasService {
         const registro = registros[0] ?? null;
         this.registroActual = registro;
         this.conteoCajaPorDenominacion.set(registro?.conteoCajaPorDenominacion ?? false);
+        this.corteCajaActivo.set(registro?.corteCajaActivo ?? true);
+        this.cierreCajaActivo.set(registro?.cierreCajaActivo ?? true);
       } catch {
         /* Sin datos disponibles todavía (p.ej. entidad no migrada aún en modo
          *  Nube) — se queda con el default (apagado). */
@@ -55,20 +67,41 @@ export class ConfiguracionVentasService {
   }
 
   async alternarConteoPorDenominacion(activo: boolean): Promise<void> {
+    await this.guardarParametro('conteoCajaPorDenominacion', activo, this.conteoCajaPorDenominacion);
+  }
+
+  async alternarCorteCaja(activo: boolean): Promise<void> {
+    await this.guardarParametro('corteCajaActivo', activo, this.corteCajaActivo);
+  }
+
+  async alternarCierreCaja(activo: boolean): Promise<void> {
+    await this.guardarParametro('cierreCajaActivo', activo, this.cierreCajaActivo);
+  }
+
+  /** Mismo "leer o crear la fila única" para cualquiera de los parámetros
+   *  de arriba — evita repetir el if/else de alta-o-modificación 3 veces. */
+  private async guardarParametro(
+    campo: 'conteoCajaPorDenominacion' | 'corteCajaActivo' | 'cierreCajaActivo',
+    activo: boolean,
+    senal: ReturnType<typeof signal<boolean>>,
+  ): Promise<void> {
     await this.cargar();
-    this.conteoCajaPorDenominacion.set(activo);
+    senal.set(activo);
 
     if (this.registroActual) {
       this.registroActual = await firstValueFrom(
         this.data.modificacion<ConfiguracionVentas>(ENTIDAD, {
           ...this.registroActual,
-          conteoCajaPorDenominacion: activo,
+          [campo]: activo,
         }),
       );
     } else {
       this.registroActual = await firstValueFrom(
         this.data.alta<ConfiguracionVentas>(ENTIDAD, {
-          conteoCajaPorDenominacion: activo,
+          conteoCajaPorDenominacion: this.conteoCajaPorDenominacion(),
+          corteCajaActivo: this.corteCajaActivo(),
+          cierreCajaActivo: this.cierreCajaActivo(),
+          [campo]: activo,
           activo: true,
         }),
       );

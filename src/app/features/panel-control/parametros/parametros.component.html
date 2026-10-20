@@ -27,3 +27,46 @@
     <p class="hint" style="margin:12px 0 0;">Solo un administrador puede cambiar este parámetro.</p>
   }
 </div>
+
+<div class="settings-card">
+  <h2 class="settings-card-title">📋🔒 Ventas: corte y cierre de caja</h2>
+  <div class="toggle-row">
+    <div>
+      <p class="toggle-row-title">Habilitar "Corte de caja"</p>
+      <p class="hint" style="margin:2px 0 0;">
+        Reporte de cómo va el turno abierto, sin cerrarlo. Si lo apagas, desaparece del menú y de
+        Inicio en Ventas — para negocios que no necesitan ese reporte a medio turno.
+      </p>
+    </div>
+    <label class="toggle-switch">
+      <input
+        type="checkbox"
+        [checked]="configuracionVentas.corteCajaActivo()"
+        [disabled]="!esAdmin"
+        (change)="alternarCorteCaja($any($event.target).checked)"
+      />
+      <span class="toggle-switch-track"></span>
+    </label>
+  </div>
+  <div class="toggle-row" style="margin-top:14px;">
+    <div>
+      <p class="toggle-row-title">Habilitar "Cierre de caja"</p>
+      <p class="hint" style="margin:2px 0 0;">
+        Termina el turno: cuenta el efectivo físico contra lo esperado. Si lo apagas, desaparece
+        del menú y de Inicio en Ventas.
+      </p>
+    </div>
+    <label class="toggle-switch">
+      <input
+        type="checkbox"
+        [checked]="configuracionVentas.cierreCajaActivo()"
+        [disabled]="!esAdmin"
+        (change)="alternarCierreCaja($any($event.target).checked)"
+      />
+      <span class="toggle-switch-track"></span>
+    </label>
+  </div>
+  @if (!esAdmin) {
+    <p class="hint" style="margin:12px 0 0;">Solo un administrador puede cambiar estos parámetros.</p>
+  }
+</div>

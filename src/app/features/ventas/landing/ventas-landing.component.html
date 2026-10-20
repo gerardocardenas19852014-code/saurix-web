@@ -2,7 +2,7 @@
   <h1>Ventas</h1>
 </div>
 
-@for (grupo of grupos; track grupo.titulo) {
+@for (grupo of grupos(); track grupo.titulo) {
   <div class="catalog-group">
     <h2 class="catalog-group-title">
       {{ grupo.titulo }}

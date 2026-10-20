@@ -38,4 +38,24 @@ export class ParametrosComponent implements OnInit {
       this.toast.error('No se pudo guardar el parámetro.');
     }
   }
+
+  async alternarCorteCaja(activo: boolean): Promise<void> {
+    if (!this.esAdmin) return;
+    try {
+      await this.configuracionVentas.alternarCorteCaja(activo);
+      this.toast.exito(activo ? 'Corte de caja activado.' : 'Corte de caja desactivado.');
+    } catch {
+      this.toast.error('No se pudo guardar el parámetro.');
+    }
+  }
+
+  async alternarCierreCaja(activo: boolean): Promise<void> {
+    if (!this.esAdmin) return;
+    try {
+      await this.configuracionVentas.alternarCierreCaja(activo);
+      this.toast.exito(activo ? 'Cierre de caja activado.' : 'Cierre de caja desactivado.');
+    } catch {
+      this.toast.error('No se pudo guardar el parámetro.');
+    }
+  }
 }

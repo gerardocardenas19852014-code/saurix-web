@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { ConfiguracionVentasService } from '../../../shared/services/configuracion-ventas.service';
 
 type ColorIcono = 'accent' | 'slate';
 
@@ -148,6 +149,25 @@ const GRUPOS: GrupoModulo[] = [
   styleUrl: './ventas-landing.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class VentasLandingComponent {
-  protected readonly grupos = GRUPOS;
+export class VentasLandingComponent implements OnInit {
+  private readonly configuracionVentas = inject(ConfiguracionVentasService);
+
+  /** Quita las tarjetas de Corte/Cierre de caja cuando están apagadas en
+   *  Panel de Control → Parámetros del sistema (ver
+   *  ConfiguracionVentasService) — mismo criterio que ya las oculta del
+   *  menú lateral en ShellComponent. */
+  protected readonly grupos = computed(() =>
+    GRUPOS.map((grupo) => ({
+      ...grupo,
+      enlaces: grupo.enlaces.filter((enlace) => {
+        if (enlace.ruta === 'corte-turno') return this.configuracionVentas.corteCajaActivo();
+        if (enlace.ruta === 'cierre-turno') return this.configuracionVentas.cierreCajaActivo();
+        return true;
+      }),
+    })).filter((grupo) => grupo.enlaces.length > 0),
+  );
+
+  async ngOnInit(): Promise<void> {
+    await this.configuracionVentas.cargar();
+  }
 }

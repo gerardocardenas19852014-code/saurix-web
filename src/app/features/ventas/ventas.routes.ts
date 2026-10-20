@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { parametroVentasGuard } from '../../core/guards/parametro-ventas.guard';
 
 export const VENTAS_ROUTES: Routes = [
   {
@@ -16,10 +17,12 @@ export const VENTAS_ROUTES: Routes = [
   {
     path: 'corte-turno',
     loadComponent: () => import('./turno/corte-turno.component').then((m) => m.CorteTurnoComponent),
+    canActivate: [parametroVentasGuard('corteCajaActivo')],
   },
   {
     path: 'cierre-turno',
     loadComponent: () => import('./turno/cierre-turno.component').then((m) => m.CierreTurnoComponent),
+    canActivate: [parametroVentasGuard('cierreCajaActivo')],
   },
   {
     path: 'historial',

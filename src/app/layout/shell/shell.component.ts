@@ -11,6 +11,7 @@ import { DataClientService } from '../../core/services/data-client.service';
 import { MiPerfilComponent } from '../../shared/components/mi-perfil/mi-perfil.component';
 import { ToastComponent } from '../../shared/components/toast/toast.component';
 import { ConfiguracionAparienciaService } from '../../shared/services/configuracion-apariencia.service';
+import { ConfiguracionVentasService } from '../../shared/services/configuracion-ventas.service';
 import { NotificacionesService } from '../../shared/services/notificaciones.service';
 import { Ticket } from '../../features/proyectos/kanban/ticket.model';
 import { MovimientoPresupuesto } from '../../features/presupuesto/movimientos/movimiento.model';
@@ -223,6 +224,13 @@ export class ShellComponent implements OnDestroy {
   protected readonly asistenteIaActivo = this.configuracionApariencia.asistenteIaActivo;
   protected readonly notificacionesService = inject(NotificacionesService);
 
+  /** Gatea "Corte de caja"/"Cierre de caja" en el menú de Ventas y en su
+   *  Inicio (ver VentasLandingComponent) — parámetros de Panel de Control →
+   *  Parámetros del sistema, default encendidos. */
+  private readonly configuracionVentas = inject(ConfiguracionVentasService);
+  protected readonly corteCajaActivo = this.configuracionVentas.corteCajaActivo;
+  protected readonly cierreCajaActivo = this.configuracionVentas.cierreCajaActivo;
+
   /** Revisión periódica de SLA (ver NotificacionesService.revisarSlaTickets) — cada
    *  5 minutos mientras la sesión siga abierta, para no depender de tener abierta
    *  ninguna pantalla de Proyectos en particular. */
@@ -240,6 +248,7 @@ export class ShellComponent implements OnDestroy {
     // localStorage de este navegador.
     void this.configuracionApariencia.cargarParaUsuarioActual();
     void this.notificacionesService.cargarParaUsuarioActual();
+    void this.configuracionVentas.cargar();
     this.revisarNotificacionesPeriodicas();
     this.intervaloRevisionSla = setInterval(
       () => this.revisarNotificacionesPeriodicas(),

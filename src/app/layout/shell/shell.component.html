@@ -135,6 +135,7 @@
       <nav class="sidebar-nav" aria-label="Menú de panel de control">
         <a routerLink="/panel-control" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
         <a routerLink="/panel-control/apariencia" routerLinkActive="active">🎨 Apariencia</a>
+        <a routerLink="/panel-control/parametros" routerLinkActive="active">🧮 Parámetros del sistema</a>
       </nav>
     }
 
@@ -227,8 +228,12 @@
         @if (grupoAbierto('ventas', 'Proceso')) {
           <a routerLink="/ventas/cobro" routerLinkActive="active">🧾 Cobro</a>
           <a routerLink="/ventas/apertura-turno" routerLinkActive="active">🔓 Apertura de caja</a>
-          <a routerLink="/ventas/corte-turno" routerLinkActive="active">📋 Corte de caja</a>
-          <a routerLink="/ventas/cierre-turno" routerLinkActive="active">🔒 Cierre de caja</a>
+          @if (corteCajaActivo()) {
+            <a routerLink="/ventas/corte-turno" routerLinkActive="active">📋 Corte de caja</a>
+          }
+          @if (cierreCajaActivo()) {
+            <a routerLink="/ventas/cierre-turno" routerLinkActive="active">🔒 Cierre de caja</a>
+          }
           <a routerLink="/ventas/cotizaciones" routerLinkActive="active">📝 Cotizaciones</a>
           <a routerLink="/ventas/pedidos-tienda" routerLinkActive="active">🛍️ Pedidos web</a>
           <a routerLink="/ventas/cuentas-por-cobrar" routerLinkActive="active">💳 Cuentas por cobrar</a>
