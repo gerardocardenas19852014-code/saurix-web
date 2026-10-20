@@ -1,1 +1,3 @@
-/* Reutiliza .toolbar/.modal-overlay/.pos-ticket-* globales. */
+/* Reutiliza .grid-toolbar/.grid-filter/.modal-overlay/.pos-ticket-* globales
+ * (antes usaba ".toolbar", una clase que nunca existió en styles.scss — el buscador
+ * se veía sin estilo alguno, distinto al resto de catálogos). */

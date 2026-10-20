@@ -7,17 +7,19 @@
   conforme va pagando.
 </p>
 
-<div class="toolbar">
-  <input
-    type="search"
-    placeholder="Buscar por cliente o folio…"
-    [value]="busqueda()"
-    (input)="busqueda.set($any($event.target).value)"
-  />
-  <label class="checkbox-inline">
-    <input type="checkbox" [checked]="soloPendientes()" (change)="soloPendientes.set($any($event.target).checked)" />
-    Solo pendientes
-  </label>
+<div class="grid-toolbar">
+  <div class="grid-filter">
+    <input
+      type="search"
+      placeholder="Buscar por cliente o folio…"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value)"
+    />
+    <label class="checkbox-inline" style="margin:0;">
+      <input type="checkbox" [checked]="soloPendientes()" (change)="soloPendientes.set($any($event.target).checked)" />
+      Solo pendientes
+    </label>
+  </div>
 </div>
 
 <app-data-table

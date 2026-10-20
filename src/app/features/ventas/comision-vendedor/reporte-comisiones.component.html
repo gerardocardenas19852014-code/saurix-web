@@ -2,15 +2,17 @@
   <h1>Reporte de comisiones</h1>
 </div>
 
-<div class="toolbar">
-  <label>
-    Desde
-    <input type="date" [value]="fechaDesde()" (change)="fechaDesde.set($any($event.target).value)" />
-  </label>
-  <label>
-    Hasta
-    <input type="date" [value]="fechaHasta()" (change)="fechaHasta.set($any($event.target).value)" />
-  </label>
+<div class="grid-toolbar">
+  <div class="grid-filter">
+    <label class="grid-filter-fecha-label">
+      Desde
+      <input type="date" [value]="fechaDesde()" (change)="fechaDesde.set($any($event.target).value)" />
+    </label>
+    <label class="grid-filter-fecha-label">
+      Hasta
+      <input type="date" [value]="fechaHasta()" (change)="fechaHasta.set($any($event.target).value)" />
+    </label>
+  </div>
 </div>
 
 @if (cargando()) {

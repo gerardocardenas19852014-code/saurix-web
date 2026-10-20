@@ -9,6 +9,14 @@
   width: 100%;
 }
 
+/* La clase Bootstrap "form-control" (ver select-buscable.component.html)
+ * le da el look de textbox estándar (padding/borde/radio/alto) cuando este
+ * combo vive suelto sin un contenedor que ya lo estilice (p.ej. Cobro →
+ * .pos-ticket-config, donde Canal/Bodega sí tienen su propio estilo pero el
+ * selector de Cliente se veía sin caja) — en los lugares donde SÍ hay un
+ * contenedor más específico (.edit-form input[type=text], .board-filter-field
+ * input[type=text], etc.) esa regla gana por especificidad y se ve igual que
+ * antes, sin cambio. */
 .selbuscable-input {
   width: 100%;
   box-sizing: border-box;
