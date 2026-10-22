@@ -109,6 +109,30 @@
   </div>
 }
 
+@if (hayMasTicketsPorCargar()) {
+  <!-- Este proyecto tiene más tickets de los que se cargaron por canal (ver
+       TOPE_TICKETS en backlog.component.ts) — sprints abiertos y/o backlog
+       sin sprint. Los filtros de arriba solo buscan dentro de lo ya
+       cargado, no en los que faltan por traer, así que con un filtro activo
+       se avisa explícito (antes no decía nada y podía parecer que un ticket
+       que sí existe "no aparece"). -->
+  <div
+    class="hint kanban-mas-tickets"
+    style="margin-top:16px;"
+    [style.color]="hayFiltros() ? '#b45309' : null"
+  >
+    @if (hayFiltros()) {
+      ⚠️ Hay {{ ticketsTotalReal() - ticketsCargadosTotal() }} ticket(s) más sin cargar — la búsqueda y los
+      filtros de arriba solo aplican a los {{ ticketsCargadosTotal() }} ya traídos, puede que falten resultados.
+    } @else {
+      Mostrando {{ ticketsCargadosTotal() }} de {{ ticketsTotalReal() }} tickets.
+    }
+    <button type="button" class="btn-secondary small" (click)="cargarMasTickets()" [disabled]="cargandoMas()">
+      {{ cargandoMas() ? 'Cargando…' : 'Cargar más' }}
+    </button>
+  </div>
+}
+
 @if (cargando()) {
   <p class="hint" style="margin-top:16px;">Cargando…</p>
 } @else {

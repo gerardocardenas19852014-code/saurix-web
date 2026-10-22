@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } 
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Observable, forkJoin, of } from 'rxjs';
-import { DataClientService } from '../../../core/services/data-client.service';
+import { DataClientService, ResultadoPagina } from '../../../core/services/data-client.service';
 import { ToastService } from '../../../shared/services/toast.service';
 import { colorAvatar, colorBadgeFondo, colorBadgeTexto, iniciales } from '../kanban/avatar.util';
 import { Ticket } from '../kanban/ticket.model';
@@ -192,6 +192,29 @@ export class BacklogComponent implements OnInit {
    *  proyecto (cargarSprintsYTickets). */
   private readonly ticketsSprintCerradoCargado = signal<Set<number>>(new Set());
 
+  /** Tope por "canal" de carga (sprints abiertos / backlog sin sprint) — una
+   *  prueba de rendimiento real (200,000 tickets en un solo proyecto) mostró
+   *  que, aunque excluir los sprints cerrados resuelve la mayor parte del
+   *  volumen, el backlog sin asignar (sprintId null) puede por sí solo seguir
+   *  siendo enorme — ahí también hacía falta tope + "cargar más" en vez de
+   *  list() trayendo todo de ese canal de un jalón. */
+  private static readonly TOPE_TICKETS = 2000;
+  private readonly totalAbiertos = signal(0);
+  private readonly cargadosAbiertos = signal(0);
+  private readonly totalSinSprint = signal(0);
+  private readonly cargadosSinSprint = signal(0);
+  protected readonly hayMasTicketsPorCargar = computed(
+    () => this.cargadosAbiertos() < this.totalAbiertos() || this.cargadosSinSprint() < this.totalSinSprint(),
+  );
+  protected readonly ticketsCargadosTotal = computed(() => this.cargadosAbiertos() + this.cargadosSinSprint());
+  protected readonly ticketsTotalReal = computed(() => this.totalAbiertos() + this.totalSinSprint());
+  /** Candado contra clics repetidos en "Cargar más" — sin esto, picarle varias
+   *  veces seguidas (antes de que la primera petición regrese) manda varias
+   *  peticiones pidiendo LA MISMA página en cada canal, y cada una agrega los
+   *  mismos tickets otra vez (NG0955 "duplicated keys" en el @for del Kanban,
+   *  mismo riesgo aquí). */
+  protected readonly cargandoMas = signal(false);
+
   private cargarSprintsYTickets(): void {
     const proyectoId = this.proyectoSeleccionadoId();
     // Los sprints 'cerrado' son, con mucho, lo que más crece con el tiempo —
@@ -212,13 +235,27 @@ export class BacklogComponent implements OnInit {
         const idsAbiertos = sprints.filter((s) => s.estado !== 'cerrado').map((s) => s.id);
         forkJoin({
           deSprintsAbiertos: idsAbiertos.length
-            ? this.data.list<Ticket>('Ticket', { proyectoId, activo: true, sprintId: idsAbiertos })
-            : of([] as Ticket[]),
-          sinSprint: this.data.list<Ticket>('Ticket', { proyectoId, activo: true, sprintId: { esNulo: true } }),
+            ? this.data.listarPagina<Ticket>(
+                'Ticket',
+                { proyectoId, activo: true, sprintId: idsAbiertos },
+                0,
+                BacklogComponent.TOPE_TICKETS,
+              )
+            : of({ filas: [] as Ticket[], total: 0 }),
+          sinSprint: this.data.listarPagina<Ticket>(
+            'Ticket',
+            { proyectoId, activo: true, sprintId: { esNulo: true } },
+            0,
+            BacklogComponent.TOPE_TICKETS,
+          ),
         }).subscribe({
           next: ({ deSprintsAbiertos, sinSprint }) => {
             this.sprints.set([...sprints].sort(this.compararSprints));
-            this.tickets.set([...deSprintsAbiertos, ...sinSprint]);
+            this.tickets.set([...deSprintsAbiertos.filas, ...sinSprint.filas]);
+            this.totalAbiertos.set(deSprintsAbiertos.total);
+            this.cargadosAbiertos.set(deSprintsAbiertos.filas.length);
+            this.totalSinSprint.set(sinSprint.total);
+            this.cargadosSinSprint.set(sinSprint.filas.length);
             this.ticketsSprintCerradoCargado.set(new Set());
             this.cargando.set(false);
           },
@@ -226,6 +263,66 @@ export class BacklogComponent implements OnInit {
         });
       },
       error: () => this.cargando.set(false),
+    });
+  }
+
+  /** "Cargar más tickets" (ver hayMasTicketsPorCargar) — siguiente página de
+   *  cada canal que todavía tenga más (sprints abiertos y/o backlog sin
+   *  sprint), agregada al final de lo ya cargado. */
+  protected cargarMasTickets(): void {
+    if (this.cargandoMas()) return; // ver cargandoMas — evita peticiones duplicadas
+    const proyectoId = this.proyectoSeleccionadoId();
+    const idsAbiertos = this.sprintsAbiertos().map((s) => s.id);
+    const canales: { esAbiertos: boolean; obs: Observable<ResultadoPagina<Ticket>> }[] = [];
+    if (this.cargadosAbiertos() < this.totalAbiertos()) {
+      canales.push({
+        esAbiertos: true,
+        obs: this.data.listarPagina<Ticket>(
+          'Ticket',
+          { proyectoId, activo: true, sprintId: idsAbiertos },
+          this.cargadosAbiertos(),
+          BacklogComponent.TOPE_TICKETS,
+        ),
+      });
+    }
+    if (this.cargadosSinSprint() < this.totalSinSprint()) {
+      canales.push({
+        esAbiertos: false,
+        obs: this.data.listarPagina<Ticket>(
+          'Ticket',
+          { proyectoId, activo: true, sprintId: { esNulo: true } },
+          this.cargadosSinSprint(),
+          BacklogComponent.TOPE_TICKETS,
+        ),
+      });
+    }
+    if (!canales.length) return;
+    this.cargandoMas.set(true);
+    forkJoin(canales.map((c) => c.obs)).subscribe({
+      next: (resultados) => {
+        const nuevos: Ticket[] = [];
+        resultados.forEach((resultado, i) => {
+          nuevos.push(...resultado.filas);
+          if (canales[i].esAbiertos) {
+            this.totalAbiertos.set(resultado.total);
+            this.cargadosAbiertos.update((n) => n + resultado.filas.length);
+          } else {
+            this.totalSinSprint.set(resultado.total);
+            this.cargadosSinSprint.update((n) => n + resultado.filas.length);
+          }
+        });
+        // Nunca agregar un id que ya está en pantalla — última barrera contra
+        // el NG0955 de @for (track ticket.id); los contadores de arriba ya
+        // sumaron lo que el servidor realmente entregó (correcto para el
+        // offset de la siguiente página), independiente de si algo se
+        // descarta aquí por ya estar presente.
+        this.tickets.update((actuales) => {
+          const idsActuales = new Set(actuales.map((t) => t.id));
+          return [...actuales, ...nuevos.filter((t) => !idsActuales.has(t.id))];
+        });
+        this.cargandoMas.set(false);
+      },
+      error: () => this.cargandoMas.set(false),
     });
   }
 

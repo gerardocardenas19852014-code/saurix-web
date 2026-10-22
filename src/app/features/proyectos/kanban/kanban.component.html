@@ -149,10 +149,19 @@
 @if (hayMasTicketsPorCargar()) {
   <!-- Este proyecto tiene más tickets de los que se cargaron (ver TOPE_TICKETS
        en kanban.component.ts) — los filtros de arriba (tipo, módulo, texto...)
-       solo buscan dentro de lo ya cargado, no en los que faltan por traer. -->
-  <div class="hint kanban-mas-tickets">
-    Mostrando {{ ticketsCargados() }} de {{ totalTickets() }} tickets.
-    <button type="button" class="btn-secondary small" (click)="cargarMasTickets()">Cargar más</button>
+       solo buscan dentro de lo ya cargado, no en los que faltan por traer, así
+       que con un filtro activo se avisa explícito (antes no decía nada y
+       podía parecer que un ticket que sí existe "no aparece"). -->
+  <div class="hint kanban-mas-tickets" [style.color]="hayFiltros() ? '#b45309' : null">
+    @if (hayFiltros()) {
+      ⚠️ Hay {{ totalTickets() - ticketsCargados() }} ticket(s) más sin cargar — la búsqueda y los filtros de
+      arriba solo aplican a los {{ ticketsCargados() }} ya traídos, puede que falten resultados.
+    } @else {
+      Mostrando {{ ticketsCargados() }} de {{ totalTickets() }} tickets.
+    }
+    <button type="button" class="btn-secondary small" (click)="cargarMasTickets()" [disabled]="cargandoMas()">
+      {{ cargandoMas() ? 'Cargando…' : 'Cargar más' }}
+    </button>
   </div>
 }
 

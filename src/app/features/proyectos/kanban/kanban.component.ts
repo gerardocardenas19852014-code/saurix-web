@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { forkJoin, of, switchMap } from 'rxjs';
+import { Observable, forkJoin, map, of, switchMap } from 'rxjs';
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -99,6 +99,12 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly totalTickets = signal(0);
   protected readonly ticketsCargados = signal(0);
   protected readonly hayMasTicketsPorCargar = computed(() => this.ticketsCargados() < this.totalTickets());
+  /** Candado contra clics repetidos en "Cargar más": sin esto, picarle varias
+   *  veces seguidas (antes de que la primera petición regrese) mandaba varias
+   *  peticiones pidiendo LA MISMA página, y cada una agregaba los mismos
+   *  tickets otra vez — se veía como NG0955 "duplicated keys" en consola y,
+   *  en la práctica, tickets repetidos en el tablero/lista. */
+  protected readonly cargandoMas = signal(false);
   protected readonly etiquetasPorTicket = signal<Map<number, TicketEtiqueta[]>>(new Map());
   /** Igual que etiquetasPorTicket, pero para Asociados (TicketDependencia) — para
    *  poder mostrar un contador en la tarjeta del tablero sin tener que abrir el
@@ -660,7 +666,13 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.data.list<TicketTipo>('TicketTipo').subscribe((tipos) => this.tipos.set(tipos));
     this.data.list<TicketPrioridad>('TicketPrioridad').subscribe((prioridades) => this.prioridades.set(prioridades));
     this.data.list<TicketModulo>('TicketModulo').subscribe((modulos) => this.modulos.set(modulos));
-    this.data.list<Sprint>('Sprint').subscribe((sprints) => this.sprints.set(sprints));
+    // Sprint YA NO se carga aquí sin filtrar — ver cargarTablero() más abajo:
+    // se pide acotado al proyectoId y se recarga al cambiar de proyecto, igual
+    // que TableroColumna. Sin ese filtro se traían los sprints de TODOS los
+    // proyectos de la empresa (otra "tabla que crece sin tope", mismo riesgo
+    // que ya se corrigió en Notificaciones/Tickets — con los años y varios
+    // proyectos acumulando sprints cerrados, esto se vuelve una carga grande
+    // e innecesaria cada vez que se abre cualquier tablero).
     // 'Usuario' no trae un campo nombreCompleto propio (ver Usuario.model.ts) — hay que
     // armarlo con nombreCompletoUsuario(), si no los combos de Asignado a / Reportado por
     // quedan con opciones en blanco.
@@ -826,13 +838,50 @@ export class KanbanComponent implements OnInit, OnDestroy {
     if (!proyectoId) return;
 
     this.cargando.set(true);
-    this.data.list<TableroColumna>('TableroColumna', { proyectoId }).subscribe({
-      next: (columnas) => {
+    // Sprint acotado a proyectoId (ver nota en ngOnInit) — se trae junto con
+    // TableroColumna porque ambos dependen solo del proyecto seleccionado,
+    // no de los tickets todavía.
+    forkJoin({
+      columnas: this.data.list<TableroColumna>('TableroColumna', { proyectoId }),
+      sprints: this.data.list<Sprint>('Sprint', { proyectoId }),
+    }).subscribe({
+      next: ({ columnas, sprints }) => {
         this.columnasTablero.set(columnas.sort((a, b) => a.orden - b.orden));
+        this.sprints.set(sprints);
         this.cargarTickets(abrirTicketId);
       },
       error: () => this.cargando.set(false),
     });
+  }
+
+  /** Actualiza o agrega UN ticket en la lista ya cargada, sin volver a pedir
+   *  todo el tablero — alta()/modificacion() ya devuelven el ticket completo
+   *  y actualizado, así que no hace falta cargarTickets() (ni perder el
+   *  progreso de "cargar más") para reflejar un solo cambio. Si es nuevo,
+   *  también ajusta ticketsCargados/totalTickets para que el "Mostrando X de
+   *  Y" siga siendo correcto. Las etiquetas/dependencias de ESE ticket no
+   *  cambian con esto — quien llame debe seguir recargándolas aparte si
+   *  aplica (ver cargarEtiquetasDeTablero/cargarDependenciasDeTablero). */
+  private actualizarTicketLocal(ticket: Ticket): void {
+    const existe = this.tickets().some((t) => Number(t.id) === Number(ticket.id));
+    this.tickets.update((actuales) =>
+      existe ? actuales.map((t) => (Number(t.id) === Number(ticket.id) ? ticket : t)) : [...actuales, ticket],
+    );
+    if (!existe) {
+      this.ticketsCargados.update((n) => n + 1);
+      this.totalTickets.update((n) => n + 1);
+    }
+  }
+
+  /** Contraparte de actualizarTicketLocal para eliminarTicket — mismo ajuste
+   *  de contadores, en sentido inverso. */
+  private quitarTicketLocal(id: number): void {
+    const habia = this.tickets().some((t) => Number(t.id) === Number(id));
+    this.tickets.update((actuales) => actuales.filter((t) => Number(t.id) !== Number(id)));
+    if (habia) {
+      this.ticketsCargados.update((n) => Math.max(0, n - 1));
+      this.totalTickets.update((n) => Math.max(0, n - 1));
+    }
   }
 
   private cargarTickets(abrirTicketId?: number): void {
@@ -862,36 +911,73 @@ export class KanbanComponent implements OnInit, OnDestroy {
    *  MISMO filtro que ya está en pantalla (filtroTicketsActual), agregada al
    *  final de lo ya cargado. */
   protected cargarMasTickets(): void {
+    if (this.cargandoMas()) return; // ver cargandoMas — evita peticiones duplicadas
+    this.cargandoMas.set(true);
     const desde = this.ticketsCargados();
     this.data.listarPagina<Ticket>('Ticket', this.filtroTicketsActual(), desde, KanbanComponent.TOPE_TICKETS).subscribe({
       next: ({ filas, total }) => {
-        this.tickets.update((actuales) => [...actuales, ...filas]);
+        // Por si acaso algo más (red lenta + reintento, etc.) igual llegara a
+        // traer un id que ya está en pantalla: nunca lo vuelve a agregar —
+        // última barrera contra el NG0955 de @for (track ticket.id). El
+        // contador ticketsCargados SIEMPRE suma filas.length (lo que el
+        // servidor realmente entregó), no los únicos agregados: es el offset
+        // para la siguiente página, tiene que reflejar lo ya consumido del
+        // servidor, no cuántos quedaron visibles en pantalla.
+        this.tickets.update((actuales) => {
+          const idsActuales = new Set(actuales.map((t) => t.id));
+          const nuevos = filas.filter((t) => !idsActuales.has(t.id));
+          return [...actuales, ...nuevos];
+        });
         this.totalTickets.set(total);
         this.ticketsCargados.update((n) => n + filas.length);
-        // Con la lista YA completa (no solo la página nueva): etiquetasPorTicket/
-        // dependenciasPorTicket se REEMPLAZAN por completo con lo que se les pase
-        // (ver cargarEtiquetasDeTablero/cargarDependenciasDeTablero) — pasar solo
-        // los ids nuevos borraría lo ya cargado de la página anterior.
-        const todosLosIds = this.tickets().map((t) => t.id);
-        this.cargarEtiquetasDeTablero(todosLosIds);
-        this.cargarDependenciasDeTablero(todosLosIds);
+        // Solo los ids de la página NUEVA, en modo fusión (ver
+        // cargarEtiquetasDeTablero/cargarDependenciasDeTablero): antes se
+        // volvía a pedir la lista COMPLETA acumulada en cada "cargar más" —
+        // con el tablero ya en varios miles de tickets, esa lista de ids
+        // generaba una URL tan larga que el navegador ni siquiera llegaba a
+        // mandar la petición ("TypeError: Failed to fetch").
+        const idsNuevos = filas.map((t) => t.id);
+        this.cargarEtiquetasDeTablero(idsNuevos, true);
+        this.cargarDependenciasDeTablero(idsNuevos, true);
+        this.cargandoMas.set(false);
       },
+      error: () => this.cargandoMas.set(false),
     });
+  }
+
+  /** Tope de ids por petición en los .in() de abajo — una lista de miles de
+   *  ids genera una URL tan larga que el navegador la rechaza sin ni
+   *  siquiera mandarla ("TypeError: Failed to fetch", sin llegar a haber
+   *  respuesta del servidor) — se parte en bloques y se junta el resultado. */
+  private static readonly TOPE_IDS_POR_PETICION = 300;
+
+  private listarEnBloques<T>(entidad: string, campo: string, ids: number[]): Observable<T[]> {
+    const bloques: number[][] = [];
+    for (let i = 0; i < ids.length; i += KanbanComponent.TOPE_IDS_POR_PETICION) {
+      bloques.push(ids.slice(i, i + KanbanComponent.TOPE_IDS_POR_PETICION));
+    }
+    return forkJoin(bloques.map((bloque) => this.data.list<T>(entidad, { [campo]: bloque }))).pipe(
+      map((resultados) => resultados.flat()),
+    );
   }
 
   /** TicketEtiqueta/TicketDependencia son tablas "multiplicador" (muchas filas
    *  por ticket, de TODOS los proyectos): se piden acotadas a solo los
-   *  ticketIds del tablero abierto, en vez de traer la tabla completa de la
+   *  ticketIds que hacen falta, en vez de traer la tabla completa de la
    *  empresa — mismo riesgo de 504 Gateway Timeout que ya se corrigió en el
-   *  dashboard de ventas. */
-  private cargarEtiquetasDeTablero(ticketIds: number[]): void {
+   *  dashboard de ventas.
+   *  fusionar=true AGREGA los ids pedidos al mapa ya existente en vez de
+   *  reemplazarlo por completo — así una recarga parcial (cargar más
+   *  tickets, o refrescar solo el ticket que acabas de editar) no borra lo
+   *  que ya estaba cargado para el resto del tablero. */
+  private cargarEtiquetasDeTablero(ticketIds: number[], fusionar = false): void {
     if (ticketIds.length === 0) {
-      this.etiquetasPorTicket.set(new Map());
+      if (!fusionar) this.etiquetasPorTicket.set(new Map());
       return;
     }
-    this.data.list<TicketEtiqueta>('TicketEtiqueta', { ticketId: ticketIds }).subscribe({
+    this.listarEnBloques<TicketEtiqueta>('TicketEtiqueta', 'ticketId', ticketIds).subscribe({
       next: (todas) => {
-        const mapa = new Map<number, TicketEtiqueta[]>();
+        const mapa = fusionar ? new Map(this.etiquetasPorTicket()) : new Map<number, TicketEtiqueta[]>();
         for (const id of ticketIds) mapa.set(id, []);
         for (const etiqueta of todas) {
           mapa.get(etiqueta.ticketId)?.push(etiqueta);
@@ -901,9 +987,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
     });
   }
 
-  private cargarDependenciasDeTablero(ticketIds: number[]): void {
+  private cargarDependenciasDeTablero(ticketIds: number[], fusionar = false): void {
     if (ticketIds.length === 0) {
-      this.dependenciasPorTicket.set(new Map());
+      if (!fusionar) this.dependenciasPorTicket.set(new Map());
       return;
     }
     // Una dependencia puede apuntar HACIA un ticket del tablero desde uno que
@@ -911,13 +997,13 @@ export class KanbanComponent implements OnInit, OnDestroy {
     // ambas direcciones, así que son dos .in() (uno por columna FK) en vez de
     // un solo filtro (el contrato de list() solo admite AND entre claves).
     forkJoin([
-      this.data.list<TicketDependencia>('TicketDependencia', { ticketId: ticketIds }),
-      this.data.list<TicketDependencia>('TicketDependencia', { ticketRelacionadoId: ticketIds }),
+      this.listarEnBloques<TicketDependencia>('TicketDependencia', 'ticketId', ticketIds),
+      this.listarEnBloques<TicketDependencia>('TicketDependencia', 'ticketRelacionadoId', ticketIds),
     ]).subscribe({
       next: ([porOrigen, porDestino]) => {
         const todasPorId = new Map<number, TicketDependencia>();
         for (const d of [...porOrigen, ...porDestino]) todasPorId.set(d.id, d);
-        const mapa = new Map<number, TicketDependencia[]>();
+        const mapa = fusionar ? new Map(this.dependenciasPorTicket()) : new Map<number, TicketDependencia[]>();
         for (const id of ticketIds) mapa.set(id, []);
         for (const dependencia of todasPorId.values()) {
           mapa.get(dependencia.ticketId)?.push(dependencia);
@@ -1114,7 +1200,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
             .subscribe({ error: () => undefined });
           this.modalAbierto.set(false);
         }
-        this.cargarTickets();
+        this.actualizarTicketLocal(ticketGuardado);
       },
     });
   }
@@ -1137,7 +1223,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     if (Number(ticket.tableroColumnaId) === Number(columnaId)) return;
     const columnaAnteriorId = Number(ticket.tableroColumnaId);
     this.data.modificacion<Ticket>('Ticket', { ...ticket, tableroColumnaId: Number(columnaId) }).subscribe({
-      next: () => {
+      next: (ticketActualizado) => {
         // Best-effort: el historial es una bitácora informativa, no debe
         // impedir que el movimiento del ticket (ya persistido arriba) se
         // refleje en pantalla si este registro en particular falla.
@@ -1150,7 +1236,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
           })
           .subscribe({ error: () => undefined });
         this.notificarCambioEstado(ticket, Number(columnaId));
-        this.cargarTickets();
+        // El servidor es quien manda (puede haber triggers que ajusten fechas
+        // de SLA al cambiar de columna) — se usa SU respuesta, no se
+        // reconstruye el ticket a mano.
+        this.actualizarTicketLocal(ticketActualizado);
         if (this.ticketActivo()?.id === ticket.id) this.refrescarTicketActivo();
       },
       error: () => this.toast.error('No se pudo mover el ticket. Intenta de nuevo.'),
@@ -1408,9 +1497,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
       .subscribe({
         next: () => {
           this.toast.exito('Ticket eliminado.');
+          this.quitarTicketLocal(ticket.id);
           this.ticketAEliminar.set(null);
           this.cerrarDetalle();
-          this.cargarTickets();
         },
       });
   }
@@ -1458,7 +1547,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
           this.formAsociado.reset({ ticketRelacionadoId: 0, tipo: 'relacionado' });
         this.filtroAsociado.set('');
           this.cargarDetalle(activo.id);
-          this.cargarDependenciasDeTablero(this.tickets().map((t) => t.id));
+          // Solo los dos tickets que la dependencia conecta, en modo fusión
+          // (ver cargarDependenciasDeTablero) — no todo el tablero.
+          this.cargarDependenciasDeTablero([activo.id, ticketRelacionadoId], true);
         },
       });
   }
@@ -1469,7 +1560,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.data.baja('TicketDependencia', dependencia.id).subscribe({
       next: () => {
         this.cargarDetalle(activo.id);
-        this.cargarDependenciasDeTablero(this.tickets().map((t) => t.id));
+        this.cargarDependenciasDeTablero([dependencia.ticketId, dependencia.ticketRelacionadoId], true);
       },
     });
   }
@@ -1525,10 +1616,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
         ticketPadreId: activo.id,
       })
       .subscribe({
-        next: () => {
+        next: (subtareaCreada) => {
           this.formSubtarea.reset({ titulo: '' });
           this.toast.exito('Subtarea creada.');
-          this.cargarTickets();
+          this.actualizarTicketLocal(subtareaCreada);
         },
       });
   }
@@ -1543,11 +1634,11 @@ export class KanbanComponent implements OnInit, OnDestroy {
     if (!candidato) return;
 
     this.data.modificacion<Ticket>('Ticket', { ...candidato, ticketPadreId: activo.id }).subscribe({
-      next: () => {
+      next: (ticketActualizado) => {
         this.formSubtareaExistente.reset({ ticketId: 0 });
         this.filtroSubtarea.set('');
         this.toast.exito('Ticket convertido en subtarea.');
-        this.cargarTickets();
+        this.actualizarTicketLocal(ticketActualizado);
       },
     });
   }
@@ -1555,9 +1646,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
   /** Quita el vínculo (no elimina el ticket, solo deja de ser subtarea). */
   quitarDeSubtareas(ticket: Ticket): void {
     this.data.modificacion<Ticket>('Ticket', { ...ticket, ticketPadreId: null }).subscribe({
-      next: () => {
+      next: (ticketActualizado) => {
         this.toast.exito('Se quitó como subtarea.');
-        this.cargarTickets();
+        this.actualizarTicketLocal(ticketActualizado);
       },
     });
   }
@@ -1663,7 +1754,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
         next: () => {
           this.formEtiqueta.reset({ texto: '' });
           this.cargarDetalle(activo.id);
-          this.cargarEtiquetasDeTablero(this.tickets().map((t) => t.id));
+          // Solo el ticket que cambió, en modo fusión (ver
+          // cargarEtiquetasDeTablero) — no todo el tablero.
+          this.cargarEtiquetasDeTablero([activo.id], true);
         },
       });
   }
@@ -1675,7 +1768,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.data.baja('TicketEtiqueta', etiqueta.id).subscribe({
       next: () => {
         this.cargarDetalle(activo.id);
-        this.cargarEtiquetasDeTablero(this.tickets().map((t) => t.id));
+        this.cargarEtiquetasDeTablero([activo.id], true);
       },
     });
   }
