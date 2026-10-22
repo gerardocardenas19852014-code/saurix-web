@@ -28,6 +28,22 @@ export interface FiltroRango {
   lte?: string | number;
 }
 
+/** Valor de filtro para "esta columna está vacía" (NULL) — un valor simple
+ *  de `null` en el filtro se interpreta como "sin filtro" (ver list()), así
+ *  que para de verdad pedir "columna IS NULL" (p.ej. Ticket.sprintId vacío =
+ *  el backlog sin asignar a ningún sprint) hace falta este marcador. */
+export interface FiltroNulo {
+  esNulo: true;
+}
+
+/** Resultado de listarPagina(): la página pedida + el total real que hay
+ *  (filtrado, antes de recortar a la página) — para poder mostrar "mostrando
+ *  X de Y" y decidir si todavía hay más por cargar. */
+export interface ResultadoPagina<T> {
+  filas: T[];
+  total: number;
+}
+
 export abstract class DataClientService {
   /**
    * Lista de registros de una entidad, con filtro opcional.
@@ -49,4 +65,20 @@ export abstract class DataClientService {
 
   /** Baja (eliminación) de un registro por id. */
   abstract baja(entidad: string, id: number): Observable<void>;
+
+  /**
+   * Como `list()`, pero trayendo solo una página (orden por `id`) en vez de
+   * la tabla filtrada completa — pensado para catálogos que pueden crecer
+   * mucho dentro de un mismo alcance (p.ej. Ticket de un solo proyecto con
+   * decenas de miles de filas: ahí ni acotar por fecha ni por "activo"
+   * alcanza para evitar traer todo de un jalón). `total` es la cantidad real
+   * de filas que cumplen el filtro (sin recortar), para poder mostrar
+   * "mostrando X de Y" y un "cargar más" que sepa cuándo ya no hay más.
+   */
+  abstract listarPagina<T>(
+    entidad: string,
+    filtro: Record<string, unknown> | undefined,
+    desde: number,
+    cantidad: number,
+  ): Observable<ResultadoPagina<T>>;
 }

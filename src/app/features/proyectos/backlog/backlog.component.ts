@@ -187,19 +187,68 @@ export class BacklogComponent implements OnInit {
    *  a Backlog" no hacía nada (el navegador ya lo consideraba seleccionado y
    *  no disparaba 'change' al hacer clic ahí). Cargando ambas listas a la
    *  vez, todas las <option> ya existen desde el primer render. */
+  /** Sprints 'cerrado' cuyos tickets YA se trajeron del servidor (ver
+   *  cargarTicketsDeSprintCerrado) — empieza vacío cada vez que se recarga el
+   *  proyecto (cargarSprintsYTickets). */
+  private readonly ticketsSprintCerradoCargado = signal<Set<number>>(new Set());
+
   private cargarSprintsYTickets(): void {
     const proyectoId = this.proyectoSeleccionadoId();
-    forkJoin({
-      sprints: this.data.list<Sprint>('Sprint', { proyectoId }),
-      tickets: this.data.list<Ticket>('Ticket', { proyectoId }),
-    }).subscribe({
-      next: ({ sprints, tickets }) => {
-        this.sprints.set([...sprints].sort(this.compararSprints));
-        this.tickets.set(tickets);
-        this.cargando.set(false);
+    // Los sprints 'cerrado' son, con mucho, lo que más crece con el tiempo —
+    // trabajo ya terminado que se queda ahí para siempre (se viene una
+    // migración de ~100,000 tickets) — y el Backlog es para planear lo que
+    // falta, no para revisar ese historial a diario: ya no se piden de
+    // entrada, solo al expandir uno en particular (ver
+    // cargarTicketsDeSprintCerrado/toggleSprint más abajo). Tampoco se piden
+    // los dados de baja (activo=false): a diferencia del Tablero Kanban (que
+    // sí tiene una casilla "mostrar archivados" para ese caso puntual), aquí
+    // nunca hace falta verlos.
+    // Se necesitan los sprints PRIMERO para saber cuáles están abiertos
+    // (activo/planeado) y así acotar el filtro de Ticket — pero sprints y
+    // tickets se siguen aplicando a la vez al final (ver el comentario sobre
+    // el <select> "Mover a" más arriba).
+    this.data.list<Sprint>('Sprint', { proyectoId }).subscribe({
+      next: (sprints) => {
+        const idsAbiertos = sprints.filter((s) => s.estado !== 'cerrado').map((s) => s.id);
+        forkJoin({
+          deSprintsAbiertos: idsAbiertos.length
+            ? this.data.list<Ticket>('Ticket', { proyectoId, activo: true, sprintId: idsAbiertos })
+            : of([] as Ticket[]),
+          sinSprint: this.data.list<Ticket>('Ticket', { proyectoId, activo: true, sprintId: { esNulo: true } }),
+        }).subscribe({
+          next: ({ deSprintsAbiertos, sinSprint }) => {
+            this.sprints.set([...sprints].sort(this.compararSprints));
+            this.tickets.set([...deSprintsAbiertos, ...sinSprint]);
+            this.ticketsSprintCerradoCargado.set(new Set());
+            this.cargando.set(false);
+          },
+          error: () => this.cargando.set(false),
+        });
       },
       error: () => this.cargando.set(false),
     });
+  }
+
+  /** Trae (una sola vez por sprint, ver ticketsSprintCerradoCargado) los
+   *  tickets de un sprint cerrado que cargarSprintsYTickets ya no pide de
+   *  entrada — llamado al expandirlo (ver toggleSprint). */
+  private cargarTicketsDeSprintCerrado(sprintId: number): void {
+    if (this.ticketsSprintCerradoCargado().has(sprintId)) return;
+    const proyectoId = this.proyectoSeleccionadoId();
+    this.data.list<Ticket>('Ticket', { proyectoId, activo: true, sprintId }).subscribe({
+      next: (tickets) => {
+        this.tickets.update((actuales) => [...actuales, ...tickets]);
+        this.ticketsSprintCerradoCargado.update((set) => new Set(set).add(sprintId));
+      },
+    });
+  }
+
+  /** Para el contador de un sprint cerrado antes de expandirlo (ver
+   *  ticketsDeSprintFiltrados): mientras no se haya cargado, no hay manera
+   *  honesta de mostrar la cantidad real sin traer sus tickets — se muestra
+   *  '—' en vez de aparentar que tiene 0. */
+  protected conteoSprintCerrado(sprintId: number): number | '—' {
+    return this.ticketsSprintCerradoCargado().has(sprintId) ? this.ticketsDeSprintFiltrados(sprintId).length : '—';
   }
 
   /** Orden de los sprints de un proyecto: los que ya tienen 'orden' explícito (ver
@@ -386,12 +435,20 @@ export class BacklogComponent implements OnInit {
     return this.sprintsExpandidos().has(sprintId);
   }
   protected toggleSprint(sprintId: number): void {
+    const expandiendo = !this.sprintsExpandidos().has(sprintId);
     this.sprintsExpandidos.update((set) => {
       const nuevo = new Set(set);
       if (nuevo.has(sprintId)) nuevo.delete(sprintId);
       else nuevo.add(sprintId);
       return nuevo;
     });
+    // Los sprints abiertos ya traen sus tickets desde cargarSprintsYTickets;
+    // solo un 'cerrado' puede necesitar traerlos hasta ahora (ver
+    // cargarTicketsDeSprintCerrado, que de todos modos no repite la petición
+    // si ya se había cargado antes).
+    if (expandiendo && this.sprints().find((s) => Number(s.id) === Number(sprintId))?.estado === 'cerrado') {
+      this.cargarTicketsDeSprintCerrado(sprintId);
+    }
   }
 
   protected nombrePrioridad(id: number): string {

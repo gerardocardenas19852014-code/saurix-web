@@ -105,9 +105,9 @@
     </div>
 
     <p class="hint" style="margin: 8px 0 14px;">
-      Arrastra una caja para acomodarla. 🔓 = sin restricción (se puede mover a cualquiera); da
-      clic para restringirla (🔒) y luego usa "+ Agregar transición" para dibujar a qué columnas
-      sí puede moverse — clic en una flecha existente la elimina.
+      Arrastra una caja para acomodarla. 🔓 (anillo verde) = sin restricción (se puede mover a
+      cualquiera); da clic para restringirla (🔒, anillo rojo) y luego usa "+ Agregar transición"
+      para dibujar a qué columnas sí puede moverse — clic en una flecha existente la elimina.
     </p>
 
     <div
@@ -142,6 +142,7 @@
           [style.top.px]="posicionDe(columna.id).y"
           [style.width.px]="ANCHO_CAJA"
           [style.height.px]="ALTO_CAJA"
+          [style.background]="colorCaja(columna)"
           [class.flujo-caja-seleccionada]="origenTransicion()?.id === columna.id"
           [class.flujo-caja-modo-transicion]="modoAgregarTransicion()"
           (mousedown)="onCajaMouseDown($event, columna)"
@@ -151,6 +152,8 @@
           <button
             type="button"
             class="flujo-caja-candado"
+            [class.flujo-caja-candado-restringida]="esRestringida(columna)"
+            [class.flujo-caja-candado-libre]="!esRestringida(columna)"
             (click)="$event.stopPropagation(); toggleRestriccionDiagrama(columna)"
             [title]="esRestringida(columna) ? 'Restringida — clic para permitir mover a cualquier columna' : 'Sin restricción — clic para restringir'"
           >

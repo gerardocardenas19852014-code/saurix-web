@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { DataClientService } from './data-client.service';
+import { DataClientService, ResultadoPagina } from './data-client.service';
 
 /**
  * Implementación FUTURA: llama a los endpoints reales de PlataformaSaurix
@@ -45,5 +45,22 @@ export class HttpDataClientService extends DataClientService {
 
   override baja(entidad: string, id: number): Observable<void> {
     return this.http.delete<void>(`${this.url(entidad)}/Baja`, { params: { id } });
+  }
+
+  override listarPagina<T>(
+    entidad: string,
+    filtro: Record<string, unknown> | undefined,
+    desde: number,
+    cantidad: number,
+  ): Observable<ResultadoPagina<T>> {
+    let params = new HttpParams().set('desde', desde).set('cantidad', cantidad);
+    if (filtro) {
+      for (const [clave, valor] of Object.entries(filtro)) {
+        if (valor !== null && valor !== undefined && valor !== '') {
+          params = params.set(clave, String(valor));
+        }
+      }
+    }
+    return this.http.get<ResultadoPagina<T>>(`${this.url(entidad)}/GetListPagina`, { params });
   }
 }

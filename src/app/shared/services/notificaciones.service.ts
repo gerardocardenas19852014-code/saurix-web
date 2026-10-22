@@ -21,15 +21,11 @@ const ENTIDAD = 'Notificacion';
 
 /**
  * Notificación real, persistida (ya no la lista fija/hardcodeada que traía
- * ShellComponent). Mismo espíritu que ConfiguracionApariencia: hoy vive en
- * IndexedDB sin backend, pero con un contrato pensado para que encaje el
- * día que se conecte PlataformaSaurix — con una salvedad importante: **esta
- * entidad todavía NO existe en 01_Tablas_Saurix.sql/02_SPs_Saurix.sql**
- * (ver esquema-tablas-saurix.md, sección "Pendiente": "El prototipo tiene
- * un sistema de notificaciones... NO se modeló como tabla... queda
- * pendiente si se decide llevarlo a BD"). Falta agregar la tabla+SPs del
- * lado de Saurix SQL/PlataformaSaurix antes de poder cambiar esto de
- * IndexedDB a la API real.
+ * ShellComponent). Ya tiene tabla real en Supabase (seguridad.notificacion,
+ * ver supabase-esquema.ts) con RLS: cada usuario solo ve las notificaciones
+ * dirigidas a él o las que él mismo creó (notificacion_ver — necesario
+ * porque el INSERT va con `.select()`/RETURNING, que Postgres filtra con la
+ * política de SELECT; ver migración 40_notificacion_ver_incluye_creador.sql).
  */
 export interface Notificacion {
   id: number;
@@ -61,6 +57,18 @@ export class NotificacionesService {
 
   private usuarioIdCargado: number | null = null;
 
+  /** La campanita solo muestra pendientes, nunca el historial completo: esta
+   *  tabla no tiene borrado/archivado (ver revisarAlertasStockBajo/
+   *  revisarOrdenesVencidas/revisarSlaTickets, que generan una fila nueva por
+   *  día/ciclo mientras la condición siga), así que con el tiempo crece sin
+   *  límite — mismo riesgo de bitácora/movimientos que motivó FiltroRango.
+   *  Antes se traía TODO el historial (leídas incluidas) del usuario en cada
+   *  login/refresh del shell. Ahora: solo no leídas (en cuanto se marca
+   *  leída, deja de traerse — ver marcarLeida/marcarTodasLeidas más abajo,
+   *  que la quitan de la lista en vez de solo cambiarle la bandera), topado
+   *  a las MAX_NOTIFICACIONES más recientes. */
+  private static readonly MAX_NOTIFICACIONES = 10;
+
   /** Llamar al entrar al shell (login fresco o sesión restaurada) — mismo patrón
    *  que ConfiguracionAparienciaService.cargarParaUsuarioActual(). */
   async cargarParaUsuarioActual(): Promise<void> {
@@ -77,9 +85,11 @@ export class NotificacionesService {
 
   private async recargar(usuarioId: number): Promise<void> {
     try {
-      const registros = await firstValueFrom(this.data.list<Notificacion>(ENTIDAD, { usuarioId }));
+      const pendientes = await firstValueFrom(this.data.list<Notificacion>(ENTIDAD, { usuarioId, leida: false }));
       this.notificaciones.set(
-        [...registros].sort((a, b) => (b.fechaCreacion ?? '').localeCompare(a.fechaCreacion ?? '')),
+        [...pendientes]
+          .sort((a, b) => (b.fechaCreacion ?? '').localeCompare(a.fechaCreacion ?? ''))
+          .slice(0, NotificacionesService.MAX_NOTIFICACIONES),
       );
     } catch {
       /* Sin datos disponibles todavía; se deja la lista como estaba. */
@@ -96,7 +106,9 @@ export class NotificacionesService {
     this.data.alta<Notificacion>(ENTIDAD, { usuarioId, titulo, link, leida: false }).subscribe({
       next: (registro) => {
         if (usuarioId === this.auth.usuarioActual()?.id) {
-          this.notificaciones.update((items) => [registro, ...items]);
+          this.notificaciones.update((items) =>
+            [registro, ...items].slice(0, NotificacionesService.MAX_NOTIFICACIONES),
+          );
         }
       },
       error: (error) => console.warn('No se pudo guardar la notificación:', error),
@@ -106,7 +118,10 @@ export class NotificacionesService {
   marcarLeida(id: number): void {
     const item = this.notificaciones().find((n) => n.id === id);
     if (!item || item.leida) return;
-    this.notificaciones.update((items) => items.map((n) => (n.id === id ? { ...n, leida: true } : n)));
+    // Ya no se deja en la lista con la bandera cambiada: como ahora solo se
+    // muestran pendientes (ver recargar()), en cuanto se marca leída
+    // simplemente desaparece de la campanita.
+    this.notificaciones.update((items) => items.filter((n) => n.id !== id));
     this.data.modificacion<Notificacion>(ENTIDAD, { ...item, leida: true }).subscribe({
       error: (error) => console.warn('No se pudo marcar la notificación como leída:', error),
     });
@@ -115,7 +130,9 @@ export class NotificacionesService {
   marcarTodasLeidas(): void {
     const pendientes = this.notificaciones().filter((n) => !n.leida);
     if (!pendientes.length) return;
-    this.notificaciones.update((items) => items.map((n) => ({ ...n, leida: true })));
+    // Igual que marcarLeida: al quedar todas leídas, ya no hay nada que
+    // mostrar en la campanita.
+    this.notificaciones.set([]);
     for (const n of pendientes) {
       this.data
         .modificacion<Notificacion>(ENTIDAD, { ...n, leida: true })

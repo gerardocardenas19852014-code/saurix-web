@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } 
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { DataClientService } from '../../../core/services/data-client.service';
+import { colorAvatar } from '../kanban/avatar.util';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../../shared/services/toast.service';
 import {
@@ -417,6 +418,16 @@ export class TablerosComponent implements OnInit {
 
   esRestringida(columna: TableroColumna): boolean {
     return parsearTransicionesPermitidas(columna.transicionesPermitidasJson) !== null;
+  }
+
+  /** Color de fondo de la caja en el diagrama de flujo — antes todas usaban
+   *  el mismo var(--accent) y no se distinguía una de otra; ahora cada
+   *  estado tiene un color determinístico por su nombre (hash simple, mismo
+   *  criterio ya usado para los avatares del Kanban — ver colorAvatar() en
+   *  avatar.util.ts), así que "Desarrollo" siempre se ve del mismo color,
+   *  distinto al de "Pruebas", sin guardar nada nuevo en la base. */
+  colorCaja(columna: TableroColumna): string {
+    return colorAvatar(columna.nombre);
   }
 
   toggleModoTransicion(): void {

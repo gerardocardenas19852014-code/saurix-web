@@ -90,6 +90,15 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly proyectoSeleccionadoId = signal<number>(0);
   protected readonly columnasTablero = signal<TableroColumna[]>([]);
   protected readonly tickets = signal<Ticket[]>([]);
+  /** Tope de tickets que se piden de un jalón (ver cargarTickets/cargarMasTickets
+   *  más abajo) — antes se traía TODO el proyecto sin límite, lo cual no
+   *  escala si un proyecto llega a decenas o cientos de miles de tickets
+   *  (viene una migración de ~100,000). totalTickets/ticketsCargados dejan
+   *  saber si hay más por cargar ("cargar más" en el tablero/lista). */
+  private static readonly TOPE_TICKETS = 2000;
+  protected readonly totalTickets = signal(0);
+  protected readonly ticketsCargados = signal(0);
+  protected readonly hayMasTicketsPorCargar = computed(() => this.ticketsCargados() < this.totalTickets());
   protected readonly etiquetasPorTicket = signal<Map<number, TicketEtiqueta[]>>(new Map());
   /** Igual que etiquetasPorTicket, pero para Asociados (TicketDependencia) — para
    *  poder mostrar un contador en la tarjeta del tablero sin tener que abrir el
@@ -131,8 +140,52 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly filtroPlaneado = signal<number>(0);
   protected readonly filtroTexto = signal('');
   /** false por defecto: los tickets archivados (activo === false) se ocultan del
-   *  tablero/lista salvo que se marque esta casilla — alternativa al borrado duro. */
+   *  tablero/lista salvo que se marque esta casilla — alternativa al borrado duro.
+   *  Ya no es solo un filtro visual: con el proyecto creciendo (se viene una
+   *  migración de ~100,000 tickets), traer SIEMPRE los archivados del servidor
+   *  para luego esconderlos en el navegador desperdicia esa carga para nada —
+   *  ahora cargarTickets() solo los pide cuando esta casilla está marcada (ver
+   *  cambiarMostrarInactivos). */
   protected readonly mostrarInactivos = signal(false);
+
+  /** false por defecto: los tickets de la ÚLTIMA columna del tablero (= resueltos,
+   *  mismo criterio que estaResuelto() en BacklogComponent) no se piden al
+   *  servidor salvo que se marque esta casilla. Es, con mucho, la categoría
+   *  que más crece sin límite con el tiempo (todo lo que ya se cerró se queda
+   *  ahí para siempre) — excluirla por defecto es lo que de verdad resuelve
+   *  el volumen de la migración de ~100,000 tickets, ya que en cualquier
+   *  momento dado lo realmente ABIERTO/pendiente es un conjunto mucho más
+   *  chico que el histórico completo. */
+  protected readonly mostrarResueltos = signal(false);
+
+  /** Handler de los checkboxes "mostrar archivados"/"mostrar resueltos" — a
+   *  diferencia de los demás filtros de esta pantalla (tipo, módulo,
+   *  prioridad...), estos SÍ cambian qué se le pide al servidor (ver
+   *  cargarTickets), así que hay que recargar. */
+  protected cambiarMostrarInactivos(valor: boolean): void {
+    this.mostrarInactivos.set(valor);
+    this.cargarTickets();
+  }
+
+  protected cambiarMostrarResueltos(valor: boolean): void {
+    this.mostrarResueltos.set(valor);
+    this.cargarTickets();
+  }
+
+  /** Filtro que se le manda al servidor en cargarTickets/cargarMasTickets —
+   *  separado en su propio método para que ambos siempre pidan exactamente
+   *  lo mismo (si no, "cargar más" podría traer páginas de un conjunto
+   *  distinto al que ya está en pantalla). */
+  private filtroTicketsActual(): Record<string, unknown> {
+    const proyectoId = this.proyectoSeleccionadoId();
+    const filtro: Record<string, unknown> = this.mostrarInactivos() ? { proyectoId } : { proyectoId, activo: true };
+    const columnas = this.columnasTablero();
+    if (!this.mostrarResueltos() && columnas.length > 1) {
+      const ultimaColumnaId = columnas[columnas.length - 1].id;
+      filtro['tableroColumnaId'] = columnas.filter((c) => c.id !== ultimaColumnaId).map((c) => c.id);
+    }
+    return filtro;
+  }
   protected readonly hayFiltros = computed(
     () =>
       !!(
@@ -783,19 +836,46 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
 
   private cargarTickets(abrirTicketId?: number): void {
-    const proyectoId = this.proyectoSeleccionadoId();
-    this.data.list<Ticket>('Ticket', { proyectoId }).subscribe({
-      next: (tickets) => {
-        this.tickets.set(tickets);
+    // Antes: this.data.list<Ticket>('Ticket', { proyectoId }) — TODO el
+    // proyecto de un jalón, sin límite. Con listarPagina + filtroTicketsActual
+    // (que ya excluye archivados/resueltos por defecto) el caso normal ni
+    // siquiera se acerca al tope; "cargar más" (ver hayMasTicketsPorCargar)
+    // es el respaldo para cuando sí se acerca.
+    this.data.listarPagina<Ticket>('Ticket', this.filtroTicketsActual(), 0, KanbanComponent.TOPE_TICKETS).subscribe({
+      next: ({ filas, total }) => {
+        this.tickets.set(filas);
+        this.totalTickets.set(total);
+        this.ticketsCargados.set(filas.length);
         this.cargando.set(false);
-        this.cargarEtiquetasDeTablero(tickets.map((t) => t.id));
-        this.cargarDependenciasDeTablero(tickets.map((t) => t.id));
+        this.cargarEtiquetasDeTablero(filas.map((t) => t.id));
+        this.cargarDependenciasDeTablero(filas.map((t) => t.id));
         if (abrirTicketId) {
-          const ticket = tickets.find((t) => Number(t.id) === Number(abrirTicketId));
+          const ticket = filas.find((t) => Number(t.id) === Number(abrirTicketId));
           if (ticket) this.abrirDetalle(ticket);
         }
       },
       error: () => this.cargando.set(false),
+    });
+  }
+
+  /** "Cargar más tickets" (ver hayMasTicketsPorCargar) — siguiente página del
+   *  MISMO filtro que ya está en pantalla (filtroTicketsActual), agregada al
+   *  final de lo ya cargado. */
+  protected cargarMasTickets(): void {
+    const desde = this.ticketsCargados();
+    this.data.listarPagina<Ticket>('Ticket', this.filtroTicketsActual(), desde, KanbanComponent.TOPE_TICKETS).subscribe({
+      next: ({ filas, total }) => {
+        this.tickets.update((actuales) => [...actuales, ...filas]);
+        this.totalTickets.set(total);
+        this.ticketsCargados.update((n) => n + filas.length);
+        // Con la lista YA completa (no solo la página nueva): etiquetasPorTicket/
+        // dependenciasPorTicket se REEMPLAZAN por completo con lo que se les pase
+        // (ver cargarEtiquetasDeTablero/cargarDependenciasDeTablero) — pasar solo
+        // los ids nuevos borraría lo ya cargado de la página anterior.
+        const todosLosIds = this.tickets().map((t) => t.id);
+        this.cargarEtiquetasDeTablero(todosLosIds);
+        this.cargarDependenciasDeTablero(todosLosIds);
+      },
     });
   }
 

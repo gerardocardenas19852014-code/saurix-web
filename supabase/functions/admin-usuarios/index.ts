@@ -93,6 +93,34 @@ Deno.serve(async (req: Request) => {
       ? Number(cuerpo.empresaId ?? yo.empresa_activa_id ?? yo.empresa_id)
       : yo.empresa_id;
 
+    // Mismo límite que ya valida el trigger de auth.users
+    // (privado.crear_perfil_usuario) al insertar en seguridad.usuario — pero
+    // GoTrue (Supabase Auth) NUNCA propaga el mensaje real de un trigger que
+    // aborta el INSERT: createUser() solo regresa el genérico "Database
+    // error creating new user" (confirmado en los logs: el trigger sí
+    // levantó "Esta empresa ya alcanzó su límite de N usuario(s).", pero ese
+    // texto nunca llega aquí). Se valida primero para dar un mensaje claro;
+    // el trigger queda como respaldo (defensa en profundidad, por si se crea
+    // un usuario sin pasar por esta función).
+    const { data: empresaInfo } = await seguridad
+      .from('empresa')
+      .select('max_usuarios')
+      .eq('id', empresaId)
+      .maybeSingle();
+    if (empresaInfo?.max_usuarios != null) {
+      const { count: usuariosActivos } = await seguridad
+        .from('usuario')
+        .select('id', { count: 'exact', head: true })
+        .eq('empresa_id', empresaId)
+        .eq('activo', true);
+      if ((usuariosActivos ?? 0) >= empresaInfo.max_usuarios) {
+        return falla(
+          `Esta empresa ya alcanzó su límite de ${empresaInfo.max_usuarios} usuario(s) activo(s). Desactiva alguno o aumenta el límite para crear uno nuevo.`,
+          409,
+        );
+      }
+    }
+
     const { data: duplicado } = await seguridad
       .from('usuario')
       .select('id')

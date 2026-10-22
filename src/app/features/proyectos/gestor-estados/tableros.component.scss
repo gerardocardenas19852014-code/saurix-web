@@ -59,9 +59,14 @@
   gap: 6px;
   padding: 0 10px;
   border-radius: 8px;
+  // El color real lo pone [style.background]="colorCaja(columna)" en el
+  // template (un color determinístico por nombre de estado, ver
+  // colorCaja() en el componente) — antes todas usaban var(--accent) y no
+  // se distinguía una caja de otra; este valor solo queda como respaldo.
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+  border: 1px solid rgba(0, 0, 0, .18);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .3);
   cursor: grab;
   user-select: none;
 }
@@ -77,6 +82,7 @@
 .flujo-caja.flujo-caja-seleccionada {
   outline: 3px solid #fff;
   outline-offset: -5px;
+  box-shadow: 0 0 0 3px var(--accent), 0 2px 6px rgba(0, 0, 0, .35);
 }
 
 .flujo-caja-nombre {
@@ -90,11 +96,16 @@
   white-space: nowrap;
 }
 
+// Fondo SIEMPRE blanco (nunca el color de la caja, que ahora varía por
+// estado — ver colorCaja()): si el candado tomaba un color de la misma
+// paleta que la caja (p.ej. --client, el mismo verde que una caja podía
+// tener), se confundía con el fondo y parecía "igual" en vez de resaltar.
+// Con fondo blanco fijo, el anillo de color (verde/rojo) siempre contrasta
+// sin importar en qué caja esté.
 .flujo-caja-candado {
   flex-shrink: 0;
-  background: rgba(255, 255, 255, .18);
-  border: none;
-  border-radius: 6px;
+  background: #fff;
+  border-radius: 50%;
   width: 22px;
   height: 22px;
   font-size: 12px;
@@ -103,8 +114,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+}
+
+.flujo-caja-candado-libre {
+  border: 3px solid var(--client);
+}
+
+.flujo-caja-candado-restringida {
+  border: 3px solid var(--danger);
 }
 
 .flujo-caja-candado:hover {
-  background: rgba(255, 255, 255, .32);
+  filter: brightness(.92);
 }

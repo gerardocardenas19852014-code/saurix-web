@@ -1,10 +1,14 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, from, of } from 'rxjs';
 import { FunctionsHttpError, PostgrestError } from '@supabase/supabase-js';
-import { DataClientService, FiltroRango } from './data-client.service';
+import { DataClientService, FiltroNulo, FiltroRango, ResultadoPagina } from './data-client.service';
 
 function esFiltroRango(valor: unknown): valor is FiltroRango {
   return typeof valor === 'object' && valor !== null && !Array.isArray(valor) && ('gte' in valor || 'lte' in valor);
+}
+
+function esFiltroNulo(valor: unknown): valor is FiltroNulo {
+  return typeof valor === 'object' && valor !== null && (valor as FiltroNulo).esNulo === true;
 }
 import { SupabaseService } from './supabase.service';
 import { DefinicionTabla, definicionTabla, entidadExiste } from './supabase-esquema';
@@ -137,44 +141,87 @@ export class SupabaseDataClientService extends DataClientService {
     return from(this.conToast(() => this.eliminar(entidad, id)));
   }
 
+  override listarPagina<T>(
+    entidad: string,
+    filtro: Record<string, unknown> | undefined,
+    desde: number,
+    cantidad: number,
+  ): Observable<ResultadoPagina<T>> {
+    if (!entidadExiste(entidad)) return of({ filas: [], total: 0 });
+    return from(this.conToast(() => this.listarUnaPagina(entidad, filtro, desde, cantidad))) as Observable<
+      ResultadoPagina<T>
+    >;
+  }
+
   // ── Operaciones ─────────────────────────────────────────────────────────
 
   private tabla(def: DefinicionTabla) {
     return this.sb.schema(def.esquema).from(def.tabla);
   }
 
+  /** true si el filtro ya se sabe que no puede coincidir con nada (columna
+   *  inexistente, o un arreglo vacío como "está en esta lista" de 0 valores)
+   *  — tanto listar() como listarPagina() necesitan cortar temprano en ese
+   *  caso, antes de siquiera construir la consulta. */
+  private filtroImposible(def: DefinicionTabla, filtro?: Record<string, unknown>): boolean {
+    for (const [clave, valor] of Object.entries(filtro ?? {})) {
+      if (valor === null || valor === undefined || valor === '') continue;
+      if (!def.columnas.get(clave)) return true;
+      if (Array.isArray(valor) && valor.length === 0) return true;
+    }
+    return false;
+  }
+
+  /** Arma la consulta de Supabase aplicando el mismo contrato de filtro que
+   *  describe DataClientService.list() (valor simple, arreglo/IN, FiltroRango)
+   *  — compartido entre listar() (trae todo, paginando internamente) y
+   *  listarPagina() (trae solo una página, con total real vía `count`). */
+  private aplicarFiltros<Consulta extends { ilike: Function; eq: Function; in: Function; gte: Function; lte: Function; is: Function }>(
+    consulta: Consulta,
+    def: DefinicionTabla,
+    filtro?: Record<string, unknown>,
+  ): Consulta {
+    for (const [clave, valor] of Object.entries(filtro ?? {})) {
+      if (valor === null || valor === undefined || valor === '') continue;
+      const columna = def.columnas.get(clave);
+      if (!columna) continue;
+      // Un arreglo = "está en esta lista" (ver DashboardVentasComponent:
+      // pedir VentaItem/VentaPago solo de un conjunto acotado de ventaId,
+      // en vez de traer la tabla completa y filtrar en el navegador — el
+      // patrón que causaba timeouts en el dashboard con historial largo).
+      if (Array.isArray(valor)) {
+        consulta = consulta.in(columna.snake, valor);
+        continue;
+      }
+      // {gte, lte} = acotar una tabla que crece sin límite (bitácora,
+      // movimientos) a un rango de fechas en vez de traerla completa.
+      if (esFiltroRango(valor)) {
+        if (valor.gte !== undefined) consulta = consulta.gte(columna.snake, valor.gte);
+        if (valor.lte !== undefined) consulta = consulta.lte(columna.snake, valor.lte);
+        continue;
+      }
+      // {esNulo: true} = "columna IS NULL" (p.ej. Ticket.sprintId vacío = el
+      // backlog sin asignar a ningún sprint) — un valor simple `null` en el
+      // filtro se trata como "sin filtro" (ver arriba), así que hace falta
+      // este marcador explícito para de verdad pedirlo.
+      if (esFiltroNulo(valor)) {
+        consulta = consulta.is(columna.snake, null);
+        continue;
+      }
+      consulta =
+        typeof valor === 'string' && columna.tipo === 't'
+          ? consulta.ilike(columna.snake, `%${escaparLike(valor)}%`)
+          : consulta.eq(columna.snake, valor);
+    }
+    return consulta;
+  }
+
   private async listar(entidad: string, filtro?: Record<string, unknown>): Promise<Fila[]> {
     const def = definicionTabla(entidad);
+    if (this.filtroImposible(def, filtro)) return [];
     const filas: Fila[] = [];
     for (let desde = 0; ; desde += TAMANO_PAGINA) {
-      let consulta = this.tabla(def).select('*');
-      for (const [clave, valor] of Object.entries(filtro ?? {})) {
-        if (valor === null || valor === undefined || valor === '') continue;
-        const columna = def.columnas.get(clave);
-        // Igual que en IndexedDB: filtrar por un campo que el registro no
-        // tiene no coincide con nada.
-        if (!columna) return [];
-        // Un arreglo = "está en esta lista" (ver DashboardVentasComponent:
-        // pedir VentaItem/VentaPago solo de un conjunto acotado de ventaId,
-        // en vez de traer la tabla completa y filtrar en el navegador — el
-        // patrón que causaba timeouts en el dashboard con historial largo).
-        if (Array.isArray(valor)) {
-          if (valor.length === 0) return [];
-          consulta = consulta.in(columna.snake, valor);
-          continue;
-        }
-        // {gte, lte} = acotar una tabla que crece sin límite (bitácora,
-        // movimientos) a un rango de fechas en vez de traerla completa.
-        if (esFiltroRango(valor)) {
-          if (valor.gte !== undefined) consulta = consulta.gte(columna.snake, valor.gte);
-          if (valor.lte !== undefined) consulta = consulta.lte(columna.snake, valor.lte);
-          continue;
-        }
-        consulta =
-          typeof valor === 'string' && columna.tipo === 't'
-            ? consulta.ilike(columna.snake, `%${escaparLike(valor)}%`)
-            : consulta.eq(columna.snake, valor);
-      }
+      const consulta = this.aplicarFiltros(this.tabla(def).select('*'), def, filtro);
       const { data, error } = await consulta.order('id').range(desde, desde + TAMANO_PAGINA - 1);
       if (error) throw error;
       filas.push(...((data ?? []) as Fila[]));
@@ -182,6 +229,24 @@ export class SupabaseDataClientService extends DataClientService {
     }
     const resultado = filas.map(filaACamel);
     return esTablaAdjuntos(def) ? this.firmarAdjuntos(resultado) : resultado;
+  }
+
+  private async listarUnaPagina(
+    entidad: string,
+    filtro: Record<string, unknown> | undefined,
+    desde: number,
+    cantidad: number,
+  ): Promise<ResultadoPagina<Fila>> {
+    const def = definicionTabla(entidad);
+    if (this.filtroImposible(def, filtro)) return { filas: [], total: 0 };
+    const consulta = this.aplicarFiltros(this.tabla(def).select('*', { count: 'exact' }), def, filtro);
+    const { data, error, count } = await consulta.order('id').range(desde, desde + cantidad - 1);
+    if (error) throw error;
+    const filas = (data ?? []).map(filaACamel);
+    return {
+      filas: esTablaAdjuntos(def) ? await this.firmarAdjuntos(filas) : filas,
+      total: count ?? filas.length,
+    };
   }
 
   private async obtener(entidad: string, id: number): Promise<Fila> {

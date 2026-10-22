@@ -311,7 +311,7 @@
             <span class="actividad-item-texto">
               {{ sprint.nombre }}
               <span class="grid-badge grid-badge-muted">Cerrado</span>
-              — {{ ticketsDeSprintFiltrados(sprint.id).length }} ticket(s)
+              — {{ conteoSprintCerrado(sprint.id) }} ticket(s)
             </span>
             <div class="actividad-item-meta">
               <button type="button" class="btn-secondary small" (click)="reabrirSprint(sprint)" title="Reabrir este sprint, por ejemplo si se completó por error">

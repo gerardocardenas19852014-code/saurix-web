@@ -201,11 +201,27 @@ export class ProductosComponent implements OnInit, OnDestroy {
     this.cargar();
   }
 
+  // Sin `error` en estos 4 catálogos, un fallo de red/permiso se volvía un
+  // "Uncaught (in promise)" en vez de degradarse a "sin datos todavía"
+  // (conToast() ya muestra su propio toast y vuelve a lanzar el error) —
+  // mismo bug ya corregido en cliente-form-modal.component.ts.
   private cargarCatalogos(): void {
-    this.data.list<CategoriaProducto>('CategoriaProducto').subscribe((c) => this.categorias.set(c));
-    this.data.list<UnidadMedida>('UnidadMedida').subscribe((u) => this.unidades.set(u));
-    this.data.list<ExistenciaBodega>('ExistenciaBodega').subscribe((e) => this.existenciasBodega.set(e));
-    this.data.list<Proveedor>('Proveedor').subscribe((p) => this.proveedores.set(p));
+    this.data.list<CategoriaProducto>('CategoriaProducto').subscribe({
+      next: (c) => this.categorias.set(c),
+      error: () => {},
+    });
+    this.data.list<UnidadMedida>('UnidadMedida').subscribe({
+      next: (u) => this.unidades.set(u),
+      error: () => {},
+    });
+    this.data.list<ExistenciaBodega>('ExistenciaBodega').subscribe({
+      next: (e) => this.existenciasBodega.set(e),
+      error: () => {},
+    });
+    this.data.list<Proveedor>('Proveedor').subscribe({
+      next: (p) => this.proveedores.set(p),
+      error: () => {},
+    });
   }
 
   cargar(): void {
@@ -347,6 +363,10 @@ export class ProductosComponent implements OnInit, OnDestroy {
         this.modalAbierto.set(false);
         this.cargar();
       },
+      // conToast() ya muestra su propio toast de error y vuelve a lanzar —
+      // sin este handler, un guardado fallido quedaba como "Uncaught (in
+      // promise)" en vez de solo dejar el modal abierto para reintentar.
+      error: () => {},
     });
   }
 
@@ -391,6 +411,9 @@ export class ProductosComponent implements OnInit, OnDestroy {
         this.productoAEliminar.set(null);
         this.cargar();
       },
+      // Igual que en guardar(): sin esto, una baja fallida (p.ej. producto
+      // referenciado en otra tabla) quedaba como "Uncaught (in promise)".
+      error: () => {},
     });
   }
 

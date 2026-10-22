@@ -1,9 +1,13 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, from } from 'rxjs';
-import { DataClientService, FiltroRango } from './data-client.service';
+import { DataClientService, FiltroNulo, FiltroRango, ResultadoPagina } from './data-client.service';
 
 function esFiltroRango(valor: unknown): valor is FiltroRango {
   return typeof valor === 'object' && valor !== null && !Array.isArray(valor) && ('gte' in valor || 'lte' in valor);
+}
+
+function esFiltroNulo(valor: unknown): valor is FiltroNulo {
+  return typeof valor === 'object' && valor !== null && (valor as FiltroNulo).esNulo === true;
 }
 import { IndexedDbEngineService } from './indexeddb-engine.service';
 
@@ -23,6 +27,11 @@ function coincideFiltro(fila: Record<string, unknown>, filtro: Record<string, un
       const comparable = valorFila as string | number;
       if (valor.gte !== undefined && comparable < valor.gte) return false;
       if (valor.lte !== undefined && comparable > valor.lte) return false;
+      continue;
+    }
+    // {esNulo: true} = "columna IS NULL" (ver supabase-data-client.service.ts).
+    if (esFiltroNulo(valor)) {
+      if (valorFila !== null && valorFila !== undefined) return false;
       continue;
     }
     if (typeof valor === 'string' && typeof valorFila === 'string') {
@@ -80,5 +89,19 @@ export class IndexedDbDataClientService extends DataClientService {
 
   override baja(entidad: string, id: number): Observable<void> {
     return from(this.engine.remove(entidad, id));
+  }
+
+  override listarPagina<T>(
+    entidad: string,
+    filtro: Record<string, unknown> | undefined,
+    desde: number,
+    cantidad: number,
+  ): Observable<ResultadoPagina<T>> {
+    return from(
+      this.engine.getAll<T & Record<string, unknown>>(entidad).then((filas) => {
+        const filtradas = filtro ? filas.filter((fila) => coincideFiltro(fila, filtro)) : filas;
+        return { filas: filtradas.slice(desde, desde + cantidad), total: filtradas.length } as ResultadoPagina<T>;
+      }),
+    );
   }
 }

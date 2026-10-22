@@ -360,7 +360,11 @@ export class UsuariosListComponent implements OnInit, OnDestroy {
     // El nombre de usuario debe ser único: se revisa contra el catálogo completo
     // (no la lista filtrada por búsqueda) antes de dar de alta o modificar.
     this.data.list<Usuario>('Usuario').subscribe({
-      error: () => this.toast.error('No se pudo verificar el nombre de usuario. Intenta de nuevo.'),
+      // El propio DataClientService (conToast) ya muestra un toast con el
+      // mensaje real del error (incluido el de la Edge Function, p.ej. el
+      // límite de usuarios de la empresa); un segundo toast genérico aquí
+      // solo lo tapaba con texto menos útil.
+      error: () => {},
       next: async (usuarios) => {
         const yaExiste = usuarios.some(
           (u) => u.nombreUsuario.toLowerCase() === nombreUsuarioNuevo && u.id !== valor.id,
@@ -405,7 +409,10 @@ export class UsuariosListComponent implements OnInit, OnDestroy {
             this.modalAbierto.set(false);
             this.cargar();
           },
-          error: () => this.toast.error('No se pudo guardar el usuario. Intenta de nuevo.'),
+          // Igual que arriba: conToast ya mostró el toast con el mensaje
+          // específico (por ejemplo, el límite de usuarios de la empresa),
+          // así que aquí no se repite con uno genérico.
+          error: () => {},
         });
       },
     });
