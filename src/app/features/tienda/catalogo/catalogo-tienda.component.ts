@@ -148,6 +148,13 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
     );
   });
 
+  /** true = "menú visual" (ver 42_tienda_catalogo_visual.sql): la empresa
+   *  apagó los pedidos en línea — el catálogo se muestra igual (mismo QR),
+   *  pero sin carrito, sin "Agregar"/"Elegir" y sin botón de enviar pedido.
+   *  Se deriva del detalle cargado, no es un signal propio: no hay forma de
+   *  cambiarlo desde el navegador del cliente. */
+  protected readonly modoVisual = computed(() => this.detalle()?.empresa.aceptaPedidos === false);
+
   /** Carrusel "⭐ Destacados" arriba del catálogo — los que la empresa marcó
    *  como destacado() en Productos y que sigan disponibles. A propósito NO
    *  se filtran por la búsqueda (busqueda()): es una vitrina fija, no otra
@@ -364,7 +371,7 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
   // ── Agregar al carrito ────────────────────────────────────────────
   /** Productos sin ningún grupo de opciones se agregan directo, sin abrir modal. */
   agregar(producto: ProductoTienda): void {
-    if (!producto.disponible) return;
+    if (this.modoVisual() || !producto.disponible) return;
     if (producto.opciones.length > 0) {
       this.abrirModal(producto);
       return;
@@ -373,6 +380,9 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
   }
 
   abrirModal(producto: ProductoTienda): void {
+    // Defensa extra — también se llama directo desde el carrusel de
+    // Destacados (ver el .html), que no pasa por agregar().
+    if (this.modoVisual()) return;
     this.productoEnModal.set(producto);
     this.cantidadModal.set(1);
     // Grupos de selección única con exactamente 1 valor: se pre-marca el
@@ -555,7 +565,7 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
   //    mensaje, valida con el cliente y ella captura la venta a mano en
   //    Ventas → Cobro (usando el campo "Canal" para marcarla). ────────────
   abrirEnvio(): void {
-    if (this.carrito().length === 0) return;
+    if (this.modoVisual() || this.carrito().length === 0) return;
     // Limpio para no arrastrar nota/ubicación de un pedido anterior ya
     // enviado en esta misma visita.
     this.formCliente.patchValue({ notas: '' });

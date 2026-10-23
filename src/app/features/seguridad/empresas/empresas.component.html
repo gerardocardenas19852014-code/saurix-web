@@ -87,6 +87,18 @@
             Disponible en <code>/tienda/{{ formEmpresa.controls.clave.value || '…' }}</code>
             (y listada en el portal <code>/tienda</code>).
           </p>
+
+          <label class="checkbox-inline full-span">
+            <input type="checkbox" formControlName="catalogoPublicoAceptaPedidos" />
+            Permitir que los clientes armen y envíen pedidos desde la tienda
+          </label>
+          @if (!formEmpresa.controls.catalogoPublicoAceptaPedidos.value) {
+            <p class="hint full-span" style="margin:0;">
+              Apagado = <strong>menú visual</strong>: el catálogo solo se muestra (sin carrito ni botón de
+              pedido), pensado para negocios que solo quieren un menú digital bonito accesible por QR —
+              el mismo QR de "Compartir tienda" sigue funcionando igual.
+            </p>
+          }
         }
 
         <label class="full-span">

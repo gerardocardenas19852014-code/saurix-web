@@ -101,6 +101,12 @@ export interface EmpresaTienda {
   envioPrecioKm: number | null;
   envioMinimo: number | null;
   envioDistanciaMaximaKm: number | null;
+  /** false = "menú visual": catálogo solo informativo, sin carrito ni envío
+   *  de pedido (ver 42_tienda_catalogo_visual.sql) — el negocio solo quiere
+   *  mostrar su menú/catálogo bonito, accesible por el mismo QR de siempre,
+   *  pero no toma pedidos en línea. Default true (no cambia tiendas ya
+   *  configuradas, ver catalogo-tienda.component.ts: modoVisual()). */
+  aceptaPedidos: boolean;
 }
 
 export interface TiendaDetalle {

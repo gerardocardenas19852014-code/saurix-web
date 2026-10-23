@@ -12,8 +12,15 @@
        var(--color-primario, #2563eb) en vez del azul escrito a mano). Sin
        color propio (null), se quita el estilo inline y gana el azul por
        defecto del fallback. -->
+  <!-- tienda-catalogo-visual: la presentación "tipo menú" (categorías con
+       placa de color, fotos grandes con zoom, precio con guía punteada,
+       etc. — ver 42_tienda_catalogo_visual.sql y el bloque de abajo en el
+       .scss) se aplica SIEMPRE, acepte o no pedidos esta tienda — al
+       usuario le gustó y pidió que no dependiera del interruptor. Lo que
+       SÍ sigue dependiendo de modoVisual() es lo funcional: carrito,
+       "Agregar"/"Elegir", barra inferior, etc. -->
   <div
-    class="tienda-catalogo"
+    class="tienda-catalogo tienda-catalogo-visual"
     [style.--color-primario]="d.empresa.colorAcento || null"
     [style.--color-texto-banner]="d.empresa.colorTextoBanner || null"
   >
@@ -27,9 +34,11 @@
         <button type="button" class="tienda-compartir-boton" title="Compartir esta tienda" aria-label="Compartir esta tienda" (click)="abrirCompartir()">
           🔗
         </button>
-        <button type="button" class="tienda-carrito-boton" [class.tienda-carrito-boton-pulso]="pulsoCarrito()" (click)="carritoAbierto.set(true)">
-          🛒 {{ cantidadArticulos() }}
-        </button>
+        @if (!modoVisual()) {
+          <button type="button" class="tienda-carrito-boton" [class.tienda-carrito-boton-pulso]="pulsoCarrito()" (click)="carritoAbierto.set(true)">
+            🛒 {{ cantidadArticulos() }}
+          </button>
+        }
       </div>
       <div class="tienda-banner-nombre">
         <h1>{{ d.empresa.nombre }}</h1>
@@ -66,7 +75,7 @@
          en el .ts; solo aparece si hay un pedido anterior guardado en ESTE
          navegador para ESTA tienda y el carrito actual sigue vacío (si ya
          trae algo agregado, no tiene caso ofrecer reemplazarlo). -->
-    @if (ultimoPedidoDisponible() && carrito().length === 0 && d.empresa.volverPedirActivo) {
+    @if (!modoVisual() && ultimoPedidoDisponible() && carrito().length === 0 && d.empresa.volverPedirActivo) {
       <div class="tienda-volver-pedir">
         <span>¿Pedir lo mismo que la última vez?</span>
         <button type="button" (click)="volverAPedir()">Volver a pedir</button>
@@ -81,14 +90,20 @@
         <h2 class="tienda-destacados-titulo">⭐ Destacados</h2>
         <div class="tienda-destacados-fila">
           @for (producto of productosDestacados(); track producto.id) {
+            <!-- Nombre/precio sobre la foto (no debajo) — se ve más como un
+                 letrero/anuncio que como una miniatura de catálogo. En modo
+                 visual no abre nada al tocarlo (abrirModal() ya se protege
+                 en el .ts), pero la presentación es la misma en los 2 modos. -->
             <div class="tienda-destacado-tarjeta" (click)="abrirModal(producto)">
               @if (producto.foto; as foto) {
                 <img class="tienda-destacado-foto" [src]="foto" [alt]="producto.nombre" />
               } @else {
                 <div class="tienda-destacado-foto tienda-destacado-foto-vacia">📦</div>
               }
-              <strong>{{ producto.nombre }}</strong>
-              <span>${{ producto.precio | number: '1.0-0' }}</span>
+              <div class="tienda-destacado-leyenda">
+                <strong>{{ producto.nombre }}</strong>
+                <span>${{ producto.precio | number: '1.0-0' }}</span>
+              </div>
             </div>
           }
         </div>
@@ -120,23 +135,24 @@
 
     @for (grupo of gruposProductos(); track grupo.clave) {
       <section class="tienda-categoria">
-        <h2 class="tienda-categoria-titulo">{{ grupo.titulo }}</h2>
+        <h2 class="tienda-categoria-titulo"><span class="tienda-categoria-titulo-texto">{{ grupo.titulo }}</span></h2>
         <div class="tienda-grid" [class.tienda-grid-lista]="vistaLista()">
           @for (producto of grupo.productos; track producto.id) {
             <div class="tienda-tarjeta" [class.tienda-tarjeta-agotada]="!producto.disponible">
               <div class="tienda-tarjeta-foto-contenedor">
                 @if (producto.foto; as foto) {
-                  <img class="tienda-tarjeta-foto" [src]="foto" [alt]="producto.nombre" />
-                  <!-- "+" sobre la foto (no sobre Agregar) — abre la imagen en
-                       grande, ver imagenAmpliada()/ampliarImagen() en el .ts. -->
+                  <!-- Toda la foto es el botón de ampliar (antes solo la "+"
+                       chica de la esquina) — la lupa nomás avisa que se
+                       puede, ver imagenAmpliada()/ampliarImagen() en el .ts. -->
                   <button
                     type="button"
-                    class="tienda-tarjeta-foto-ampliar"
+                    class="tienda-tarjeta-foto-boton"
                     title="Ver imagen grande"
                     aria-label="Ver imagen grande de {{ producto.nombre }}"
                     (click)="ampliarImagen(foto)"
                   >
-                    +
+                    <img class="tienda-tarjeta-foto" [src]="foto" [alt]="producto.nombre" />
+                    <span class="tienda-tarjeta-foto-ampliar" aria-hidden="true">🔍</span>
                   </button>
                 } @else {
                   <div class="tienda-tarjeta-foto tienda-tarjeta-foto-vacia">📦</div>
@@ -153,13 +169,46 @@
                     }
                   </div>
                 }
-                <strong>{{ producto.nombre }}</strong>
+                <!-- Nombre + precio con guía punteada, estilo "carta de
+                     restaurante" — se muestra SIEMPRE (acepte o no pedidos
+                     esta tienda, al usuario le gustó este estilo para las
+                     2). Si el producto tiene variantes, es el precio base;
+                     el costo de cada variante se lista abajo (modo visual)
+                     o se ve al elegir (modo con pedidos). -->
+                <div class="tienda-tarjeta-nombre-precio">
+                  <strong>{{ producto.nombre }}</strong>
+                  <span class="tienda-tarjeta-guia" aria-hidden="true"></span>
+                  <span class="tienda-tarjeta-precio-visual">${{ producto.precio.toFixed(2) }}</span>
+                </div>
                 @if (producto.descripcion) {
                   <p>{{ producto.descripcion }}</p>
                 }
-                <div class="tienda-tarjeta-pie">
-                  @if (!producto.disponible) {
-                    <span class="tienda-tarjeta-precio">${{ producto.precio.toFixed(2) }}</span>
+                <div class="tienda-tarjeta-pie" [class.tienda-tarjeta-pie-visual]="modoVisual()">
+                  @if (modoVisual()) {
+                    <!-- El precio ya se muestra arriba junto al nombre — aquí
+                         solo queda, si el producto tiene variantes, la lista
+                         de opciones y su costo adicional (de otro modo el
+                         cliente no se entera de que existen, ver el modal
+                         "Elegir" que en este modo no se ofrece), o el aviso
+                         de agotado. -->
+                    @if (!producto.disponible) {
+                      <span class="tienda-tarjeta-agotado-badge">Agotado</span>
+                    } @else if (producto.opciones.length > 0) {
+                      <div class="tienda-tarjeta-visual-opciones">
+                        @for (grupo of producto.opciones; track grupo.id) {
+                          <p class="tienda-tarjeta-visual-grupo">
+                            <span class="tienda-tarjeta-visual-grupo-nombre">{{ grupo.nombre }}:</span>
+                            @for (valor of grupo.valores; track valor.id) {
+                              <span class="tienda-tarjeta-visual-valor">
+                                {{ valor.nombre }}{{ valor.precioAdicional > 0 ? ' +$' + valor.precioAdicional.toFixed(2) : '' }}
+                              </span>
+                            }
+                          </p>
+                        }
+                      </div>
+                    }
+                  } @else if (!producto.disponible) {
+                    <!-- El precio ya se muestra arriba junto al nombre. -->
                     <span class="tienda-tarjeta-agotado-badge">Agotado</span>
                   } @else if (producto.opciones.length === 0 && cantidadesEnCarrito()[producto.id]; as cantidad) {
                     <!-- Producto simple (sin variantes) ya en el carrito: +/-
@@ -195,11 +244,10 @@
                     </div>
                   } @else {
                     <div class="tienda-tarjeta-acciones">
-                      <!-- Precio y acción en un solo botón (en vez de precio aparte
-                           + botón chico) — mismo patrón que el modal de variantes,
-                           para que sea igual de fácil de usar en toda la tienda. -->
+                      <!-- Sin precio en el botón (ya se ve arriba junto al
+                           nombre) — nomás la acción. -->
                       <button type="button" class="tienda-tarjeta-agregar" (click)="agregar(producto)">
-                        {{ producto.opciones.length > 0 ? 'Elegir' : 'Agregar' }} &bull; ${{ producto.precio.toFixed(2) }}
+                        {{ producto.opciones.length > 0 ? 'Elegir opciones' : 'Agregar al carrito' }}
                       </button>
                       <!-- Solo productos con variantes llegan aquí ya en el
                            carrito (los simples usan el stepper de arriba): no
@@ -240,7 +288,7 @@
        quiera, sin que "Agregar" lo saque de la pantalla — ver el comentario
        en agregarLineaAlCarrito(). Se oculta solo mientras el panel ya está
        abierto, para no duplicar el mismo total en pantalla. ── -->
-  @if (cantidadArticulos() > 0 && !carritoAbierto()) {
+  @if (!modoVisual() && cantidadArticulos() > 0 && !carritoAbierto()) {
     <div class="tienda-barra-inferior">
       <div class="tienda-barra-inferior-info">
         <span class="tienda-barra-inferior-cantidad">{{ cantidadArticulos() }} artículo{{ cantidadArticulos() === 1 ? '' : 's' }}</span>
@@ -257,7 +305,7 @@
        los modales de abajo (opciones/datos de envío), que sí son pasos que
        requieren su atención completa. Por eso no comparte .tienda-overlay
        (sin backdrop que capture clics ni cierre al tocar fuera). ── -->
-  @if (carritoAbierto()) {
+  @if (!modoVisual() && carritoAbierto()) {
     <aside class="tienda-carrito-panel" (click)="$event.stopPropagation()">
         <div class="tienda-carrito-panel-header">
           <h2>Tu pedido</h2>

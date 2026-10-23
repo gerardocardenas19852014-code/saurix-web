@@ -71,8 +71,9 @@
 
   h1 {
     margin: 0;
-    font-size: 1.5rem;
+    font-size: 1.7rem;
     font-weight: 700;
+    letter-spacing: 0.02em;
     /* Con "color" nomás no bastaba: hay una regla global "h1, h2 { color:
      * var(--heading-navy); }" (src/styles.scss) que, aunque el banner
      * declara su propio color, GANA porque un valor heredado siempre
@@ -85,6 +86,19 @@
      * de letra propio elegido a propósito no estorba, así que se deja
      * siempre encendida. */
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+
+    // Barrita de acento (color de marca) debajo del título — como el
+    // "letrero" de un menú.
+    &::after {
+      content: '';
+      display: block;
+      width: 56px;
+      height: 3px;
+      margin: 8px auto 0;
+      background: var(--color-texto-banner, #fff);
+      border-radius: 999px;
+      opacity: 0.85;
+    }
   }
 
   p {
@@ -241,7 +255,7 @@
  * gruposProductos() en catalogo-tienda.component.ts) — separa visualmente
  * el catálogo en vez de una sola rejilla plana. */
 .tienda-categoria {
-  margin-bottom: 28px;
+  margin-bottom: 44px;
 
   &:last-child {
     margin-bottom: 0;
@@ -249,23 +263,49 @@
 }
 
 .tienda-categoria-titulo {
-  font-size: 1.05rem;
-  margin: 0 0 12px;
-  padding-bottom: 8px;
-  border-bottom: 2px solid var(--borde, #e5e7eb);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 0 0 20px;
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    height: 2px;
+    max-width: 70px;
+    background: linear-gradient(90deg, transparent, var(--color-primario, #2563eb));
+  }
+
+  &::after {
+    background: linear-gradient(90deg, var(--color-primario, #2563eb), transparent);
+  }
+}
+
+.tienda-categoria-titulo-texto {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--color-primario, #2563eb);
+  padding: 6px 18px;
+  border-radius: 999px;
+  white-space: nowrap;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
 }
 
 .tienda-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 20px;
 
-  /* En celular, minmax(190px) solo deja entrar 1 columna y cada tarjeta
-   * termina ocupando toda la pantalla (foto gigante, se ve "perdida") — se
-   * fuerzan 2 columnas angostas, igual que se ven en escritorio. */
+  // En celular se queda 1 columna: con tarjetas/fotos grandes, 2 columnas
+  // angostas se ven apretadas.
   @media (max-width: 480px) {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
+    grid-template-columns: 1fr;
+    gap: 16px;
   }
 
   /* Lista: una sola columna de renglones compactos (foto chica a la
@@ -316,12 +356,25 @@
       padding: 8px 12px;
       gap: 10px;
 
-      strong {
+      // En lista, nombre+precio (.tienda-tarjeta-nombre-precio) ocupa el
+      // mismo lugar/ancho que antes ocupaba el <strong> solo — sin la guía
+      // punteada (no cabe en un renglón angosto) y con el nombre truncado,
+      // no el precio.
+      .tienda-tarjeta-nombre-precio {
         flex-shrink: 0;
-        max-width: 45%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        max-width: 55%;
+        gap: 6px;
+
+        strong {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+      }
+
+      .tienda-tarjeta-guia {
+        display: none;
       }
 
       p {
@@ -383,18 +436,17 @@
 
 .tienda-tarjeta {
   border: 1px solid var(--borde, #e5e7eb);
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
   background: var(--fondo-tarjeta, #fff);
   display: flex;
   flex-direction: column;
-  /* Sombra más marcada (antes no tenía) — le da un aire más "premium",
-   * separando mejor las tarjetas del fondo de la página. */
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
-  transition: box-shadow 0.15s ease;
+  box-shadow: 0 3px 16px rgba(0, 0, 0, 0.09);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 
   &:hover {
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.16);
+    transform: translateY(-3px);
   }
 
   &-agotada {
@@ -437,7 +489,11 @@
 
 .tienda-destacados-titulo {
   margin: 0 0 10px;
-  font-size: 1.05rem;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 1rem;
+  color: var(--color-primario, #2563eb);
 }
 
 .tienda-destacados-fila {
@@ -449,40 +505,27 @@
   -webkit-overflow-scrolling: touch;
 }
 
+// Letrero/anuncio (foto con nombre+precio superpuestos abajo, ver
+// .tienda-destacado-leyenda) — mismo estilo para las 2 modalidades de
+// tienda, nomás que en modo visual no hace nada al tocarlo (abrirModal()
+// ya se protege en el .ts).
 .tienda-destacado-tarjeta {
+  position: relative;
   flex: 0 0 auto;
-  width: 120px;
+  width: 190px;
   scroll-snap-align: start;
-  border: 1px solid var(--borde, #e5e7eb);
   border-radius: 12px;
-  background: var(--fondo-tarjeta, #fff);
-  padding: 8px;
+  overflow: hidden;
   cursor: pointer;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
-
-  strong {
-    display: block;
-    margin-top: 6px;
-    font-size: 0.82rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  span {
-    display: block;
-    font-size: 0.8rem;
-    color: var(--color-texto-banner, var(--color-primario, #2563eb));
-    font-weight: 600;
-  }
 }
 
 .tienda-destacado-foto {
   width: 100%;
-  aspect-ratio: 1 / 1;
-  object-fit: contain;
+  height: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
   background: var(--fondo-sutil, #f3f4f6);
-  border-radius: 8px;
 
   &-vacia {
     display: flex;
@@ -495,19 +538,38 @@
 .tienda-tarjeta-foto-contenedor {
   position: relative;
   width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+}
+
+// Botón invisible que envuelve toda la foto (antes solo la "+" chica de la
+// esquina abría la imagen en grande) — reset de estilos de <button> para
+// que se vea exactamente igual que antes, nomás ahora clicable completo.
+.tienda-tarjeta-foto-boton {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: inherit;
+  font: inherit;
+  color: inherit;
 }
 
 .tienda-tarjeta-foto {
   width: 100%;
-  aspect-ratio: 1 / 1;
-  /* contain (no cover): las fotos de los productos no siempre tienen la
-   * misma proporción (hay bolis angostos y alargados, otros más cuadrados).
-   * Con "cover" cada foto se recorta distinto según su forma original y
-   * algunas terminan mostrando solo un pedazo/zoom irreconocible; con
-   * "contain" siempre se ve la foto completa, igual que la original,
-   * nomás con el fondo rellenando los espacios sobrantes. */
+  aspect-ratio: 4 / 3;
+  // "contain" (no "cover"): las fotos de los productos no siempre tienen
+  // la misma proporción (hay bolis angostos y alargados, otros más
+  // cuadrados) — con "cover" se veían recortadas/con espacios en blanco
+  // raros según la forma de cada foto; con "contain" siempre se ve la
+  // foto completa, nomás con el fondo rellenando lo que sobra.
   object-fit: contain;
   background: var(--fondo-sutil, #f3f4f6);
+  transition: transform 0.35s ease;
 
   &-vacia {
     display: flex;
@@ -517,32 +579,35 @@
   }
 }
 
+.tienda-tarjeta:hover .tienda-tarjeta-foto {
+  transform: scale(1.06);
+}
+
 .tienda-tarjeta-foto-ampliar {
-  /* Sobre la esquina de la foto (no sobre el botón Agregar) — un "+" chico
-   * y semitransparente para no estorbar, que abre la imagen en grande. */
+  /* Lupa sobre la esquina de la foto — solo visual (el botón real es toda
+   * la foto, .tienda-tarjeta-foto-boton de arriba), nomás avisa que se
+   * puede ampliar, semitransparente para no estorbar la imagen. */
   position: absolute;
   top: 6px;
   right: 6px;
   width: 26px;
   height: 26px;
   border-radius: 999px;
-  border: none;
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
-  font-size: 1rem;
+  font-size: 0.85rem;
   line-height: 1;
-  font-weight: 700;
-  cursor: pointer;
+  pointer-events: none;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .tienda-tarjeta-cuerpo {
-  padding: 10px 12px 12px;
+  padding: 16px 18px 18px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 7px;
   flex: 1;
 
   strong {
@@ -551,12 +616,12 @@
 
   p {
     margin: 0;
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     color: var(--texto-tenue, #6b7280);
     overflow: hidden;
     text-overflow: ellipsis;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
   }
 }
@@ -567,10 +632,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-}
-
-.tienda-tarjeta-precio {
-  font-weight: 600;
 }
 
 .tienda-tarjeta-agotado-badge {
@@ -1226,5 +1287,109 @@
   100% {
     transform: translateY(100vh) rotate(360deg);
     opacity: 0;
+  }
+}
+
+// Nombre + precio en la misma línea con una "guía punteada" entre los dos,
+// como un letrero de menú clásico ("Ensalada César ......... $85.00") — en
+// vez del precio hasta abajo, donde ya no hay ningún botón que lo acompañe.
+.tienda-tarjeta-nombre-precio {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  // min-width:0 — sin esto, un flex item no se achica más allá de su
+  // contenido aunque el padre sea angosto, y el precio terminaba cortado
+  // por el overflow:hidden de .tienda-tarjeta (ver .tienda-tarjeta-guia).
+  min-width: 0;
+
+  // El nombre se trunca con "…" si no cabe (antes no se achicaba nunca:
+  // con nombres largos el precio se salía de la tarjeta y se veía
+  // cortado a la mitad). El precio SIEMPRE se ve completo.
+  strong {
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 1.05rem;
+    letter-spacing: 0.01em;
+  }
+}
+
+.tienda-tarjeta-guia {
+  flex: 1;
+  min-width: 0;
+  border-bottom: 2px dotted var(--borde, #d1d5db);
+  margin-bottom: 4px;
+}
+
+.tienda-tarjeta-precio-visual {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--color-primario, #2563eb);
+  white-space: nowrap;
+}
+
+// Opciones de solo lectura (producto con variantes en menú visual) — mismo
+// lugar donde normalmente va "Agregar"/el stepper, pero sin ningún control:
+// cada grupo de opciones se lista como referencia (p.ej. "Tamaño: Chico,
+// Mediano +$10.00, Grande +$20.00").
+.tienda-tarjeta-pie-visual {
+  align-items: flex-start;
+}
+
+.tienda-tarjeta-visual-opciones {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+
+.tienda-tarjeta-visual-grupo {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--texto-tenue, #6b7280);
+}
+
+.tienda-tarjeta-visual-grupo-nombre {
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.tienda-tarjeta-visual-valor {
+  &:not(:last-child)::after {
+    content: ', ';
+  }
+}
+
+.tienda-destacado-leyenda {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 18px 10px 8px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.75), transparent);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+
+  strong {
+    margin: 0;
+    color: #fff;
+    font-size: 0.85rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    margin: 0;
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.85rem;
+    white-space: nowrap;
   }
 }
