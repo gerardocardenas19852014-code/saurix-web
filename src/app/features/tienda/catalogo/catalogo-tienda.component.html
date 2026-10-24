@@ -593,13 +593,9 @@
               @if (envioPropioFaltaMinimo() > 0) {
                 <p class="tienda-envio-aviso tienda-envio-aviso-bloqueo">
                   🛵 Te falta{{ envioPropioFaltaMinimo() === 1 ? '' : 'n' }} {{ envioPropioFaltaMinimo() }}
-                  producto{{ envioPropioFaltaMinimo() === 1 ? '' : 's' }} más para el pedido mínimo de envío a
+                  producto{{ envioPropioFaltaMinimo() === 1 ? '' : 's' }} más para el pedido mínimo de entrega a
                   domicilio (mínimo {{ minimo }} producto{{ minimo === 1 ? '' : 's' }}).
-                  @if (modalidadesDisponibles().length > 1) {
-                    Puedes seguir agregando productos o elegir otra forma de entrega arriba.
-                  } @else {
-                    Puedes seguir agregando productos al carrito.
-                  }
+                  Puedes seguir agregando productos{{ recoleccionDisponible() ? ' o elegir "Pasar a recoger" arriba' : '' }}.
                 </p>
               }
             }
@@ -665,6 +661,16 @@
               <textarea formControlName="notas" rows="2" placeholder="Ej. paso por la tarde, sin cebolla…"></textarea>
             </label>
           } @else if (modalidadEntrega() === 'plataforma' && variantePlataforma() === 'negocio') {
+            @if (envioPropioPedidoMinimo(); as minimo) {
+              @if (envioPropioFaltaMinimo() > 0) {
+                <p class="tienda-envio-aviso tienda-envio-aviso-bloqueo">
+                  🛵 Te falta{{ envioPropioFaltaMinimo() === 1 ? '' : 'n' }} {{ envioPropioFaltaMinimo() }}
+                  producto{{ envioPropioFaltaMinimo() === 1 ? '' : 's' }} más para el pedido mínimo de entrega a
+                  domicilio (mínimo {{ minimo }} producto{{ minimo === 1 ? '' : 's' }}).
+                  Puedes seguir agregando productos{{ recoleccionDisponible() ? ' o elegir "Pasar a recoger" arriba' : '' }}.
+                </p>
+              }
+            }
             <p class="tienda-envio-aviso">
               🚗 El costo del repartidor se cotiza por separado y se confirma antes de solicitar el servicio.
             </p>
@@ -700,6 +706,16 @@
               ></textarea>
             </label>
           } @else if (modalidadEntrega() === 'plataforma' && variantePlataforma() === 'cliente') {
+            @if (envioPropioPedidoMinimo(); as minimo) {
+              @if (envioPropioFaltaMinimo() > 0) {
+                <p class="tienda-envio-aviso tienda-envio-aviso-bloqueo">
+                  🛵 Te falta{{ envioPropioFaltaMinimo() === 1 ? '' : 'n' }} {{ envioPropioFaltaMinimo() }}
+                  producto{{ envioPropioFaltaMinimo() === 1 ? '' : 's' }} más para el pedido mínimo de entrega a
+                  domicilio (mínimo {{ minimo }} producto{{ minimo === 1 ? '' : 's' }}).
+                  Puedes seguir agregando productos{{ recoleccionDisponible() ? ' o elegir "Pasar a recoger" arriba' : '' }}.
+                </p>
+              }
+            }
             <div class="tienda-campo tienda-recoleccion-info">
               <span>🚗 Envío gestionado por ti</span>
               <p class="tienda-resumen-dato">

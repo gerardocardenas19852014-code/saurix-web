@@ -174,12 +174,12 @@ export class NotificacionesService {
    *  aunque los avisos/PATCH ya estén acotados (ver MAX_AVISOS_SLA_POR_CICLO),
    *  con una tabla Ticket enorme (p.ej. 200,000 filas en una prueba de
    *  rendimiento) el simple hecho de traer y recorrer TODOS los candidatos
-   *  en el navegador seguía siendo lento. 2000 es muchísimo más de lo que
-   *  cualquier negocio real tendría de tickets activos con prioridad con
-   *  SLA configurado a la vez — en uso real este tope nunca se alcanza, así
-   *  que nunca cambia el comportamiento; solo pone un techo fijo al costo
-   *  por ciclo sin importar qué tan grande crezca la tabla. */
-  private static readonly LIMITE_TICKETS_SLA_POR_CICLO = 2000;
+   *  en el navegador seguía siendo lento. 100 ya cubre de sobra a cualquier
+   *  negocio real (mismo orden que MAX_AVISOS_SLA_POR_CICLO) — en uso real
+   *  este tope prácticamente nunca se alcanza, así que no cambia el
+   *  comportamiento; solo pone un techo fijo y chico al costo por ciclo sin
+   *  importar qué tan grande crezca la tabla. */
+  private static readonly LIMITE_TICKETS_SLA_POR_CICLO = 100;
 
   /**
    * Revisión periódica de SLA — cierra el hueco que dejaba el comentario de arriba:

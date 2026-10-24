@@ -387,8 +387,10 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
 
   /** Cantidad mínima de PIEZAS en el carrito (suma de cantidades, ver
    *  cantidadArticulos() arriba — NO es un monto en dinero) para poder
-   *  elegir "Envío del negocio" — distinto del pedidoMinimo general
-   *  (ese sí es dinero y aplica siempre). */
+   *  elegir cualquier modalidad que entrega a domicilio: "Envío del
+   *  negocio" O "Envío por plataforma" (cualquiera de sus 2 variantes) —
+   *  "Pasar a recoger" nunca lo exige. Distinto del pedidoMinimo general
+   *  (ese sí es dinero y aplica siempre, sin importar la modalidad). */
   protected readonly envioPropioPedidoMinimo = computed(() => this.detalle()?.empresa.envioPropioPedidoMinimo ?? null);
   protected readonly envioPropioFaltaMinimo = computed(() => {
     const minimo = this.envioPropioPedidoMinimo();
@@ -436,13 +438,21 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
     const modalidad = this.modalidadEntrega();
     if (this.modalidadesDisponibles().length === 0) return true; // flujo de siempre, nunca bloquea
     if (!modalidad) return false; // debe elegir una tarjeta
+
     if (modalidad === 'plataforma') {
       const e = this.detalle()?.empresa;
       const dosVariantes = !!e?.envioPlataformaNegocioSolicita && !!e?.envioPlataformaClienteSolicita;
-      return !dosVariantes || !!this.variantePlataforma();
+      if (dosVariantes && !this.variantePlataforma()) return false; // debe elegir variante primero
     }
+
+    // El mínimo de piezas aplica a cualquier modalidad que SÍ entrega a
+    // domicilio (envío propio o plataforma, cualquiera de sus 2 variantes)
+    // — "Pasar a recoger" nunca lo exige, ahí el cliente hace el trabajo.
+    if ((modalidad === 'envio_propio' || modalidad === 'plataforma') && this.envioPropioFaltaMinimo() > 0) {
+      return false;
+    }
+
     if (modalidad === 'envio_propio') {
-      if (this.envioPropioFaltaMinimo() > 0) return false;
       // "Fuera de zona" solo bloquea si hay a dónde cambiarse — si esta es
       // la ÚNICA modalidad, se mantiene el aviso de siempre (no bloquea).
       if (this.envioPropioFueraDeZona() && this.modalidadesDisponibles().length > 1) return false;
