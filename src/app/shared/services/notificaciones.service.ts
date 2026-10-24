@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { catchError, firstValueFrom, from, mergeMap, of, toArray } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { DataClientService } from '../../core/services/data-client.service';
 import { Ticket } from '../../features/proyectos/kanban/ticket.model';
@@ -159,6 +159,16 @@ export class NotificacionesService {
     return mapa;
   }
 
+  /** Máximo de tickets que reciben un aviso NUEVO en un mismo ciclo (ver
+   *  revisarSlaTickets) — ninguno se pierde: el que no alcance en este ciclo
+   *  lo agarra el siguiente (se llama cada 5 min, ver ShellComponent), solo
+   *  se reparte en el tiempo en vez de dispararse todo de golpe. */
+  private static readonly MAX_AVISOS_SLA_POR_CICLO = 100;
+
+  /** Cuántos tickets se marcan (`modificacion`, con sus notificaciones) en
+   *  paralelo dentro de un mismo ciclo — ver revisarSlaTickets. */
+  private static readonly CONCURRENCIA_AVISOS_SLA = 5;
+
   /**
    * Revisión periódica de SLA — cierra el hueco que dejaba el comentario de arriba:
    * hasta ahora NINGÚN ticket avisaba por SLA, pese a que el catálogo de Prioridades
@@ -178,28 +188,55 @@ export class NotificacionesService {
    * seguía llamándose en cada ciclo del intervalo de ShellComponent y mandaba
    * peticiones reales a la API con un token ya inválido, inundando la consola de
    * errores 401 sin parar.
+   *
+   * Dos cuidados de escala agregados tras una prueba de rendimiento con 200,000
+   * tickets (antes se traía la tabla Ticket COMPLETA sin filtro y se disparaba
+   * un PATCH/POST por cada ticket que calificaba, todo de golpe y sin límite —
+   * con pocos tickets no se notaba, pero con cientos de miles saturaba la red
+   * del navegador, `ERR_INSUFFICIENT_RESOURCES`, y terminaba tumbando la
+   * pestaña). Mismo resultado final, solo más barato de calcular y más sano
+   * de mandar:
+   *   1. Antes de pedir los tickets, se filtra Ticket.ticketPrioridadId a solo
+   *      las prioridades que de verdad tienen vigenciaHoras configurada (con
+   *      IN, en el servidor) — exactamente el mismo descarte que antes hacía
+   *      `!prioridad?.vigenciaHoras` adentro del for, nomás que ahora nunca
+   *      se trae ni se recorre en el navegador lo que de todos modos iba a
+   *      descartarse.
+   *   2. Los avisos NUEVOS que sí califican se procesan de a
+   *      CONCURRENCIA_AVISOS_SLA a la vez (en vez de todos simultáneos), y se
+   *      acota a MAX_AVISOS_SLA_POR_CICLO por corrida — lo que sobre lo
+   *      recoge el siguiente ciclo (cada 5 min), nunca se pierde un aviso.
    */
   async revisarSlaTickets(): Promise<void> {
     if (!this.auth.usuarioActual()?.id) return;
     try {
-      const [tickets, prioridades, avisosExtra, columnas] = await Promise.all([
-        firstValueFrom(this.data.list<Ticket>('Ticket')),
+      const [prioridades, avisosExtra, columnas] = await Promise.all([
         firstValueFrom(this.data.list<TicketPrioridad>('TicketPrioridad')),
         firstValueFrom(this.data.list<TicketPrioridadNotificar>('TicketPrioridadNotificar')),
         firstValueFrom(this.data.list<TableroColumna>('TableroColumna')),
       ]);
+      const prioridadesConVigencia = prioridades.filter((p) => !!p.vigenciaHoras);
+      if (prioridadesConVigencia.length === 0) return; // nada que revisar — ningún ticket puede calificar
+
+      const tickets = await firstValueFrom(
+        this.data.list<Ticket>('Ticket', {
+          ticketPrioridadId: prioridadesConVigencia.map((p) => Number(p.id)),
+        }),
+      );
       const ultimaColumna = this.ultimaColumnaPorProyecto(columnas);
       const ahora = Date.now();
 
+      type Candidato = { ticket: Ticket; nivel: 'warning' | 'expired'; destinatarios: Set<number> };
+      const candidatos: Candidato[] = [];
       for (const ticket of tickets) {
         if (ticket.activo === false) continue;
         if (ultimaColumna.get(Number(ticket.proyectoId)) === Number(ticket.tableroColumnaId)) continue; // ya resuelto
 
-        const prioridad = prioridades.find((p) => Number(p.id) === Number(ticket.ticketPrioridadId));
-        if (!prioridad?.vigenciaHoras || !ticket.fechaCreacion) continue;
+        const prioridad = prioridadesConVigencia.find((p) => Number(p.id) === Number(ticket.ticketPrioridadId));
+        if (!prioridad || !ticket.fechaCreacion) continue;
 
         const creado = new Date(ticket.fechaCreacion).getTime();
-        const deadline = creado + prioridad.vigenciaHoras * 3600000;
+        const deadline = creado + prioridad.vigenciaHoras! * 3600000;
         const warnAt = deadline - (prioridad.avisoHoras || 0) * 3600000;
 
         let nivel: 'warning' | 'expired' | null = null;
@@ -213,19 +250,32 @@ export class NotificacionesService {
           if (Number(extra.ticketPrioridadId) === Number(prioridad.id)) destinatarios.add(Number(extra.usuarioId));
         }
 
-        const titulo =
-          nivel === 'expired'
-            ? `🔥 SLA vencido: #${ticket.numeroTicket} — ${ticket.titulo}`
-            : `⏰ SLA por vencer: #${ticket.numeroTicket} — ${ticket.titulo}`;
-        const link = `/proyectos/tablero?ticket=${ticket.id}`;
-        for (const usuarioId of destinatarios) {
-          this.notificar(usuarioId, titulo, link);
-        }
-
-        this.data.modificacion<Ticket>('Ticket', { ...ticket, slaAvisoNivel: nivel }).subscribe({
-          error: (error) => console.warn('No se pudo marcar el aviso de SLA como enviado:', error),
-        });
+        candidatos.push({ ticket, nivel, destinatarios });
+        if (candidatos.length >= NotificacionesService.MAX_AVISOS_SLA_POR_CICLO) break;
       }
+      if (candidatos.length === 0) return;
+
+      await firstValueFrom(
+        from(candidatos).pipe(
+          mergeMap(({ ticket, nivel, destinatarios }) => {
+            const titulo =
+              nivel === 'expired'
+                ? `🔥 SLA vencido: #${ticket.numeroTicket} — ${ticket.titulo}`
+                : `⏰ SLA por vencer: #${ticket.numeroTicket} — ${ticket.titulo}`;
+            const link = `/proyectos/tablero?ticket=${ticket.id}`;
+            for (const usuarioId of destinatarios) {
+              this.notificar(usuarioId, titulo, link);
+            }
+            return this.data.modificacion<Ticket>('Ticket', { ...ticket, slaAvisoNivel: nivel }).pipe(
+              catchError((error) => {
+                console.warn('No se pudo marcar el aviso de SLA como enviado:', error);
+                return of(null);
+              }),
+            );
+          }, NotificacionesService.CONCURRENCIA_AVISOS_SLA),
+          toArray(),
+        ),
+      );
     } catch (error) {
       console.warn('No se pudo revisar el SLA de los tickets:', error);
     }
