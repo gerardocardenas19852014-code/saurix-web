@@ -107,7 +107,46 @@ export interface EmpresaTienda {
    *  pero no toma pedidos en línea. Default true (no cambia tiendas ya
    *  configuradas, ver catalogo-tienda.component.ts: modoVisual()). */
   aceptaPedidos: boolean;
+  // ── Modalidades de entrega (ver 43_tienda_modalidades_entrega.sql) ────
+  /** Apaga/prende TEMPORALMENTE el envío por distancia ya configurado
+   *  arriba (envioOrigenLat/envioPrecioKm, etc. — esos campos NO se
+   *  tocan al apagar esto, solo se deja de ofrecer la modalidad).
+   *  Default true: una tienda que ya usaba envío por distancia (p.ej. La
+   *  Reyna de los Bolis) sigue exactamente igual sin que el dueño toque
+   *  nada nuevo. */
+  envioPropioActivo: boolean;
+  /** Mínimo de SUBTOTAL de productos (antes del costo de envío) para
+   *  poder elegir "Envío del negocio" — null = sin mínimo específico
+   *  (distinto de pedidoMinimo, que aplica a CUALQUIER modalidad). */
+  envioPropioPedidoMinimo: number | null;
+  /** "Pasar a recoger en sucursal" — sin GPS, sin costo. */
+  recoleccionActiva: boolean;
+  /** Dirección en texto para mostrar en "Pasar a recoger" — no existía
+   *  ningún campo de dirección legible antes de esto (envioOrigenLat/Lng
+   *  son coordenadas, no texto). null = no se muestra la línea. */
+  direccionPublica: string | null;
+  /** "Envío por plataforma" (Uber/inDrive/etc.) — Saurix NO integra
+   *  ninguna API ni calcula tarifas, solo prepara la información
+   *  (ubicación/referencias) para que el negocio cotice el repartidor
+   *  aparte. Tiene 2 variantes independientes, ver abajo. */
+  envioPlataformaActivo: boolean;
+  /** Variante A: el negocio recibe el pedido, cotiza el repartidor y
+   *  confirma el costo con el cliente antes de solicitarlo. */
+  envioPlataformaNegocioSolicita: boolean;
+  /** Variante B: el cliente solicitará y pagará su propio repartidor —
+   *  la tienda solo le avisa cuándo está listo para recoger. */
+  envioPlataformaClienteSolicita: boolean;
 }
+
+/** Las 3 modalidades grandes que el cliente elige en el paso "Entrega"
+ *  (ver catalogo-tienda.component.ts: modalidadEntrega()). Cuando es
+ *  'plataforma' y la empresa ofrece las 2 variantes, hay una elección
+ *  secundaria (ver VariantePlataformaTienda, abajo). */
+export type ModalidadEntregaTienda = 'envio_propio' | 'recoleccion' | 'plataforma';
+
+/** Sub-elección dentro de 'plataforma' — cuál de las 2 variantes
+ *  configurables usa este pedido en concreto. */
+export type VariantePlataformaTienda = 'negocio' | 'cliente';
 
 export interface TiendaDetalle {
   empresa: EmpresaTienda;
@@ -126,6 +165,11 @@ export interface LineaCarritoTienda {
   productoId: number;
   nombreProducto: string;
   precioBase: number;
+  /** Para la miniatura en el panel del carrito — null si el producto no
+   *  tiene foto (se usa el mismo placeholder que en la tarjeta). Un
+   *  carrito guardado de ANTES de este campo (localStorage, "volver a
+   *  pedir") simplemente no lo trae — se trata como null, no rompe nada. */
+  fotoProducto: string | null;
   /** Cada valor elegido, de cualquier grupo, ya "aplanado" — para el
    *  mensaje y para sumar el total. */
   opcionesElegidas: { grupoNombre: string; valorNombre: string; precioAdicional: number }[];

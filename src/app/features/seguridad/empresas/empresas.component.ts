@@ -99,6 +99,23 @@ export interface Empresa {
   envioMinimo?: number | null;
   /** Radio de entrega; null = sin límite (no bloquea, solo advierte). */
   envioDistanciaMaximaKm?: number | null;
+  // ── Modalidades de entrega (ver 43_tienda_modalidades_entrega.sql) ──
+  /** Apaga/prende TEMPORALMENTE el envío de arriba (no borra su config). */
+  envioPropioActivo?: boolean;
+  /** Mínimo de subtotal para poder elegir "Envío del negocio"; null = sin mínimo. */
+  envioPropioPedidoMinimo?: number | null;
+  /** "Pasar a recoger en sucursal" — sin GPS, sin costo. */
+  recoleccionActiva?: boolean;
+  /** Dirección en texto para mostrar en "Pasar a recoger"; null = no se muestra. */
+  direccionPublica?: string | null;
+  /** "Envío por plataforma" (Uber/inDrive/etc.) — Saurix no integra ninguna
+   *  API ni calcula tarifas, solo prepara la información para que el
+   *  negocio cotice el repartidor aparte. */
+  envioPlataformaActivo?: boolean;
+  /** Variante A: el negocio cotiza y solicita el repartidor. */
+  envioPlataformaNegocioSolicita?: boolean;
+  /** Variante B: el cliente solicita y paga su propio repartidor. */
+  envioPlataformaClienteSolicita?: boolean;
 }
 
 /**
@@ -225,6 +242,14 @@ export class EmpresasComponent implements OnInit, OnDestroy {
     envioPrecioKm: this.fb.control<number | null>(null, [Validators.min(0)]),
     envioMinimo: this.fb.control<number | null>(null, [Validators.min(0)]),
     envioDistanciaMaximaKm: this.fb.control<number | null>(null, [Validators.min(0)]),
+    // ── Modalidades de entrega ──────────────────────────────────────
+    envioPropioActivo: [true],
+    envioPropioPedidoMinimo: this.fb.control<number | null>(null, [Validators.min(0)]),
+    recoleccionActiva: [false],
+    direccionPublica: ['', [Validators.maxLength(200)]],
+    envioPlataformaActivo: [false],
+    envioPlataformaNegocioSolicita: [true],
+    envioPlataformaClienteSolicita: [false],
   });
 
   // ── Logo de la tienda pública (mismo patrón que fotoActual en productos.component.ts) ──
@@ -296,6 +321,13 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       envioPrecioKm: null,
       envioMinimo: null,
       envioDistanciaMaximaKm: null,
+      envioPropioActivo: true,
+      envioPropioPedidoMinimo: null,
+      recoleccionActiva: false,
+      direccionPublica: '',
+      envioPlataformaActivo: false,
+      envioPlataformaNegocioSolicita: true,
+      envioPlataformaClienteSolicita: false,
     });
     this.logoActual.set('');
     this.logoAmpliado.set(false);
@@ -331,6 +363,13 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       envioPrecioKm: empresa.envioPrecioKm ?? null,
       envioMinimo: empresa.envioMinimo ?? null,
       envioDistanciaMaximaKm: empresa.envioDistanciaMaximaKm ?? null,
+      envioPropioActivo: empresa.envioPropioActivo ?? true,
+      envioPropioPedidoMinimo: empresa.envioPropioPedidoMinimo ?? null,
+      recoleccionActiva: empresa.recoleccionActiva ?? false,
+      direccionPublica: empresa.direccionPublica ?? '',
+      envioPlataformaActivo: empresa.envioPlataformaActivo ?? false,
+      envioPlataformaNegocioSolicita: empresa.envioPlataformaNegocioSolicita ?? true,
+      envioPlataformaClienteSolicita: empresa.envioPlataformaClienteSolicita ?? false,
     });
     this.errorUbicacionEnvio.set(null);
     this.logoActual.set(empresa.logoPublico ?? '');
@@ -412,6 +451,13 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       envioPrecioKm: valor.envioPrecioKm,
       envioMinimo: valor.envioMinimo,
       envioDistanciaMaximaKm: valor.envioDistanciaMaximaKm,
+      envioPropioActivo: valor.envioPropioActivo,
+      envioPropioPedidoMinimo: valor.envioPropioPedidoMinimo,
+      recoleccionActiva: valor.recoleccionActiva,
+      direccionPublica: valor.direccionPublica.trim() || null,
+      envioPlataformaActivo: valor.envioPlataformaActivo,
+      envioPlataformaNegocioSolicita: valor.envioPlataformaNegocioSolicita,
+      envioPlataformaClienteSolicita: valor.envioPlataformaClienteSolicita,
     };
     const peticion = edicion
       ? this.data.modificacion<Empresa>('Empresa', {

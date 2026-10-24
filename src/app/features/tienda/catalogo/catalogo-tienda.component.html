@@ -62,6 +62,12 @@
         {{ horario.abierto ? '🟢' : '🔴' }} {{ horario.texto }}
       </p>
     }
+    <!-- Qué modalidades de entrega hay, ANTES de armar el pedido — el
+         cliente no debe esperar hasta el final para enterarse de que una
+         no está disponible (ver resumenModalidades() en el .ts). -->
+    @if (resumenModalidades(); as resumen) {
+      <p class="tienda-modalidades-resumen">{{ resumen }}</p>
+    }
     @if (d.empresa.metodosPago.length > 0) {
       <div class="tienda-metodos-pago">
         <span class="tienda-metodos-pago-etiqueta">Formas de pago:</span>
@@ -96,7 +102,7 @@
                  en el .ts), pero la presentación es la misma en los 2 modos. -->
             <div class="tienda-destacado-tarjeta" (click)="abrirModal(producto)">
               @if (producto.foto; as foto) {
-                <img class="tienda-destacado-foto" [src]="foto" [alt]="producto.nombre" />
+                <img class="tienda-destacado-foto" [src]="foto" [alt]="producto.nombre" loading="lazy" />
               } @else {
                 <div class="tienda-destacado-foto tienda-destacado-foto-vacia">📦</div>
               }
@@ -133,6 +139,24 @@
       <button type="button" [class.activo]="agruparPorPrecio()" (click)="cambiarAgrupacion(true)">Precio</button>
     </div>
 
+    <!-- Chips de categoría — fila horizontal con scroll lateral en celular
+         (ver .tienda-categorias-chips en el .scss); filtran ADEMÁS de la
+         búsqueda y funcionan igual si se agrupa por categoría o por precio
+         (ver productosVisibles() en el .ts). Solo se muestran si hay más
+         de una categoría entre lo que ya pasó el filtro de búsqueda. -->
+    @if (categoriasDisponibles().length > 1) {
+      <div class="tienda-categorias-chips" role="group" aria-label="Filtrar por categoría">
+        <button type="button" class="tienda-chip" [class.activo]="categoriaActiva() === null" (click)="elegirCategoria(null)">
+          Todas
+        </button>
+        @for (cat of categoriasDisponibles(); track cat.id) {
+          <button type="button" class="tienda-chip" [class.activo]="categoriaActiva() === cat.id" (click)="elegirCategoria(cat.id)">
+            {{ cat.nombre }}
+          </button>
+        }
+      </div>
+    }
+
     @for (grupo of gruposProductos(); track grupo.clave) {
       <section class="tienda-categoria">
         <h2 class="tienda-categoria-titulo"><span class="tienda-categoria-titulo-texto">{{ grupo.titulo }}</span></h2>
@@ -151,7 +175,7 @@
                     aria-label="Ver imagen grande de {{ producto.nombre }}"
                     (click)="ampliarImagen(foto)"
                   >
-                    <img class="tienda-tarjeta-foto" [src]="foto" [alt]="producto.nombre" />
+                    <img class="tienda-tarjeta-foto" [src]="foto" [alt]="producto.nombre" loading="lazy" />
                     <span class="tienda-tarjeta-foto-ampliar" aria-hidden="true">🔍</span>
                   </button>
                 } @else {
@@ -282,22 +306,34 @@
     </p>
   </div>
 
-  <!-- ── Barra inferior fija (estilo "Ir a pagar" de apps de pedidos): se
-       queda SIEMPRE visible mientras haya algo en el carrito, para que el
-       cliente pueda seguir viendo el catálogo y abrir su pedido cuando
-       quiera, sin que "Agregar" lo saque de la pantalla — ver el comentario
-       en agregarLineaAlCarrito(). Se oculta solo mientras el panel ya está
-       abierto, para no duplicar el mismo total en pantalla. ── -->
-  @if (!modoVisual() && cantidadArticulos() > 0 && !carritoAbierto()) {
-    <div class="tienda-barra-inferior">
-      <div class="tienda-barra-inferior-info">
-        <span class="tienda-barra-inferior-cantidad">{{ cantidadArticulos() }} artículo{{ cantidadArticulos() === 1 ? '' : 's' }}</span>
-        <strong>${{ totalCarrito().toFixed(2) }}</strong>
-      </div>
-      <button type="button" class="tienda-barra-inferior-boton" (click)="carritoAbierto.set(true)">
-        Ver pedido
+  <!-- ── Barra inferior fija discreta: Inicio | Productos | Carrito —
+       siempre visible (en los 2 modos; "Carrito" solo si acepta pedidos),
+       nunca tapa contenido porque el catálogo ya trae su propio espacio
+       reservado abajo (ver padding-bottom en .tienda-catalogo del .scss).
+       Se esconde nomás mientras otro panel/modal ya ocupa la pantalla —
+       ver ocultarNavInferior() en el .ts. ── -->
+  @if (!ocultarNavInferior()) {
+    <nav class="tienda-nav-inferior" aria-label="Navegación de la tienda">
+      <button type="button" class="tienda-nav-inferior-boton" (click)="irAInicio()">
+        <span class="tienda-nav-inferior-icono" aria-hidden="true">🏠</span>
+        <span>Inicio</span>
       </button>
-    </div>
+      <button type="button" class="tienda-nav-inferior-boton" (click)="irAProductos()">
+        <span class="tienda-nav-inferior-icono" aria-hidden="true">🛍️</span>
+        <span>Productos</span>
+      </button>
+      @if (!modoVisual()) {
+        <button type="button" class="tienda-nav-inferior-boton" [class.tienda-nav-inferior-boton-pulso]="pulsoCarrito()" (click)="carritoAbierto.set(true)">
+          <span class="tienda-nav-inferior-icono tienda-nav-inferior-icono-carrito" aria-hidden="true">
+            🛒
+            @if (cantidadArticulos() > 0) {
+              <span class="tienda-nav-inferior-badge">{{ cantidadArticulos() }}</span>
+            }
+          </span>
+          <span>Carrito</span>
+        </button>
+      }
+    </nav>
   }
 
   <!-- ── Panel del carrito: NO bloquea el catálogo — el cliente debe poder
@@ -313,11 +349,27 @@
         </div>
 
         @if (carrito().length === 0) {
-          <p class="tienda-estado">Tu carrito está vacío.</p>
+          <!-- Estado vacío amigable — con una acción directa para volver al
+               catálogo (cierra el panel; el catálogo ya estaba debajo, no
+               hace falta navegar a ningún lado). -->
+          <div class="tienda-carrito-vacio">
+            <span class="tienda-carrito-vacio-icono" aria-hidden="true">🛒</span>
+            <p class="tienda-carrito-vacio-titulo">Tu carrito está vacío</p>
+            <p class="tienda-carrito-vacio-texto">Agrega tus productos favoritos para comenzar tu pedido.</p>
+            <button type="button" class="tienda-ubicacion-boton" (click)="carritoAbierto.set(false)">Ver productos</button>
+          </div>
         } @else {
           <div class="tienda-carrito-lineas">
             @for (linea of carrito(); track linea.claveLinea) {
               <div class="tienda-carrito-linea">
+                <!-- Miniatura — ver fotoProducto en LineaCarritoTienda; un
+                     carrito guardado de antes de este campo (localStorage)
+                     no lo trae y cae en el placeholder, sin romper nada. -->
+                @if (linea.fotoProducto; as foto) {
+                  <img class="tienda-carrito-linea-foto" [src]="foto" [alt]="linea.nombreProducto" loading="lazy" />
+                } @else {
+                  <div class="tienda-carrito-linea-foto tienda-carrito-linea-foto-vacia" aria-hidden="true">📦</div>
+                }
                 <div class="tienda-carrito-linea-info">
                   <strong>{{ linea.nombreProducto }}</strong>
                   @for (o of linea.opcionesElegidas; track o.valorNombre) {
@@ -347,10 +399,13 @@
               Te faltan ${{ faltaParaMinimo().toFixed(2) }} para llegar al pedido mínimo de ${{ pedidoMinimo()!.toFixed(2) }}.
             </p>
           }
-          <button type="button" class="tienda-enviar-boton" [disabled]="!cumpleMinimo()" (click)="abrirEnvio()">Enviar pedido</button>
+          <button type="button" class="tienda-enviar-boton tienda-enviar-boton-continuar" [disabled]="!cumpleMinimo()" (click)="abrirEnvio()">
+            Continuar pedido →
+          </button>
           <p class="tienda-nota-manual">
-            Al enviar, se abre WhatsApp o tu correo con el pedido ya armado — {{ d.empresa.nombre }} lo recibe,
-            lo confirma contigo y lo captura por su cuenta. Esto no hace ningún cobro ni reserva de stock.
+            Al enviar, se abre WhatsApp con el pedido ya armado para que {{ d.empresa.nombre }} lo reciba. El pedido
+            queda sujeto a confirmación de disponibilidad por parte del negocio — esto no hace ningún cobro ni
+            reserva de stock.
           </p>
         }
       </aside>
@@ -422,95 +477,397 @@
   }
 
   <!-- ── Modal: datos del cliente antes de enviar ── -->
+  <!-- ── Modal: 3 pasos visuales (datos → entrega → revisar) sobre el
+       MISMO form/lógica de siempre — ver pasoModal() en el .ts. El panel
+       del carrito (arriba) es, en los hechos, el paso implícito "1. Tu
+       pedido"; este modal cubre los pasos 2 a 4 del pedido por WhatsApp. ── -->
   @if (modalEnviarAbierto()) {
     <div class="tienda-overlay" (click)="modalEnviarAbierto.set(false)">
       <form class="tienda-modal" [formGroup]="formCliente" (click)="$event.stopPropagation()" (ngSubmit)="enviarPorWhatsapp()">
         <div class="tienda-modal-header">
-          <h3>Tus datos</h3>
+          <h3>
+            @switch (pasoModal()) {
+              @case ('datos') { Tus datos }
+              @case ('entrega') { Entrega y ubicación }
+              @default { Revisa tu pedido }
+            }
+          </h3>
           <button type="button" class="tienda-cerrar" (click)="modalEnviarAbierto.set(false)">✕</button>
         </div>
 
-        <label class="tienda-campo">
-          Tu nombre
-          <input type="text" formControlName="nombre" placeholder="¿Cómo te llamas?" />
-        </label>
-        <label class="tienda-campo">
-          Tu teléfono
-          <input type="tel" formControlName="telefono" placeholder="Para que te contacten" />
-        </label>
-        <label class="tienda-campo">
-          Nota especial (opcional)
-          <textarea
-            formControlName="notas"
-            rows="2"
-            placeholder="Ej. sin cebolla, tocar el timbre 2 veces…"
-          ></textarea>
-        </label>
-
-        <div class="tienda-campo">
-          <span>Dirección</span>
-          @if (ubicacion()) {
-            <div class="tienda-ubicacion-lista">
-              <span>📍 Ubicación compartida</span>
-              <button type="button" (click)="quitarUbicacion()">Quitar</button>
-            </div>
-            @if (envioInfo(); as envio) {
-              <p class="tienda-envio-info" [class.tienda-envio-fuera-zona]="envio.fueraDeZona">
-                🚚 Envío estimado: ${{ envio.costo.toFixed(2) }} ({{ envio.km.toFixed(1) }} km)
-                @if (envio.fueraDeZona) {
-                  <br />⚠️ Estás fuera del radio de entrega habitual — confirma con el negocio.
-                }
-              </p>
-            }
-          } @else {
-            <button
-              type="button"
-              class="tienda-ubicacion-boton"
-              [disabled]="obteniendoUbicacion()"
-              (click)="compartirUbicacion()"
-            >
-              {{ obteniendoUbicacion() ? 'Obteniendo ubicación…' : '📍 Activar GPS y enviar mi ubicación' }}
-            </button>
-            @if (ubicacionError(); as err) {
-              <p class="tienda-ubicacion-error">{{ err }}</p>
-            }
-          }
+        <!-- Indicador de pasos — avisa SIEMPRE en qué paso va el cliente. -->
+        <div class="tienda-pasos" aria-hidden="true">
+          <span class="tienda-paso" [class.tienda-paso-activo]="pasoModal() === 'datos'" [class.tienda-paso-hecho]="pasoModal() !== 'datos'">1. Tus datos</span>
+          <span class="tienda-paso" [class.tienda-paso-activo]="pasoModal() === 'entrega'" [class.tienda-paso-hecho]="pasoModal() === 'revisar'">2. Entrega</span>
+          <span class="tienda-paso" [class.tienda-paso-activo]="pasoModal() === 'revisar'">3. Revisar</span>
         </div>
 
-        <!-- Resumen del pedido — para que el cliente lo revise ANTES de que se
-             abra WhatsApp (evita errores de dedo: producto equivocado,
-             cantidad de más, etc.). Mismos datos que arma construirMensaje(),
-             nomás en lista en vez de texto plano. -->
-        <div class="tienda-campo tienda-resumen">
-          <span>Revisa tu pedido</span>
-          <div class="tienda-resumen-lineas">
-            @for (linea of carrito(); track linea.claveLinea) {
-              <div class="tienda-resumen-linea">
-                <span>{{ linea.cantidad }}&times; {{ linea.nombreProducto }}</span>
-                <span>${{ subtotalLinea(linea).toFixed(2) }}</span>
+        @if (pasoModal() === 'datos') {
+          <label class="tienda-campo">
+            Tu nombre
+            <input type="text" formControlName="nombre" placeholder="¿Cómo te llamas?" />
+          </label>
+          <label class="tienda-campo">
+            Tu teléfono
+            <input type="tel" formControlName="telefono" placeholder="Para que te contacten" />
+          </label>
+        }
+
+        @if (pasoModal() === 'entrega') {
+          @if (modalidadesDisponibles().length > 1) {
+            <div class="tienda-campo">
+              <span>¿Cómo quieres tu pedido?</span>
+              <div class="tienda-modalidades-tarjetas">
+                @if (envioPropioDisponible()) {
+                  <button
+                    type="button"
+                    class="tienda-modalidad-tarjeta"
+                    [class.tienda-modalidad-activa]="modalidadEntrega() === 'envio_propio'"
+                    (click)="elegirModalidadEntrega('envio_propio')"
+                  >
+                    <span class="tienda-modalidad-icono" aria-hidden="true">🛵</span>
+                    <strong>Envío del negocio</strong>
+                    <span>Te lo llevamos a tu domicilio</span>
+                  </button>
+                }
+                @if (recoleccionDisponible()) {
+                  <button
+                    type="button"
+                    class="tienda-modalidad-tarjeta"
+                    [class.tienda-modalidad-activa]="modalidadEntrega() === 'recoleccion'"
+                    (click)="elegirModalidadEntrega('recoleccion')"
+                  >
+                    <span class="tienda-modalidad-icono" aria-hidden="true">🏪</span>
+                    <strong>Pasar a recoger</strong>
+                    <span>Recoges tú mismo en la sucursal</span>
+                  </button>
+                }
+                @if (plataformaDisponible()) {
+                  <button
+                    type="button"
+                    class="tienda-modalidad-tarjeta"
+                    [class.tienda-modalidad-activa]="modalidadEntrega() === 'plataforma'"
+                    (click)="elegirModalidadEntrega('plataforma')"
+                  >
+                    <span class="tienda-modalidad-icono" aria-hidden="true">🚗</span>
+                    <strong>Envío por plataforma</strong>
+                    <span>Pides tú o pedimos nosotros un repartidor</span>
+                  </button>
+                }
               </div>
-              @for (o of linea.opcionesElegidas; track o.valorNombre) {
-                <span class="tienda-resumen-opcion">{{ o.grupoNombre }}: {{ o.valorNombre }}</span>
+            </div>
+          }
+
+          @if (
+            modalidadEntrega() === 'plataforma' &&
+            d.empresa.envioPlataformaNegocioSolicita &&
+            d.empresa.envioPlataformaClienteSolicita
+          ) {
+            <div class="tienda-campo">
+              <span>¿Quién solicita al repartidor?</span>
+              <div class="tienda-modalidades-tarjetas tienda-modalidades-tarjetas-variante">
+                <button
+                  type="button"
+                  class="tienda-modalidad-tarjeta"
+                  [class.tienda-modalidad-activa]="variantePlataforma() === 'negocio'"
+                  (click)="elegirVariantePlataforma('negocio')"
+                >
+                  <strong>🚗 Nosotros solicitamos el repartidor</strong>
+                  <span>Te cotizamos y confirmamos el costo antes de pedirlo</span>
+                </button>
+                <button
+                  type="button"
+                  class="tienda-modalidad-tarjeta"
+                  [class.tienda-modalidad-activa]="variantePlataforma() === 'cliente'"
+                  (click)="elegirVariantePlataforma('cliente')"
+                >
+                  <strong>🚗 Yo enviaré a mi repartidor</strong>
+                  <span>Tú gestionas y pagas tu propio transporte</span>
+                </button>
+              </div>
+            </div>
+          }
+
+          @if (modalidadEntrega() === 'envio_propio' || (modalidadesDisponibles().length === 0 && !modalidadEntrega())) {
+            @if (envioPropioPedidoMinimo(); as minimo) {
+              @if (envioPropioFaltaMinimo() > 0) {
+                <p class="tienda-envio-aviso tienda-envio-aviso-bloqueo">
+                  🛵 Te faltan ${{ envioPropioFaltaMinimo().toFixed(2) }} para el pedido mínimo de envío a domicilio
+                  (${{ minimo.toFixed(2) }}).
+                  @if (modalidadesDisponibles().length > 1) {
+                    Puedes seguir agregando productos o elegir otra forma de entrega arriba.
+                  } @else {
+                    Puedes seguir agregando productos al carrito.
+                  }
+                </p>
+              }
+            }
+            <div class="tienda-campo">
+              <span>Dirección</span>
+              @if (ubicacion()) {
+                <div class="tienda-ubicacion-lista">
+                  <span>✓ Ubicación agregada</span>
+                  <button type="button" (click)="quitarUbicacion()">Quitar</button>
+                </div>
+                @if (envioInfo(); as envio) {
+                  <p class="tienda-envio-info" [class.tienda-envio-fuera-zona]="envio.fueraDeZona">
+                    🚚 Envío estimado: ${{ envio.costo.toFixed(2) }} ({{ envio.km.toFixed(1) }} km)
+                    @if (envio.fueraDeZona) {
+                      <br />⚠️ Estás fuera del radio de entrega habitual — confirma con el negocio.
+                    }
+                  </p>
+                  @if (envio.fueraDeZona && modalidadesDisponibles().length > 1) {
+                    <p class="tienda-envio-aviso tienda-envio-aviso-bloqueo">
+                      📍 Estás fuera de nuestra zona de entrega propia. Puedes elegir "Pasar a recoger" o "Envío por
+                      plataforma" arriba sin perder tu pedido.
+                    </p>
+                  }
+                }
+              } @else {
+                <button
+                  type="button"
+                  class="tienda-ubicacion-boton tienda-ubicacion-boton-destacado"
+                  [disabled]="obteniendoUbicacion()"
+                  (click)="compartirUbicacion()"
+                >
+                  {{ obteniendoUbicacion() ? 'Obteniendo ubicación…' : '📍 Usar mi ubicación' }}
+                </button>
+                @if (ubicacionError(); as err) {
+                  <p class="tienda-ubicacion-error">
+                    {{ err }} Puedes describir tu dirección en "Referencias" y continuar sin GPS.
+                  </p>
+                }
+              }
+            </div>
+            <label class="tienda-campo">
+              Referencias / nota especial (opcional)
+              <textarea
+                formControlName="notas"
+                rows="2"
+                placeholder="Ej. casa azul junto a la tienda, sin cebolla, tocar el timbre 2 veces…"
+              ></textarea>
+            </label>
+          } @else if (modalidadEntrega() === 'recoleccion') {
+            <div class="tienda-campo tienda-recoleccion-info">
+              <span>🏪 Recoger en:</span>
+              <p class="tienda-resumen-dato"><strong>{{ d.empresa.nombre }}</strong></p>
+              @if (d.empresa.direccionPublica) {
+                <p class="tienda-resumen-dato">{{ d.empresa.direccionPublica }}</p>
+              }
+              @if (estadoHorario(); as horario) {
+                <p class="tienda-resumen-dato">{{ horario.texto }}</p>
+              }
+              <p class="tienda-resumen-dato tienda-recoleccion-gratis">Recolección: GRATIS</p>
+            </div>
+            <label class="tienda-campo">
+              Nota para tu pedido (opcional)
+              <textarea formControlName="notas" rows="2" placeholder="Ej. paso por la tarde, sin cebolla…"></textarea>
+            </label>
+          } @else if (modalidadEntrega() === 'plataforma' && variantePlataforma() === 'negocio') {
+            <p class="tienda-envio-aviso">
+              🚗 El costo del repartidor se cotiza por separado y se confirma antes de solicitar el servicio.
+            </p>
+            <div class="tienda-campo">
+              <span>Dirección</span>
+              @if (ubicacion()) {
+                <div class="tienda-ubicacion-lista">
+                  <span>✓ Ubicación agregada</span>
+                  <button type="button" (click)="quitarUbicacion()">Quitar</button>
+                </div>
+              } @else {
+                <button
+                  type="button"
+                  class="tienda-ubicacion-boton tienda-ubicacion-boton-destacado"
+                  [disabled]="obteniendoUbicacion()"
+                  (click)="compartirUbicacion()"
+                >
+                  {{ obteniendoUbicacion() ? 'Obteniendo ubicación…' : '📍 Usar mi ubicación' }}
+                </button>
+                @if (ubicacionError(); as err) {
+                  <p class="tienda-ubicacion-error">
+                    {{ err }} Puedes describir tu dirección en "Referencias" y continuar sin GPS.
+                  </p>
+                }
+              }
+            </div>
+            <label class="tienda-campo">
+              Referencias / nota especial (opcional)
+              <textarea
+                formControlName="notas"
+                rows="2"
+                placeholder="Ej. casa azul junto a la tienda, sin cebolla, tocar el timbre 2 veces…"
+              ></textarea>
+            </label>
+          } @else if (modalidadEntrega() === 'plataforma' && variantePlataforma() === 'cliente') {
+            <div class="tienda-campo tienda-recoleccion-info">
+              <span>🚗 Envío gestionado por ti</span>
+              <p class="tienda-resumen-dato">
+                Te avisaremos cuando tu pedido esté listo para que solicites tu propio repartidor.
+              </p>
+              <p class="tienda-resumen-dato"><strong>{{ d.empresa.nombre }}</strong></p>
+              @if (d.empresa.direccionPublica) {
+                <p class="tienda-resumen-dato">{{ d.empresa.direccionPublica }}</p>
+              }
+            </div>
+            <label class="tienda-campo">
+              Nota para tu pedido (opcional)
+              <textarea formControlName="notas" rows="2" placeholder="Ej. avisar al llegar…"></textarea>
+            </label>
+          }
+        }
+
+        @if (pasoModal() === 'revisar') {
+          <!-- Resumen del pedido — para que el cliente lo revise ANTES de que se
+               abra WhatsApp (evita errores de dedo: producto equivocado,
+               cantidad de más, etc.). Mismos datos que arma construirMensaje(),
+               nomás en lista en vez de texto plano. El contenido de entrega varía
+               según la modalidad elegida (ver modalidadEntrega() en el .ts); si no
+               hay ninguna modalidad configurada se mantiene el formato original. -->
+          <div class="tienda-campo tienda-resumen">
+            <span>Productos</span>
+            <div class="tienda-resumen-lineas">
+              @for (linea of carrito(); track linea.claveLinea) {
+                <div class="tienda-resumen-linea">
+                  <span>{{ linea.cantidad }}&times; {{ linea.nombreProducto }}</span>
+                  <span>${{ subtotalLinea(linea).toFixed(2) }}</span>
+                </div>
+                @for (o of linea.opcionesElegidas; track o.valorNombre) {
+                  <span class="tienda-resumen-opcion">{{ o.grupoNombre }}: {{ o.valorNombre }}</span>
+                }
+              }
+            </div>
+
+            @if (modalidadEntrega() === 'recoleccion') {
+              <div class="tienda-resumen-linea">
+                <span>Sucursal</span>
+                <span>{{ d.empresa.nombre }}</span>
+              </div>
+              @if (d.empresa.direccionPublica) {
+                <div class="tienda-resumen-linea">
+                  <span>Dirección</span>
+                  <span>{{ d.empresa.direccionPublica }}</span>
+                </div>
+              }
+              <div class="tienda-resumen-linea">
+                <span>Subtotal</span>
+                <span>${{ totalCarrito().toFixed(2) }}</span>
+              </div>
+              <div class="tienda-resumen-linea">
+                <span>Recolección</span>
+                <span>GRATIS</span>
+              </div>
+              <div class="tienda-resumen-total">
+                <span>Total</span>
+                <strong>${{ totalCarrito().toFixed(2) }}</strong>
+              </div>
+              <p class="tienda-resumen-dato"><strong>Nombre:</strong> {{ formCliente.controls.nombre.value || '—' }}</p>
+              <p class="tienda-resumen-dato"><strong>Teléfono:</strong> {{ formCliente.controls.telefono.value || '—' }}</p>
+              @if (formCliente.controls.notas.value) {
+                <p class="tienda-resumen-dato"><strong>Notas:</strong> {{ formCliente.controls.notas.value }}</p>
+              }
+            } @else if (modalidadEntrega() === 'plataforma' && variantePlataforma() === 'negocio') {
+              <div class="tienda-resumen-linea">
+                <span>Entrega por plataforma</span>
+                <span>Pendiente de cotizar</span>
+              </div>
+              <div class="tienda-resumen-total">
+                <span>Total</span>
+                <strong>${{ totalCarrito().toFixed(2) }}</strong>
+              </div>
+              <p class="tienda-resumen-dato tienda-envio-aviso">
+                El costo del repartidor se confirmará por WhatsApp antes de solicitar el servicio.
+              </p>
+              <p class="tienda-resumen-dato"><strong>Nombre:</strong> {{ formCliente.controls.nombre.value || '—' }}</p>
+              <p class="tienda-resumen-dato"><strong>Teléfono:</strong> {{ formCliente.controls.telefono.value || '—' }}</p>
+              <p class="tienda-resumen-dato">
+                <strong>Ubicación:</strong> {{ ubicacion() ? '✓ Agregada' : 'No se compartió' }}
+              </p>
+              @if (formCliente.controls.notas.value) {
+                <p class="tienda-resumen-dato"><strong>Referencias:</strong> {{ formCliente.controls.notas.value }}</p>
+              }
+            } @else if (modalidadEntrega() === 'plataforma' && variantePlataforma() === 'cliente') {
+              <div class="tienda-resumen-linea">
+                <span>Envío</span>
+                <span>Gestionado por el cliente</span>
+              </div>
+              <div class="tienda-resumen-total">
+                <span>Total</span>
+                <strong>${{ totalCarrito().toFixed(2) }}</strong>
+              </div>
+              <p class="tienda-resumen-dato"><strong>Recoger en:</strong> {{ d.empresa.nombre }}</p>
+              @if (d.empresa.direccionPublica) {
+                <p class="tienda-resumen-dato">{{ d.empresa.direccionPublica }}</p>
+              }
+              <p class="tienda-resumen-dato"><strong>Nombre:</strong> {{ formCliente.controls.nombre.value || '—' }}</p>
+              <p class="tienda-resumen-dato"><strong>Teléfono:</strong> {{ formCliente.controls.telefono.value || '—' }}</p>
+              @if (formCliente.controls.notas.value) {
+                <p class="tienda-resumen-dato"><strong>Notas:</strong> {{ formCliente.controls.notas.value }}</p>
+              }
+            } @else if (modalidadEntrega() === 'envio_propio') {
+              @if (envioInfo(); as envio) {
+                <div class="tienda-resumen-linea">
+                  <span>Subtotal</span>
+                  <span>${{ totalCarrito().toFixed(2) }}</span>
+                </div>
+                <div class="tienda-resumen-linea">
+                  <span>Envío ({{ envio.km.toFixed(1) }} km)</span>
+                  <span>${{ envio.costo.toFixed(2) }}</span>
+                </div>
+              }
+              <div class="tienda-resumen-total">
+                <span>Total</span>
+                <strong>${{ (envioInfo() ? totalConEnvio() : totalCarrito()).toFixed(2) }}</strong>
+              </div>
+              <p class="tienda-resumen-dato"><strong>Nombre:</strong> {{ formCliente.controls.nombre.value || '—' }}</p>
+              <p class="tienda-resumen-dato"><strong>Teléfono:</strong> {{ formCliente.controls.telefono.value || '—' }}</p>
+              <p class="tienda-resumen-dato">
+                <strong>Ubicación:</strong> {{ ubicacion() ? '✓ Agregada' : 'No se compartió' }}
+              </p>
+              @if (formCliente.controls.notas.value) {
+                <p class="tienda-resumen-dato"><strong>Referencias:</strong> {{ formCliente.controls.notas.value }}</p>
+              }
+            } @else {
+              @if (envioInfo(); as envio) {
+                <div class="tienda-resumen-linea">
+                  <span>Envío ({{ envio.km.toFixed(1) }} km)</span>
+                  <span>${{ envio.costo.toFixed(2) }}</span>
+                </div>
+              }
+              <div class="tienda-resumen-total">
+                <span>Total</span>
+                <strong>${{ (envioInfo() ? totalConEnvio() : totalCarrito()).toFixed(2) }}</strong>
+              </div>
+              <p class="tienda-resumen-dato"><strong>Nombre:</strong> {{ formCliente.controls.nombre.value || '—' }}</p>
+              <p class="tienda-resumen-dato"><strong>Teléfono:</strong> {{ formCliente.controls.telefono.value || '—' }}</p>
+              <p class="tienda-resumen-dato">
+                <strong>Ubicación:</strong> {{ ubicacion() ? '✓ Agregada' : 'No se compartió' }}
+              </p>
+              @if (formCliente.controls.notas.value) {
+                <p class="tienda-resumen-dato"><strong>Notas:</strong> {{ formCliente.controls.notas.value }}</p>
               }
             }
           </div>
-          @if (envioInfo(); as envio) {
-            <div class="tienda-resumen-linea">
-              <span>Envío ({{ envio.km.toFixed(1) }} km)</span>
-              <span>${{ envio.costo.toFixed(2) }}</span>
-            </div>
-          }
-          <div class="tienda-resumen-total">
-            <span>Total</span>
-            <strong>${{ (envioInfo() ? totalConEnvio() : totalCarrito()).toFixed(2) }}</strong>
-          </div>
-        </div>
+          <p class="tienda-nota-manual">
+            El pedido queda sujeto a confirmación de disponibilidad por parte del negocio — enviar por WhatsApp no
+            significa que ya fue aceptado.
+          </p>
+        }
 
         <div class="tienda-modal-footer tienda-modal-footer-envio">
-          @if (d.empresa.telefono) {
-            <button type="submit" class="tienda-enviar-boton">Enviar por WhatsApp</button>
-          } @else {
+          @if (!d.empresa.telefono) {
             <p class="tienda-estado">Esta tienda todavía no configuró un teléfono para recibir pedidos.</p>
+          } @else if (pasoModal() === 'datos') {
+            <button type="button" class="tienda-enviar-boton" (click)="siguientePasoDatos()">Siguiente →</button>
+          } @else if (pasoModal() === 'entrega') {
+            <div class="tienda-modal-footer-pasos">
+              <button type="button" class="tienda-paso-volver" (click)="pasoAnterior()">← Atrás</button>
+              <button type="button" class="tienda-enviar-boton" (click)="siguientePasoEntrega()">Siguiente →</button>
+            </div>
+          } @else {
+            <div class="tienda-modal-footer-pasos">
+              <button type="button" class="tienda-paso-volver" (click)="pasoAnterior()">← Atrás</button>
+              <button type="submit" class="tienda-enviar-boton">Enviar por WhatsApp</button>
+            </div>
           }
         </div>
       </form>
@@ -546,6 +903,13 @@
         <img [src]="url" alt="Imagen ampliada del producto" />
       </div>
     </div>
+  }
+
+  <!-- Mensaje "pedido listo" al mandar a WhatsApp — deja clarísimo que
+       enviar el mensaje NO es lo mismo que el negocio ya lo aceptó (ver
+       mostrarExitoEnvio() en enviarPorWhatsapp()); se apaga solo. -->
+  @if (mensajeExitoEnvio(); as mensaje) {
+    <div class="tienda-toast-exito" role="status">{{ mensaje }}</div>
   }
 
   <!-- Confeti al mandar el pedido por WhatsApp — puramente decorativo, no

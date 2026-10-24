@@ -4,7 +4,7 @@ import { DecimalPipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Meta, Title } from '@angular/platform-browser';
 import { TiendaPublicaService } from '../tienda-publica.service';
-import { EmpresaTienda, LineaCarritoTienda, ProductoTienda, TiendaDetalle } from '../tienda.model';
+import { EmpresaTienda, LineaCarritoTienda, ModalidadEntregaTienda, ProductoTienda, TiendaDetalle, VariantePlataformaTienda } from '../tienda.model';
 
 /** Selección en curso dentro del modal de un producto: por cada grupo de
  *  opciones, los id de valor marcados (radio = 1 elemento, checkbox =
@@ -91,7 +91,13 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
   protected readonly cantidadModal = signal(1);
 
   // ── Modal de "enviar pedido" (datos del cliente antes del WhatsApp/correo) ──
+  //    Internamente son 3 PASOS visuales (datos → entrega → revisar) sobre
+  //    el MISMO modal/form de siempre — no cambia nada de la lógica de
+  //    envío, solo el orden en que se muestran los campos (ver
+  //    siguientePaso()/pasoAnterior() más abajo). El panel del carrito
+  //    (más arriba en el HTML) funciona como el paso implícito "Tu pedido".
   protected readonly modalEnviarAbierto = signal(false);
+  protected readonly pasoModal = signal<'datos' | 'entrega' | 'revisar'>('datos');
   protected readonly formCliente = this.fb.nonNullable.group({
     nombre: ['', [Validators.required, Validators.maxLength(80)]],
     telefono: ['', [Validators.required, Validators.maxLength(30)]],
@@ -139,6 +145,16 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
     setTimeout(() => this.confetiVisible.set(false), 1800);
   }
 
+  // ── Mensaje de "pedido listo" justo al abrir WhatsApp — deja clarísimo
+  //    que mandar el mensaje NO equivale a que el negocio ya lo aceptó
+  //    (ver el texto exacto en enviarPorWhatsapp()). Se apaga solo. ──────
+  protected readonly mensajeExitoEnvio = signal<string | null>(null);
+
+  private mostrarExitoEnvio(texto: string): void {
+    this.mensajeExitoEnvio.set(texto);
+    setTimeout(() => this.mensajeExitoEnvio.set(null), 4500);
+  }
+
   protected readonly productosFiltrados = computed<ProductoTienda[]>(() => {
     const texto = this.busqueda().trim().toLowerCase();
     const productos = this.detalle()?.productos ?? [];
@@ -146,6 +162,39 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
     return productos.filter(
       (p) => p.nombre.toLowerCase().includes(texto) || (p.descripcion ?? '').toLowerCase().includes(texto),
     );
+  });
+
+  // ── Chips de categoría (arriba del catálogo) — null = "Todas". Un filtro
+  // MÁS sobre productosFiltrados() (la búsqueda), no lo reemplaza: se
+  // pueden combinar los dos. Si la categoría activa deja de existir (p.ej.
+  // la búsqueda ya no trae ningún producto de esa categoría), el filtro
+  // sigue aplicado pero simplemente no hay resultados — no se resetea solo,
+  // para no perder la selección del cliente mientras sigue escribiendo. ──
+  protected readonly categoriaActiva = signal<number | null>(null);
+
+  /** Lista de categorías con al menos un producto disponible para mostrar
+   *  como chips — se arma de los productos YA filtrados por búsqueda, para
+   *  que no aparezcan chips de categorías sin resultados mientras se busca. */
+  protected readonly categoriasDisponibles = computed<{ id: number; nombre: string }[]>(() => {
+    const vistas = new Map<number, string>();
+    for (const p of this.productosFiltrados()) {
+      if (!vistas.has(p.categoriaId)) vistas.set(p.categoriaId, p.categoriaNombre);
+    }
+    return [...vistas.entries()]
+      .map(([id, nombre]) => ({ id, nombre }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  });
+
+  protected elegirCategoria(id: number | null): void {
+    this.categoriaActiva.set(id);
+  }
+
+  /** productosFiltrados() + el chip de categoría — es lo que de verdad
+   *  alimenta gruposProductos() de abajo. */
+  protected readonly productosVisibles = computed<ProductoTienda[]>(() => {
+    const categoriaId = this.categoriaActiva();
+    const productos = this.productosFiltrados();
+    return categoriaId == null ? productos : productos.filter((p) => p.categoriaId === categoriaId);
   });
 
   /** true = "menú visual" (ver 42_tienda_catalogo_visual.sql): la empresa
@@ -176,7 +225,7 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
    *  por nombre (ver migración 29), así que basta con juntar consecutivos en
    *  el mismo grupo; por precio se ordenan aquí mismo de menor a mayor. */
   protected readonly gruposProductos = computed<{ clave: string; titulo: string; productos: ProductoTienda[] }[]>(() => {
-    const productos = this.productosFiltrados();
+    const productos = this.productosVisibles();
     const porPrecio = this.agruparPorPrecio();
     const ordenados = porPrecio
       ? [...productos].sort((a, b) => a.precio - b.precio || a.nombre.localeCompare(b.nombre))
@@ -288,6 +337,116 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
   /** Total del carrito + envío estimado (si aplica) — lo que de verdad se
    *  manda como "Total" en el mensaje de WhatsApp cuando hay envío. */
   protected readonly totalConEnvio = computed(() => this.totalCarrito() + (this.envioInfo()?.costo ?? 0));
+
+  // ── Modalidades de entrega (ver 43_tienda_modalidades_entrega.sql) ──────
+  //    Diseño a propósito "aditivo": si una tienda nunca configuró ninguna
+  //    de las 3 (modalidadesDisponibles() queda vacío — el caso de CASI
+  //    toda tienda existente hoy), el paso "Entrega" se ve y se comporta
+  //    EXACTO que antes de esta migración (ubicación opcional + notas, sin
+  //    tarjetas de elegir, sin bloqueos nuevos). Si configuró solo una
+  //    (p.ej. La Reyna de los Bolis, que ya traía envío por distancia), esa
+  //    única modalidad se autoselecciona en abrirEnvio() y tampoco ve
+  //    tarjetas — sigue siendo, en los hechos, el mismo flujo de un único
+  //    envío de siempre. Las tarjetas de elegir SOLO aparecen cuando de
+  //    verdad hay 2 o más modalidades entre las que escoger. ─────────────
+  protected readonly modalidadEntrega = signal<ModalidadEntregaTienda | null>(null);
+  protected readonly variantePlataforma = signal<VariantePlataformaTienda | null>(null);
+
+  protected readonly envioPropioDisponible = computed(() => {
+    const e = this.detalle()?.empresa;
+    return !!e && e.envioPropioActivo && e.envioOrigenLat != null && e.envioOrigenLng != null && !!e.envioPrecioKm;
+  });
+  protected readonly recoleccionDisponible = computed(() => !!this.detalle()?.empresa.recoleccionActiva);
+  protected readonly plataformaDisponible = computed(() => {
+    const e = this.detalle()?.empresa;
+    return !!e && e.envioPlataformaActivo && (e.envioPlataformaNegocioSolicita || e.envioPlataformaClienteSolicita);
+  });
+
+  protected readonly modalidadesDisponibles = computed<ModalidadEntregaTienda[]>(() => {
+    const lista: ModalidadEntregaTienda[] = [];
+    if (this.envioPropioDisponible()) lista.push('envio_propio');
+    if (this.recoleccionDisponible()) lista.push('recoleccion');
+    if (this.plataformaDisponible()) lista.push('plataforma');
+    return lista;
+  });
+
+  /** Aviso corto ANTES del checkout de qué modalidades hay (el cliente no
+   *  debe descubrirlo hasta el final) — null = tienda en modo visual o sin
+   *  ninguna modalidad nueva configurada (nada que avisar aparte). */
+  protected readonly resumenModalidades = computed(() => {
+    if (this.modoVisual()) return null;
+    const disponibles = this.modalidadesDisponibles();
+    if (disponibles.length === 0) return null;
+    const etiquetas: Record<ModalidadEntregaTienda, string> = {
+      envio_propio: '🛵 Envíos disponibles',
+      recoleccion: '🏪 Recolección disponible',
+      plataforma: '🚗 Envío por plataforma',
+    };
+    return disponibles.map((m) => etiquetas[m]).join(' · ');
+  });
+
+  /** Mínimo de SUBTOTAL (antes del envío) para poder elegir "Envío del
+   *  negocio" — distinto del pedidoMinimo general, que aplica siempre. */
+  protected readonly envioPropioPedidoMinimo = computed(() => this.detalle()?.empresa.envioPropioPedidoMinimo ?? null);
+  protected readonly envioPropioFaltaMinimo = computed(() => {
+    const minimo = this.envioPropioPedidoMinimo();
+    if (!minimo) return 0;
+    const falta = minimo - this.totalCarrito();
+    return falta > 0 ? falta : 0;
+  });
+
+  /** Reutiliza envioInfo().fueraDeZona (migración 33) tal cual — solo
+   *  cambia CÓMO se interpreta: ver puedeAvanzarEntrega() abajo. */
+  protected readonly envioPropioFueraDeZona = computed(() => this.envioInfo()?.fueraDeZona ?? false);
+
+  /** Costo que de verdad se suma al total — SOLO con "Envío del negocio"
+   *  elegido; recolección y plataforma nunca cobran envío aquí (el costo
+   *  del repartidor de plataforma se cotiza aparte, fuera del sistema). */
+  protected readonly costoEntrega = computed(() =>
+    this.modalidadEntrega() === 'envio_propio' ? (this.envioInfo()?.costo ?? 0) : 0,
+  );
+  protected readonly totalConEntrega = computed(() => this.totalCarrito() + this.costoEntrega());
+
+  protected elegirModalidadEntrega(modalidad: ModalidadEntregaTienda): void {
+    this.modalidadEntrega.set(modalidad);
+    if (modalidad !== 'plataforma') {
+      this.variantePlataforma.set(null);
+      return;
+    }
+    // Si la empresa solo activó una de las 2 variantes, se autoselecciona
+    // — el cliente no ve una elección de un solo botón.
+    const e = this.detalle()?.empresa;
+    if (e?.envioPlataformaNegocioSolicita && !e.envioPlataformaClienteSolicita) {
+      this.variantePlataforma.set('negocio');
+    } else if (!e?.envioPlataformaNegocioSolicita && e?.envioPlataformaClienteSolicita) {
+      this.variantePlataforma.set('cliente');
+    } else {
+      this.variantePlataforma.set(null);
+    }
+  }
+
+  protected elegirVariantePlataforma(variante: VariantePlataformaTienda): void {
+    this.variantePlataforma.set(variante);
+  }
+
+  /** Compuerta del botón "Siguiente" del paso Entrega. */
+  protected readonly puedeAvanzarEntrega = computed(() => {
+    const modalidad = this.modalidadEntrega();
+    if (this.modalidadesDisponibles().length === 0) return true; // flujo de siempre, nunca bloquea
+    if (!modalidad) return false; // debe elegir una tarjeta
+    if (modalidad === 'plataforma') {
+      const e = this.detalle()?.empresa;
+      const dosVariantes = !!e?.envioPlataformaNegocioSolicita && !!e?.envioPlataformaClienteSolicita;
+      return !dosVariantes || !!this.variantePlataforma();
+    }
+    if (modalidad === 'envio_propio') {
+      if (this.envioPropioFaltaMinimo() > 0) return false;
+      // "Fuera de zona" solo bloquea si hay a dónde cambiarse — si esta es
+      // la ÚNICA modalidad, se mantiene el aviso de siempre (no bloquea).
+      if (this.envioPropioFueraDeZona() && this.modalidadesDisponibles().length > 1) return false;
+    }
+    return true;
+  });
 
   /** Clave de la tienda actual (ver ngOnInit) — se reutiliza al mandar el
    *  pedido, para crearPedidoPendiente() (ver enviarPorWhatsapp()). */
@@ -486,6 +645,7 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
           productoId: producto.id,
           nombreProducto: producto.nombre,
           precioBase: producto.precio,
+          fotoProducto: producto.foto,
           opcionesElegidas,
           cantidad,
         },
@@ -571,8 +731,68 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
     this.formCliente.patchValue({ notas: '' });
     this.ubicacion.set(null);
     this.ubicacionError.set(null);
+    this.pasoModal.set('datos');
+    // Si solo hay UNA modalidad configurada (o ninguna), se autoselecciona
+    // — el cliente nunca ve una pantalla de "elegir" con un solo botón (o
+    // ninguno). Con 2+ disponibles, arranca sin elegir y ve las tarjetas.
+    const disponibles = this.modalidadesDisponibles();
+    if (disponibles.length === 1) {
+      this.elegirModalidadEntrega(disponibles[0]);
+    } else {
+      this.modalidadEntrega.set(null);
+      this.variantePlataforma.set(null);
+    }
     this.modalEnviarAbierto.set(true);
   }
+
+  // ── Navegación entre los 3 pasos visuales del modal de enviar ────────
+  protected siguientePasoDatos(): void {
+    // Solo nombre/teléfono son obligatorios en este paso — si faltan, se
+    // marcan como tocados para que se vea el error en rojo, igual que al
+    // intentar enviar directo (ver enviarPorWhatsapp()).
+    const nombre = this.formCliente.controls.nombre;
+    const telefono = this.formCliente.controls.telefono;
+    if (nombre.invalid || telefono.invalid) {
+      nombre.markAsTouched();
+      telefono.markAsTouched();
+      return;
+    }
+    this.pasoModal.set('entrega');
+  }
+
+  protected siguientePasoEntrega(): void {
+    if (!this.puedeAvanzarEntrega()) return;
+    this.pasoModal.set('revisar');
+  }
+
+  protected pasoAnterior(): void {
+    this.pasoModal.set(this.pasoModal() === 'revisar' ? 'entrega' : 'datos');
+  }
+
+  // ── Navegación de la barra inferior (Inicio | Productos | Carrito) —
+  //    scroll normal del navegador, no cambia de ruta ni de estado. ─────
+  protected irAInicio(): void {
+    document.querySelector('.tienda-banner')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  protected irAProductos(): void {
+    document
+      .querySelector('.tienda-busqueda, .tienda-categoria')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /** La barra inferior fija (Inicio | Productos | Carrito) se esconde
+   *  mientras cualquier panel/modal ya ocupa la pantalla — para no
+   *  "tapar contenido" (ni duplicar el botón de carrito) encima de otro
+   *  overlay, tal como pidió el cliente para la barra anterior. */
+  protected readonly ocultarNavInferior = computed(
+    () =>
+      this.carritoAbierto() ||
+      this.modalEnviarAbierto() ||
+      this.productoEnModal() !== null ||
+      this.modalCompartirAbierto() ||
+      this.imagenAmpliada() !== null,
+  );
 
   // ── Ubicación por GPS ──────────────────────────────────────────────
   compartirUbicacion(): void {
@@ -603,41 +823,153 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
     this.ubicacion.set(null);
   }
 
+  // ── Formato del mensaje de WhatsApp — mismo contenido de siempre
+  //    (productos, cantidades, opciones, subtotales, envío, ubicación,
+  //    notas), nomás reacomodado en bloques con mayúsculas/títulos para que
+  //    se lea más como un pedido formal y menos como una lista suelta. ───
+  /** Arma el mensaje de WhatsApp — el FORMATO cambia segun la modalidad de
+   *  entrega elegida (ver 43_tienda_modalidades_entrega.sql), pero toda la
+   *  informacion que ya se mandaba (productos/opciones/subtotales/total/
+   *  ubicacion/notas) se conserva en los 4 formatos. Si la tienda no tiene
+   *  ninguna modalidad nueva configurada (modalidadEntrega() queda null -
+   *  la inmensa mayoria de las tiendas hoy), se manda EXACTO el mismo
+   *  mensaje de siempre, sin ningun cambio. */
   private construirMensaje(nombreCliente: string, telefonoCliente: string, notas: string): string {
     const empresa = this.detalle()?.empresa;
+    const nombreEmpresa = (empresa?.nombre ?? '').toUpperCase();
+    const ubicacion = this.ubicacion();
+    const modalidad = this.modalidadEntrega();
+    const variante = this.variantePlataforma();
+
     const lineas = this.carrito()
-      .map((linea, i) => {
-        const partes = [`${i + 1}) ${linea.nombreProducto} x${linea.cantidad}`];
+      .map((linea) => {
+        const partes = [`${linea.cantidad} \u00d7 ${linea.nombreProducto} \u2014 $${this.subtotalLinea(linea).toFixed(2)}`];
         for (const o of linea.opcionesElegidas) {
           const extra = o.precioAdicional > 0 ? ` (+$${o.precioAdicional.toFixed(2)})` : '';
-          partes.push(`   - ${o.grupoNombre}: ${o.valorNombre}${extra}`);
+          partes.push(`   \u2022 ${o.grupoNombre}: ${o.valorNombre}${extra}`);
         }
-        partes.push(`   Subtotal: $${this.subtotalLinea(linea).toFixed(2)}`);
         return partes.join('\n');
       })
-      .join('\n\n');
+      .join('\n');
+    const ubicacionTexto = ubicacion
+      ? `https://www.google.com/maps?q=${ubicacion.lat},${ubicacion.lng}`
+      : 'No se comparti\u00f3 ubicaci\u00f3n.';
 
-    const ubicacion = this.ubicacion();
+    if (modalidad === 'recoleccion') {
+      return [
+        `\ud83c\udfea PASAR\u00c1 A RECOGER \u2014 ${nombreEmpresa}`,
+        '',
+        `Cliente: ${nombreCliente}`,
+        `Tel\u00e9fono: ${telefonoCliente}`,
+        '',
+        'PEDIDO',
+        lineas,
+        '',
+        `TOTAL: $${this.totalCarrito().toFixed(2)}`,
+        '',
+        'Sucursal:',
+        empresa?.nombre ?? '',
+        'Direcci\u00f3n:',
+        empresa?.direccionPublica?.trim() || 'No especificada',
+        '',
+        'Pedido generado desde la tienda online \u2014 sujeto a confirmaci\u00f3n de disponibilidad por parte del negocio.',
+      ].join('\n');
+    }
+
+    if (modalidad === 'plataforma' && variante === 'cliente') {
+      return [
+        `\ud83d\ude97 RECOGE REPARTIDOR DEL CLIENTE \u2014 ${nombreEmpresa}`,
+        '',
+        `Cliente: ${nombreCliente}`,
+        `Tel\u00e9fono: ${telefonoCliente}`,
+        '',
+        'PEDIDO',
+        lineas,
+        '',
+        `TOTAL PRODUCTOS: $${this.totalCarrito().toFixed(2)}`,
+        '',
+        'Recoger en:',
+        empresa?.nombre ?? '',
+        empresa?.direccionPublica?.trim() || 'No especificada',
+        '',
+        'El cliente solicitar\u00e1 y pagar\u00e1 su propio servicio de transporte.',
+      ].join('\n');
+    }
+
+    if (modalidad === 'plataforma' && variante === 'negocio') {
+      return [
+        '\ud83d\ude97 ENV\u00cdO POR PLATAFORMA \u2014 COTIZAR',
+        '',
+        `Cliente: ${nombreCliente}`,
+        `Tel\u00e9fono: ${telefonoCliente}`,
+        '',
+        'PEDIDO',
+        lineas,
+        '',
+        `TOTAL PRODUCTOS: $${this.totalCarrito().toFixed(2)}`,
+        '',
+        'Ubicaci\u00f3n del cliente:',
+        ubicacionTexto,
+        '',
+        'Referencias:',
+        notas.trim() || 'Sin referencias.',
+        '',
+        '\u26a0\ufe0f Costo del repartidor pendiente de cotizar y confirmar con el cliente.',
+      ].join('\n');
+    }
+
+    if (modalidad === 'envio_propio') {
+      const envio = this.envioInfo();
+      return [
+        `\ud83d\udef5 ENV\u00cdO DEL NEGOCIO \u2014 ${nombreEmpresa}`,
+        '',
+        `Cliente: ${nombreCliente}`,
+        `Tel\u00e9fono: ${telefonoCliente}`,
+        '',
+        'PEDIDO',
+        lineas,
+        '',
+        `Subtotal: $${this.totalCarrito().toFixed(2)}`,
+        `Env\u00edo: $${(envio?.costo ?? 0).toFixed(2)}${envio?.fueraDeZona ? ' \u26a0\ufe0f fuera del radio de entrega habitual' : ''}`,
+        `TOTAL: $${this.totalConEntrega().toFixed(2)}`,
+        '',
+        'Ubicaci\u00f3n:',
+        ubicacionTexto,
+        '',
+        'Referencias:',
+        notas.trim() || 'Sin referencias.',
+        '',
+        'Pedido generado desde la tienda online \u2014 sujeto a confirmaci\u00f3n de disponibilidad por parte del negocio.',
+      ].join('\n');
+    }
+
     const envio = this.envioInfo();
+    const totalesPartes = [
+      envio
+        ? `Env\u00edo estimado (${envio.km.toFixed(1)} km): $${envio.costo.toFixed(2)}${envio.fueraDeZona ? ' \u26a0\ufe0f fuera del radio de entrega habitual' : ''}`
+        : '',
+      `TOTAL: $${(envio ? this.totalConEnvio() : this.totalCarrito()).toFixed(2)}`,
+    ].filter(Boolean);
 
     return [
-      `Pedido para ${empresa?.nombre ?? ''}`,
-      '',
-      lineas,
-      '',
-      `Subtotal: $${this.totalCarrito().toFixed(2)}`,
-      envio
-        ? `Envío estimado (${envio.km.toFixed(1)} km): $${envio.costo.toFixed(2)}${envio.fueraDeZona ? ' ⚠️ fuera del radio de entrega habitual' : ''}`
-        : '',
-      envio ? `Total con envío: $${this.totalConEnvio().toFixed(2)}` : '',
+      `NUEVO PEDIDO \u2014 ${nombreEmpresa}`,
       '',
       `Cliente: ${nombreCliente}`,
-      `Teléfono: ${telefonoCliente}`,
-      notas.trim() ? `Nota especial: ${notas.trim()}` : '',
-      ubicacion ? `Ubicación: https://www.google.com/maps?q=${ubicacion.lat},${ubicacion.lng}` : '',
-    ]
-      .filter((l) => l !== '' || true)
-      .join('\n');
+      `Tel\u00e9fono: ${telefonoCliente}`,
+      '',
+      'PEDIDO',
+      lineas,
+      '',
+      ...totalesPartes,
+      '',
+      'Ubicaci\u00f3n:',
+      ubicacionTexto,
+      '',
+      'Notas:',
+      notas.trim() || 'Sin notas.',
+      '',
+      'Pedido generado desde la tienda online \u2014 sujeto a confirmaci\u00f3n de disponibilidad por parte del negocio.',
+    ].join('\n');
   }
 
   enviarPorWhatsapp(): void {
@@ -692,6 +1024,9 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
     // producto, en vez de quedarse viendo el panel del carrito ya vacío.
     this.carritoAbierto.set(false);
     this.mostrarConfeti();
+    this.mostrarExitoEnvio(
+      `¡Tu pedido está listo! Te enviamos a WhatsApp para confirmar disponibilidad con ${empresa?.nombre ?? 'el negocio'}.`,
+    );
   }
 
   // ── "Volver a pedir lo mismo" ─────────────────────────────────────
