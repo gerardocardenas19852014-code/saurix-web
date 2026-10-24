@@ -202,10 +202,10 @@
         </label>
         <label>
           <span class="label-con-tip">
-            Pedido mínimo para envío propio (opcional)
-            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Distinto del "Pedido mínimo" general de arriba: este solo aplica si el cliente elige "Envío del negocio" — si elige recoger o plataforma, no se exige. Vacío = sin mínimo específico.</span></button>
+            Cantidad mínima de productos para envío propio (opcional)
+            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Es una CANTIDAD de piezas en el carrito, no un monto en dinero. Distinto del "Pedido mínimo" general de arriba: este solo aplica si el cliente elige "Envío del negocio" — si elige recoger o plataforma, no se exige. Vacío = sin mínimo específico.</span></button>
           </span>
-          <input type="number" class="form-control" formControlName="envioPropioPedidoMinimo" min="0" step="0.01" placeholder="Sin mínimo" />
+          <input type="number" class="form-control" formControlName="envioPropioPedidoMinimo" min="0" step="1" placeholder="Sin mínimo" />
         </label>
 
         <hr class="full-span" style="width:100%; margin:4px 0;" />

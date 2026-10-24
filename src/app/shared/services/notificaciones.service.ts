@@ -169,6 +169,18 @@ export class NotificacionesService {
    *  paralelo dentro de un mismo ciclo — ver revisarSlaTickets. */
   private static readonly CONCURRENCIA_AVISOS_SLA = 5;
 
+  /** Tope de tickets que se TRAEN y recorren en memoria por ciclo (antes de
+   *  siquiera filtrar cuáles de verdad necesitan un aviso nuevo) — sin esto,
+   *  aunque los avisos/PATCH ya estén acotados (ver MAX_AVISOS_SLA_POR_CICLO),
+   *  con una tabla Ticket enorme (p.ej. 200,000 filas en una prueba de
+   *  rendimiento) el simple hecho de traer y recorrer TODOS los candidatos
+   *  en el navegador seguía siendo lento. 2000 es muchísimo más de lo que
+   *  cualquier negocio real tendría de tickets activos con prioridad con
+   *  SLA configurado a la vez — en uso real este tope nunca se alcanza, así
+   *  que nunca cambia el comportamiento; solo pone un techo fijo al costo
+   *  por ciclo sin importar qué tan grande crezca la tabla. */
+  private static readonly LIMITE_TICKETS_SLA_POR_CICLO = 2000;
+
   /**
    * Revisión periódica de SLA — cierra el hueco que dejaba el comentario de arriba:
    * hasta ahora NINGÚN ticket avisaba por SLA, pese a que el catálogo de Prioridades
@@ -218,10 +230,13 @@ export class NotificacionesService {
       const prioridadesConVigencia = prioridades.filter((p) => !!p.vigenciaHoras);
       if (prioridadesConVigencia.length === 0) return; // nada que revisar — ningún ticket puede calificar
 
-      const tickets = await firstValueFrom(
-        this.data.list<Ticket>('Ticket', {
-          ticketPrioridadId: prioridadesConVigencia.map((p) => Number(p.id)),
-        }),
+      const { filas: tickets } = await firstValueFrom(
+        this.data.listarPagina<Ticket>(
+          'Ticket',
+          { ticketPrioridadId: prioridadesConVigencia.map((p) => Number(p.id)) },
+          0,
+          NotificacionesService.LIMITE_TICKETS_SLA_POR_CICLO,
+        ),
       );
       const ultimaColumna = this.ultimaColumnaPorProyecto(columnas);
       const ahora = Date.now();

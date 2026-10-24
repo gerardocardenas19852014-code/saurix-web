@@ -244,7 +244,7 @@ export class EmpresasComponent implements OnInit, OnDestroy {
     envioDistanciaMaximaKm: this.fb.control<number | null>(null, [Validators.min(0)]),
     // ── Modalidades de entrega ──────────────────────────────────────
     envioPropioActivo: [true],
-    envioPropioPedidoMinimo: this.fb.control<number | null>(null, [Validators.min(0)]),
+    envioPropioPedidoMinimo: this.fb.control<number | null>(null, [Validators.min(0), Validators.pattern(/^\d*$/)]),
     recoleccionActiva: [false],
     direccionPublica: ['', [Validators.maxLength(200)]],
     envioPlataformaActivo: [false],
@@ -452,7 +452,8 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       envioMinimo: valor.envioMinimo,
       envioDistanciaMaximaKm: valor.envioDistanciaMaximaKm,
       envioPropioActivo: valor.envioPropioActivo,
-      envioPropioPedidoMinimo: valor.envioPropioPedidoMinimo,
+      envioPropioPedidoMinimo:
+        valor.envioPropioPedidoMinimo != null ? Math.round(valor.envioPropioPedidoMinimo) : null,
       recoleccionActiva: valor.recoleccionActiva,
       direccionPublica: valor.direccionPublica.trim() || null,
       envioPlataformaActivo: valor.envioPlataformaActivo,

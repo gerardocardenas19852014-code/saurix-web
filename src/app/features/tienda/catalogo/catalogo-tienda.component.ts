@@ -385,13 +385,15 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
     return disponibles.map((m) => etiquetas[m]).join(' · ');
   });
 
-  /** Mínimo de SUBTOTAL (antes del envío) para poder elegir "Envío del
-   *  negocio" — distinto del pedidoMinimo general, que aplica siempre. */
+  /** Cantidad mínima de PIEZAS en el carrito (suma de cantidades, ver
+   *  cantidadArticulos() arriba — NO es un monto en dinero) para poder
+   *  elegir "Envío del negocio" — distinto del pedidoMinimo general
+   *  (ese sí es dinero y aplica siempre). */
   protected readonly envioPropioPedidoMinimo = computed(() => this.detalle()?.empresa.envioPropioPedidoMinimo ?? null);
   protected readonly envioPropioFaltaMinimo = computed(() => {
     const minimo = this.envioPropioPedidoMinimo();
     if (!minimo) return 0;
-    const falta = minimo - this.totalCarrito();
+    const falta = minimo - this.cantidadArticulos();
     return falta > 0 ? falta : 0;
   });
 

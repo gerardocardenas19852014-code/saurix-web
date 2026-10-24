@@ -115,9 +115,10 @@ export interface EmpresaTienda {
    *  Reyna de los Bolis) sigue exactamente igual sin que el dueño toque
    *  nada nuevo. */
   envioPropioActivo: boolean;
-  /** Mínimo de SUBTOTAL de productos (antes del costo de envío) para
-   *  poder elegir "Envío del negocio" — null = sin mínimo específico
-   *  (distinto de pedidoMinimo, que aplica a CUALQUIER modalidad). */
+  /** Cantidad mínima de PRODUCTOS/PIEZAS en el carrito (suma de
+   *  cantidades, no dinero) para poder elegir "Envío del negocio" — null
+   *  = sin mínimo específico (distinto de pedidoMinimo, que es un monto
+   *  en dinero y aplica a CUALQUIER modalidad). */
   envioPropioPedidoMinimo: number | null;
   /** "Pasar a recoger en sucursal" — sin GPS, sin costo. */
   recoleccionActiva: boolean;

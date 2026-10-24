@@ -592,8 +592,9 @@
             @if (envioPropioPedidoMinimo(); as minimo) {
               @if (envioPropioFaltaMinimo() > 0) {
                 <p class="tienda-envio-aviso tienda-envio-aviso-bloqueo">
-                  🛵 Te faltan ${{ envioPropioFaltaMinimo().toFixed(2) }} para el pedido mínimo de envío a domicilio
-                  (${{ minimo.toFixed(2) }}).
+                  🛵 Te falta{{ envioPropioFaltaMinimo() === 1 ? '' : 'n' }} {{ envioPropioFaltaMinimo() }}
+                  producto{{ envioPropioFaltaMinimo() === 1 ? '' : 's' }} más para el pedido mínimo de envío a
+                  domicilio (mínimo {{ minimo }} producto{{ minimo === 1 ? '' : 's' }}).
                   @if (modalidadesDisponibles().length > 1) {
                     Puedes seguir agregando productos o elegir otra forma de entrega arriba.
                   } @else {
