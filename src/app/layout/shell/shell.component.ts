@@ -2,7 +2,7 @@ import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, HostListener, OnDestroy, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { filter, forkJoin, map } from 'rxjs';
+import { filter, forkJoin, map, switchMap } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { ComandoPaletaComponent } from '../../shared/components/comando-paleta/comando-paleta.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -16,7 +16,7 @@ import { NotificacionesService } from '../../shared/services/notificaciones.serv
 import { Ticket } from '../../features/proyectos/kanban/ticket.model';
 import { MovimientoPresupuesto } from '../../features/presupuesto/movimientos/movimiento.model';
 import { MiembroFamilia } from '../../features/familia/miembro-familia.model';
-import { TableroColumna } from '../../features/proyectos/tableros/tablero-columna.model';
+import { ProyectoOpcion, TableroColumna } from '../../features/proyectos/tableros/tablero-columna.model';
 import { CuentaPresupuesto } from '../../features/presupuesto/cuenta-presupuesto/cuenta-presupuesto.model';
 import { CategoriaPresupuesto } from '../../features/presupuesto/categoria-presupuesto/categoria-presupuesto.model';
 import { DeudaPresupuesto } from '../../features/presupuesto/deudas/deuda.model';
@@ -657,17 +657,32 @@ export class ShellComponent implements OnDestroy {
     // y directorio (Familia). Sigue sin ser un modelo de lenguaje real: primero
     // intenta reconocer una pregunta de cálculo (calcularRespuestaAi) y, si no
     // reconoce ninguna, cae a la búsqueda por palabra clave de siempre.
-    forkJoin({
-      documentos: this.data.list<DocumentoBuscable>('Documento'),
-      tickets: this.data.list<Ticket>('Ticket'),
-      columnas: this.data.list<TableroColumna>('TableroColumna'),
-      movimientos: this.data.list<MovimientoPresupuesto>('MovimientoPresupuesto'),
-      cuentas: this.data.list<CuentaPresupuesto>('CuentaPresupuesto'),
-      categorias: this.data.list<CategoriaPresupuesto>('CategoriaPresupuesto'),
-      deudas: this.data.list<DeudaPresupuesto>('DeudaPresupuesto'),
-      miembros: this.data.list<MiembroFamilia>('MiembroFamilia'),
-      usuarios: this.data.list<Usuario>('Usuario'),
-    }).subscribe({
+    // Se pide primero Proyecto para poder filtrar Ticket a solo los proyectos
+    // "reales" (no esPrueba) — un proyecto de prueba de rendimiento puede
+    // tener decenas de miles de tickets sintéticos, y sin este filtro el
+    // asistente intentaría traerlos todos en CUALQUIER pregunta (aunque no
+    // tenga nada que ver con tickets), con el mismo riesgo de
+    // 504/ERR_INSUFFICIENT_RESOURCES que ya se corrigió en el aviso de SLA de
+    // NotificacionesService.
+    this.data
+      .list<ProyectoOpcion>('Proyecto')
+      .pipe(
+        switchMap((proyectos) => {
+          const idsProyectosReales = proyectos.filter((p) => !p.esPrueba).map((p) => p.id);
+          return forkJoin({
+            documentos: this.data.list<DocumentoBuscable>('Documento'),
+            tickets: this.data.list<Ticket>('Ticket', { proyectoId: idsProyectosReales }),
+            columnas: this.data.list<TableroColumna>('TableroColumna'),
+            movimientos: this.data.list<MovimientoPresupuesto>('MovimientoPresupuesto'),
+            cuentas: this.data.list<CuentaPresupuesto>('CuentaPresupuesto'),
+            categorias: this.data.list<CategoriaPresupuesto>('CategoriaPresupuesto'),
+            deudas: this.data.list<DeudaPresupuesto>('DeudaPresupuesto'),
+            miembros: this.data.list<MiembroFamilia>('MiembroFamilia'),
+            usuarios: this.data.list<Usuario>('Usuario'),
+          });
+        }),
+      )
+      .subscribe({
       next: (fuentes) => {
         const calculo = this.calcularRespuestaAi(pregunta, fuentes);
         const respuesta = calculo ?? this.buscarRespuesta(pregunta, fuentes);

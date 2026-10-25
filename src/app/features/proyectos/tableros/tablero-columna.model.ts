@@ -38,6 +38,12 @@ export interface ProyectoOpcion {
   id: number;
   nombre: string;
   clave: string;
+  /** true = proyecto de datos de prueba/carga (p.ej. "Prueba de Rendimiento",
+   *  con miles de tickets sintéticos) — se excluye de reportes/estadísticas
+   *  ENTRE proyectos (Dashboard, Balanceo, Reportes ejecutivos/de horas,
+   *  Resumen ejecutivo, asistente IA) para que no distorsione los números
+   *  reales; dentro de su propio proyecto se sigue viendo normal. */
+  esPrueba: boolean;
 }
 
 /** Los 13 campos del Ticket que el "Gestor de Estados" permite configurar por

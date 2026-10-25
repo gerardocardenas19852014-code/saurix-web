@@ -111,7 +111,6 @@ export class ReportesEjecutivosComponent implements OnInit {
   ngOnInit(): void {
     document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
     this.cargando.set(true);
-    this.data.list<ProyectoOpcion>('Proyecto').subscribe((p) => this.proyectos.set(p));
     this.data.list<TableroColumna>('TableroColumna').subscribe((c) => this.columnas.set(c));
     this.data.list<Sprint>('Sprint').subscribe((s) => this.sprints.set(s));
     this.data.list<TicketPrioridad>('TicketPrioridad').subscribe((p) => this.prioridades.set(p));
@@ -121,7 +120,16 @@ export class ReportesEjecutivosComponent implements OnInit {
     this.data
       .list<Usuario>('Usuario')
       .subscribe((u) => this.usuarios.set(u.map((x) => ({ id: x.id, nombreCompleto: nombreCompletoUsuario(x) }))));
-    this.data.list<Ticket>('Ticket').subscribe((t) => {
+    // Se pide primero Proyecto para poder filtrar Ticket a solo los proyectos
+    // "reales" (no esPrueba) — un proyecto de prueba de rendimiento puede
+    // tener decenas de miles de tickets sintéticos, y sin este filtro este
+    // reporte (que combina TODOS los proyectos) intentaría traerlos todos, con
+    // el mismo riesgo de 504/ERR_INSUFFICIENT_RESOURCES que ya se corrigió en
+    // el aviso de SLA de NotificacionesService.
+    this.data.list<ProyectoOpcion>('Proyecto').subscribe((p) => {
+      this.proyectos.set(p);
+      const idsProyectosReales = p.filter((x) => !x.esPrueba).map((x) => x.id);
+      this.data.list<Ticket>('Ticket', { proyectoId: idsProyectosReales }).subscribe((t) => {
       this.tickets.set(t);
       this.cargando.set(false);
       // TicketHistorialEstado es una tabla "multiplicador" (muchas filas por
@@ -137,6 +145,7 @@ export class ReportesEjecutivosComponent implements OnInit {
       this.data
         .list<TicketHistorialEstado>('TicketHistorialEstado', { ticketId: idsTickets })
         .subscribe((h) => this.historial.set(h));
+      });
     });
   }
 

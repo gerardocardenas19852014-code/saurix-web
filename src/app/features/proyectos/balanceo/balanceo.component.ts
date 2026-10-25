@@ -82,17 +82,26 @@ export class BalanceoComponent implements OnInit {
   ngOnInit(): void {
     document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
     this.cargando.set(true);
-    this.data.list<ProyectoOpcion>('Proyecto').subscribe((p) => this.proyectos.set(p));
     this.data.list<TableroColumna>('TableroColumna').subscribe((c) => this.columnas.set(c));
     this.data.list<TicketPrioridad>('TicketPrioridad').subscribe((p) => this.prioridades.set(p));
     this.data.list<TicketTipo>('TicketTipo').subscribe((t) => this.tipos.set(t));
     this.data.list<Usuario>('Usuario').subscribe((u) => this.usuarios.set(u));
-    this.data.list<Ticket>('Ticket').subscribe({
-      next: (tickets) => {
-        this.tickets.set(tickets);
-        this.cargando.set(false);
-      },
-      error: () => this.cargando.set(false),
+    // Se pide primero Proyecto para poder filtrar Ticket a solo los proyectos
+    // "reales" (no esPrueba) — un proyecto de prueba de rendimiento puede
+    // tener decenas de miles de tickets sintéticos, y sin este filtro este
+    // Balanceo de carga (que combina TODOS los proyectos) intentaría traerlos
+    // todos, con el mismo riesgo de 504/ERR_INSUFFICIENT_RESOURCES que ya se
+    // corrigió en el aviso de SLA de NotificacionesService.
+    this.data.list<ProyectoOpcion>('Proyecto').subscribe((p) => {
+      this.proyectos.set(p);
+      const idsProyectosReales = p.filter((x) => !x.esPrueba).map((x) => x.id);
+      this.data.list<Ticket>('Ticket', { proyectoId: idsProyectosReales }).subscribe({
+        next: (tickets) => {
+          this.tickets.set(tickets);
+          this.cargando.set(false);
+        },
+        error: () => this.cargando.set(false),
+      });
     });
   }
 

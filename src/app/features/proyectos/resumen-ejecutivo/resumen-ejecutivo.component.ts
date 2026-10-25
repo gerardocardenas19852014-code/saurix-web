@@ -96,10 +96,6 @@ export class ResumenEjecutivoComponent implements OnInit {
   ngOnInit(): void {
     document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
     this.cargando.set(true);
-    this.data.list<ProyectoOpcion>('Proyecto').subscribe((proyectos) => {
-      this.proyectos.set(proyectos);
-      if (proyectos.length && !this.proyectoDetalleId()) this.proyectoDetalleId.set(proyectos[0].id);
-    });
     this.data.list<TableroColumna>('TableroColumna').subscribe((c) => this.columnas.set(c));
     this.data.list<TicketPrioridad>('TicketPrioridad').subscribe((p) => this.prioridades.set(p));
     // 'Usuario' no trae un campo nombreCompleto propio — hay que armarlo con
@@ -108,7 +104,17 @@ export class ResumenEjecutivoComponent implements OnInit {
       .list<Usuario>('Usuario')
       .subscribe((u) => this.usuarios.set(u.map((x) => ({ id: x.id, nombreCompleto: nombreCompletoUsuario(x) }))));
 
-    this.data.list<Ticket>('Ticket').subscribe({
+    // Se pide primero Proyecto para poder filtrar Ticket a solo los proyectos
+    // "reales" (no esPrueba) — un proyecto de prueba de rendimiento puede
+    // tener decenas de miles de tickets sintéticos, y sin este filtro este
+    // Resumen ejecutivo (que combina TODOS los proyectos) intentaría traerlos
+    // todos, con el mismo riesgo de 504/ERR_INSUFFICIENT_RESOURCES que ya se
+    // corrigió en el aviso de SLA de NotificacionesService.
+    this.data.list<ProyectoOpcion>('Proyecto').subscribe((proyectos) => {
+      this.proyectos.set(proyectos);
+      if (proyectos.length && !this.proyectoDetalleId()) this.proyectoDetalleId.set(proyectos[0].id);
+      const idsProyectosReales = proyectos.filter((x) => !x.esPrueba).map((x) => x.id);
+      this.data.list<Ticket>('Ticket', { proyectoId: idsProyectosReales }).subscribe({
       next: (tickets) => {
         this.tickets.set(tickets);
         this.cargando.set(false);
@@ -131,6 +137,7 @@ export class ResumenEjecutivoComponent implements OnInit {
           .subscribe((h) => this.historial.set(h));
       },
       error: () => this.cargando.set(false),
+      });
     });
   }
 
