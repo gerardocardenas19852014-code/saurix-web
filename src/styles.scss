@@ -76,7 +76,9 @@ html[data-theme='mint'] {
 }
 
 * { box-sizing: border-box; }
+// scrollbar-gutter: stable — reserva el espacio de la barra de scroll SIEMPRE, aparezca o no. Sin esto, cuando una pantalla carga datos y el contenido pasa de caber en la ventana a necesitar scroll vertical, la barra aparece de golpe, angosta el viewport ~15px, y todo lo alineado a la derecha (filtros, botones de la topbar) se recorre — ese es uno de los layout shifts medidos en Lighthouse/DevTools Performance (CLS).
 html, body { margin: 0; padding: 0; overflow-x: hidden; }
+html { scrollbar-gutter: stable; }
 body {
   background: var(--paper);
   color: var(--text-strong);
