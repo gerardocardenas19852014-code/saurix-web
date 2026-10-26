@@ -473,9 +473,18 @@ export class NotificacionesService {
         if (orden.fechaEntregaEstimada.slice(0, 10) >= hoyTexto) continue; // todavía no vence
         if (yaAvisado(orden.id)) continue;
 
-        this.notificar(usuarioId, `📦 La orden ${orden.folio} ya pasó su fecha de entrega estimada y sigue sin completarse.`, '/inventario/ordenes-compra');
+        // Mismo orden que revisarSlaTickets/revisarAlertasTarjetas/
+        // revisarAlertasStockBajo: se registra primero y solo se notifica si
+        // el registro tuvo éxito, para no repetir el aviso cada ciclo si la
+        // escritura falla.
         this.data.alta<AvisoOrdenVencida>('AvisoOrdenVencida', { ordenCompraId: orden.id, usuarioId, dia }).subscribe({
-          error: (error) => console.warn('No se pudo registrar el aviso de orden vencida:', error),
+          next: () =>
+            this.notificar(
+              usuarioId,
+              `📦 La orden ${orden.folio} ya pasó su fecha de entrega estimada y sigue sin completarse.`,
+              '/inventario/ordenes-compra',
+            ),
+          error: (error) => console.warn('No se pudo registrar el aviso de orden vencida (no se notifica):', error),
         });
       }
     } catch (error) {

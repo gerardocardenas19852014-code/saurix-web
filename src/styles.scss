@@ -1220,7 +1220,14 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
   .grid-filter input:not([type='checkbox']) { max-width: none; }
 }
 
-.grid-table-scroll { overflow-x: auto; border-radius: 0 0 10px 10px; }
+/* min-height: reserva espacio mientras cargan los datos (la tabla empieza
+   vacía — "Sin registros para mostrar" — y de golpe se llena de filas una
+   vez que llega la respuesta), para evitar el salto de layout (CLS) que eso
+   provoca. No es exacto para cada pantalla (algunas listas terminan con
+   menos filas que esto, y queda un poco de espacio vacío mientras carga),
+   pero cubre el caso típico — una tabla con datos reales — sin tocar la
+   lógica de las 34 pantallas que usan <app-data-table>. */
+.grid-table-scroll { overflow-x: auto; border-radius: 0 0 10px 10px; min-height: 260px; }
 .grid-table { width: 100%; min-width: 560px; border-collapse: separate; border-spacing: 0; font-size: 14px; background: var(--paper-raised); border: 1px solid var(--line); border-top: none; border-radius: 0 0 10px 10px; overflow: hidden; }
 .grid-table th { text-align: left; padding: 11px 16px; background: var(--paper); font-family: 'Montserrat', sans-serif; font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-soft); border-bottom: 1px solid var(--line); white-space: nowrap; }
 .grid-sort-button { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
