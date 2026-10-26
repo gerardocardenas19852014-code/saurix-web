@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { catchError, firstValueFrom, from, mergeMap, of, toArray } from 'rxjs';
+import { catchError, firstValueFrom, from, mergeMap, of, tap, toArray } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { DataClientService } from '../../core/services/data-client.service';
 import { Ticket } from '../../features/proyectos/kanban/ticket.model';
@@ -270,24 +270,37 @@ export class NotificacionesService {
       }
       if (candidatos.length === 0) return;
 
+      // IMPORTANTE: se marca el ticket (slaAvisoNivel) ANTES de notificar, y
+      // solo se notifica si ese PATCH tuvo éxito (ver tap() abajo) — antes se
+      // notificaba primero y se intentaba marcar después; si el PATCH fallaba
+      // (p.ej. 504 por la carga de la prueba de rendimiento) el ticket se
+      // quedaba "sin marcar" para siempre y volvía a calificar como candidato
+      // en CADA ciclo de 5 min, generando un aviso duplicado cada vez —  un
+      // "notification storm" que además alimentaba más carga sobre la base de
+      // datos. Con este orden, un PATCH que falla simplemente no notifica ese
+      // ciclo (se reintenta solo, sin duplicar, cuando la base de datos pueda).
       await firstValueFrom(
         from(candidatos).pipe(
-          mergeMap(({ ticket, nivel, destinatarios }) => {
-            const titulo =
-              nivel === 'expired'
-                ? `🔥 SLA vencido: #${ticket.numeroTicket} — ${ticket.titulo}`
-                : `⏰ SLA por vencer: #${ticket.numeroTicket} — ${ticket.titulo}`;
-            const link = `/proyectos/tablero?ticket=${ticket.id}`;
-            for (const usuarioId of destinatarios) {
-              this.notificar(usuarioId, titulo, link);
-            }
-            return this.data.modificacion<Ticket>('Ticket', { ...ticket, slaAvisoNivel: nivel }).pipe(
-              catchError((error) => {
-                console.warn('No se pudo marcar el aviso de SLA como enviado:', error);
-                return of(null);
-              }),
-            );
-          }, NotificacionesService.CONCURRENCIA_AVISOS_SLA),
+          mergeMap(
+            ({ ticket, nivel, destinatarios }) =>
+              this.data.modificacion<Ticket>('Ticket', { ...ticket, slaAvisoNivel: nivel }).pipe(
+                tap(() => {
+                  const titulo =
+                    nivel === 'expired'
+                      ? `🔥 SLA vencido: #${ticket.numeroTicket} — ${ticket.titulo}`
+                      : `⏰ SLA por vencer: #${ticket.numeroTicket} — ${ticket.titulo}`;
+                  const link = `/proyectos/tablero?ticket=${ticket.id}`;
+                  for (const usuarioId of destinatarios) {
+                    this.notificar(usuarioId, titulo, link);
+                  }
+                }),
+                catchError((error) => {
+                  console.warn('No se pudo marcar el aviso de SLA como enviado (no se notifica este ciclo):', error);
+                  return of(null);
+                }),
+              ),
+            NotificacionesService.CONCURRENCIA_AVISOS_SLA,
+          ),
           toArray(),
         ),
       );
@@ -319,9 +332,20 @@ export class NotificacionesService {
       const cicloActual = `${hoy.getFullYear()}-${hoy.getMonth() + 1}`;
       const yaAvisado = (cuentaId: number, tipoAviso: 'uso' | 'pago', ciclo: string): boolean =>
         avisos.some((a) => Number(a.cuentaPresupuestoId) === cuentaId && a.tipoAviso === tipoAviso && a.ciclo === ciclo);
-      const registrarAviso = (cuentaId: number, tipoAviso: 'uso' | 'pago', ciclo: string): void => {
+      // Se registra el aviso (dedupe) ANTES de notificar, y solo se notifica
+      // si ese registro tuvo éxito — si el registro falla (p.ej. un 504
+      // transitorio), NO se notifica: así no se repite el mismo aviso en cada
+      // ciclo de 5 min mientras la escritura siga fallando (mismo ajuste que
+      // revisarSlaTickets, ver su comentario).
+      const registrarAvisoYNotificar = (
+        cuentaId: number,
+        tipoAviso: 'uso' | 'pago',
+        ciclo: string,
+        titulo: string,
+      ): void => {
         this.data.alta<AvisoTarjetaCiclo>('AvisoTarjetaCiclo', { cuentaPresupuestoId: cuentaId, usuarioId, tipoAviso, ciclo }).subscribe({
-          error: (error) => console.warn('No se pudo registrar el aviso de tarjeta:', error),
+          next: () => this.notificar(usuarioId, titulo, '/presupuesto/movimientos'),
+          error: (error) => console.warn('No se pudo registrar el aviso de tarjeta (no se notifica):', error),
         });
       };
 
@@ -334,8 +358,12 @@ export class NotificacionesService {
         const info = infoTarjeta(cuenta, saldo, hoy);
 
         if (info.pctUso >= 90 && !yaAvisado(cuentaId, 'uso', cicloActual)) {
-          this.notificar(usuarioId, `💳 "${cuenta.nombre}" ya usó el ${info.pctUso.toFixed(0)}% de su límite de crédito.`, '/presupuesto/movimientos');
-          registrarAviso(cuentaId, 'uso', cicloActual);
+          registrarAvisoYNotificar(
+            cuentaId,
+            'uso',
+            cicloActual,
+            `💳 "${cuenta.nombre}" ya usó el ${info.pctUso.toFixed(0)}% de su límite de crédito.`,
+          );
         }
 
         if (info.deuda > 0 && info.proximaFechaPago) {
@@ -344,8 +372,12 @@ export class NotificacionesService {
             const cicloPago = `${info.proximaFechaPago.getFullYear()}-${info.proximaFechaPago.getMonth() + 1}`;
             if (!yaAvisado(cuentaId, 'pago', cicloPago)) {
               const cuando = diasRestantes === 0 ? 'hoy' : diasRestantes === 1 ? 'mañana' : `en ${diasRestantes} días`;
-              this.notificar(usuarioId, `📅 El pago de "${cuenta.nombre}" (${formatMoneda(info.deuda)}) vence ${cuando}.`, '/presupuesto/movimientos');
-              registrarAviso(cuentaId, 'pago', cicloPago);
+              registrarAvisoYNotificar(
+                cuentaId,
+                'pago',
+                cicloPago,
+                `📅 El pago de "${cuenta.nombre}" (${formatMoneda(info.deuda)}) vence ${cuando}.`,
+              );
             }
           }
         }
@@ -391,15 +423,19 @@ export class NotificacionesService {
         for (const alerta of alertasStockBajo(producto, existenciasBodega, nivelesMinimoBodega)) {
           if (yaAvisado(producto.id, alerta.bodegaId)) continue;
 
-          this.notificar(
-            usuarioId,
-            `📉 "${producto.nombre}" tiene ${alerta.existencia} de existencia, por debajo de su mínimo (${alerta.nivelMinimo}).`,
-            '/inventario/valor-stock',
-          );
+          // Mismo orden que revisarSlaTickets/revisarAlertasTarjetas: se
+          // registra primero y solo se notifica si el registro tuvo éxito,
+          // para no repetir el aviso cada ciclo si la escritura falla.
           this.data
             .alta<AvisoStockBajo>('AvisoStockBajo', { productoId: producto.id, bodegaId: alerta.bodegaId, usuarioId, dia })
             .subscribe({
-              error: (error) => console.warn('No se pudo registrar el aviso de stock bajo:', error),
+              next: () =>
+                this.notificar(
+                  usuarioId,
+                  `📉 "${producto.nombre}" tiene ${alerta.existencia} de existencia, por debajo de su mínimo (${alerta.nivelMinimo}).`,
+                  '/inventario/valor-stock',
+                ),
+              error: (error) => console.warn('No se pudo registrar el aviso de stock bajo (no se notifica):', error),
             });
         }
       }
