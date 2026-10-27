@@ -4,6 +4,7 @@
 
 <div class="grid-toolbar">
   <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo</button>
+  <button type="button" class="btn-primary small" (click)="cambiarFiltro()">🔍 Buscar</button>
 
   <div class="toolbar-group">
     <button type="button" class="btn-secondary small toolbar-icon-button" title="Descargar plantilla CSV" aria-label="Descargar plantilla CSV" (click)="descargarPlantilla()">⬇️</button>
@@ -38,13 +39,10 @@
         (valueChange)="filtroCategoriaId.set(+($event ?? 0))"
       />
     </div>
-    <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
-      <label class="board-filter-field board-filter-checkbox" style="margin:0;">
-        <input type="checkbox" [checked]="mostrarInactivos()" (change)="mostrarInactivos.set($any($event.target).checked)" />
-        Mostrar inactivos
-      </label>
-      <button type="button" class="btn-primary small" (click)="cambiarFiltro()">🔍 Buscar</button>
-    </div>
+    <label class="board-filter-field board-filter-checkbox" style="margin:0;">
+      <input type="checkbox" [checked]="mostrarInactivos()" (change)="mostrarInactivos.set($any($event.target).checked)" />
+      Mostrar inactivos
+    </label>
   </div>
 </div>
 
