@@ -206,7 +206,11 @@ export class CobroComponent implements OnInit, OnDestroy {
 
     await this.lealtadService.cargar();
 
-    const turno = await this.turnoCajaService.turnoAbierto(usuario.id);
+    // turnoAbiertoOCrear(): si "Apertura de caja" está desactivada, abre un
+    // turno en silencio en vez de mandar a una pantalla que ya ni aparece en
+    // el menú (ver su comentario en TurnoCajaService) — así Cobro no se queda
+    // esperando algo que el negocio nunca podría crear.
+    const turno = await this.turnoCajaService.turnoAbiertoOCrear(usuario.id);
     if (!turno) {
       this.router.navigateByUrl('/ventas/apertura-turno');
       return;

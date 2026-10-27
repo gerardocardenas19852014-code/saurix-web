@@ -3,6 +3,7 @@
     #inputBuscable
     type="text"
     class="selbuscable-input form-control"
+    [class.selbuscable-input-con-limpiar]="mostrarBotonLimpiar()"
     [value]="textoMostrado()"
     [placeholder]="placeholder"
     [disabled]="disabled"
@@ -10,6 +11,17 @@
     (focus)="onFocus()"
     (input)="onInput($any($event.target).value)"
   />
+  @if (mostrarBotonLimpiar()) {
+    <button
+      type="button"
+      class="selbuscable-limpiar"
+      title="Quitar filtro"
+      aria-label="Quitar filtro"
+      (mousedown)="limpiar($event)"
+    >
+      ✕
+    </button>
+  }
 </div>
 
 @if (abierta()) {

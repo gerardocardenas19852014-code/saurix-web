@@ -165,7 +165,9 @@ export class PedidosTiendaComponent implements OnInit, OnDestroy {
     const usuario = this.auth.usuarioActual();
     if (!usuario) return;
 
-    const turno = await this.turnoCajaService.turnoAbierto(usuario.id);
+    // turnoAbiertoOCrear(): si "Apertura de caja" está desactivada, abre uno
+    // en silencio en vez de bloquear — ver su comentario en TurnoCajaService.
+    const turno = await this.turnoCajaService.turnoAbiertoOCrear(usuario.id);
     if (!turno) {
       this.toast.advertencia('Abre un turno de caja antes de confirmar un pedido como venta.');
       return;
@@ -194,7 +196,7 @@ export class PedidosTiendaComponent implements OnInit, OnDestroy {
 
     this.confirmando.set(true);
     try {
-      const turno = await this.turnoCajaService.turnoAbierto(usuario.id);
+      const turno = await this.turnoCajaService.turnoAbiertoOCrear(usuario.id);
       if (!turno) {
         this.toast.advertencia('Ya no tienes un turno de caja abierto.');
         return;

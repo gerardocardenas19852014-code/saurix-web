@@ -1,2 +1,38 @@
-// Sin estilos propios — reutiliza dashboard-stats/dashboard-stat-card,
-// wallet-cat-bar-*, grid-toolbar/grid-filter y grid-table de src/styles.scss.
+// Reutiliza dashboard-stats/dashboard-stat-card, wallet-cat-bar-*,
+// grid-toolbar/grid-filter y grid-table de src/styles.scss.
+//
+// La pestaña Productos ahora tiene 4 controles de filtro (búsqueda,
+// categoría, bodega, estado) en vez de 1 — el mismo squish/CLS que se
+// corrigió en productos.component.scss (ver auditoría de rendimiento,
+// sección 9.2) aplica aquí por la misma razón: app-select-buscable
+// (:host{width:100%}) compite como flex-item contra .grid-filter's
+// flex-wrap:nowrap (intencional y global, ver comentario en styles.scss).
+// Mismo arreglo: SCOPED a este componente, nunca tocar la regla global.
+.productos-filtro-categoria {
+  flex: 1 1 200px;
+  min-width: 160px;
+  max-width: 420px;
+}
+
+/* Igual que categoría/bodega: el buscador de texto también crece para
+ * repartirse el espacio libre de .grid-filter en vez de dejarlo vacío a la
+ * derecha (ver mismo override/razón en productos.component.scss). Scoped a
+ * esta pantalla, no toca el max-width:260px global del resto de la app. */
+.grid-filter input:not([type='checkbox']) {
+  flex: 1 1 200px;
+  max-width: 420px;
+}
+
+/* Antes esta regla forzaba flex-wrap:wrap SIEMPRE, sin importar que sobrara
+ * espacio de sobra en .grid-filter — el flex-basis de cada campo (no su
+ * max-width/flex-grow) es lo que decide si entran en una sola línea, y
+ * dejaba un hueco vacío a la derecha con el botón "Buscar" solo en una
+ * segunda línea aun en pantallas anchas. Ver misma corrección y
+ * explicación en productos.component.scss. Con 5 controles (busqueda +
+ * categoría + bodega + estado + Buscar) el punto de quiebre es un poco más
+ * ancho que en Productos (4 controles). */
+@media (max-width: 1250px) {
+  .grid-filter {
+    flex-wrap: wrap;
+  }
+}

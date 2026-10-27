@@ -2,6 +2,54 @@
 // edit-form, table, grid-badge, etc.) vive en src/styles.scss. Lo de aquí es
 // específico de esta pantalla.
 
+/* Ancho del filtro de categoría dentro de .grid-filter — sin esto,
+ * app-select-buscable (:host{width:100%} en su propio componente, ver
+ * select-buscable.component.scss) se comporta como un flex-item con
+ * flex-basis:100% dentro de .grid-filter (flex-wrap:nowrap, ver
+ * styles.scss), compitiendo por TODO el ancho disponible y empujando los
+ * demás campos (Buscar por nombre/código) hasta su min-width de 140px,
+ * donde el placeholder ya no cabe completo (se veía recortado: "Buscar por
+ * cód"). Envuelto en este div para no tocar el componente compartido.
+ * flex-grow:1 (antes 0) para que, junto con el override de los buscadores
+ * de abajo, los 3 campos de texto/categoría se repartan el espacio libre de
+ * .grid-filter en vez de dejarlo vacío a la derecha (el checkbox y el botón
+ * "Buscar" al final quedan a tamaño fijo con flex-shrink:0, ver .html). */
+.productos-filtro-categoria {
+  flex: 1 1 200px;
+  min-width: 160px;
+  max-width: 420px;
+}
+
+/* Mismo criterio que arriba: los dos buscadores de texto (nombre/código)
+ * también crecen para ocupar el espacio libre, en vez de quedarse en su
+ * max-width:260px global (ver .grid-filter input en styles.scss) con todo
+ * el resto del ancho de .grid-filter vacío. Override local, scoped a esta
+ * pantalla (no toca la regla global, que sigue aplicando su max-width:260px
+ * por default en el resto de la app). */
+.grid-filter input:not([type='checkbox']) {
+  flex: 1 1 200px;
+  max-width: 420px;
+}
+
+/* Con 4 elementos en .grid-filter (2 buscadores + categoría + checkbox+Buscar)
+ * en vez de los 1-2 que maneja la mayoría de pantallas, antes esta regla
+ * forzaba flex-wrap:wrap SIEMPRE — sin importar que sobrara espacio de
+ * sobra (el flex-basis de cada campo, no su max-width/flex-grow, es lo que
+ * decide si entran en una sola línea; max-width/flex-grow solo deciden
+ * CUÁNTO crecen una vez que ya decidieron no envolver). Eso dejaba un hueco
+ * vacío a la derecha de .grid-filter y el botón "Buscar" solo en una
+ * segunda línea aun en pantallas anchas de sobra — el bug real reportado.
+ * Ahora se queda en nowrap (heredado de la regla global en styles.scss) en
+ * pantallas normales, y solo se envuelve bajo este ancho — rango donde con
+ * los 4 campos a su ancho mínimo (140/160px c/u) de verdad no caben en una
+ * sola línea junto con "+ Nuevo"/iconos de la izquierda. Override local (no
+ * toca la regla global, pensada para pantallas con 1-2 campos). */
+@media (max-width: 1100px) {
+  .grid-filter {
+    flex-wrap: wrap;
+  }
+}
+
 .tipo-producto-toggle {
   display: flex;
   flex-direction: column;

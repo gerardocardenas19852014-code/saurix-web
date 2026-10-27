@@ -55,6 +55,13 @@ export interface OpcionBuscable {
 export class SelectBuscableComponent implements ControlValueAccessor, OnDestroy {
   @Input() placeholder = 'Buscar…';
 
+  /** true solo en filtros opcionales (p.ej. categoría/bodega en un listado):
+   *  muestra una "✕" para volver al estado en blanco (sin selección = sin
+   *  filtrar) sin tener que agregar una opción artificial como "Todas las
+   *  categorías" a la lista. false por defecto para no cambiar nada en los
+   *  usos existentes (campos obligatorios de formulario, donde no aplica). */
+  @Input() permiteLimpiar = false;
+
   @Input()
   set opciones(v: OpcionBuscable[] | null) {
     this._opciones.set(v ?? []);
@@ -117,6 +124,14 @@ export class SelectBuscableComponent implements ControlValueAccessor, OnDestroy 
   });
 
   protected readonly textoMostrado = computed(() => (this.abierta() ? this.texto() : this.etiquetaSeleccion()));
+
+  /** La "✕" solo se ve si permiteLimpiar y hay algo que limpiar (si no,
+   *  estorbaría sobre el placeholder vacío). Se basa en si hay una etiqueta
+   *  visible, no en el valor crudo — así "0 sin opción en la lista" (el caso
+   *  de categoría/bodega aquí) se trata igual que null. */
+  protected readonly mostrarBotonLimpiar = computed(
+    () => this.permiteLimpiar && this.etiquetaSeleccion() !== '' && !this.abierta(),
+  );
 
   private readonly opcionesFiltradas = computed(() => {
     const termino = this.normalizar(this.texto());
@@ -189,6 +204,18 @@ export class SelectBuscableComponent implements ControlValueAccessor, OnDestroy 
     this.valueChange.emit(opcion.valor);
     this.onChange?.(opcion.valor);
     this.cerrar();
+  }
+
+  /** Botón "✕": vuelve al estado en blanco sin abrir el panel. mousedown
+   *  (no click) + preventDefault, igual que seleccionar(), para que no se
+   *  dispare primero el (focus) del input y reabra el panel. */
+  protected limpiar(evento: Event): void {
+    evento.preventDefault();
+    evento.stopPropagation();
+    this._value.set(null);
+    this.valueChange.emit(null);
+    this.onChange?.(null);
+    this.onTouched?.();
   }
 
   protected cerrar(): void {

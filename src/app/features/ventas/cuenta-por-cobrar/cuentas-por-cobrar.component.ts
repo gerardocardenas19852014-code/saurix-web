@@ -137,7 +137,9 @@ export class CuentasPorCobrarComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const turno = await this.turnoCajaService.turnoAbierto(usuario.id);
+    // turnoAbiertoOCrear(): si "Apertura de caja" está desactivada, abre uno
+    // en silencio en vez de bloquear — ver su comentario en TurnoCajaService.
+    const turno = await this.turnoCajaService.turnoAbiertoOCrear(usuario.id);
     if (!turno) {
       this.toast.advertencia('Abre un turno de caja antes de registrar un abono.');
       return;

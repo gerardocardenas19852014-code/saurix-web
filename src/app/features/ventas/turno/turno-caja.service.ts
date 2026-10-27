@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
+import { ConfiguracionVentasService } from '../../../shared/services/configuracion-ventas.service';
 import { Venta } from '../venta/venta.model';
 import { VentaPago } from '../venta/venta.model';
 import { DenominacionCantidad } from '../../../shared/components/conteo-denominaciones/conteo-denominaciones.model';
@@ -17,12 +18,33 @@ import { MomentoConteoCaja, ResumenTurno, TurnoCaja, TurnoCajaDenominacion } fro
 @Injectable({ providedIn: 'root' })
 export class TurnoCajaService {
   private readonly data = inject(DataClientService);
+  private readonly configuracionVentas = inject(ConfiguracionVentasService);
 
   /** El turno Abierto de este usuario, si tiene uno — null si no. Cobro
    *  redirige a Apertura de turno cuando esto da null. */
   async turnoAbierto(usuarioId: number): Promise<TurnoCaja | null> {
     const turnos = await firstValueFrom(this.data.list<TurnoCaja>('TurnoCaja', { usuarioId, estado: 'Abierto' }));
     return turnos.find((t) => t.estado === 'Abierto') ?? null;
+  }
+
+  /** Mismo que turnoAbierto(), pero si no hay ninguno Y "Apertura de caja"
+   *  está desactivada (ver ConfiguracionVentasService), abre uno en
+   *  silencio ($0, sin notas) en vez de devolver null — para negocios que
+   *  apagaron esa pantalla precisamente porque no quieren manejar el
+   *  ritual de abrir/cerrar turno, pero igual necesitan poder cobrar
+   *  (turnoCajaId es obligatorio en Venta, así que SIEMPRE hace falta un
+   *  turno "por dentro", se vea o no esa pantalla). Si "Apertura de caja"
+   *  SÍ está activa, el comportamiento no cambia: null si no hay uno
+   *  abierto, para que Cobro/Pedidos web sigan mandando al flujo manual
+   *  de siempre. Usado por Cobro y por "Confirmar venta" en Pedidos web. */
+  async turnoAbiertoOCrear(usuarioId: number): Promise<TurnoCaja | null> {
+    const existente = await this.turnoAbierto(usuarioId);
+    if (existente) return existente;
+
+    await this.configuracionVentas.cargar();
+    if (this.configuracionVentas.aperturaCajaActivo()) return null;
+
+    return this.abrir(usuarioId, 0, null);
   }
 
   async abrir(usuarioId: number, montoApertura: number, notas: string | null): Promise<TurnoCaja> {

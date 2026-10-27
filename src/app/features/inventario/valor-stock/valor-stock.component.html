@@ -7,9 +7,9 @@
   valorizar y los productos inactivos no se incluyen.
 </p>
 
-@if (cargando()) {
+@if (cargandoResumen()) {
   <p class="empty">Cargando…</p>
-} @else if (filas().length === 0) {
+} @else if (sinNadaQueValorizar()) {
   <div class="empty-state-block">
     <p>No hay productos físicos activos con existencia para valorizar.</p>
   </div>
@@ -70,6 +70,8 @@
           </div>
           <span class="wallet-cat-bar-amount">{{ formatMoneda(cat.valor) }} · {{ cat.pct | number: '1.0-0' }}%</span>
         </div>
+      } @empty {
+        <p class="empty">Sin categorías con valor que mostrar.</p>
       }
     </div>
 
@@ -83,47 +85,111 @@
           </div>
           <span class="wallet-cat-bar-amount">{{ formatMoneda(bod.valor) }} · {{ bod.pct | number: '1.0-0' }}%</span>
         </div>
+      } @empty {
+        <p class="empty">Sin bodegas con valor que mostrar.</p>
       }
     </div>
   } @else if (tabActiva() === 'productos') {
     <div class="grid-toolbar">
       <div class="grid-filter">
-        <input type="search" placeholder="Buscar por nombre o código…" [value]="busqueda()" (input)="busqueda.set($any($event.target).value)" />
+        <input
+          type="search"
+          placeholder="Buscar por nombre o código…"
+          [value]="busquedaProductos()"
+          (input)="onBusquedaProductosInput($any($event.target).value)"
+          (keyup.enter)="cambiarFiltroProductos()"
+        />
+        <div class="productos-filtro-categoria">
+          <app-select-buscable
+            [opciones]="opcionesCategoriaFiltro()"
+            [value]="categoriaIdFiltro()"
+            placeholder="Filtrar por categoría…"
+            [permiteLimpiar]="true"
+            (valueChange)="categoriaIdFiltro.set(+($event ?? 0))"
+          />
+        </div>
+        <div class="productos-filtro-categoria">
+          <app-select-buscable
+            [opciones]="opcionesBodegaFiltro()"
+            [value]="bodegaIdFiltro()"
+            placeholder="Filtrar por bodega…"
+            [permiteLimpiar]="true"
+            (valueChange)="bodegaIdFiltro.set(+($event ?? 0))"
+          />
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+          <select [value]="estadoFiltro()" (change)="estadoFiltro.set($any($event.target).value)">
+            <option value="">Todos los estados</option>
+            <option value="sin_existencia">Sin existencia</option>
+            <option value="stock_bajo">Stock bajo</option>
+            <option value="sobre_stock">Sobre-stock</option>
+          </select>
+          <button type="button" class="btn-primary small" (click)="cambiarFiltroProductos()">🔍 Buscar</button>
+        </div>
       </div>
       <button type="button" class="btn-secondary small" (click)="exportarCsvProductos()">⬇ Exportar CSV</button>
       <button type="button" class="btn-secondary small" (click)="exportarPdfProductos()">⬇ Exportar PDF</button>
     </div>
 
-    <div class="grid-table-scroll">
-      <table class="grid-table">
-        <thead>
-          <tr><th>Código</th><th>Nombre</th><th>Categoría</th><th>Existencia</th><th>Costo</th><th>Valor</th></tr>
-        </thead>
-        <tbody>
-          @for (fila of filasFiltradas(); track fila.productoId) {
+    @if (busquedaProductosRealizada()) {
+      <div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-bottom:10px;">
+        <span class="hint" style="margin:0;">
+          Página {{ paginaActualProductos() }} de {{ totalPaginasProductos() }} — {{ totalProductosFiltrados() }} producto(s)
+        </span>
+        <button type="button" class="btn-secondary small" [disabled]="paginaActualProductos() <= 1 || cargandoProductos()" (click)="irAPaginaAnteriorProductos()">
+          ← Anterior
+        </button>
+        <button type="button" class="btn-secondary small" [disabled]="paginaActualProductos() >= totalPaginasProductos() || cargandoProductos()" (click)="irAPaginaSiguienteProductos()">
+          Siguiente →
+        </button>
+      </div>
+
+      <div class="grid-table-scroll">
+        <table class="grid-table">
+          <thead>
             <tr>
-              <td data-label="Código">{{ fila.codigo || '—' }}</td>
-              <td data-label="Nombre">{{ fila.nombre }}</td>
-              <td data-label="Categoría">{{ fila.categoriaNombre }}</td>
-              <td data-label="Existencia">
-                {{ fila.existencia }}
-                @if (fila.existencia === 0) {
-                  <span class="tag" style="background:var(--danger-soft); color:var(--danger); margin-left:6px;">Sin existencia</span>
-                } @else if (fila.stockBajo) {
-                  <span class="tag" style="background:var(--amber-soft); color:var(--amber); margin-left:6px;">Stock bajo</span>
-                } @else if (fila.sobreStock) {
-                  <span class="tag" style="background:var(--amber-soft); color:var(--amber); margin-left:6px;">Sobre-stock</span>
-                }
-              </td>
-              <td data-label="Costo">{{ formatMoneda(fila.costo) }}</td>
-              <td data-label="Valor">{{ formatMoneda(fila.valor) }}</td>
+              <th (click)="cambiarOrdenProductos('codigo')" style="cursor:pointer;">Código {{ ordenProductos() === 'codigo' ? (direccionProductos() === 'asc' ? '▲' : '▼') : '' }}</th>
+              <th (click)="cambiarOrdenProductos('nombre')" style="cursor:pointer;">Nombre {{ ordenProductos() === 'nombre' ? (direccionProductos() === 'asc' ? '▲' : '▼') : '' }}</th>
+              <th>Categoría</th>
+              <th (click)="cambiarOrdenProductos('existencia')" style="cursor:pointer;">Existencia {{ ordenProductos() === 'existencia' ? (direccionProductos() === 'asc' ? '▲' : '▼') : '' }}</th>
+              <th (click)="cambiarOrdenProductos('costo')" style="cursor:pointer;">Costo {{ ordenProductos() === 'costo' ? (direccionProductos() === 'asc' ? '▲' : '▼') : '' }}</th>
+              <th (click)="cambiarOrdenProductos('valor')" style="cursor:pointer;">Valor {{ ordenProductos() === 'valor' ? (direccionProductos() === 'asc' ? '▲' : '▼') : '' }}</th>
             </tr>
-          } @empty {
-            <tr><td colspan="6"><p class="empty">Sin resultados para "{{ busqueda() }}".</p></td></tr>
-          }
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            @if (cargandoProductos()) {
+              <tr><td colspan="6"><p class="empty">Cargando…</p></td></tr>
+            } @else {
+              @for (fila of productosPagina(); track fila.productoId) {
+                <tr>
+                  <td data-label="Código">{{ fila.codigo || '—' }}</td>
+                  <td data-label="Nombre">{{ fila.nombre }}</td>
+                  <td data-label="Categoría">{{ fila.categoriaNombre }}</td>
+                  <td data-label="Existencia">
+                    {{ fila.existencia }}
+                    @if (fila.existencia === 0) {
+                      <span class="tag" style="background:var(--danger-soft); color:var(--danger); margin-left:6px;">Sin existencia</span>
+                    } @else if (fila.stockBajo) {
+                      <span class="tag" style="background:var(--amber-soft); color:var(--amber); margin-left:6px;">Stock bajo</span>
+                    } @else if (fila.sobreStock) {
+                      <span class="tag" style="background:var(--amber-soft); color:var(--amber); margin-left:6px;">Sobre-stock</span>
+                    }
+                  </td>
+                  <td data-label="Costo">{{ formatMoneda(fila.costo) }}</td>
+                  <td data-label="Valor">{{ formatMoneda(fila.valor) }}</td>
+                </tr>
+              } @empty {
+                <tr><td colspan="6"><p class="empty">Sin resultados para los filtros actuales.</p></td></tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <div class="empty-state-block">
+        <p>Usa los filtros de arriba y da click en <strong>🔍 Buscar</strong> (o Enter) para ver los productos.</p>
+      </div>
+    }
   } @else {
     <p class="hint" style="margin:0 0 14px;">
       Productos físicos activos sin ningún movimiento (entrada, traspaso o salida) en los últimos
@@ -133,10 +199,22 @@
         min="1"
         style="width:70px; display:inline-block;"
         [value]="umbralDias()"
-        (change)="umbralDias.set(+$any($event.target).value || 1)"
+        (change)="cambiarUmbralDias(+$any($event.target).value || 1)"
       />
       días — capital posiblemente inmovilizado. "Nunca" significa que jamás tuvo un movimiento registrado.
     </p>
+
+    <div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-bottom:10px;">
+      <span class="hint" style="margin:0;">
+        Página {{ paginaActualRotacion() }} de {{ totalPaginasRotacion() }} — {{ totalRotacionFiltrada() }} producto(s)
+      </span>
+      <button type="button" class="btn-secondary small" [disabled]="paginaActualRotacion() <= 1 || cargandoRotacion()" (click)="irAPaginaAnteriorRotacion()">
+        ← Anterior
+      </button>
+      <button type="button" class="btn-secondary small" [disabled]="paginaActualRotacion() >= totalPaginasRotacion() || cargandoRotacion()" (click)="irAPaginaSiguienteRotacion()">
+        Siguiente →
+      </button>
+    </div>
 
     <div class="grid-table-scroll">
       <table class="grid-table">
@@ -144,22 +222,26 @@
           <tr><th>Código</th><th>Nombre</th><th>Existencia</th><th>Último movimiento</th><th>Días sin moverse</th></tr>
         </thead>
         <tbody>
-          @for (fila of rotacionFiltrada(); track fila.productoId) {
-            <tr>
-              <td data-label="Código">{{ fila.codigo || '—' }}</td>
-              <td data-label="Nombre">{{ fila.nombre }}</td>
-              <td data-label="Existencia">{{ fila.existencia }}</td>
-              <td data-label="Último movimiento">{{ fila.ultimoMovimiento ? (fila.ultimoMovimiento | date: 'dd/MM/yyyy') : 'Nunca' }}</td>
-              <td data-label="Días sin moverse">
-                @if (fila.diasSinMovimiento === null) {
-                  <span class="tag" style="background:var(--danger-soft); color:var(--danger);">Nunca</span>
-                } @else {
-                  <span class="tag" style="background:var(--amber-soft); color:var(--amber);">{{ fila.diasSinMovimiento }} días</span>
-                }
-              </td>
-            </tr>
-          } @empty {
-            <tr><td colspan="5"><p class="empty">Ningún producto lleva {{ umbralDias() }} días o más sin movimiento.</p></td></tr>
+          @if (cargandoRotacion()) {
+            <tr><td colspan="5"><p class="empty">Cargando…</p></td></tr>
+          } @else {
+            @for (fila of rotacionPagina(); track fila.productoId) {
+              <tr>
+                <td data-label="Código">{{ fila.codigo || '—' }}</td>
+                <td data-label="Nombre">{{ fila.nombre }}</td>
+                <td data-label="Existencia">{{ fila.existencia }}</td>
+                <td data-label="Último movimiento">{{ fila.ultimoMovimiento ? (fila.ultimoMovimiento | date: 'dd/MM/yyyy') : 'Nunca' }}</td>
+                <td data-label="Días sin moverse">
+                  @if (fila.diasSinMovimiento === null) {
+                    <span class="tag" style="background:var(--danger-soft); color:var(--danger);">Nunca</span>
+                  } @else {
+                    <span class="tag" style="background:var(--amber-soft); color:var(--amber);">{{ fila.diasSinMovimiento }} días</span>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="5"><p class="empty">Ningún producto lleva {{ umbralDias() }} días o más sin movimiento.</p></td></tr>
+            }
           }
         </tbody>
       </table>

@@ -57,16 +57,51 @@ export class ProductosComponent implements OnInit, OnDestroy {
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
   private readonly fb = inject(FormBuilder);
 
+  /** Tope de resultados para la búsqueda rápida del modal "Imprimir
+   *  etiquetas" (ver buscarProductosEtiquetas()) — ese modal busca aparte
+   *  contra el servidor (no contra la página actual de la tabla), así que
+   *  necesita su propio límite acotado. */
+  private static readonly LIMITE_BUSQUEDA_ETIQUETAS = 200;
+
   protected readonly productos = signal<Producto[]>([]);
+  /** Total real de productos que cumplen el filtro actual (sin recortar a
+   *  la página) — ver cargar(). Con esto se calcula totalPaginas y se sabe
+   *  si "Siguiente" tiene a dónde ir, sin tener que traer el catálogo
+   *  completo solo para contarlo. */
+  protected readonly totalProductos = signal(0);
   protected readonly categorias = signal<CategoriaProducto[]>([]);
   protected readonly unidades = signal<UnidadMedida[]>([]);
   protected readonly proveedores = signal<Proveedor[]>([]);
   protected readonly existenciasBodega = signal<ExistenciaBodega[]>([]);
   protected readonly cargando = signal(false);
   protected readonly busqueda = signal('');
+  /** Búsqueda por código/SKU — igual que busqueda (nombre), va server-side
+   *  (coincidencia parcial, ver DataClientService.list()) en vez de
+   *  filtrar en memoria, para que funcione aunque el producto buscado no
+   *  esté en la página actualmente cargada. */
+  protected readonly busquedaCodigo = signal('');
+  /** 0 = sin filtrar por categoría (campo en blanco — ver
+   *  opcionesCategoriaFiltro, que ya no incluye una opción "Todas" propia;
+   *  el combo la limpia con su botón "✕" en vez de tener que elegirla). */
+  protected readonly filtroCategoriaId = signal(0);
   protected readonly mostrarInactivos = signal(false);
-  protected readonly productosFiltrados = computed(() =>
-    this.productos().filter((p) => this.mostrarInactivos() || p.activo !== false),
+  /** true solo después de que el usuario hace click en "Buscar" (o Enter en
+   *  un campo de texto) al menos una vez — ver cambiarFiltro(). Antes de eso
+   *  no se pide nada al servidor ni se muestra la tabla/paginador: con un
+   *  catálogo de cientos de miles de productos, cargar la página 1 "porque
+   *  sí" al abrir la pantalla ya no tiene sentido si de todas formas el
+   *  usuario va a filtrar antes de mirar resultados. */
+  protected readonly busquedaRealizada = signal(false);
+
+  /** Página actual (1-based) de la paginación REAL contra el servidor — ver
+   *  cargar(). A diferencia de [tamanoPagina] en <app-data-table> (que solo
+   *  pagina en memoria lo que ya se trajo), esto controla qué página se le
+   *  PIDE al servidor: nunca se trae más de una página a la vez, así que
+   *  "Siguiente" dispara una petición nueva en vez de solo cambiar qué
+   *  renglones ya cargados se muestran. */
+  protected readonly paginaActual = signal(1);
+  protected readonly totalPaginas = computed(() =>
+    Math.max(1, Math.ceil(this.totalProductos() / Math.max(1, this.preferenciasGrid.tamanoPagina()))),
   );
 
   protected readonly opcionesCategoria = computed<OpcionBuscable[]>(() =>
@@ -74,6 +109,13 @@ export class ProductosComponent implements OnInit, OnDestroy {
       .filter((c) => c.activo !== false)
       .map((c) => ({ valor: c.id, etiqueta: c.nombre })),
   );
+  /** Igual que opcionesCategoria — para el filtro de búsqueda del listado
+   *  (opcional), a diferencia del dropdown del formulario de alta/edición
+   *  donde elegir categoría es obligatorio. Sin una opción "Todas las
+   *  categorías" artificial: sin selección (campo en blanco) YA significa
+   *  "todas"; el combo usa [permiteLimpiar]="true" para volver a ese
+   *  estado con su botón "✕". */
+  protected readonly opcionesCategoriaFiltro = this.opcionesCategoria;
   protected readonly opcionesUnidad = computed<OpcionBuscable[]>(() =>
     this.unidades()
       .filter((u) => u.activo !== false)
@@ -198,7 +240,8 @@ export class ProductosComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
     this.cargarCatalogos();
-    this.cargar();
+    // Ya no se llama this.cargar() aquí — la tabla arranca vacía hasta que
+    // el usuario haga click en "Buscar" (ver busquedaRealizada/cambiarFiltro()).
   }
 
   // Sin `error` en estos 4 catálogos, un fallo de red/permiso se volvía un
@@ -224,15 +267,75 @@ export class ProductosComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** Filtro actual para Producto: nombre/código son parciales (ilike),
+   *  categoriaProductoId exacto, activo solo se manda cuando NO se quieren
+   *  inactivos (mandarlo en false excluiría los activos, que es lo
+   *  opuesto de "Mostrar inactivos" — omitirlo trae ambos). */
+  private filtroActual(): Record<string, unknown> {
+    const filtro: Record<string, unknown> = {
+      nombre: this.busqueda().trim() || undefined,
+      codigo: this.busquedaCodigo().trim() || undefined,
+    };
+    if (this.filtroCategoriaId()) filtro['categoriaProductoId'] = this.filtroCategoriaId();
+    if (!this.mostrarInactivos()) filtro['activo'] = true;
+    return filtro;
+  }
+
+  /** Trae SOLO la página actual (paginaActual, tamaño = preferencia del
+   *  usuario) del catálogo que cumple el filtro actual — nunca el catálogo
+   *  completo. Antes se traían hasta 500 productos de un jalón aunque solo
+   *  se fueran a mostrar 10/25/50 a la vez (según [tamanoPagina] de
+   *  <app-data-table>, que de cualquier forma solo pagina EN MEMORIA lo ya
+   *  traído); con un catálogo de cientos de miles de productos (p.ej. una
+   *  prueba de rendimiento) eso seguía siendo una petición enorme y lenta
+   *  para mostrar una sola pantalla. Ahora "Siguiente"/"Anterior" piden al
+   *  servidor la página que haga falta, bajo demanda (ver
+   *  irAPaginaSiguiente/irAPaginaAnterior), igual que ya hace Kanban con
+   *  Ticket (ver cargarMasTickets() en kanban.component.ts, aunque ahí es
+   *  "cargar más" acumulando en vez de reemplazar página por página). */
   cargar(): void {
     this.cargando.set(true);
-    this.data.list<Producto>('Producto', { nombre: this.busqueda() || undefined }).subscribe({
-      next: (productos) => {
-        this.productos.set(productos);
+    const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
+    const desde = (this.paginaActual() - 1) * tamanio;
+    this.data.listarPagina<Producto>('Producto', this.filtroActual(), desde, tamanio).subscribe({
+      next: ({ filas, total }) => {
+        this.totalProductos.set(total);
+        // Si la página en la que estábamos quedó vacía (p.ej. se acaba de
+        // eliminar el último producto de la última página, o un filtro
+        // nuevo tiene menos páginas que la posición actual), retrocede a la
+        // última página real en vez de dejar la tabla en blanco.
+        if (filas.length === 0 && this.paginaActual() > 1 && total > 0) {
+          this.paginaActual.set(Math.max(1, Math.ceil(total / tamanio)));
+          this.cargar();
+          return;
+        }
+        this.productos.set(filas);
         this.cargando.set(false);
       },
       error: () => this.cargando.set(false),
     });
+  }
+
+  /** Cualquier cambio de filtro (nombre, código, categoría, mostrar
+   *  inactivos) vuelve a la página 1 — quedarse en, digamos, la página 4 de
+   *  un filtro nuevo casi siempre cae fuera de rango o muestra resultados
+   *  que no tienen relación con lo que se acaba de buscar. */
+  protected cambiarFiltro(): void {
+    this.busquedaRealizada.set(true);
+    this.paginaActual.set(1);
+    this.cargar();
+  }
+
+  protected irAPaginaAnterior(): void {
+    if (this.paginaActual() <= 1) return;
+    this.paginaActual.update((p) => p - 1);
+    this.cargar();
+  }
+
+  protected irAPaginaSiguiente(): void {
+    if (this.paginaActual() >= this.totalPaginas()) return;
+    this.paginaActual.update((p) => p + 1);
+    this.cargar();
   }
 
   nuevo(): void {
@@ -315,14 +418,27 @@ export class ProductosComponent implements OnInit, OnDestroy {
    *  bodegas/Conteo físico/Órdenes de compra y un duplicado haría que el
    *  escaneo encuentre el producto equivocado. */
   asignarCodigoEscaneado(codigo: string): void {
-    const idActual = this.productoEnEdicion()?.id ?? 0;
-    const duplicado = this.productos().find(
-      (p) => p.id !== idActual && p.activo !== false && (p.codigo ?? '').trim().toLowerCase() === codigo.trim().toLowerCase(),
-    );
-    if (duplicado) {
-      this.toast.advertencia(`Ojo: "${duplicado.nombre}" ya tiene este mismo código.`);
-    }
     this.form.patchValue({ codigo });
+    const codigoLimpio = codigo.trim();
+    if (!codigoLimpio) return;
+    // Antes se buscaba el duplicado solo entre los productos ya cargados en
+    // memoria (this.productos()) — con la paginación real de cargar(), esta
+    // pantalla normalmente solo tiene cargada UNA página a la vez, así que
+    // ese chequeo ya no cubre el catálogo completo. Se pregunta directo al
+    // servidor por ese código exacto en su lugar (aviso best-effort, igual
+    // que antes: no bloquea guardar si hay un duplicado real).
+    const idActual = this.productoEnEdicion()?.id ?? 0;
+    this.data.listarPagina<Producto>('Producto', { codigo: codigoLimpio, activo: true }, 0, 5).subscribe({
+      next: ({ filas }) => {
+        const duplicado = filas.find(
+          (p) => p.id !== idActual && (p.codigo ?? '').trim().toLowerCase() === codigoLimpio.toLowerCase(),
+        );
+        if (duplicado) {
+          this.toast.advertencia(`Ojo: "${duplicado.nombre}" ya tiene este mismo código.`);
+        }
+      },
+      error: () => {},
+    });
   }
 
   guardar(): void {
@@ -361,7 +477,7 @@ export class ProductosComponent implements OnInit, OnDestroy {
       next: () => {
         this.toast.exito(esEdicion ? 'Producto actualizado.' : 'Producto creado.');
         this.modalAbierto.set(false);
-        this.cargar();
+        if (this.busquedaRealizada()) this.cargar();
       },
       // conToast() ya muestra su propio toast de error y vuelve a lanzar —
       // sin este handler, un guardado fallido quedaba como "Uncaught (in
@@ -409,7 +525,7 @@ export class ProductosComponent implements OnInit, OnDestroy {
       next: () => {
         this.toast.exito('Producto eliminado.');
         this.productoAEliminar.set(null);
-        this.cargar();
+        if (this.busquedaRealizada()) this.cargar();
       },
       // Igual que en guardar(): sin esto, una baja fallida (p.ej. producto
       // referenciado en otra tabla) quedaba como "Uncaught (in promise)".
@@ -621,7 +737,7 @@ export class ProductosComponent implements OnInit, OnDestroy {
     }
 
     this.toast.exito(`Importación terminada: ${importados} creado${importados === 1 ? '' : 's'}.`);
-    this.cargar();
+    if (this.busquedaRealizada()) this.cargar();
   }
 
   // ── Foto del producto ────────────────────────────────────────────────
@@ -698,16 +814,18 @@ export class ProductosComponent implements OnInit, OnDestroy {
   // ventana nueva aparte, no desde esta misma pantalla.
   protected readonly modalEtiquetasAbierto = signal(false);
   protected readonly busquedaEtiquetas = signal('');
+  protected readonly cargandoEtiquetas = signal(false);
   protected readonly seleccionEtiquetas = signal<Set<number>>(new Set());
   protected readonly cantidadEtiquetas = signal<Record<number, number>>({});
 
-  protected readonly productosParaEtiquetas = computed(() => {
-    const texto = this.busquedaEtiquetas().trim().toLowerCase();
-    return this.productos()
-      .filter((p) => p.activo !== false)
-      .filter((p) => !texto || p.nombre.toLowerCase().includes(texto) || (p.codigo ?? '').toLowerCase().includes(texto))
-      .sort((a, b) => a.nombre.localeCompare(b.nombre));
-  });
+  /** Resultados de la búsqueda del modal "Imprimir etiquetas" — a
+   *  diferencia de antes (computed sobre this.productos(), que solo tenía
+   *  sentido cuando esa señal traía el catálogo completo), ahora es su
+   *  propia señal llenada por buscarProductosEtiquetas(), que pregunta al
+   *  servidor directo: la tabla principal ya solo mantiene en memoria la
+   *  página actual (ver cargar()), así que buscar aquí contra eso dejaría
+   *  de encontrar productos que no estén en esa página. */
+  protected readonly productosParaEtiquetas = signal<Producto[]>([]);
 
   protected readonly totalEtiquetasSeleccionadas = computed(() =>
     Array.from(this.seleccionEtiquetas()).reduce((acc, id) => acc + this.cantidadEtiquetaDe(id), 0),
@@ -717,7 +835,49 @@ export class ProductosComponent implements OnInit, OnDestroy {
     this.busquedaEtiquetas.set('');
     this.seleccionEtiquetas.set(new Set());
     this.cantidadEtiquetas.set({});
+    this.productosParaEtiquetas.set([]);
     this.modalEtiquetasAbierto.set(true);
+    this.buscarProductosEtiquetas();
+  }
+
+  /** Dispara la búsqueda server-side del modal (ver productosParaEtiquetas).
+   *  El cuadro de búsqueda cubre nombre Y código a la vez (igual que el
+   *  comportamiento anterior en memoria): primero intenta por nombre
+   *  (parcial); si no hay texto o si no encontró nada, intenta por código
+   *  — así un código exacto que no haga match por nombre igual aparece. */
+  protected buscarProductosEtiquetas(): void {
+    this.cargandoEtiquetas.set(true);
+    const texto = this.busquedaEtiquetas().trim();
+    this.data
+      .listarPagina<Producto>(
+        'Producto',
+        { activo: true, nombre: texto || undefined },
+        0,
+        ProductosComponent.LIMITE_BUSQUEDA_ETIQUETAS,
+      )
+      .subscribe({
+        next: ({ filas }) => {
+          if (filas.length > 0 || !texto) {
+            this.productosParaEtiquetas.set(this.ordenarPorNombre(filas));
+            this.cargandoEtiquetas.set(false);
+            return;
+          }
+          this.data
+            .listarPagina<Producto>('Producto', { activo: true, codigo: texto }, 0, ProductosComponent.LIMITE_BUSQUEDA_ETIQUETAS)
+            .subscribe({
+              next: ({ filas: filasPorCodigo }) => {
+                this.productosParaEtiquetas.set(this.ordenarPorNombre(filasPorCodigo));
+                this.cargandoEtiquetas.set(false);
+              },
+              error: () => this.cargandoEtiquetas.set(false),
+            });
+        },
+        error: () => this.cargandoEtiquetas.set(false),
+      });
+  }
+
+  private ordenarPorNombre(filas: Producto[]): Producto[] {
+    return [...filas].sort((a, b) => a.nombre.localeCompare(b.nombre));
   }
 
   estaSeleccionadoParaEtiqueta(id: number): boolean {
@@ -796,7 +956,7 @@ export class ProductosComponent implements OnInit, OnDestroy {
     // a la misma URL), que es justo lo que causaba que "no pasara nada".
     event.preventDefault();
 
-    const seleccionados = this.productos().filter((p) => this.seleccionEtiquetas().has(p.id));
+    const seleccionados = this.productosParaEtiquetas().filter((p) => this.seleccionEtiquetas().has(p.id));
     if (seleccionados.length === 0) {
       this.toast.advertencia('Elige al menos un producto.');
       return;

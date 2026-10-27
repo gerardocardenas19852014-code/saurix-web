@@ -216,17 +216,47 @@ export class SupabaseDataClientService extends DataClientService {
     return consulta;
   }
 
+  /** Páginas siguientes a la primera (ver listar()), traídas en PARALELO
+   *  con un tope de concurrencia — nunca todas a la vez (eso reproduciría
+   *  el mismo bug de fan-out sin límite ya documentado en este repo, ver
+   *  NotificacionesService) ni todas en serie una por una (eso era
+   *  exactamente el problema: con un catálogo de 200,000+ filas —
+   *  ver inventario.producto tras la prueba de rendimiento — list() hacía
+   *  ~200 peticiones en fila, cada una esperando a la anterior, dejando la
+   *  pantalla en "Cargando…" decenas de segundos sin ningún error). */
+  private static readonly CONCURRENCIA_PAGINAS = 6;
+
   private async listar(entidad: string, filtro?: Record<string, unknown>): Promise<Fila[]> {
     const def = definicionTabla(entidad);
     if (this.filtroImposible(def, filtro)) return [];
-    const filas: Fila[] = [];
-    for (let desde = 0; ; desde += TAMANO_PAGINA) {
-      const consulta = this.aplicarFiltros(this.tabla(def).select('*'), def, filtro);
-      const { data, error } = await consulta.order('id').range(desde, desde + TAMANO_PAGINA - 1);
-      if (error) throw error;
-      filas.push(...((data ?? []) as Fila[]));
-      if (!data || data.length < TAMANO_PAGINA) break;
+
+    // Primera página con count exacto: con eso ya se sabe cuántas páginas
+    // más hacen falta, sin tener que ir descubriéndolo una por una.
+    const primera = this.aplicarFiltros(this.tabla(def).select('*', { count: 'exact' }), def, filtro);
+    const { data: datosIniciales, error: errorInicial, count } = await primera.order('id').range(0, TAMANO_PAGINA - 1);
+    if (errorInicial) throw errorInicial;
+    const filas: Fila[] = [...((datosIniciales ?? []) as Fila[])];
+    const total = count ?? filas.length;
+
+    const desdeRestantes: number[] = [];
+    for (let desde = TAMANO_PAGINA; desde < total; desde += TAMANO_PAGINA) desdeRestantes.push(desde);
+
+    for (let i = 0; i < desdeRestantes.length; i += SupabaseDataClientService.CONCURRENCIA_PAGINAS) {
+      const lote = desdeRestantes.slice(i, i + SupabaseDataClientService.CONCURRENCIA_PAGINAS);
+      const resultadosLote = await Promise.all(
+        lote.map(async (desde) => {
+          const consulta = this.aplicarFiltros(this.tabla(def).select('*'), def, filtro);
+          const { data, error } = await consulta.order('id').range(desde, desde + TAMANO_PAGINA - 1);
+          if (error) throw error;
+          return (data ?? []) as Fila[];
+        }),
+      );
+      // Promise.all conserva el orden de `lote` en `resultadosLote` (no el
+      // orden en que cada petición respondió), así que el resultado final
+      // sigue viniendo ordenado por id ascendente, igual que antes.
+      for (const pagina of resultadosLote) filas.push(...pagina);
     }
+
     const resultado = filas.map(filaACamel);
     return esTablaAdjuntos(def) ? this.firmarAdjuntos(resultado) : resultado;
   }

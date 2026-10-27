@@ -181,6 +181,19 @@ export class NotificacionesService {
    *  importar qué tan grande crezca la tabla. */
   private static readonly LIMITE_TICKETS_SLA_POR_CICLO = 100;
 
+  /** Mismos 3 topes que MAX_AVISOS_SLA_POR_CICLO/CONCURRENCIA_AVISOS_SLA/
+   *  LIMITE_TICKETS_SLA_POR_CICLO, pero para revisarAlertasStockBajo() —
+   *  necesarios por la misma razón: Producto puede llegar a tener cientos de
+   *  miles de filas (p.ej. en una prueba de rendimiento) y, sin tope, tanto
+   *  traer/recorrer todos los productos como el fan-out de escrituras
+   *  (AvisoStockBajo + notificación) por cada uno que esté bajo de stock
+   *  podía disparar miles de peticiones HTTP simultáneas — mismo patrón que
+   *  causó la crisis original de SLA, solo que esta vez con Producto en vez
+   *  de Ticket. */
+  private static readonly MAX_AVISOS_STOCK_POR_CICLO = 100;
+  private static readonly CONCURRENCIA_AVISOS_STOCK = 5;
+  private static readonly LIMITE_PRODUCTOS_STOCK_POR_CICLO = 100;
+
   /**
    * Revisión periódica de SLA — cierra el hueco que dejaba el comentario de arriba:
    * hasta ahora NINGÚN ticket avisaba por SLA, pese a que el catálogo de Prioridades
@@ -404,8 +417,14 @@ export class NotificacionesService {
       const hoy = new Date();
       const dia = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
 
-      const [productos, existenciasBodega, nivelesMinimoBodega, avisos] = await Promise.all([
-        firstValueFrom(this.data.list<Producto>('Producto')),
+      // listarPagina() en vez de list(): con Producto en cientos de miles de
+      // filas (ver comentario de LIMITE_PRODUCTOS_STOCK_POR_CICLO), traer y
+      // recorrer la tabla completa en memoria cada 5 min ya era costoso por
+      // sí solo, antes de siquiera llegar al fan-out de abajo.
+      const [{ filas: productos }, existenciasBodega, nivelesMinimoBodega, avisos] = await Promise.all([
+        firstValueFrom(
+          this.data.listarPagina<Producto>('Producto', {}, 0, NotificacionesService.LIMITE_PRODUCTOS_STOCK_POR_CICLO),
+        ),
         firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega')),
         firstValueFrom(this.data.list<NivelMinimoBodega>('NivelMinimoBodega')),
         firstValueFrom(this.data.list<AvisoStockBajo>('AvisoStockBajo', { usuarioId, dia })),
@@ -417,28 +436,46 @@ export class NotificacionesService {
       const yaAvisado = (productoId: number, bodegaId: number | null) =>
         avisos.some((a) => Number(a.productoId) === productoId && (a.bodegaId ?? null) === bodegaId);
 
-      for (const producto of productos) {
+      // Se arma la lista de candidatos ANTES de escribir nada (igual que
+      // revisarSlaTickets) para poder acotar el fan-out de escrituras con
+      // mergeMap(..., CONCURRENCIA_AVISOS_STOCK) en vez de disparar todas las
+      // peticiones de golpe (con miles de productos bajos de stock a la vez,
+      // eso era justo lo que tronaba el navegador: "TypeError: Failed to
+      // fetch" por cientos/miles de peticiones simultáneas).
+      type Candidato = { producto: Producto; bodegaId: number | null; existencia: number; nivelMinimo: number };
+      const candidatos: Candidato[] = [];
+      outer: for (const producto of productos) {
         if (!producto.activo) continue;
-
         for (const alerta of alertasStockBajo(producto, existenciasBodega, nivelesMinimoBodega)) {
           if (yaAvisado(producto.id, alerta.bodegaId)) continue;
-
-          // Mismo orden que revisarSlaTickets/revisarAlertasTarjetas: se
-          // registra primero y solo se notifica si el registro tuvo éxito,
-          // para no repetir el aviso cada ciclo si la escritura falla.
-          this.data
-            .alta<AvisoStockBajo>('AvisoStockBajo', { productoId: producto.id, bodegaId: alerta.bodegaId, usuarioId, dia })
-            .subscribe({
-              next: () =>
-                this.notificar(
-                  usuarioId,
-                  `📉 "${producto.nombre}" tiene ${alerta.existencia} de existencia, por debajo de su mínimo (${alerta.nivelMinimo}).`,
-                  '/inventario/valor-stock',
-                ),
-              error: (error) => console.warn('No se pudo registrar el aviso de stock bajo (no se notifica):', error),
-            });
+          candidatos.push({ producto, bodegaId: alerta.bodegaId, existencia: alerta.existencia, nivelMinimo: alerta.nivelMinimo });
+          if (candidatos.length >= NotificacionesService.MAX_AVISOS_STOCK_POR_CICLO) break outer;
         }
       }
+      if (candidatos.length === 0) return;
+
+      await firstValueFrom(
+        from(candidatos).pipe(
+          mergeMap(
+            ({ producto, bodegaId, existencia, nivelMinimo }) =>
+              this.data.alta<AvisoStockBajo>('AvisoStockBajo', { productoId: producto.id, bodegaId, usuarioId, dia }).pipe(
+                tap(() =>
+                  this.notificar(
+                    usuarioId,
+                    `📉 "${producto.nombre}" tiene ${existencia} de existencia, por debajo de su mínimo (${nivelMinimo}).`,
+                    '/inventario/valor-stock',
+                  ),
+                ),
+                catchError((error) => {
+                  console.warn('No se pudo registrar el aviso de stock bajo (no se notifica este ciclo):', error);
+                  return of(null);
+                }),
+              ),
+            NotificacionesService.CONCURRENCIA_AVISOS_STOCK,
+          ),
+          toArray(),
+        ),
+      );
     } catch (error) {
       console.warn('No se pudo revisar las alertas de stock bajo:', error);
     }

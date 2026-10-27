@@ -27,6 +27,37 @@
   cursor: not-allowed;
 }
 
+// Deja espacio a la "✕" (permiteLimpiar) para que el texto largo de una
+// categoría/bodega seleccionada no quede debajo del botón.
+.selbuscable-input-con-limpiar {
+  padding-right: 28px;
+}
+
+.selbuscable-limpiar {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--ink-soft);
+  padding: 0;
+}
+
+.selbuscable-limpiar:hover {
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--text-strong);
+}
+
 // position:fixed a propósito (ver comentario en el .ts): así el panel no
 // queda recortado por un .modal-box con overflow-y:auto. Su posición se
 // calcula en JS a partir del <input> cada vez que se abre.

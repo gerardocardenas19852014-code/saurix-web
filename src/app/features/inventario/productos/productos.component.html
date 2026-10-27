@@ -19,30 +19,78 @@
       type="search"
       placeholder="Buscar por nombre…"
       [value]="busqueda()"
-      (input)="busqueda.set($any($event.target).value); cargar()"
+      (input)="busqueda.set($any($event.target).value)"
+      (keyup.enter)="cambiarFiltro()"
     />
-    <label class="board-filter-field board-filter-checkbox" style="margin:0;">
-      <input type="checkbox" [checked]="mostrarInactivos()" (change)="mostrarInactivos.set($any($event.target).checked)" />
-      Mostrar inactivos
-    </label>
+    <input
+      type="search"
+      placeholder="Buscar por código…"
+      [value]="busquedaCodigo()"
+      (input)="busquedaCodigo.set($any($event.target).value)"
+      (keyup.enter)="cambiarFiltro()"
+    />
+    <div class="productos-filtro-categoria">
+      <app-select-buscable
+        [opciones]="opcionesCategoriaFiltro()"
+        [value]="filtroCategoriaId()"
+        placeholder="Filtrar por categoría…"
+        [permiteLimpiar]="true"
+        (valueChange)="filtroCategoriaId.set(+($event ?? 0))"
+      />
+    </div>
+    <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+      <label class="board-filter-field board-filter-checkbox" style="margin:0;">
+        <input type="checkbox" [checked]="mostrarInactivos()" (change)="mostrarInactivos.set($any($event.target).checked)" />
+        Mostrar inactivos
+      </label>
+      <button type="button" class="btn-primary small" (click)="cambiarFiltro()">🔍 Buscar</button>
+    </div>
   </div>
 </div>
 
-<app-data-table
-  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
-  [columnas]="columnas"
-  [filas]="productosFiltrados()"
-  [cargando]="cargando()"
-  accionExtraEtiqueta="📉"
-  [accionExtraIcono]="true"
-  accionExtraTitulo="Nivel mínimo de existencia por bodega para este producto"
-  (accionExtra)="verNivelMinimoBodega($event)"
-  [accionExtra2EtiquetaFn]="etiquetaOpciones"
-  accionExtra2Titulo="Variantes con costo adicional (sabor, tamaño…) para la tienda pública"
-  (accionExtra2)="verOpciones($event)"
-  (editar)="editar($event)"
-  (eliminar)="pedirEliminar($event)"
-/>
+<!-- Paginación REAL contra el servidor (ver cargar()/irAPaginaSiguiente()/
+     irAPaginaAnterior() en productos.component.ts) — a diferencia del
+     paginador interno de <app-data-table> (que solo pagina en memoria lo ya
+     traído y por eso no se nota aquí, dado que siempre se le pasa
+     exactamente una página de servidor), este SÍ dispara una petición
+     nueva al servidor en cada clic. VA ANTES de la tabla (no después): la
+     tabla crece de vacía a poblada cada vez que cargar() resuelve (ver
+     min-height en .grid-table-scroll, styles.scss) — poner este bloque
+     DESPUÉS la hacía brincar hacia abajo cada vez, un shift de layout
+     nuevo que no existía antes de agregar este paginador. -->
+@if (busquedaRealizada()) {
+  <div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-bottom:10px;">
+    <span class="hint" style="margin:0;">
+      Página {{ paginaActual() }} de {{ totalPaginas() }} — {{ totalProductos() }} producto(s)
+    </span>
+    <button type="button" class="btn-secondary small" [disabled]="paginaActual() <= 1 || cargando()" (click)="irAPaginaAnterior()">
+      ← Anterior
+    </button>
+    <button type="button" class="btn-secondary small" [disabled]="paginaActual() >= totalPaginas() || cargando()" (click)="irAPaginaSiguiente()">
+      Siguiente →
+    </button>
+  </div>
+
+  <app-data-table
+    [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+    [columnas]="columnas"
+    [filas]="productos()"
+    [cargando]="cargando()"
+    accionExtraEtiqueta="📉"
+    [accionExtraIcono]="true"
+    accionExtraTitulo="Nivel mínimo de existencia por bodega para este producto"
+    (accionExtra)="verNivelMinimoBodega($event)"
+    [accionExtra2EtiquetaFn]="etiquetaOpciones"
+    accionExtra2Titulo="Variantes con costo adicional (sabor, tamaño…) para la tienda pública"
+    (accionExtra2)="verOpciones($event)"
+    (editar)="editar($event)"
+    (eliminar)="pedirEliminar($event)"
+  />
+} @else {
+  <div class="empty-state-block">
+    <p>Usa los filtros de arriba y da click en <strong>🔍 Buscar</strong> (o Enter) para ver los productos.</p>
+  </div>
+}
 
 @if (modalAbierto()) {
   <div class="modal-overlay show" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
@@ -307,9 +355,12 @@
           type="search"
           placeholder="Buscar por nombre o código…"
           [value]="busquedaEtiquetas()"
-          (input)="busquedaEtiquetas.set($any($event.target).value)"
+          (input)="busquedaEtiquetas.set($any($event.target).value); buscarProductosEtiquetas()"
         />
       </div>
+      @if (cargandoEtiquetas()) {
+        <p class="hint" style="margin:-6px 0 12px;">Buscando…</p>
+      }
 
       <div class="grid-table-scroll" style="max-height:360px;">
         <table class="grid-table">
