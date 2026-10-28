@@ -14,3 +14,122 @@
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
+
+// ── Barra de captura rápida de "Nueva orden de compra" (homologación
+// 27-oct-2026) — Código/escáner, Buscar producto, Cantidad y "+ Agregar"
+// en UNA sola fila, usando todo el ancho del contenedor. Dedicada a esta
+// pantalla: NO reutiliza .grid-toolbar/.grid-filter (pensadas para barras
+// de FILTRO alineadas a la derecha con margin-left:auto y flex-wrap:nowrap
+// que, si no cabe, baja TODO el bloque junto — exactamente el bug que
+// mandaba "+ Agregar" debajo de Código cuando el contenido no entraba en
+// una sola línea).
+.oc-barra-captura {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  // En desktop, con los flex-basis/min-width de abajo, los 4 controles
+  // caben siempre en una sola fila; flex-wrap:wrap solo entra en juego en
+  // pantallas angostas (ver media query), nunca scroll horizontal.
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+// "Código / escanear…" + botón 📷 (ambos dentro de app-escaneo-codigo) —
+// ~20% del ancho, nunca más angosto que 200px (para códigos largos).
+.oc-barra-codigo {
+  flex: 2 1 200px;
+  min-width: 200px;
+}
+.oc-barra-codigo ::ng-deep .escaneo-codigo-fila input {
+  width: 100%;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  font-family: inherit;
+  font-size: 13px;
+  background: var(--paper);
+  color: var(--text-strong);
+}
+.oc-barra-codigo ::ng-deep .escaneo-codigo-fila input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+// Botón 📷 compacto — nunca se encoge ni se estira.
+.oc-barra-codigo ::ng-deep .escaneo-codigo-fila button {
+  flex-shrink: 0;
+  height: 36px;
+  box-sizing: border-box;
+}
+
+// "Buscar producto por nombre…" — el control más ancho de la barra,
+// ~35-40% (app-select-buscable ya es :host{display:block;width:100%}, solo
+// hace falta darle el flex-basis y vestir su input interno).
+.oc-barra-producto {
+  flex: 4 1 260px;
+  min-width: 240px;
+}
+.oc-barra-producto ::ng-deep .selbuscable-input {
+  height: 36px;
+  box-sizing: border-box;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  font-family: inherit;
+  font-size: 13px;
+  background: var(--paper);
+  color: var(--text-strong);
+}
+.oc-barra-producto ::ng-deep .selbuscable-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+// Cantidad — el control más angosto, ~15%.
+.oc-barra-cantidad {
+  flex: 1 1 70px;
+  min-width: 64px;
+  max-width: 90px;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  font-family: inherit;
+  font-size: 13px;
+  background: var(--paper);
+  color: var(--text-strong);
+  text-align: center;
+}
+.oc-barra-cantidad:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+// "+ Agregar" — al extremo derecho, misma altura (36px) que el resto de
+// los controles y mismo verde que "Guardar"/"+ Nueva orden" (.toolbar-btn
+// ya es exactamente ese estilo). Solo se agrega el estado :disabled, que
+// .toolbar-btn no trae (nunca antes se usó deshabilitado).
+.oc-barra-agregar {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.oc-barra-agregar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .oc-barra-codigo,
+  .oc-barra-producto,
+  .oc-barra-cantidad,
+  .oc-barra-agregar {
+    flex-basis: 100%;
+    max-width: none;
+  }
+}

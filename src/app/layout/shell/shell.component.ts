@@ -232,9 +232,12 @@ export class ShellComponent implements OnDestroy {
   protected readonly corteCajaActivo = this.configuracionVentas.corteCajaActivo;
   protected readonly cierreCajaActivo = this.configuracionVentas.cierreCajaActivo;
 
-  /** Revisión periódica de SLA (ver NotificacionesService.revisarSlaTickets) — cada
-   *  5 minutos mientras la sesión siga abierta, para no depender de tener abierta
-   *  ninguna pantalla de Proyectos en particular. */
+  /** Revisión periódica de notificaciones (tarjetas/stock bajo/órdenes vencidas)
+   *  — cada 5 minutos mientras la sesión siga abierta, para no depender de tener
+   *  abierta ninguna pantalla en particular. El nombre quedó de cuando también
+   *  incluía SLA de tickets; ahora SLA se revisa por separado vía pg_cron
+   *  (ver revisarNotificacionesPeriodicas más abajo) — no se renombró para no
+   *  mezclar refactorización con este despliegue (BLOQUE B). */
   private static readonly INTERVALO_REVISION_SLA_MS = 5 * 60 * 1000;
   private intervaloRevisionSla?: ReturnType<typeof setInterval>;
 
@@ -279,11 +282,19 @@ export class ShellComponent implements OnDestroy {
     this.observadorModales.observe(document.body, { childList: true, subtree: true });
   }
 
-  /** SLA de tickets + alertas de tarjeta (uso ≥90%, recordatorio de pago) + stock
-   *  bajo y órdenes de compra vencidas de Inventario — mismo intervalo, así
-   *  ninguna pantalla en particular necesita estar abierta. */
+  /** Alertas de tarjeta (uso ≥90%, recordatorio de pago) + stock bajo y
+   *  órdenes de compra vencidas de Inventario — mismo intervalo, así
+   *  ninguna pantalla en particular necesita estar abierta.
+   *
+   *  SLA de tickets YA NO se revisa desde aquí (BLOQUE B, migración del
+   *  sistema de notificaciones): se centralizó en pg_cron + PostgreSQL
+   *  (privado.fn_revisar_sla_tickets(), job 'revisar-sla-tickets', cada
+   *  minuto) para no depender de tener una pestaña abierta ni duplicar
+   *  trabajo entre pestañas. NotificacionesService.revisarSlaTickets()
+   *  se conserva por ahora (no se borra todavía) mientras se estabiliza
+   *  el cambio; se retirará en una limpieza posterior, por separado de
+   *  este despliegue. */
   private revisarNotificacionesPeriodicas(): void {
-    void this.notificacionesService.revisarSlaTickets();
     void this.notificacionesService.revisarAlertasTarjetas();
     void this.notificacionesService.revisarAlertasStockBajo();
     void this.notificacionesService.revisarOrdenesVencidas();

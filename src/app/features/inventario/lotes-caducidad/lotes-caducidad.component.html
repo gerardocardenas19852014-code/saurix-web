@@ -8,26 +8,61 @@
   aquí se captura aparte.
 </p>
 
+<!-- Próximos a vencer / Vencidos: conteos GLOBALES vía fn_lotes_resumen()
+     (dos count(*) filter en PostgreSQL) — nunca se descargan lotes a Angular
+     para calcularlos. -->
 <div class="dashboard-stats" style="margin-bottom:18px;">
   <div class="dashboard-stat-card">
-    <div class="num">{{ totalProximos() }}</div>
+    <div class="num">{{ cargandoResumen() ? '…' : totalProximos() }}</div>
     <div class="label">Próximos a vencer (≤30 días)</div>
   </div>
   <div class="dashboard-stat-card">
-    <div class="num">{{ totalVencidos() }}</div>
+    <div class="num">{{ cargandoResumen() ? '…' : totalVencidos() }}</div>
     <div class="label">Vencidos</div>
   </div>
 </div>
 
+<!-- Barra homologada al estándar de Productos y servicios/Órdenes de
+     compra/Kardex: ningún filtro dispara una consulta por sí solo — solo
+     "🔍 Buscar" (cambiarFiltro()) consulta al servidor y vuelve a página 1. -->
 <div class="grid-toolbar">
   <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo lote</button>
+  <button type="button" class="btn-primary small" [disabled]="cargando()" (click)="cambiarFiltro()">🔍 Buscar</button>
 
   <div class="grid-filter">
-    <select [value]="filtroVencimiento()" (change)="filtroVencimiento.set($any($event.target).value)">
-      <option value="todos">Todos</option>
-      <option value="proximos">Próximos a vencer</option>
-      <option value="vencidos">Vencidos</option>
+    <label class="board-filter-field" style="min-width:230px; margin:0;">
+      <app-select-buscable
+        [busquedaRemota]="buscarProductosRemoto"
+        [debounceMs]="300"
+        [permiteLimpiar]="true"
+        [value]="filtroProductoId()"
+        placeholder="Buscar producto…"
+        (valueChange)="filtroProductoId.set(+($event ?? 0))"
+      />
+    </label>
+
+    <input
+      type="search"
+      placeholder="Buscar lote…"
+      style="min-width:160px;"
+      [value]="filtroLote()"
+      (input)="filtroLote.set($any($event.target).value)"
+    />
+
+    <select class="toolbar-select" [value]="filtroBodegaId()" (change)="filtroBodegaId.set(+$any($event.target).value)">
+      <option [value]="0">Bodega: Todas</option>
+      @for (b of bodegasActivas(); track b.id) {
+        <option [value]="b.id">{{ b.nombre }}</option>
+      }
     </select>
+
+    <select class="toolbar-select" [value]="filtroEstado()" (change)="filtroEstado.set($any($event.target).value)">
+      <option value="">Estado: Todos</option>
+      <option value="vigente">Vigentes</option>
+      <option value="proximo">Próximos a vencer</option>
+      <option value="vencido">Vencidos</option>
+    </select>
+
     <label class="board-filter-field board-filter-checkbox" style="margin:0;">
       <input type="checkbox" [checked]="mostrarInactivos()" (change)="mostrarInactivos.set($any($event.target).checked)" />
       Mostrar inactivos
@@ -35,21 +70,110 @@
   </div>
 </div>
 
-@if (productosConLotes().length === 0) {
+<!-- La tabla arranca vacía: nada se consulta ni se muestra hasta que el
+     usuario presiona "🔍 Buscar" (busquedaRealizada()) — mismo patrón que
+     Productos y servicios/Órdenes de compra. -->
+@if (!busquedaRealizada()) {
   <div class="empty-state-block">
-    <p>Todavía no hay ningún producto marcado con "Maneja lotes y caducidad". Activa esa opción en
-    Productos para poder registrar lotes aquí.</p>
+    <p>Usa los filtros de arriba y da click en <strong>🔍 Buscar</strong> para ver los lotes.</p>
+  </div>
+} @else {
+
+<!-- Paginación REAL contra el servidor (ver cargarListado()/
+     irAPaginaSiguiente()/irAPaginaAnterior()) — un filtro con 175,000 lotes
+     nunca manda más de una página a la vez. -->
+<div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-bottom:10px;">
+  <span class="hint" style="margin:0;">
+    Página {{ paginaActual() }} de {{ totalPaginas() }} — {{ totalFilasFiltradas() }} lote(s)
+  </span>
+  <button type="button" class="btn-secondary small" [disabled]="paginaActual() <= 1 || cargando()" (click)="irAPaginaAnterior()">
+    ← Anterior
+  </button>
+  <button type="button" class="btn-secondary small" [disabled]="paginaActual() >= totalPaginas() || cargando()" (click)="irAPaginaSiguiente()">
+    Siguiente →
+  </button>
+</div>
+
+@if (cargando() && filasListado().length === 0) {
+  <p class="empty">Cargando…</p>
+} @else if (filasListado().length === 0 && !hayFiltrosActivos()) {
+  <div class="empty-state-block">
+    <p>Sin registros para mostrar.</p>
+  </div>
+} @else if (filasListado().length === 0) {
+  <div class="empty-state-block">
+    <p>No se encontraron lotes con los filtros seleccionados.</p>
+  </div>
+} @else {
+  <!-- Tabla armada a mano (no &lt;app-data-table&gt;) para poder tener
+       encabezados ordenables server-side, mismo patrón que
+       ValorStockComponent.cambiarOrdenProductos() — &lt;app-data-table&gt; no
+       soporta orden por clic en el encabezado. El botón Editar/Eliminar
+       replica exactamente la columna Acciones de &lt;app-data-table&gt;. -->
+  <div class="grid-table-scroll">
+    <table class="grid-table">
+      <thead>
+        <tr>
+          <th (click)="cambiarOrden('producto')" style="cursor:pointer;">
+            Producto {{ ordenCampo() === 'producto' ? (ordenDireccion() === 'asc' ? '▲' : '▼') : '' }}
+          </th>
+          <th (click)="cambiarOrden('lote')" style="cursor:pointer;">
+            Lote {{ ordenCampo() === 'lote' ? (ordenDireccion() === 'asc' ? '▲' : '▼') : '' }}
+          </th>
+          <th (click)="cambiarOrden('bodega')" style="cursor:pointer;">
+            Bodega {{ ordenCampo() === 'bodega' ? (ordenDireccion() === 'asc' ? '▲' : '▼') : '' }}
+          </th>
+          <th (click)="cambiarOrden('cantidad')" style="cursor:pointer;">
+            Cantidad {{ ordenCampo() === 'cantidad' ? (ordenDireccion() === 'asc' ? '▲' : '▼') : '' }}
+          </th>
+          <th (click)="cambiarOrden('fecha_caducidad')" style="cursor:pointer;">
+            Caducidad {{ ordenCampo() === 'fecha_caducidad' ? (ordenDireccion() === 'asc' ? '▲' : '▼') : '' }}
+          </th>
+          <th (click)="cambiarOrden('dias')" style="cursor:pointer;">
+            Días {{ ordenCampo() === 'dias' ? (ordenDireccion() === 'asc' ? '▲' : '▼') : '' }}
+          </th>
+          <th (click)="cambiarOrden('activo')" style="cursor:pointer;">
+            Activo {{ ordenCampo() === 'activo' ? (ordenDireccion() === 'asc' ? '▲' : '▼') : '' }}
+          </th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (fila of filasListado(); track fila.id) {
+          <tr>
+            <td data-label="Producto">{{ fila.productoCodigo ? fila.productoCodigo + ' — ' + fila.productoNombre : fila.productoNombre }}</td>
+            <td data-label="Lote">{{ fila.lote }}</td>
+            <td data-label="Bodega">{{ fila.bodegaNombre ?? '—' }}</td>
+            <td data-label="Cantidad">{{ fila.cantidad ?? '—' }}</td>
+            <td data-label="Caducidad">{{ fila.fechaCaducidad ?? '—' }}</td>
+            <td data-label="Días">
+              @if (fila.dias === null) {
+                <span class="hint">—</span>
+              } @else if (fila.dias < 0) {
+                <span class="grid-badge grid-badge-danger">Vencido ({{ fila.dias }})</span>
+              } @else if (fila.dias <= 30) {
+                <span class="grid-badge grid-badge-warning">{{ fila.dias }}</span>
+              } @else {
+                <span class="grid-badge grid-badge-success">{{ fila.dias }}</span>
+              }
+            </td>
+            <td data-label="Activo">
+              <span class="grid-badge" [class.grid-badge-success]="fila.activo" [class.grid-badge-danger]="!fila.activo">
+                {{ fila.activo ? 'Sí' : 'No' }}
+              </span>
+            </td>
+            <td data-label="Acciones">
+              <button type="button" class="btn-secondary small grid-action-icon" title="Editar" aria-label="Editar registro" (click)="editar(fila)">✎</button>
+              <button type="button" class="btn-danger small grid-action-icon" title="Eliminar" aria-label="Eliminar registro" (click)="pedirEliminar(fila)">🗑</button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
   </div>
 }
 
-<app-data-table
-  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
-  [columnas]="columnas"
-  [filas]="filasLotes()"
-  [cargando]="cargando()"
-  (editar)="editar($event)"
-  (eliminar)="pedirEliminar($event)"
-/>
+}
 
 @if (modalAbierto()) {
   <div class="modal-overlay show" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
@@ -59,7 +183,17 @@
       <div class="edit-form" style="margin-bottom: 18px;">
         <label>
           Producto
-          <app-select-buscable [opciones]="opcionesProducto()" formControlName="productoId" placeholder="Buscar producto…" />
+          <!-- Autocomplete remoto (fn_lotes_productos_autocomplete) — nunca
+               carga los 200,000 productos. etiquetaValorExterno resuelve la
+               etiqueta al editar un lote existente sin otra consulta (ya
+               viene en la fila del listado). -->
+          <app-select-buscable
+            [busquedaRemota]="buscarProductosRemoto"
+            [debounceMs]="300"
+            [etiquetaValorExterno]="etiquetaProductoEdicion()"
+            formControlName="productoId"
+            placeholder="Buscar por código o nombre…"
+          />
         </label>
 
         <label>

@@ -37,6 +37,17 @@ export interface OpcionBuscable {
  * un contenedor con scroll). Si la página hace scroll mientras está abierto,
  * simplemente se cierra (como un <select> nativo) en vez de perseguir la
  * posición del input.
+ *
+ * MODO REMOTO (27-oct, ver Movimientos entre bodegas → Historial → Producto):
+ * si se pasa [busquedaRemota], el componente deja de filtrar [opciones] en
+ * memoria (pensado para catálogos chicos) y en su lugar llama a esa función
+ * con debounce cada vez que el usuario escribe, mostrando lo que devuelva
+ * (pensado para catálogos de 200,000+ filas, donde nunca se puede traer todo
+ * de un jalón) — mismo panel/estilos/navegación por teclado de siempre, cero
+ * cambio de comportamiento para los usos existentes (que no pasan este
+ * input). La etiqueta del valor seleccionado, en este modo, es la del último
+ * producto elegido (no se puede "buscar" en una lista que no existe en
+ * memoria) — se limpia junto con el valor en limpiar().
  */
 @Component({
   selector: 'app-select-buscable',
@@ -61,6 +72,24 @@ export class SelectBuscableComponent implements ControlValueAccessor, OnDestroy 
    *  categorías" a la lista. false por defecto para no cambiar nada en los
    *  usos existentes (campos obligatorios de formulario, donde no aplica). */
   @Input() permiteLimpiar = false;
+
+  /** Ver comentario de clase ("MODO REMOTO"). undefined = comportamiento de
+   *  siempre (filtra [opciones] en memoria). */
+  @Input() busquedaRemota?: (texto: string) => Promise<OpcionBuscable[]>;
+  /** Espera antes de llamar a busquedaRemota tras la última tecla — evita
+   *  una petición por cada letra. Solo aplica en modo remoto. */
+  @Input() debounceMs = 300;
+
+  /** En modo remoto, sirve para mostrar la etiqueta de un valor preseleccionado
+   *  programáticamente (p.ej. un formulario que precarga un productoId con
+   *  reset()/patchValue()) — en ese modo el componente no tiene el catálogo
+   *  completo para resolverla por sí solo (ver etiquetaSeleccion()). undefined
+   *  = no se toca la etiqueta actual. */
+  @Input()
+  set etiquetaValorExterno(v: string | null | undefined) {
+    if (v !== undefined) this.etiquetaManualRemota.set(v);
+  }
+
 
   @Input()
   set opciones(v: OpcionBuscable[] | null) {
@@ -98,6 +127,16 @@ export class SelectBuscableComponent implements ControlValueAccessor, OnDestroy 
   protected readonly indiceActivo = signal(0);
   protected readonly panelRect = signal<{ top: number; left: number; width: number } | null>(null);
 
+  // ── Modo remoto ───────────────────────────────────────────────────────
+  private readonly opcionesRemotas = signal<OpcionBuscable[]>([]);
+  protected readonly cargandoRemoto = signal(false);
+  /** Etiqueta del último producto elegido en modo remoto (ver comentario de
+   *  clase) — independiente de [opciones], que en ese modo nunca contiene
+   *  el catálogo completo. */
+  private readonly etiquetaManualRemota = signal<string | null>(null);
+  private debounceHandle: ReturnType<typeof setTimeout> | null = null;
+  private secuenciaBusquedaRemota = 0;
+
   private onChange: ((v: number | string | null) => void) | null = null;
   private onTouched: (() => void) | null = null;
   // El panel de opciones tiene su propia lista con overflow-y:auto (para
@@ -119,6 +158,7 @@ export class SelectBuscableComponent implements ControlValueAccessor, OnDestroy 
   protected readonly etiquetaSeleccion = computed(() => {
     const v = this._value();
     if (v === null || v === undefined || v === '') return '';
+    if (this.busquedaRemota) return this.etiquetaManualRemota() ?? '';
     const opcion = this._opciones().find((o) => String(o.valor) === String(v));
     return opcion?.etiqueta ?? '';
   });
@@ -133,7 +173,11 @@ export class SelectBuscableComponent implements ControlValueAccessor, OnDestroy 
     () => this.permiteLimpiar && this.etiquetaSeleccion() !== '' && !this.abierta(),
   );
 
+  /** En modo remoto, el servidor ya filtró — no se vuelve a filtrar en
+   *  memoria (y no habría nada que filtrar: opcionesRemotas() es justo lo
+   *  que ya coincide con el texto buscado). */
   private readonly opcionesFiltradas = computed(() => {
+    if (this.busquedaRemota) return this.opcionesRemotas();
     const termino = this.normalizar(this.texto());
     const todas = this._opciones();
     if (!termino) return todas;
@@ -167,6 +211,7 @@ export class SelectBuscableComponent implements ControlValueAccessor, OnDestroy 
 
   ngOnDestroy(): void {
     document.removeEventListener('scroll', this.manejarScrollGlobal, true);
+    if (this.debounceHandle) clearTimeout(this.debounceHandle);
   }
 
   private normalizar(texto: string): string {
@@ -191,16 +236,44 @@ export class SelectBuscableComponent implements ControlValueAccessor, OnDestroy 
     this.indiceActivo.set(0);
     this.abierta.set(true);
     document.addEventListener('scroll', this.manejarScrollGlobal, true);
+    // Precarga las primeras coincidencias (texto vacío = "top N") para que
+    // el panel no se vea vacío nada más abrir — solo la primera vez.
+    if (this.busquedaRemota && this.opcionesRemotas().length === 0) this.dispararBusquedaRemota('');
   }
 
   protected onInput(v: string): void {
     this.texto.set(v);
     this.indiceActivo.set(0);
     if (!this.abierta()) this.onFocus();
+    if (this.busquedaRemota) this.dispararBusquedaRemota(v);
+  }
+
+  /** Debounce manual (sin RxJS, para no agregarle una dependencia a un
+   *  componente compartido en ~15 pantallas) — ver [debounceMs]. Ignora
+   *  respuestas que lleguen después de una búsqueda más nueva (el usuario
+   *  pudo seguir escribiendo mientras la petición anterior seguía en
+   *  vuelo). */
+  private dispararBusquedaRemota(texto: string): void {
+    const resolver = this.busquedaRemota;
+    if (!resolver) return;
+    if (this.debounceHandle) clearTimeout(this.debounceHandle);
+    this.debounceHandle = setTimeout(() => {
+      const miSecuencia = ++this.secuenciaBusquedaRemota;
+      this.cargandoRemoto.set(true);
+      resolver(texto.trim())
+        .then((resultado) => {
+          if (miSecuencia !== this.secuenciaBusquedaRemota) return;
+          this.opcionesRemotas.set(resultado);
+        })
+        .finally(() => {
+          if (miSecuencia === this.secuenciaBusquedaRemota) this.cargandoRemoto.set(false);
+        });
+    }, texto ? this.debounceMs : 0);
   }
 
   protected seleccionar(opcion: OpcionBuscable): void {
     this._value.set(opcion.valor);
+    this.etiquetaManualRemota.set(opcion.etiqueta);
     this.valueChange.emit(opcion.valor);
     this.onChange?.(opcion.valor);
     this.cerrar();
@@ -213,6 +286,7 @@ export class SelectBuscableComponent implements ControlValueAccessor, OnDestroy 
     evento.preventDefault();
     evento.stopPropagation();
     this._value.set(null);
+    this.etiquetaManualRemota.set(null);
     this.valueChange.emit(null);
     this.onChange?.(null);
     this.onTouched?.();

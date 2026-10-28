@@ -2,59 +2,92 @@
   <h1>Kardex de producto</h1>
 </div>
 
-<p class="hint" style="margin-top:-6px;">
-  Elige un producto para ver todos sus movimientos (entradas, traspasos, salidas/ajustes — incluye
-  recepciones de Órdenes de compra y ajustes de Conteo físico) en orden cronológico, con el saldo
-  acumulado después de cada uno.
-</p>
-
+<!-- Homologación 28-oct-2026: el producto se busca con autocomplete remoto
+     (nunca se descarga el catálogo completo — ver buscarProductosRemoto() en
+     kardex.component.ts) y NADA del kardex se consulta hasta elegir uno. -->
 <div class="board-filters" style="margin:18px 0;">
-  <label class="board-filter-field" style="min-width:260px;">
+  <label class="board-filter-field" style="min-width:320px;">
     Producto
-    <app-select-buscable [opciones]="opcionesProducto()" [value]="productoId()" placeholder="Buscar producto…" (valueChange)="elegirProducto(+($event ?? 0))" />
+    <app-select-buscable
+      [busquedaRemota]="buscarProductosRemoto"
+      [debounceMs]="300"
+      [value]="productoId()"
+      placeholder="Buscar por código o nombre…"
+      (valueChange)="elegirProducto(+($event ?? 0))"
+    />
   </label>
-
-  @if (productoId()) {
-    <label class="board-filter-field">
-      Bodega (opcional — saldo total si no se elige)
-      <select [value]="bodegaFiltroId()" (change)="bodegaFiltroId.set(+$any($event.target).value)">
-        <option [value]="0">Todas (saldo total)</option>
-        @for (b of bodegasActivas(); track b.id) {
-          <option [value]="b.id">{{ b.nombre }}</option>
-        }
-      </select>
-    </label>
-  }
 </div>
 
-@if (cargando()) {
-  <p class="empty">Cargando…</p>
-} @else if (!productoId()) {
+@if (!productoId()) {
   <div class="empty-state-block">
     <p>Elige un producto para ver su kardex.</p>
   </div>
 } @else {
-  <div class="dashboard-stats" style="margin-bottom:22px;">
+  <div class="dashboard-stats" style="margin-bottom:18px;">
     <div class="dashboard-stat-card">
-      <div class="num">{{ existenciaActual() }}</div>
-      <div class="label">Existencia actual{{ bodegaFiltroId() ? '' : ' (todas las bodegas)' }}</div>
+      <div class="num">{{ cargandoResumen() ? '…' : existenciaActual() }}</div>
+      <div class="label">Existencia actual{{ filtroBodegaId() ? '' : ' (todas las bodegas)' }}</div>
     </div>
     <div class="dashboard-stat-card">
-      <div class="num">{{ kardex().length }}</div>
+      <div class="num">{{ cargandoListado() ? '…' : totalFilasFiltradas() }}</div>
       <div class="label">Movimientos registrados</div>
     </div>
   </div>
 
-  @if (kardex().length > 0) {
-    <div class="grid-toolbar" style="margin:0 0 14px;">
+  <!-- Barra homologada al estándar nuevo de Saurix (mismo patrón que
+       Órdenes de compra/Productos y servicios): ningún filtro dispara una
+       consulta por sí solo — solo "🔍 Buscar" (cambiarFiltro()) consulta al
+       servidor. Ancho completo, igual orden que el resto de los grids. -->
+  <div class="grid-toolbar">
+    <button type="button" class="btn-primary small" [disabled]="cargandoListado()" (click)="cambiarFiltro()">🔍 Buscar</button>
+
+    <div class="grid-filter">
+      <select class="toolbar-select" [value]="filtroBodegaId()" (change)="filtroBodegaId.set(+$any($event.target).value)">
+        <option [value]="0">Todas las bodegas (saldo total)</option>
+        @for (b of bodegasActivas(); track b.id) {
+          <option [value]="b.id">{{ b.nombre }}</option>
+        }
+      </select>
+      <select class="toolbar-select" [value]="filtroTipo()" (change)="filtroTipo.set($any($event.target).value)">
+        <option value="">Todos los movimientos</option>
+        <option value="entrada">Entrada</option>
+        <option value="traspaso">Traspaso</option>
+        <option value="salida">Salida/Ajuste</option>
+      </select>
+      <label class="grid-filter-fecha-label">
+        Desde
+        <input type="date" [value]="filtroDesde()" (change)="filtroDesde.set($any($event.target).value)" />
+      </label>
+      <label class="grid-filter-fecha-label">
+        Hasta
+        <input type="date" [value]="filtroHasta()" (change)="filtroHasta.set($any($event.target).value)" />
+      </label>
       <button type="button" class="btn-secondary small" (click)="exportarCsv()">⬇ Exportar CSV</button>
       <button type="button" class="btn-secondary small" (click)="exportarPdf()">⬇ Exportar PDF</button>
     </div>
-  }
+  </div>
 
-  @if (kardex().length === 0) {
+  <!-- Paginación REAL contra el servidor (ver cargarListado()/
+       irAPaginaSiguiente()/irAPaginaAnterior()) — mismo patrón que
+       Productos y servicios/Órdenes de compra: un producto con 185,430
+       movimientos nunca manda más de una página a la vez. -->
+  <div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-bottom:10px;">
+    <span class="hint" style="margin:0;">
+      Página {{ paginaActual() }} de {{ totalPaginas() }} — {{ totalFilasFiltradas() }} movimiento(s)
+    </span>
+    <button type="button" class="btn-secondary small" [disabled]="paginaActual() <= 1 || cargandoListado()" (click)="irAPaginaAnterior()">
+      ← Anterior
+    </button>
+    <button type="button" class="btn-secondary small" [disabled]="paginaActual() >= totalPaginas() || cargandoListado()" (click)="irAPaginaSiguiente()">
+      Siguiente →
+    </button>
+  </div>
+
+  @if (cargandoListado() && filasListado().length === 0) {
+    <p class="empty">Cargando…</p>
+  } @else if (filasListado().length === 0) {
     <div class="empty-state-block">
-      <p>Este producto todavía no tiene ningún movimiento{{ bodegaFiltroId() ? ' en esta bodega' : '' }}.</p>
+      <p>Este producto todavía no tiene ningún movimiento{{ filtroBodegaId() ? ' en esta bodega' : '' }} con los filtros actuales.</p>
     </div>
   } @else {
     <div class="grid-table-scroll">
@@ -72,7 +105,7 @@
           </tr>
         </thead>
         <tbody>
-          @for (fila of kardex(); track fila.id) {
+          @for (fila of filasListado(); track fila.id) {
             <tr>
               <td data-label="Fecha">{{ fila.fecha | date: 'dd/MM/yyyy HH:mm' }}</td>
               <td data-label="Tipo">

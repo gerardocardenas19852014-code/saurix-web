@@ -2,6 +2,8 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { catchError, firstValueFrom, from, mergeMap, of, tap, toArray } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { DataClientService } from '../../core/services/data-client.service';
+import { SupabaseService } from '../../core/services/supabase.service';
+import { fuenteDatosActual } from '../../core/services/fuente-datos';
 import { Ticket } from '../../features/proyectos/kanban/ticket.model';
 import { TicketPrioridad, TicketPrioridadNotificar } from '../../features/proyectos/ticket-prioridades/ticket-prioridad.model';
 import { TableroColumna } from '../../features/proyectos/tableros/tablero-columna.model';
@@ -51,9 +53,21 @@ export class NotificacionesService {
   private readonly data = inject(DataClientService);
   private readonly auth = inject(AuthService);
 
+  private readonly esSupabase = fuenteDatosActual() === 'supabase';
+  private readonly sb = this.esSupabase ? inject(SupabaseService).cliente : null;
+
   readonly notificaciones = signal<Notificacion[]>([]);
-  readonly hayNoLeidas = computed(() => this.notificaciones().some((n) => !n.leida));
-  readonly totalNoLeidas = computed(() => this.notificaciones().filter((n) => !n.leida).length);
+  /** Total REAL de no leídas (puede ser mayor que notificaciones().length,
+   *  que sigue topado a MAX_NOTIFICACIONES para la lista visible) — ver
+   *  recargar()/BLOQUE A: antes esto era un computed() derivado de la misma
+   *  lista ya topada a 10, así que nunca podía mostrar más de 10 aunque
+   *  hubiera 47 pendientes reales (bug encontrado y corregido aquí). Ahora
+   *  viene directo de fn_notificaciones_campanita() (Supabase) o del total
+   *  real ya en memoria antes de topar (modo local), y se mantiene al día
+   *  con cada notificar()/marcarLeida()/marcarTodasLeidas() sin volver a
+   *  consultar. */
+  readonly totalNoLeidas = signal(0);
+  readonly hayNoLeidas = computed(() => this.totalNoLeidas() > 0);
 
   private usuarioIdCargado: number | null = null;
 
@@ -83,16 +97,51 @@ export class NotificacionesService {
     await this.recargar(usuarioId);
   }
 
+  /** BLOQUE A: en modo Supabase ya NO se trae "todo lo no leído" para cortar
+   *  a 10 en el navegador (`list()` sin límite + `.slice()`) — eso además de
+   *  costoso, es lo que producía el bug de totalNoLeidas descrito arriba.
+   *  Ahora el LIMIT real y el total real de no leídas vienen en una sola
+   *  vuelta desde fn_notificaciones_campanita() (ver migración
+   *  notificaciones_campanita_indice_rpc — índice parcial
+   *  notificacion_usuario_pendientes_ix, WHERE leida=false, cubre tanto el
+   *  ORDER BY+LIMIT como el COUNT). RLS (notificacion_ver/solo_mi_empresa)
+   *  sigue aplicando igual que siempre: la función es SECURITY INVOKER. */
   private async recargar(usuarioId: number): Promise<void> {
+    if (this.esSupabase) {
+      try {
+        const { data, error } = await this.sb!.schema('seguridad').rpc('fn_notificaciones_campanita', {
+          p_limite: NotificacionesService.MAX_NOTIFICACIONES,
+        });
+        if (error) throw error;
+        const filas = (data ?? []) as Record<string, unknown>[];
+        this.notificaciones.set(
+          filas.map((f) => ({
+            id: Number(f['id']),
+            usuarioId,
+            titulo: String(f['titulo']),
+            link: f['link'] ? String(f['link']) : undefined,
+            leida: false,
+            fechaCreacion: f['fecha_creacion'] ? String(f['fecha_creacion']) : undefined,
+          })),
+        );
+        this.totalNoLeidas.set(Number(filas[0]?.['total_no_leidas'] ?? 0));
+      } catch {
+        /* Sin datos disponibles todavía; se deja el estado como estaba. */
+      }
+      return;
+    }
+
+    // Modo IndexedDB local (catálogos chicos de prueba): se conserva el
+    // mismo cálculo de siempre, pero ahora totalNoLeidas se fija al total
+    // REAL (antes de topar a MAX_NOTIFICACIONES), no al tamaño de la lista
+    // ya topada — mismo bug corregido también aquí.
     try {
       const pendientes = await firstValueFrom(this.data.list<Notificacion>(ENTIDAD, { usuarioId, leida: false }));
-      this.notificaciones.set(
-        [...pendientes]
-          .sort((a, b) => (b.fechaCreacion ?? '').localeCompare(a.fechaCreacion ?? ''))
-          .slice(0, NotificacionesService.MAX_NOTIFICACIONES),
-      );
+      const ordenadas = [...pendientes].sort((a, b) => (b.fechaCreacion ?? '').localeCompare(a.fechaCreacion ?? ''));
+      this.notificaciones.set(ordenadas.slice(0, NotificacionesService.MAX_NOTIFICACIONES));
+      this.totalNoLeidas.set(ordenadas.length);
     } catch {
-      /* Sin datos disponibles todavía; se deja la lista como estaba. */
+      /* Sin datos disponibles todavía; se deja el estado como estaba. */
     }
   }
 
@@ -109,6 +158,7 @@ export class NotificacionesService {
           this.notificaciones.update((items) =>
             [registro, ...items].slice(0, NotificacionesService.MAX_NOTIFICACIONES),
           );
+          this.totalNoLeidas.update((n) => n + 1);
         }
       },
       error: (error) => console.warn('No se pudo guardar la notificación:', error),
@@ -122,21 +172,55 @@ export class NotificacionesService {
     // muestran pendientes (ver recargar()), en cuanto se marca leída
     // simplemente desaparece de la campanita.
     this.notificaciones.update((items) => items.filter((n) => n.id !== id));
+    this.totalNoLeidas.update((n) => Math.max(0, n - 1));
     this.data.modificacion<Notificacion>(ENTIDAD, { ...item, leida: true }).subscribe({
       error: (error) => console.warn('No se pudo marcar la notificación como leída:', error),
     });
   }
 
-  marcarTodasLeidas(): void {
-    const pendientes = this.notificaciones().filter((n) => !n.leida);
-    if (!pendientes.length) return;
-    // Igual que marcarLeida: al quedar todas leídas, ya no hay nada que
-    // mostrar en la campanita.
+  /**
+   * BLOQUE A: antes esto solo marcaba como leídas las notificaciones ya
+   * cargadas en `notificaciones()` (topadas a MAX_NOTIFICACIONES) — con el
+   * viejo `totalNoLeidas` (computado de esa misma lista) eso se veía
+   * consistente, pero si de verdad había más de 10 pendientes reales, el
+   * resto se quedaba `leida=false` en la base para siempre sin que
+   * "marcar todas" las tocara. Ahora que `totalNoLeidas` refleja el total
+   * real (ver recargar()), hacía falta corregirlo de raíz: en modo
+   * Supabase se manda UN SOLO UPDATE server-side con el filtro real
+   * (usuario_id + leida=false, protegido además por RLS), no un PATCH por
+   * fila ni limitado a lo visible.
+   */
+  async marcarTodasLeidas(): Promise<void> {
+    if (this.totalNoLeidas() === 0) return;
+    const usuarioId = this.auth.usuarioActual()?.id;
+    if (!usuarioId) return;
+
+    // Limpieza optimista de la campanita — igual que antes.
     this.notificaciones.set([]);
-    for (const n of pendientes) {
-      this.data
-        .modificacion<Notificacion>(ENTIDAD, { ...n, leida: true })
-        .subscribe({ error: (error) => console.warn('No se pudo marcar la notificación como leída:', error) });
+    this.totalNoLeidas.set(0);
+
+    if (this.esSupabase) {
+      const { error } = await this.sb!
+        .schema('seguridad')
+        .from('notificacion')
+        .update({ leida: true })
+        .eq('usuario_id', usuarioId)
+        .eq('leida', false);
+      if (error) console.warn('No se pudieron marcar todas las notificaciones como leídas:', error);
+      return;
+    }
+
+    // Modo IndexedDB local: se trae el total real de pendientes (sin topar,
+    // tablas chicas de prueba) y se marca cada una.
+    try {
+      const pendientes = await firstValueFrom(this.data.list<Notificacion>(ENTIDAD, { usuarioId, leida: false }));
+      for (const n of pendientes) {
+        this.data
+          .modificacion<Notificacion>(ENTIDAD, { ...n, leida: true })
+          .subscribe({ error: (error) => console.warn('No se pudo marcar la notificación como leída:', error) });
+      }
+    } catch (error) {
+      console.warn('No se pudieron marcar todas las notificaciones como leídas:', error);
     }
   }
 

@@ -26,12 +26,14 @@
 /* Antes esta regla forzaba flex-wrap:wrap SIEMPRE, sin importar que sobrara
  * espacio de sobra en .grid-filter — el flex-basis de cada campo (no su
  * max-width/flex-grow) es lo que decide si entran en una sola línea, y
- * dejaba un hueco vacío a la derecha con el botón "Buscar" solo en una
- * segunda línea aun en pantallas anchas. Ver misma corrección y
- * explicación en productos.component.scss. Con 5 controles (busqueda +
- * categoría + bodega + estado + Buscar) el punto de quiebre es un poco más
- * ancho que en Productos (4 controles). */
-@media (max-width: 1250px) {
+ * dejaba un hueco vacío a la derecha. Ver misma corrección y explicación en
+ * productos.component.scss. Desde la homologación visual con Productos y
+ * servicios (27-oct), "Buscar" y "Exportar CSV/PDF" ya NO viven dentro de
+ * .grid-filter (ver .html) — ahora .grid-filter solo tiene 4 campos
+ * (búsqueda + categoría + bodega + estado), igual que Productos (2
+ * buscadores + categoría + checkbox), así que usa el mismo punto de
+ * quiebre. */
+@media (max-width: 1100px) {
   .grid-filter {
     flex-wrap: wrap;
   }

@@ -2,90 +2,127 @@
   <h1>Sugerencia de reposición</h1>
 </div>
 
-<p class="hint" style="margin-top:-6px;">
+<p class="hint" style="margin-top:-6px; max-width:none;">
   Productos físicos activos cuya existencia ya está por debajo de su nivel mínimo. La cantidad sugerida
   busca dejar la existencia en el doble del mínimo, no solo igualarlo, para no volver a caer en alerta
   con la primera salida. Esta pantalla no registra ningún movimiento — cuando llegue la mercancía,
   regístrala como Entrada en Movimientos entre bodegas.
 </p>
 
-@if (cargando()) {
-  <p class="empty">Cargando…</p>
-} @else if (filas().length === 0) {
-  <div class="empty-state-block">
-    <p>✅ Ningún producto está por debajo de su nivel mínimo en este momento.</p>
-  </div>
-} @else {
-  <div class="dashboard-stats">
-    <div class="dashboard-stat-card dashboard-stat-warning">
-      <div class="num">{{ filas().length }}</div>
-      <div class="label">Productos por reabastecer</div>
+<div class="grid-toolbar">
+  <button type="button" class="btn-primary small" (click)="cambiarFiltro()">🔍 Buscar</button>
+
+  <div class="grid-filter">
+    <input
+      type="search"
+      placeholder="Buscar por nombre…"
+      [value]="busquedaNombre()"
+      (input)="busquedaNombre.set($any($event.target).value)"
+      (keyup.enter)="cambiarFiltro()"
+    />
+    <input
+      type="search"
+      placeholder="Buscar por código…"
+      [value]="busquedaCodigo()"
+      (input)="busquedaCodigo.set($any($event.target).value)"
+      (keyup.enter)="cambiarFiltro()"
+    />
+    <div class="productos-filtro-categoria">
+      <app-select-buscable
+        [opciones]="opcionesProveedor()"
+        [value]="filtroProveedorId()"
+        placeholder="Todos los proveedores"
+        [permiteLimpiar]="true"
+        (valueChange)="filtroProveedorId.set(+($event ?? 0))"
+      />
+    </div>
+    <div class="productos-filtro-categoria">
+      <app-select-buscable
+        [opciones]="opcionesBodega()"
+        [value]="filtroBodegaId()"
+        placeholder="Todas las bodegas"
+        [permiteLimpiar]="true"
+        (valueChange)="filtroBodegaId.set(+($event ?? 0))"
+      />
     </div>
   </div>
+</div>
 
-  @if (opcionesProveedorFiltro().length > 0 || opcionesBodegaFiltro().length > 0) {
-    <div class="board-filters" style="margin:18px 0; display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap;">
-      @if (opcionesProveedorFiltro().length > 0) {
-        <label class="board-filter-field">
-          Proveedor
-          <select [value]="filtroProveedorId()" (change)="filtroProveedorId.set(+$any($event.target).value)">
-            <option [value]="0">Todos</option>
-            @for (p of opcionesProveedorFiltro(); track p.id) {
-              <option [value]="p.id">{{ p.nombre }}</option>
-            }
-          </select>
-        </label>
-      }
-      @if (opcionesBodegaFiltro().length > 0) {
-        <label class="board-filter-field">
-          Bodega
-          <select [value]="filtroBodegaId()" (change)="filtroBodegaId.set(+$any($event.target).value)">
-            <option [value]="0">Todas</option>
-            @for (b of opcionesBodegaFiltro(); track b.id) {
-              <option [value]="b.id">{{ b.nombre }}</option>
-            }
-          </select>
-        </label>
-      }
-      @if (filtroProveedorId()) {
-        <button type="button" class="btn btn-primary" (click)="generarOrdenCompra(filtroProveedorId())">
+@if (busquedaRealizada()) {
+  @if (totalFilas() === 0 && !cargando()) {
+    <div class="empty-state-block">
+      <p>✅ Ningún producto está por debajo de su nivel mínimo con los filtros actuales.</p>
+    </div>
+  } @else {
+    <div class="dashboard-stats" style="margin:18px 0;">
+      <div class="dashboard-stat-card dashboard-stat-warning">
+        <div class="num">{{ totalFilas() }}</div>
+        <div class="label">Producto{{ totalFilas() === 1 ? '' : 's' }} por reabastecer</div>
+      </div>
+    </div>
+
+    @if (filtroProveedorId() && filtroProveedorId() !== -1) {
+      <div style="margin-bottom:14px;">
+        <button type="button" class="btn-secondary small" (click)="generarOrdenCompra(filtroProveedorId())">
           🛒 Generar orden de compra
         </button>
-      }
+      </div>
+    }
+
+    <div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-bottom:10px;">
+      <span class="hint" style="margin:0;">
+        Página {{ paginaActual() }} de {{ totalPaginas() }} — {{ totalFilas() }} producto(s)
+      </span>
+      <button type="button" class="btn-secondary small" [disabled]="paginaActual() <= 1 || cargando()" (click)="irAPaginaAnterior()">
+        ← Anterior
+      </button>
+      <button type="button" class="btn-secondary small" [disabled]="paginaActual() >= totalPaginas() || cargando()" (click)="irAPaginaSiguiente()">
+        Siguiente →
+      </button>
+    </div>
+
+    <div class="grid-table-scroll">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th>Proveedor</th>
+            <th>Bodega</th>
+            <th class="sortable" (click)="ordenarPor('codigo')">Código{{ indicadorOrden('codigo') }}</th>
+            <th class="sortable" (click)="ordenarPor('nombre')">Producto{{ indicadorOrden('nombre') }}</th>
+            <th class="sortable" (click)="ordenarPor('existencia')">Existencia{{ indicadorOrden('existencia') }}</th>
+            <th class="sortable" (click)="ordenarPor('minimo')">Mínimo{{ indicadorOrden('minimo') }}</th>
+            <th class="sortable" (click)="ordenarPor('sugerido')">Sugerido a comprar{{ indicadorOrden('sugerido') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (cargando()) {
+            <tr><td colspan="7"><p class="empty">Cargando…</p></td></tr>
+          } @else {
+            @for (fila of filasPagina(); track fila.productoId + '-' + fila.bodegaId) {
+              <tr>
+                <td data-label="Proveedor">
+                  {{ fila.proveedorNombre }}
+                  @if (!fila.proveedorId) {
+                    <span class="tag" style="background:var(--amber-soft); color:var(--amber); margin-left:6px;">Sin proveedor</span>
+                  }
+                </td>
+                <td data-label="Bodega">{{ fila.bodegaNombre }}</td>
+                <td data-label="Código">{{ fila.codigo || '—' }}</td>
+                <td data-label="Producto">{{ fila.nombre }}</td>
+                <td data-label="Existencia">{{ fila.existencia }}</td>
+                <td data-label="Mínimo">{{ fila.nivelMinimo }}</td>
+                <td data-label="Sugerido a comprar"><strong>{{ fila.sugerida }}</strong></td>
+              </tr>
+            } @empty {
+              <tr><td colspan="7"><p class="empty">Sin resultados para los filtros actuales.</p></td></tr>
+            }
+          }
+        </tbody>
+      </table>
     </div>
   }
-
-  <div class="grid-table-scroll">
-    <table class="grid-table">
-      <thead>
-        <tr>
-          <th>Proveedor</th>
-          <th>Bodega</th>
-          <th>Código</th>
-          <th>Producto</th>
-          <th>Existencia</th>
-          <th>Mínimo</th>
-          <th>Sugerido a comprar</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (fila of filasFiltradas(); track fila.productoId + '-' + fila.bodegaId) {
-          <tr>
-            <td data-label="Proveedor">
-              {{ fila.proveedorNombre }}
-              @if (!fila.proveedorId) {
-                <span class="tag" style="background:var(--amber-soft); color:var(--amber); margin-left:6px;">Sin proveedor</span>
-              }
-            </td>
-            <td data-label="Bodega">{{ fila.bodegaNombre }}</td>
-            <td data-label="Código">{{ fila.codigo || '—' }}</td>
-            <td data-label="Producto">{{ fila.nombre }}</td>
-            <td data-label="Existencia">{{ fila.existencia }}</td>
-            <td data-label="Mínimo">{{ fila.nivelMinimo }}</td>
-            <td data-label="Sugerido a comprar"><strong>{{ fila.sugerida }}</strong></td>
-          </tr>
-        }
-      </tbody>
-    </table>
+} @else {
+  <div class="empty-state-block">
+    <p>Usa los filtros de arriba y da click en <strong>🔍 Buscar</strong> (o Enter) para ver los productos por reabastecer.</p>
   </div>
 }

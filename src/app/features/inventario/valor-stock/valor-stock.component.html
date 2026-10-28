@@ -2,7 +2,7 @@
   <h1>Valor de stock</h1>
 </div>
 
-<p class="hint" style="margin-top:-6px;">
+<p class="hint" style="margin-top:-6px; max-width:none;">
   Solo cuenta productos físicos activos (costo × existencia); los servicios no tienen inventario que
   valorizar y los productos inactivos no se incluyen.
 </p>
@@ -91,6 +91,13 @@
     </div>
   } @else if (tabActiva() === 'productos') {
     <div class="grid-toolbar">
+      <button type="button" class="btn-primary small" (click)="cambiarFiltroProductos()">🔍 Buscar</button>
+
+      <div class="toolbar-group">
+        <button type="button" class="btn-secondary small" (click)="exportarCsvProductos()">⬇ Exportar CSV</button>
+        <button type="button" class="btn-secondary small" (click)="exportarPdfProductos()">⬇ Exportar PDF</button>
+      </div>
+
       <div class="grid-filter">
         <input
           type="search"
@@ -117,18 +124,13 @@
             (valueChange)="bodegaIdFiltro.set(+($event ?? 0))"
           />
         </div>
-        <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
-          <select [value]="estadoFiltro()" (change)="estadoFiltro.set($any($event.target).value)">
-            <option value="">Todos los estados</option>
-            <option value="sin_existencia">Sin existencia</option>
-            <option value="stock_bajo">Stock bajo</option>
-            <option value="sobre_stock">Sobre-stock</option>
-          </select>
-          <button type="button" class="btn-primary small" (click)="cambiarFiltroProductos()">🔍 Buscar</button>
-        </div>
+        <select class="toolbar-select" [value]="estadoFiltro()" (change)="estadoFiltro.set($any($event.target).value)">
+          <option value="">Todos los estados</option>
+          <option value="sin_existencia">Sin existencia</option>
+          <option value="stock_bajo">Stock bajo</option>
+          <option value="sobre_stock">Sobre-stock</option>
+        </select>
       </div>
-      <button type="button" class="btn-secondary small" (click)="exportarCsvProductos()">⬇ Exportar CSV</button>
-      <button type="button" class="btn-secondary small" (click)="exportarPdfProductos()">⬇ Exportar PDF</button>
     </div>
 
     @if (busquedaProductosRealizada()) {
@@ -191,7 +193,7 @@
       </div>
     }
   } @else {
-    <p class="hint" style="margin:0 0 14px;">
+    <p class="hint" style="margin:0 0 14px; max-width:none;">
       Productos físicos activos sin ningún movimiento (entrada, traspaso o salida) en los últimos
       <input
         type="number"

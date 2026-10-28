@@ -1,7 +1,9 @@
-// Reutiliza page-header/page-actions, empty-state-block,
-// catalog-group-title, grid-table, modal-box/edit-form/form-grid-2col y
-// tipo-producto-toggle de src/styles.scss (los mismos de Productos y
-// servicios, ver productos.component.html).
+// Reutiliza page-header, tab-bar, grid-toolbar/toolbar-group/grid-filter/
+// toolbar-btn/toolbar-select, grid-table, empty-state-block,
+// modal-box/edit-form/form-grid-2col y tipo-producto-toggle de
+// src/styles.scss — mismos que usa Productos y servicios (ver
+// productos.component.html/.scss). Lo de aquí es específico de esta
+// pantalla, homologación visual del 27-oct (ver auditoría del proyecto).
 
 // El input de "Ubicación" en la pestaña Existencia por bodega usaba la
 // clase .precio-lista-input (mismo patrón que nivel-minimo-bodega/
@@ -25,4 +27,39 @@
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Ancho de los campos de app-select-buscable dentro de .grid-filter (Bodega,
+ * y el autocomplete remoto de Producto en Historial) — mismo criterio y
+ * misma clase que productos.component.scss/valor-stock.component.scss:
+ * sin esto, :host{width:100%} del combo compite por TODO el espacio dentro
+ * de .grid-filter (flex-wrap:nowrap), empujando a los demás campos a su
+ * min-width. Scoped a este componente, no toca la regla global. */
+.productos-filtro-categoria {
+  flex: 1 1 200px;
+  min-width: 160px;
+  max-width: 420px;
+}
+
+/* Igual que arriba: el buscador de texto de Existencia por bodega y los
+ * date inputs "Desde"/"Hasta" de Historial también crecen para repartirse
+ * el espacio libre de .grid-filter en vez de dejarlo vacío a la derecha —
+ * mismo override/razón que en productos.component.scss. */
+.grid-filter input:not([type='checkbox']) {
+  flex: 1 1 200px;
+  max-width: 420px;
+}
+
+/* Con hasta 4-5 controles dentro de .grid-filter (el máximo lo tiene
+ * Historial: Producto + Bodega + Desde + Hasta), antes esta regla forzaba
+ * flex-wrap:wrap SIEMPRE — ver explicación completa en
+ * productos.component.scss (el flex-basis de cada campo, no su max-width/
+ * flex-grow, es lo que decide si entran en una sola línea). Mismo punto de
+ * quiebre que Productos y servicios / Valor de stock: en pantallas
+ * normales se queda en nowrap (heredado de styles.scss), y solo envuelve
+ * bajo este ancho. Override local, no toca la regla global. */
+@media (max-width: 1100px) {
+  .grid-filter {
+    flex-wrap: wrap;
+  }
 }

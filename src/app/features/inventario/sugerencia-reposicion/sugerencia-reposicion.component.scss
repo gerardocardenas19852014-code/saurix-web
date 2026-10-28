@@ -1,1 +1,37 @@
-// Sin estilos propios — reutiliza dashboard-stats/dashboard-stat-card, board-filters y grid-table de src/styles.scss.
+// El sistema visual global (page-header, grid-toolbar, grid-table,
+// dashboard-stats, empty-state-block, etc.) vive en src/styles.scss. Lo de
+// aquí es específico de esta pantalla — mismo patrón ya usado en
+// productos.component.scss / movimientos-bodega.component.scss.
+
+// Mismo motivo que en Productos y servicios: sin esto, app-select-buscable
+// compite por todo el ancho de .grid-filter y empuja los buscadores de
+// texto hasta su min-width, recortando el placeholder.
+.productos-filtro-categoria {
+  flex: 1 1 200px;
+  min-width: 160px;
+  max-width: 420px;
+}
+
+.grid-filter input:not([type='checkbox']) {
+  flex: 1 1 200px;
+  max-width: 420px;
+}
+
+@media (max-width: 1100px) {
+  .grid-filter {
+    flex-wrap: wrap;
+  }
+}
+
+// Encabezados ordenables (requerimiento 16) — Productos y servicios no
+// tiene todavía este patrón en ningún lado; se agregó aquí mínimo y
+// consistente con el resto (solo cursor + un leve resalte al pasar el
+// mouse, sin tocar el estilo base de .grid-table th en styles.scss).
+.grid-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+
+  &:hover {
+    color: var(--ink);
+  }
+}

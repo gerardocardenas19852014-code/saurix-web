@@ -1,26 +1,82 @@
 @if (vista() === 'lista') {
   <div class="page-header">
     <h1>Órdenes de compra</h1>
-    <div class="page-actions">
-      <button type="button" class="toolbar-btn" (click)="nuevaOrden()">+ Nueva orden</button>
-    </div>
   </div>
 
+  <!-- Barra homologada al estándar nuevo de Saurix (mismo patrón que
+       Productos y servicios / Movimientos entre bodegas / Valor de stock):
+       "+ Nueva orden" ya NO queda aislado arriba a la derecha — vive aquí,
+       del lado izquierdo, como "+ Nuevo" de Productos. Ningún filtro
+       dispara una búsqueda por sí solo — solo "🔍 Buscar" o Enter en el
+       campo de texto (ver cambiarFiltro()) consultan al servidor; cambiar
+       Proveedor/Bodega/Estado/fechas solo actualiza el filtro en memoria
+       hasta que se presione Buscar. -->
   <div class="grid-toolbar">
+    <button type="button" class="toolbar-btn" (click)="nuevaOrden()">+ Nueva orden</button>
+    <button type="button" class="btn-primary small" [disabled]="cargando()" (click)="cambiarFiltro()">🔍 Buscar</button>
+
     <div class="grid-filter">
       <input
         type="search"
         placeholder="Buscar por folio o proveedor…"
-        [value]="busqueda()"
-        (input)="busqueda.set($any($event.target).value)"
+        [value]="filtroBusqueda()"
+        (input)="filtroBusqueda.set($any($event.target).value)"
+        (keyup.enter)="cambiarFiltro()"
       />
+      <div class="productos-filtro-categoria">
+        <app-select-buscable
+          [opciones]="opcionesProveedor()"
+          [value]="filtroProveedorId()"
+          placeholder="Filtrar por proveedor…"
+          [permiteLimpiar]="true"
+          (valueChange)="filtroProveedorId.set(+($event ?? 0))"
+        />
+      </div>
+      <select class="toolbar-select" [value]="filtroBodegaId()" (change)="filtroBodegaId.set(+$any($event.target).value)">
+        <option [value]="0">Todas las bodegas</option>
+        @for (b of bodegasActivas(); track b.id) {
+          <option [value]="b.id">{{ b.nombre }}</option>
+        }
+      </select>
+      <select class="toolbar-select" [value]="filtroEstado()" (change)="filtroEstado.set($any($event.target).value)">
+        <option value="">Todos los estados</option>
+        <option value="pendiente">Pendiente</option>
+        <option value="recibida_parcial">Recibida parcial</option>
+        <option value="recibida_completa">Recibida completa</option>
+        <option value="cancelada">Cancelada</option>
+      </select>
+      <label class="grid-filter-fecha-label">
+        Desde
+        <input type="date" [value]="filtroDesde()" (change)="filtroDesde.set($any($event.target).value)" />
+      </label>
+      <label class="grid-filter-fecha-label">
+        Hasta
+        <input type="date" [value]="filtroHasta()" (change)="filtroHasta.set($any($event.target).value)" />
+      </label>
     </div>
+  </div>
+
+  <!-- Paginación REAL contra el servidor (ver cargarListado()/
+       irAPaginaSiguiente()/irAPaginaAnterior()) — mismo patrón que
+       Productos y servicios/Movimientos entre bodegas (historial): el
+       paginador interno de <app-data-table> no se nota porque siempre se
+       le pasa exactamente una página de servidor. -->
+  <div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-bottom:10px;">
+    <span class="hint" style="margin:0;">
+      Página {{ paginaActual() }} de {{ totalPaginas() }} — {{ totalOrdenesFiltradas() }} orden(es)
+    </span>
+    <button type="button" class="btn-secondary small" [disabled]="paginaActual() <= 1 || cargando()" (click)="irAPaginaAnterior()">
+      ← Anterior
+    </button>
+    <button type="button" class="btn-secondary small" [disabled]="paginaActual() >= totalPaginas() || cargando()" (click)="irAPaginaSiguiente()">
+      Siguiente →
+    </button>
   </div>
 
   <app-data-table
     [tamanoPagina]="preferenciasGrid.tamanoPagina()"
     [columnas]="columnas"
-    [filas]="filasFiltradas()"
+    [filas]="filasListado()"
     [cargando]="cargando()"
     (editar)="abrirOrden($event)"
     (eliminar)="pedirEliminar($event)"
@@ -50,7 +106,11 @@
     </span>
   }
 
-  <form [formGroup]="form" class="edit-form form-grid-4col" style="margin-bottom:24px;">
+  <!-- max-width:none — .form-grid-4col trae un tope de 1100px en los estilos
+       globales que no se enteró de que esta pantalla ya usa el ancho
+       completo (data-wide="grid", hasta 1600px); sin esto quedaba una franja
+       vacía a la derecha del formulario. Acotado a esta pantalla nada más. -->
+  <form [formGroup]="form" class="edit-form form-grid-4col" style="margin-bottom:24px; max-width:none;">
     <label>
       Proveedor
       <app-select-buscable [opciones]="opcionesProveedor()" formControlName="proveedorId" placeholder="Buscar proveedor…" />
@@ -77,11 +137,40 @@
   @if (!puedeEditarItems()) {
     <p class="hint" style="margin:0 0 12px;">Esta orden ya tiene mercancía recibida — las cantidades y costos de las líneas ya no se pueden editar.</p>
   } @else {
-    <div style="max-width:420px; margin-bottom:12px;">
-      <label class="board-filter-field" style="width:100%;">
-        Escanear producto (agrega la línea o suma 1 a la cantidad)
-        <app-escaneo-codigo (codigoEscaneado)="escanearLinea($event)" />
-      </label>
+    <!-- Barra de captura rápida — código/escaneo, nombre (autocomplete remoto)
+         y cantidad, en ese orden, para poder escanear/teclear producto tras
+         producto sin soltar el teclado (ver agregarPorCodigo()/
+         agregarDesdeBarra() en el componente). Ya no existe "+ Agregar
+         línea": una fila solo nace cuando de verdad se eligió un producto. -->
+    <div class="oc-barra-captura">
+      <app-escaneo-codigo
+        #escaneoCodigoBarra
+        class="oc-barra-codigo"
+        placeholder="Código / escanear…"
+        [limpiarDespues]="true"
+        (codigoEscaneado)="agregarPorCodigo($event)"
+      />
+      <app-select-buscable
+        class="oc-barra-producto"
+        [busquedaRemota]="buscarProductoAutocomplete"
+        [debounceMs]="300"
+        [value]="productoSeleccionadoId()"
+        placeholder="Buscar producto por nombre…"
+        (valueChange)="onSeleccionarProductoAutocomplete($event)"
+      />
+      <input
+        type="number"
+        step="1"
+        min="1"
+        class="oc-barra-cantidad"
+        title="Cantidad"
+        [value]="cantidadCapturaTexto()"
+        (input)="cantidadCapturaTexto.set($any($event.target).value)"
+        (keyup.enter)="agregarDesdeBarra()"
+      />
+      <button type="button" class="toolbar-btn oc-barra-agregar" [disabled]="!productoSeleccionadoId()" (click)="agregarDesdeBarra()">
+        + Agregar
+      </button>
     </div>
   }
 
@@ -89,6 +178,7 @@
     <table class="grid-table">
       <thead>
         <tr>
+          <th>Código</th>
           <th>Producto</th>
           <th>Unidad</th>
           <th>Cantidad</th>
@@ -105,26 +195,16 @@
       <tbody>
         @for (linea of itemsForm(); track $index) {
           <tr>
-            <td data-label="Producto">
-              @if (puedeEditarItems()) {
-                <app-select-buscable
-                  [opciones]="opcionesProducto()"
-                  [value]="linea.productoId"
-                  placeholder="Buscar producto…"
-                  (valueChange)="seleccionarProductoEnLinea($index, +($event ?? 0))"
-                />
-              } @else {
-                {{ nombreProducto(linea.productoId) }}
-              }
-            </td>
+            <td data-label="Código">{{ linea.codigo || '—' }}</td>
+            <td data-label="Producto">{{ linea.nombre }}</td>
             <td data-label="Unidad">
-              @if (puedeEditarItems() && tieneUnidadCompraAlterna(linea.productoId)) {
+              @if (puedeEditarItems() && tieneUnidadCompraAlterna(linea)) {
                 <select
                   class="precio-lista-input"
                   [value]="linea.unidadId ?? 0"
                   (change)="cambiarUnidadLinea($index, +$any($event.target).value)"
                 >
-                  @for (opcion of opcionesUnidadLinea(linea.productoId); track opcion.valor) {
+                  @for (opcion of opcionesUnidadLinea(linea); track opcion.valor) {
                     <option [value]="opcion.valor">{{ opcion.etiqueta }}</option>
                   }
                 </select>
@@ -177,11 +257,7 @@
     </table>
   </div>
 
-  @if (puedeEditarItems()) {
-    <button type="button" class="btn-secondary small" (click)="agregarLinea()">+ Agregar línea</button>
-  }
-
-  <p class="hint" style="text-align:right; font-weight:600; margin-top:16px;">Total: {{ formatMoneda(totalOrden()) }}</p>
+  <p class="hint" style="text-align:right; font-weight:600; font-size:15px; margin-top:16px;">Total: {{ formatMoneda(totalOrden()) }}</p>
 
   @if (ordenActiva(); as orden) {
     @if (orden.estado === 'pendiente' || orden.estado === 'recibida_parcial') {
@@ -227,7 +303,7 @@
             @for (m of movimientosDeOrden(); track m.id) {
               <tr>
                 <td data-label="Fecha">{{ m.fecha | date: 'short' }}</td>
-                <td data-label="Producto">{{ nombreProducto(m.productoId) }}</td>
+                <td data-label="Producto">{{ nombreProductoOrdenActual(m.productoId) }}</td>
                 <td data-label="Cantidad">{{ m.cantidad }}</td>
                 <td data-label="Costo unitario">{{ m.costoUnitario != null ? formatMoneda(m.costoUnitario) : '—' }}</td>
               </tr>

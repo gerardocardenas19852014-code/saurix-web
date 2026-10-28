@@ -41,6 +41,7 @@ export class EscaneoCodigoComponent implements OnDestroy {
   private readonly toast = inject(ToastService);
 
   @ViewChild('video') private videoRef?: ElementRef<HTMLVideoElement>;
+  @ViewChild('inputCodigo') private inputRef?: ElementRef<HTMLInputElement>;
 
   protected readonly texto = signal('');
   protected readonly camaraAbierta = signal(false);
@@ -57,6 +58,22 @@ export class EscaneoCodigoComponent implements OnDestroy {
     if (!valor) return;
     this.codigoEscaneado.emit(valor);
     if (this.limpiarDespues) this.texto.set('');
+  }
+
+  /** Limpia el texto capturado sin esperar a limpiarDespues — para cuando
+   *  otra pantalla agrega un producto por OTRO camino (p.ej. autocomplete
+   *  por nombre, ver Órdenes de compra) y quiere dejar este campo listo
+   *  para el siguiente código de todas formas. */
+  limpiarTexto(): void {
+    this.texto.set('');
+  }
+
+  /** Regresa el foco a este input — para pantallas donde agregar un
+   *  producto por otro camino (autocomplete por nombre) no debe dejar el
+   *  foco en el botón/combo recién usado: después de agregar, el usuario
+   *  debe poder seguir escaneando/tecleando códigos sin tocar el mouse. */
+  enfocar(): void {
+    this.inputRef?.nativeElement.focus();
   }
 
   /** Abre el visor de cámara y empieza a decodificar frame por frame. El
