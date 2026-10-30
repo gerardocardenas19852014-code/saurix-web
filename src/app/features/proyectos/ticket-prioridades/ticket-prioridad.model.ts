@@ -14,9 +14,3 @@ export interface TicketPrioridad {
   critica?: boolean;
 }
 
-/** Usuarios extra a avisar (además del asignado) cuando el SLA de esta prioridad está por vencer. */
-export interface TicketPrioridadNotificar {
-  id: number;
-  ticketPrioridadId: number;
-  usuarioId: number;
-}

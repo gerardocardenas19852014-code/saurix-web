@@ -218,12 +218,12 @@ export class SupabaseDataClientService extends DataClientService {
 
   /** Páginas siguientes a la primera (ver listar()), traídas en PARALELO
    *  con un tope de concurrencia — nunca todas a la vez (eso reproduciría
-   *  el mismo bug de fan-out sin límite ya documentado en este repo, ver
-   *  NotificacionesService) ni todas en serie una por una (eso era
-   *  exactamente el problema: con un catálogo de 200,000+ filas —
-   *  ver inventario.producto tras la prueba de rendimiento — list() hacía
-   *  ~200 peticiones en fila, cada una esperando a la anterior, dejando la
-   *  pantalla en "Cargando…" decenas de segundos sin ningún error). */
+   *  un bug de fan-out sin límite ya visto en este repo) ni todas en serie
+   *  una por una (eso era exactamente el problema: con un catálogo de
+   *  200,000+ filas — ver inventario.producto tras la prueba de
+   *  rendimiento — list() hacía ~200 peticiones en fila, cada una
+   *  esperando a la anterior, dejando la pantalla en "Cargando…" decenas
+   *  de segundos sin ningún error). */
   private static readonly CONCURRENCIA_PAGINAS = 6;
 
   private async listar(entidad: string, filtro?: Record<string, unknown>): Promise<Fila[]> {

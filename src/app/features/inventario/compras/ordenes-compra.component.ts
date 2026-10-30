@@ -31,8 +31,7 @@ interface FilaOrdenCompra {
   estado: EstadoOrdenCompra;
   total: number;
   /** true si estado es pendiente/recibida_parcial Y ya pasó su
-   *  fechaEntregaEstimada — mismo criterio que
-   *  NotificacionesService.revisarOrdenesVencidas(). */
+   *  fechaEntregaEstimada. */
   vencida: boolean;
 }
 

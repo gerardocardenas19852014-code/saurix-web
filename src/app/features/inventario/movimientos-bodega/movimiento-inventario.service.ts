@@ -1,6 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
+import { SupabaseService } from '../../../core/services/supabase.service';
+import { fuenteDatosActual } from '../../../core/services/fuente-datos';
 import { ExistenciaBodega } from './existencia-bodega.model';
 import { MovimientoInventario } from './movimiento-inventario.model';
 
@@ -26,14 +28,26 @@ export interface RegistroMovimiento {
  * y arriesgar que un día se desincronicen (mismo criterio de integridad que
  * existenciaTotal() en producto.util.ts: una sola fuente de verdad).
  *
- * Carga su propia copia fresca de ExistenciaBodega en cada llamada — como
- * esta es una app de un solo usuario local (IndexedDB, sin backend
- * concurrente), es más simple y más seguro que pedirle al que llama que
- * cargue y mantenga sincronizado ese arreglo él mismo.
+ * En modo IndexedDB (un solo usuario local, sin backend concurrente) carga
+ * su propia copia fresca de ExistenciaBodega en cada llamada y calcula el
+ * nuevo valor aquí mismo — simple y seguro porque no hay concurrencia real.
+ *
+ * En modo Supabase (BLOQUE C.5, auditoría del sistema de notificaciones:
+ * ese "un solo usuario" ya no aplica con varios usuarios reales escribiendo
+ * a la vez) ese mismo patrón de leer-calcular-escribir es una condición de
+ * carrera: dos escrituras concurrentes pueden pisarse y perder un
+ * movimiento. Por eso aquí se usa una función RPC (inventario.
+ * fn_registrar_movimiento_inventario / fn_enviar_en_transito /
+ * fn_confirmar_recepcion_transito) que hace todo el movimiento en una sola
+ * transacción atómica de Postgres — probado en vivo con dos sesiones
+ * concurrentes reales sin pérdida de actualizaciones. El modo IndexedDB no
+ * se tocó: no tiene este riesgo.
  */
 @Injectable({ providedIn: 'root' })
 export class MovimientoInventarioService {
   private readonly data = inject(DataClientService);
+  private readonly esSupabase = fuenteDatosActual() === 'supabase';
+  private readonly sb = this.esSupabase ? inject(SupabaseService).cliente : null;
 
   /** Existencia actual de un producto en una bodega — 0 si no hay registro. */
   async existenciaEnBodega(productoId: number, bodegaId: number): Promise<number> {
@@ -42,8 +56,23 @@ export class MovimientoInventarioService {
   }
 
   async registrar(registro: RegistroMovimiento): Promise<void> {
-    const existenciasBodega = await firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega'));
     const { productoId, bodegaOrigenId, bodegaDestinoId, cantidad, nota, ordenCompraId, costoUnitario } = registro;
+
+    if (this.esSupabase) {
+      const { error } = await this.sb!.schema('inventario').rpc('fn_registrar_movimiento_inventario', {
+        p_producto_id: productoId,
+        p_bodega_origen_id: bodegaOrigenId,
+        p_bodega_destino_id: bodegaDestinoId,
+        p_cantidad: cantidad,
+        p_nota: nota,
+        p_orden_compra_id: ordenCompraId ?? null,
+        p_costo_unitario: costoUnitario ?? null,
+      });
+      if (error) throw error;
+      return;
+    }
+
+    const existenciasBodega = await firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega'));
 
     // 1. Restar del origen, si aplica (Traspaso o Salida/Ajuste).
     if (bodegaOrigenId !== null) {
@@ -97,8 +126,21 @@ export class MovimientoInventarioService {
    * funciona en todas las pantallas que lo usan.
    */
   async enviarEnTransito(registro: RegistroMovimiento): Promise<void> {
-    const existenciasBodega = await firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega'));
     const { productoId, bodegaOrigenId, bodegaDestinoId, cantidad, nota } = registro;
+
+    if (this.esSupabase) {
+      const { error } = await this.sb!.schema('inventario').rpc('fn_enviar_en_transito', {
+        p_producto_id: productoId,
+        p_bodega_origen_id: bodegaOrigenId,
+        p_bodega_destino_id: bodegaDestinoId,
+        p_cantidad: cantidad,
+        p_nota: nota,
+      });
+      if (error) throw error;
+      return;
+    }
+
+    const existenciasBodega = await firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega'));
 
     if (bodegaOrigenId !== null) {
       const filaOrigen = existenciasBodega.find((e) => e.productoId === productoId && e.bodegaId === bodegaOrigenId);
@@ -132,6 +174,14 @@ export class MovimientoInventarioService {
    * restó cuando se envió.
    */
   async confirmarRecepcionTransito(movimientoId: number): Promise<void> {
+    if (this.esSupabase) {
+      const { error } = await this.sb!.schema('inventario').rpc('fn_confirmar_recepcion_transito', {
+        p_movimiento_id: movimientoId,
+      });
+      if (error) throw error;
+      return;
+    }
+
     const movimiento = await firstValueFrom(this.data.getById<MovimientoInventario>('MovimientoInventario', movimientoId));
     if (!movimiento || !movimiento.enTransito || movimiento.bodegaDestinoId === null) return;
 

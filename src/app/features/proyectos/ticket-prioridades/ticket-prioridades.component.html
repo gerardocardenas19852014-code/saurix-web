@@ -112,26 +112,6 @@
         </label>
       </div>
 
-      <div class="edit-form" style="margin-bottom: 18px;">
-        <label>Avisar también a (además del asignado)</label>
-        @if (usuarios().length === 0) {
-          <p class="hint">No hay usuarios registrados.</p>
-        } @else {
-          <div class="role-checkbox-list">
-            @for (usuario of usuarios(); track usuario.id) {
-              <label class="checkbox-inline">
-                <input
-                  type="checkbox"
-                  [checked]="usuarioIdsNotificar().includes(usuario.id)"
-                  (change)="toggleNotificar(usuario.id, $any($event.target).checked)"
-                />
-                {{ usuario.nombreCompleto }}
-              </label>
-            }
-          </div>
-        }
-      </div>
-
       <div class="modal-actions">
         <button type="button" class="btn-secondary" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">Cancelar</button>
         <button type="submit" class="btn-primary">Guardar</button>

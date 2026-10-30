@@ -30,11 +30,6 @@ export interface Ticket {
   /** Auditoría: la agrega IndexedDbDataClientService.alta() automáticamente. Se usa para calcular el SLA (vigencia de la prioridad) desde la creación del ticket. */
   fechaCreacion?: string;
   fechaModificacion?: string;
-  /** Marca interna de NotificacionesService.revisarSlaTickets(): el nivel de SLA
-   *  ('warning'/'expired') para el que YA se avisó a asignado + "avisar también a"
-   *  de la Prioridad — evita mandar el mismo aviso una y otra vez en cada revisión
-   *  periódica. No se edita desde ningún formulario. */
-  slaAvisoNivel?: 'warning' | 'expired' | null;
   /** Ticket "padre" del que este es subtarea — null/ausente si es un ticket de
    *  nivel superior (ver pestaña "Subtareas" en kanban.component.ts). Igual que
    *  Jira, no se permiten subtareas de subtareas: un ticket que ya tiene

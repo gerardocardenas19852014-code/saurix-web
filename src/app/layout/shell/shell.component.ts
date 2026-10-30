@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, HostListener, OnDestroy, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
@@ -12,7 +11,6 @@ import { MiPerfilComponent } from '../../shared/components/mi-perfil/mi-perfil.c
 import { ToastComponent } from '../../shared/components/toast/toast.component';
 import { ConfiguracionAparienciaService } from '../../shared/services/configuracion-apariencia.service';
 import { ConfiguracionVentasService } from '../../shared/services/configuracion-ventas.service';
-import { NotificacionesService } from '../../shared/services/notificaciones.service';
 import { Ticket } from '../../features/proyectos/kanban/ticket.model';
 import { MovimientoPresupuesto } from '../../features/presupuesto/movimientos/movimiento.model';
 import { MiembroFamilia } from '../../features/familia/miembro-familia.model';
@@ -62,7 +60,6 @@ interface DocumentoBuscable {
     RouterLinkActive,
     ToastComponent,
     MiPerfilComponent,
-    DatePipe,
     ComandoPaletaComponent,
     ConfirmDialogComponent,
   ],
@@ -222,7 +219,6 @@ export class ShellComponent implements OnDestroy {
   /** Gatea el botón flotante del Asistente IA (ver ai-fab/ai-panel en la plantilla):
    *  si está apagado en Apariencia, el asistente no se muestra en ningún módulo. */
   protected readonly asistenteIaActivo = this.configuracionApariencia.asistenteIaActivo;
-  protected readonly notificacionesService = inject(NotificacionesService);
 
   /** Gatea "Corte de caja"/"Cierre de caja" en el menú de Ventas y en su
    *  Inicio (ver VentasLandingComponent) — parámetros de Panel de Control →
@@ -231,15 +227,6 @@ export class ShellComponent implements OnDestroy {
   protected readonly aperturaCajaActivo = this.configuracionVentas.aperturaCajaActivo;
   protected readonly corteCajaActivo = this.configuracionVentas.corteCajaActivo;
   protected readonly cierreCajaActivo = this.configuracionVentas.cierreCajaActivo;
-
-  /** Revisión periódica de notificaciones (tarjetas/stock bajo/órdenes vencidas)
-   *  — cada 5 minutos mientras la sesión siga abierta, para no depender de tener
-   *  abierta ninguna pantalla en particular. El nombre quedó de cuando también
-   *  incluía SLA de tickets; ahora SLA se revisa por separado vía pg_cron
-   *  (ver revisarNotificacionesPeriodicas más abajo) — no se renombró para no
-   *  mezclar refactorización con este despliegue (BLOQUE B). */
-  private static readonly INTERVALO_REVISION_SLA_MS = 5 * 60 * 1000;
-  private intervaloRevisionSla?: ReturnType<typeof setInterval>;
 
   constructor() {
     // Restaura la posición del botón del asistente si el usuario ya lo
@@ -251,13 +238,7 @@ export class ShellComponent implements OnDestroy {
     // (login fresco o sesión restaurada) — no solo lo que había en
     // localStorage de este navegador.
     void this.configuracionApariencia.cargarParaUsuarioActual();
-    void this.notificacionesService.cargarParaUsuarioActual();
     void this.configuracionVentas.cargar();
-    this.revisarNotificacionesPeriodicas();
-    this.intervaloRevisionSla = setInterval(
-      () => this.revisarNotificacionesPeriodicas(),
-      ShellComponent.INTERVALO_REVISION_SLA_MS,
-    );
     this.mediaQuerySidebarAngosta.addEventListener('change', this.onCambioSidebarAngosta);
     effect(() => {
       this.urlActual();
@@ -282,26 +263,7 @@ export class ShellComponent implements OnDestroy {
     this.observadorModales.observe(document.body, { childList: true, subtree: true });
   }
 
-  /** Alertas de tarjeta (uso ≥90%, recordatorio de pago) + stock bajo y
-   *  órdenes de compra vencidas de Inventario — mismo intervalo, así
-   *  ninguna pantalla en particular necesita estar abierta.
-   *
-   *  SLA de tickets YA NO se revisa desde aquí (BLOQUE B, migración del
-   *  sistema de notificaciones): se centralizó en pg_cron + PostgreSQL
-   *  (privado.fn_revisar_sla_tickets(), job 'revisar-sla-tickets', cada
-   *  minuto) para no depender de tener una pestaña abierta ni duplicar
-   *  trabajo entre pestañas. NotificacionesService.revisarSlaTickets()
-   *  se conserva por ahora (no se borra todavía) mientras se estabiliza
-   *  el cambio; se retirará en una limpieza posterior, por separado de
-   *  este despliegue. */
-  private revisarNotificacionesPeriodicas(): void {
-    void this.notificacionesService.revisarAlertasTarjetas();
-    void this.notificacionesService.revisarAlertasStockBajo();
-    void this.notificacionesService.revisarOrdenesVencidas();
-  }
-
   ngOnDestroy(): void {
-    if (this.intervaloRevisionSla) clearInterval(this.intervaloRevisionSla);
     this.mediaQuerySidebarAngosta.removeEventListener('change', this.onCambioSidebarAngosta);
     document.removeEventListener('click', this.interceptarCierreDeModal, true);
     this.observadorModales?.disconnect();
@@ -461,30 +423,6 @@ export class ShellComponent implements OnDestroy {
     this.router.navigateByUrl('/login');
   }
 
-  // ── Notificaciones ────────────────────────────────────────────────
-  // Ya no es una lista fija en memoria: NotificacionesService persiste en
-  // IndexedDB y la alimentan eventos reales (SLA, menciones, asignación de
-  // ticket — ver kanban.component.ts).
-  protected readonly notifPanelAbierto = signal(false);
-  protected readonly notificaciones = this.notificacionesService.notificaciones;
-  protected readonly hayNoLeidas = this.notificacionesService.hayNoLeidas;
-  protected readonly totalNoLeidas = this.notificacionesService.totalNoLeidas;
-
-  toggleNotifPanel(): void {
-    this.notifPanelAbierto.update((v) => !v);
-  }
-
-  /** Marca como leída y, si trae un link, navega ahí (p.ej. abre el ticket directo). */
-  abrirNotificacion(n: { id: number; leida: boolean; link?: string }): void {
-    this.notificacionesService.marcarLeida(n.id);
-    this.notifPanelAbierto.set(false);
-    if (n.link) this.router.navigateByUrl(n.link);
-  }
-
-  marcarTodasLeidas(): void {
-    this.notificacionesService.marcarTodasLeidas();
-  }
-
   // ── Asistente de IA (chat flotante) ──────────────────────────────
   protected readonly aiAbierto = signal(false);
   protected readonly aiMensajes = signal<AiMensaje[]>([]);
@@ -605,53 +543,7 @@ export class ShellComponent implements OnDestroy {
       this.aiSeArrastro = false;
       return;
     }
-    const seVaAAbrir = !this.aiAbierto();
     this.aiAbierto.update((v) => !v);
-    if (seVaAAbrir && this.aiMensajes().length === 0) {
-      this.mostrarAvisoProactivoAi();
-    }
-  }
-
-  /** Al abrir el chat por primera vez (todavía sin mensajes), adelanta sin
-   *  que se pregunte nada lo mismo que ya avisa la campanita 🔔 (SLA de
-   *  tickets por vencer, alertas de tarjeta — ver NotificacionesService):
-   *  reutiliza esas notificaciones ya calculadas, no vuelve a calcular nada. */
-  private mostrarAvisoProactivoAi(): void {
-    const pendientes = this.notificacionesService.notificaciones().filter((n) => !n.leida);
-    if (pendientes.length === 0) return;
-    const lista = pendientes
-      .slice(0, 3)
-      .map((n) => ({ texto: n.titulo, ruta: n.link } as { texto: string; ruta?: string }));
-    const extra = pendientes.length > 3 ? ` y ${pendientes.length - 3} más (revisa la campanita 🔔)` : '';
-    this.aiMensajes.update((m) => [
-      ...m,
-      {
-        rol: 'bot',
-        texto: `Antes de que preguntes algo, esto tienes pendiente${extra}:`,
-        secciones: [
-          {
-            titulo: '🔔 Pendientes',
-            enlaces: lista.map((l) => this.enlaceDesdeRutaCompleta(l.texto, l.ruta)),
-          },
-        ],
-      },
-    ]);
-  }
-
-  /** Notificacion.link viene como string completo tipo '/proyectos/tablero?ticket=123'
-   *  (ver NotificacionesService) — se separa en ruta+queryParams para usarlo
-   *  como [routerLink]/[queryParams], igual que el resto de enlaces del asistente. */
-  private enlaceDesdeRutaCompleta(texto: string, rutaCompleta?: string): AiEnlace {
-    if (!rutaCompleta) return { texto, ruta: '' };
-    const [ruta, query] = rutaCompleta.split('?');
-    const queryParams: Record<string, string> = {};
-    if (query) {
-      for (const par of query.split('&')) {
-        const [clave, valor] = par.split('=');
-        if (clave) queryParams[decodeURIComponent(clave)] = decodeURIComponent(valor ?? '');
-      }
-    }
-    return { texto, ruta, queryParams: query ? queryParams : undefined };
   }
 
   enviarPreguntaAi(): void {
@@ -673,8 +565,7 @@ export class ShellComponent implements OnDestroy {
     // tener decenas de miles de tickets sintéticos, y sin este filtro el
     // asistente intentaría traerlos todos en CUALQUIER pregunta (aunque no
     // tenga nada que ver con tickets), con el mismo riesgo de
-    // 504/ERR_INSUFFICIENT_RESOURCES que ya se corrigió en el aviso de SLA de
-    // NotificacionesService.
+    // 504/ERR_INSUFFICIENT_RESOURCES visto antes al traer tickets sin filtrar.
     this.data
       .list<ProyectoOpcion>('Proyecto')
       .pipe(

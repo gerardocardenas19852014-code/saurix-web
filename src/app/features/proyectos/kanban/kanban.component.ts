@@ -10,7 +10,6 @@ import { AdjuntosPanelComponent } from '../../../shared/components/adjuntos-pane
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ConfiguracionAparienciaService } from '../../../shared/services/configuracion-apariencia.service';
-import { NotificacionesService } from '../../../shared/services/notificaciones.service';
 import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { ToastService } from '../../../shared/services/toast.service';
 import { exportarCsv } from '../../../shared/utils/csv.util';
@@ -79,7 +78,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly configuracionApariencia = inject(ConfiguracionAparienciaService);
-  private readonly notificaciones = inject(NotificacionesService);
   private readonly route = inject(ActivatedRoute);
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
 
@@ -136,9 +134,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
    *  Ctrl/Cmd+clic, poco descubrible). */
   protected readonly filtroEstadoIds = signal<number[]>([]);
   /** Controla si el desplegable de casillas del filtro de Estado está abierto
-   *  — mismo patrón de panel flotante que .notif-panel (shell), sin cierre al
-   *  hacer clic afuera (tampoco lo tiene el panel de notificaciones): se cierra
-   *  con el botón "Cerrar" de adentro o al volver a hacer clic en el disparador. */
+   *  — panel flotante sin cierre al hacer clic afuera: se cierra con el botón
+   *  "Cerrar" de adentro o al volver a hacer clic en el disparador. */
   protected readonly filtroEstadoAbierto = signal(false);
   protected readonly filtroAsignadoId = signal<number>(0);
   /** 0 = Todos (sin filtro), 1 = solo planeados, 2 = solo no planeados — mismo
@@ -1175,16 +1172,9 @@ export class KanbanComponent implements OnInit, OnDestroy {
       ? this.data.modificacion<Ticket>('Ticket', payload)
       : this.data.alta<Ticket>('Ticket', payload);
 
-    // Para poder avisarle al nuevo asignado SOLO cuando el asignado realmente
-    // cambió (y no en cada guardado, ni cuando se asigna a sí mismo).
-    const asignadoAnteriorId = enEdicion?.asignadoUsuarioId ? Number(enEdicion.asignadoUsuarioId) : null;
-
     peticion.subscribe({
       next: (ticketGuardado) => {
         this.toast.exito(esEdicion ? 'Ticket actualizado.' : 'Ticket creado.');
-        if (payload.asignadoUsuarioId && payload.asignadoUsuarioId !== asignadoAnteriorId) {
-          this.notificarAsignacion(ticketGuardado, payload.asignadoUsuarioId);
-        }
         if (esEdicion) {
           this.refrescarTicketActivo();
         } else {
@@ -1203,17 +1193,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
         this.actualizarTicketLocal(ticketGuardado);
       },
     });
-  }
-
-  /** Notifica al usuario recién asignado — no antes de guardar (si falla el guardado, no
-   *  tiene sentido avisar de una asignación que no se llegó a persistir). */
-  private notificarAsignacion(ticket: Ticket, asignadoUsuarioId: number): void {
-    if (asignadoUsuarioId === this.auth.usuarioActual()?.id) return;
-    this.notificaciones.notificar(
-      asignadoUsuarioId,
-      `Te asignaron el ticket #${ticket.numeroTicket} — ${ticket.titulo}`,
-      `/proyectos/tablero?ticket=${ticket.id}`,
-    );
   }
 
   /** Único punto que persiste un cambio de columna: lo usan los botones "Aceptar"/"Regresar"
@@ -1235,7 +1214,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
             usuarioId: this.auth.usuarioActual()?.id ?? null,
           })
           .subscribe({ error: () => undefined });
-        this.notificarCambioEstado(ticket, Number(columnaId));
         // El servidor es quien manda (puede haber triggers que ajusten fechas
         // de SLA al cambiar de columna) — se usa SU respuesta, no se
         // reconstruye el ticket a mano.
@@ -1243,32 +1221,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
         if (this.ticketActivo()?.id === ticket.id) this.refrescarTicketActivo();
       },
       error: () => this.toast.error('No se pudo mover el ticket. Intenta de nuevo.'),
-    });
-  }
-
-  /** Avisa a quien REPORTÓ el ticket y a sus seguidores (TicketSeguidor) cuando cambia
-   *  de columna — antes solo se notificaba al asignado, y solo al asignárselo (ver
-   *  notificarAsignacion), nunca al avanzar/retroceder de estado. Consulta
-   *  TicketSeguidor directo (no this.seguidores(), que solo trae los del detalle
-   *  abierto) para funcionar igual se mueva el ticket desde el detalle o el tablero. */
-  private notificarCambioEstado(ticket: Ticket, columnaNuevaId: number): void {
-    const propioId = this.auth.usuarioActual()?.id ?? null;
-    const columnas = this.columnasTablero();
-    const esResuelto = columnas.length > 0 && Number(columnaNuevaId) === Number(columnas[columnas.length - 1].id);
-    const titulo = `${esResuelto ? '✅ Se resolvió' : '🔄 Cambió de estado'} el ticket #${ticket.numeroTicket} — ${ticket.titulo} (${this.nombreColumna(columnaNuevaId)})`;
-    const link = `/proyectos/tablero?ticket=${ticket.id}`;
-
-    const destinatarios = new Set<number>();
-    if (ticket.reportadoPorUsuarioId && Number(ticket.reportadoPorUsuarioId) !== Number(propioId)) {
-      destinatarios.add(Number(ticket.reportadoPorUsuarioId));
-    }
-    this.data.list<TicketSeguidor>('TicketSeguidor', { ticketId: ticket.id }).subscribe((seguidores) => {
-      for (const s of seguidores) {
-        if (Number(s.usuarioId) !== Number(propioId)) destinatarios.add(Number(s.usuarioId));
-      }
-      for (const usuarioId of destinatarios) {
-        this.notificaciones.notificar(usuarioId, titulo, link);
-      }
     });
   }
 
@@ -1689,35 +1641,10 @@ export class KanbanComponent implements OnInit, OnDestroy {
       })
       .subscribe({
         next: () => {
-          this.notificarMenciones(activo, texto);
           this.formComentario.reset({ texto: '' });
           this.cargarDetalle(activo.id);
         },
       });
-  }
-
-  /** Notifica a cada usuario mencionado con "@primerNombre" en un comentario recién
-   *  guardado. Se compara solo contra el primer nombre (sin apellido, insensible a
-   *  mayúsculas) porque el catálogo de Usuarios no tiene un @usuario/slug propio. */
-  private notificarMenciones(ticket: Ticket, texto: string): void {
-    const tokens = new Set(
-      Array.from(texto.matchAll(/@([\p{L}\p{N}_]+)/gu)).map((m) => m[1].toLowerCase()),
-    );
-    if (!tokens.size) return;
-
-    const propioId = this.auth.usuarioActual()?.id ?? null;
-    const yaNotificados = new Set<number>();
-    for (const usuario of this.usuarios()) {
-      const primerNombre = usuario.nombreCompleto.trim().split(/\s+/)[0]?.toLowerCase();
-      if (!primerNombre || !tokens.has(primerNombre)) continue;
-      if (Number(usuario.id) === Number(propioId) || yaNotificados.has(Number(usuario.id))) continue;
-      yaNotificados.add(Number(usuario.id));
-      this.notificaciones.notificar(
-        Number(usuario.id),
-        `Te mencionaron en el ticket #${ticket.numeroTicket} — ${ticket.titulo}`,
-        `/proyectos/tablero?ticket=${ticket.id}`,
-      );
-    }
   }
 
   agregarActividad(): void {

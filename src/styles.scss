@@ -133,38 +133,15 @@ h1, h2 { font-family: 'Montserrat', sans-serif; font-weight: 700; color: var(--h
   border-radius: 12px; padding: 12px 14px; margin: 4px 0 8px;
 }
 .session-actions { display: flex; align-items: center; gap: 8px; }
-.notif-wrap { position: relative; }
+// .notif-bell se conserva: lo reutiliza mi-perfil.component.html (botón 🔑 de
+// Mi perfil en el topbar) para su estilo de botón circular, sin relación con
+// notificaciones.
 .notif-bell {
   position: relative; background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .2);
   color: #fff; font-size: 15px; width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
 }
 .notif-bell:hover { background: rgba(255, 255, 255, .18); }
-.notif-dot {
-  position: absolute; top: -2px; right: -2px; min-width: 16px; height: 16px; padding: 0 3px;
-  background: var(--danger); color: #fff; border-radius: 8px; font-size: 10px; font-weight: 700;
-  font-family: 'Montserrat', sans-serif; display: flex; align-items: center; justify-content: center;
-  border: 2px solid var(--ink);
-}
-.notif-panel {
-  display: none; position: absolute; top: calc(100% + 8px); right: 0; width: 280px; max-width: calc(100vw - 24px); max-height: 340px; overflow-y: auto;
-  background: var(--paper-raised); border: 1px solid var(--line); border-radius: 12px;
-  box-shadow: 0 16px 32px -14px rgba(0, 0, 0, .35); z-index: 120;
-}
-.notif-panel.open { display: block; }
-.notif-panel-head {
-  display: flex; justify-content: space-between; align-items: center; padding: 12px 14px;
-  border-bottom: 1px solid var(--line); font-family: 'Montserrat', sans-serif; font-size: 12px;
-  font-weight: 700; color: var(--text-strong); text-transform: uppercase; letter-spacing: .05em;
-}
-.notif-panel-head a { font-size: 11px; text-transform: none; letter-spacing: 0; font-weight: 600; }
-.notif-panel-list { padding: 6px; }
-.notif-item { display: block; padding: 10px 10px; border-radius: 8px; cursor: pointer; margin-bottom: 2px; background: none; border: none; width: 100%; text-align: left; }
-.notif-item:hover { background: var(--paper); }
-.notif-item.unread { background: var(--client-soft); }
-.notif-item-title { font-size: 13px; font-weight: 600; color: var(--text-strong); display: block; }
-.notif-item-meta { font-size: 11px; color: var(--ink-soft); font-family: 'Montserrat', sans-serif; }
-.notif-empty { padding: 24px 14px; text-align: center; color: var(--ink-soft); font-size: 13px; }
 
 #sessionInfo, .session-info { font-family: 'Montserrat', sans-serif; font-size: 13px; color: rgba(255, 255, 255, .85); }
 #sessionInfo strong, .session-info strong { color: #fff; font-size: 14px; }
@@ -188,7 +165,6 @@ h1, h2 { font-family: 'Montserrat', sans-serif; font-weight: 700; color: var(--h
 .topbar-user-info strong { color: var(--text-strong); font-size: 12px; }
 .topbar-actions .notif-bell { width: 38px; height: 38px; background: var(--paper); border-color: var(--line); color: var(--text-strong); font-size: 17px; box-shadow: 0 2px 8px rgba(0, 0, 0, .08); }
 .topbar-actions .notif-bell:hover { background: var(--accent-soft); border-color: var(--accent); }
-.topbar-actions .notif-dot { border-color: var(--paper-raised); }
 .topbar-exit { padding: 6px 12px; background: var(--paper); border-color: var(--line); color: var(--text-strong); }
 .topbar-exit:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
 
@@ -381,8 +357,7 @@ html[data-wide='grid'] .content { max-width: 1600px; }
 
 // Filtro de Estado con selección múltiple (tickets › Lista de tickets): un
 // botón con la misma pinta que los <select> vecinos que abre un desplegable
-// de casillas — mismo patrón de panel flotante que .notif-panel (shell),
-// pero colgando de un filtro en vez de la campanita.
+// de casillas en un panel flotante, colgando de un filtro.
 .filtro-estado-wrap { position: relative; }
 .filtro-estado-btn {
   padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-family: inherit; font-size: 14px;
@@ -637,8 +612,7 @@ html[data-wide='grid'] .content { max-width: 1600px; }
 .tab-btn.is-active { color: var(--accent); border-bottom-color: var(--accent); }
 
 /* Menú "Más ▾" del detalle de ticket (kanban.component.html) — mismo patrón visual
- * que .notif-panel (panel de notificaciones), pero colgando de una pestaña en vez
- * de la campanita. */
+ * de panel flotante, colgando de una pestaña. */
 .tab-more-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
 .tab-more-btn { display: inline-flex; align-items: center; gap: 4px; }
 .tab-more-menu {

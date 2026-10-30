@@ -108,8 +108,8 @@ export class ResumenEjecutivoComponent implements OnInit {
     // "reales" (no esPrueba) — un proyecto de prueba de rendimiento puede
     // tener decenas de miles de tickets sintéticos, y sin este filtro este
     // Resumen ejecutivo (que combina TODOS los proyectos) intentaría traerlos
-    // todos, con el mismo riesgo de 504/ERR_INSUFFICIENT_RESOURCES que ya se
-    // corrigió en el aviso de SLA de NotificacionesService.
+    // todos, con el mismo riesgo de 504/ERR_INSUFFICIENT_RESOURCES visto antes
+    // al traer tickets sin filtrar.
     this.data.list<ProyectoOpcion>('Proyecto').subscribe((proyectos) => {
       this.proyectos.set(proyectos);
       if (proyectos.length && !this.proyectoDetalleId()) this.proyectoDetalleId.set(proyectos[0].id);

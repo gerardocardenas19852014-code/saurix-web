@@ -1,13 +1,10 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
-import { forkJoin, of, switchMap } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../../shared/services/toast.service';
-import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
-import { UsuarioOpcion } from '../kanban/ticket.model';
-import { TicketPrioridad, TicketPrioridadNotificar } from './ticket-prioridad.model';
+import { TicketPrioridad } from './ticket-prioridad.model';
 
 @Component({
   selector: 'app-ticket-prioridades',
@@ -40,12 +37,6 @@ export class TicketPrioridadesComponent implements OnInit {
   protected readonly modalAbierto = signal(false);
   protected readonly prioridadEnEdicion = signal<TicketPrioridad | null>(null);
   protected readonly prioridadAEliminar = signal<TicketPrioridad | null>(null);
-
-  /** Catálogo de usuarios (para elegir a quién avisar) y selección actual del modal. */
-  protected readonly usuarios = signal<UsuarioOpcion[]>([]);
-  protected readonly usuarioIdsNotificar = signal<number[]>([]);
-  /** Snapshot de TicketPrioridadNotificar tal como estaban al abrir el modal (para diff al guardar). */
-  private notificacionesOriginales: TicketPrioridadNotificar[] = [];
 
   protected readonly form = this.fb.nonNullable.group({
     id: [0],
@@ -83,7 +74,6 @@ export class TicketPrioridadesComponent implements OnInit {
   ngOnInit(): void {
     document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
     this.cargar();
-    this.cargarUsuarios();
   }
 
   cargar(): void {
@@ -94,14 +84,6 @@ export class TicketPrioridadesComponent implements OnInit {
         this.cargando.set(false);
       },
       error: () => this.cargando.set(false),
-    });
-  }
-
-  private cargarUsuarios(): void {
-    this.data.list<Usuario>('Usuario').subscribe((usuarios) => {
-      this.usuarios.set(
-        usuarios.map((u) => ({ id: u.id, nombreCompleto: nombreCompletoUsuario(u) })),
-      );
     });
   }
 
@@ -117,8 +99,6 @@ export class TicketPrioridadesComponent implements OnInit {
       activo: true,
       critica: false,
     });
-    this.notificacionesOriginales = [];
-    this.usuarioIdsNotificar.set([]);
     this.modalAbierto.set(true);
   }
 
@@ -134,23 +114,7 @@ export class TicketPrioridadesComponent implements OnInit {
       activo: prioridad.activo !== false,
       critica: prioridad.critica === true,
     });
-    this.notificacionesOriginales = [];
-    this.usuarioIdsNotificar.set([]);
-    this.data
-      .list<TicketPrioridadNotificar>('TicketPrioridadNotificar', { ticketPrioridadId: prioridad.id })
-      .subscribe((filas) => {
-        this.notificacionesOriginales = filas;
-        this.usuarioIdsNotificar.set(filas.map((f) => Number(f.usuarioId)));
-      });
     this.modalAbierto.set(true);
-  }
-
-  /** Marca/desmarca a un usuario en la lista de "avisar también a" del modal actual. */
-  toggleNotificar(usuarioId: number, marcado: boolean): void {
-    const actuales = this.usuarioIdsNotificar();
-    this.usuarioIdsNotificar.set(
-      marcado ? [...actuales, usuarioId] : actuales.filter((id) => id !== usuarioId),
-    );
   }
 
   guardar(): void {
@@ -166,40 +130,13 @@ export class TicketPrioridadesComponent implements OnInit {
       : this.data.alta<TicketPrioridad>('TicketPrioridad', valor);
 
     peticion.subscribe({
-      next: (resultado) => {
-        this.sincronizarNotificaciones(resultado.id);
+      next: () => {
         this.toast.exito(esEdicion ? 'Prioridad actualizada.' : 'Prioridad creada.');
         this.modalAbierto.set(false);
         this.cargar();
       },
       error: () => this.toast.error('No se pudo guardar la prioridad. Intenta de nuevo.'),
     });
-  }
-
-  /** Alta/baja de TicketPrioridadNotificar según lo marcado en el modal vs. lo que había al abrirlo. */
-  private sincronizarNotificaciones(prioridadId: number): void {
-    const seleccionados = this.usuarioIdsNotificar();
-    const idsOriginales = this.notificacionesOriginales.map((n) => Number(n.usuarioId));
-    let huboError = false;
-    const avisarError = () => {
-      if (huboError) return;
-      huboError = true;
-      this.toast.advertencia('La prioridad se guardó, pero no se pudieron actualizar todos los avisos.');
-    };
-
-    seleccionados
-      .filter((usuarioId) => !idsOriginales.includes(usuarioId))
-      .forEach((usuarioId) => {
-        this.data
-          .alta<TicketPrioridadNotificar>('TicketPrioridadNotificar', { ticketPrioridadId: prioridadId, usuarioId })
-          .subscribe({ error: avisarError });
-      });
-
-    this.notificacionesOriginales
-      .filter((n) => !seleccionados.includes(Number(n.usuarioId)))
-      .forEach((n) => {
-        this.data.baja('TicketPrioridadNotificar', n.id).subscribe({ error: avisarError });
-      });
   }
 
   pedirEliminar(prioridad: TicketPrioridad): void {
@@ -221,23 +158,12 @@ export class TicketPrioridadesComponent implements OnInit {
     const prioridad = this.prioridadAEliminar();
     if (!prioridad) return;
 
-    // Limpia también sus propias TicketPrioridadNotificar (a quién avisar) —
-    // si no, quedan huérfanas en la base sin ninguna prioridad a la que pertenecer.
-    this.data
-      .list<TicketPrioridadNotificar>('TicketPrioridadNotificar', { ticketPrioridadId: prioridad.id })
-      .pipe(
-        switchMap((notificaciones) => {
-          const bajas = notificaciones.map((n) => this.data.baja('TicketPrioridadNotificar', n.id));
-          return bajas.length ? forkJoin(bajas) : of(null);
-        }),
-        switchMap(() => this.data.baja('TicketPrioridad', prioridad.id)),
-      )
-      .subscribe({
-        next: () => {
-          this.toast.exito('Prioridad eliminada.');
-          this.prioridadAEliminar.set(null);
-          this.cargar();
-        },
-      });
+    this.data.baja('TicketPrioridad', prioridad.id).subscribe({
+      next: () => {
+        this.toast.exito('Prioridad eliminada.');
+        this.prioridadAEliminar.set(null);
+        this.cargar();
+      },
+    });
   }
 }
