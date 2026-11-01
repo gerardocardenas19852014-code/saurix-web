@@ -132,3 +132,13 @@
   font-size: 15px;
   line-height: 1;
 }
+
+// Selector "Modo de funcionamiento" de la tienda pública — mismo patrón
+// visual que .tipo-producto-toggle en productos.component.scss (los estilos
+// de componente están aislados por Angular, así que se repite aquí).
+.tipo-producto-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 2px 0 2px;
+}

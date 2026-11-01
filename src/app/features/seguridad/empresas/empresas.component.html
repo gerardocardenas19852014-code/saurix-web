@@ -88,17 +88,40 @@
             (y listada en el portal <code>/tienda</code>).
           </p>
 
-          <label class="checkbox-inline full-span">
-            <input type="checkbox" formControlName="catalogoPublicoAceptaPedidos" />
-            Permitir que los clientes armen y envíen pedidos desde la tienda
-          </label>
-          @if (!formEmpresa.controls.catalogoPublicoAceptaPedidos.value) {
-            <p class="hint full-span" style="margin:0;">
-              Apagado = <strong>menú visual</strong>: el catálogo solo se muestra (sin carrito ni botón de
-              pedido), pensado para negocios que solo quieren un menú digital bonito accesible por QR —
-              el mismo QR de "Compartir tienda" sigue funcionando igual.
-            </p>
-          }
+          <div class="full-span">
+            <p class="hint" style="margin:0 0 4px;"><strong>Modo de funcionamiento</strong></p>
+            <div class="tipo-producto-toggle" role="group" aria-label="Modo de funcionamiento de la tienda">
+              <label class="checkbox-inline">
+                <input type="radio" formControlName="modoTienda" value="menu_visual" />
+                Menú visual
+              </label>
+              <label class="checkbox-inline">
+                <input type="radio" formControlName="modoTienda" value="menu_orden" />
+                Menú + Mi orden
+              </label>
+              <label class="checkbox-inline">
+                <input type="radio" formControlName="modoTienda" value="pedidos_online" />
+                Pedidos en línea
+              </label>
+            </div>
+            @if (formEmpresa.controls.modoTienda.value === 'menu_visual') {
+              <p class="hint" style="margin:4px 0 0;">
+                Los clientes consultan el catálogo por el enlace o QR, pero no pueden seleccionar
+                productos ni enviar pedidos — pensado para un menú digital bonito accesible por QR.
+              </p>
+            } @else if (formEmpresa.controls.modoTienda.value === 'menu_orden') {
+              <p class="hint" style="margin:4px 0 0;">
+                Los clientes seleccionan productos mientras consultan el menú y generan una orden con
+                folio/QR para mostrarla en caja. No es un pedido en línea ni una venta: no pide domicilio,
+                GPS ni envío, y no descuenta inventario.
+              </p>
+            } @else {
+              <p class="hint" style="margin:4px 0 0;">
+                Los clientes arman y envían su pedido con el flujo completo actual: carrito, datos,
+                entrega/recolección/envío y WhatsApp.
+              </p>
+            }
+          </div>
         }
 
         <label class="full-span">

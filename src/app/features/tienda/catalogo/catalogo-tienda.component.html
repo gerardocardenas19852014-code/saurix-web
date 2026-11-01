@@ -5,7 +5,7 @@
     <p>{{ error() }}</p>
     <a routerLink="/tienda">← Ver todas las tiendas</a>
   </div>
-} @else if (detalle(); as d) {
+} @else if (config(); as d) {
   <!-- --color-primario: el color de marca que la empresa eligió en su panel
        (ver colorAcento) — se define aquí en la raíz para que TODA la
        tienda lo herede (botones, stepper, banner, insignias ya usan
@@ -36,7 +36,11 @@
         </button>
         @if (!modoVisual()) {
           <button type="button" class="tienda-carrito-boton" [class.tienda-carrito-boton-pulso]="pulsoCarrito()" (click)="carritoAbierto.set(true)">
-            🛒 {{ cantidadArticulos() }}
+            @if (modoTienda() === 'menu_orden') {
+              🧾 Mi orden · {{ cantidadArticulos() }} · ${{ totalCarrito().toFixed(2) }}
+            } @else {
+              🛒 {{ cantidadArticulos() }}
+            }
           </button>
         }
       </div>
@@ -101,7 +105,7 @@
                  visual no abre nada al tocarlo (abrirModal() ya se protege
                  en el .ts), pero la presentación es la misma en los 2 modos. -->
             <div class="tienda-destacado-tarjeta" (click)="abrirModal(producto)">
-              @if (producto.foto; as foto) {
+              @if (producto.fotoThumbUrl; as foto) {
                 <img class="tienda-destacado-foto" [src]="foto" [alt]="producto.nombre" loading="lazy" />
               } @else {
                 <div class="tienda-destacado-foto tienda-destacado-foto-vacia">📦</div>
@@ -121,7 +125,7 @@
         type="text"
         placeholder="Buscar producto…"
         [value]="busqueda()"
-        (input)="busqueda.set($any($event.target).value)"
+        (input)="onBusquedaInput($any($event.target).value)"
       />
       <!-- Cuadrícula (tarjetas) ↔ lista (renglones compactos) — ver
            vistaLista()/cambiarVista() en catalogo-tienda.component.ts. -->
@@ -164,16 +168,20 @@
           @for (producto of grupo.productos; track producto.id) {
             <div class="tienda-tarjeta" [class.tienda-tarjeta-agotada]="!producto.disponible">
               <div class="tienda-tarjeta-foto-contenedor">
-                @if (producto.foto; as foto) {
+                @if (producto.fotoThumbUrl; as foto) {
                   <!-- Toda la foto es el botón de ampliar (antes solo la "+"
                        chica de la esquina) — la lupa nomás avisa que se
-                       puede, ver imagenAmpliada()/ampliarImagen() en el .ts. -->
+                       puede, ver imagenAmpliada()/ampliarImagen() en el .ts.
+                       Al ampliar se pide la versión de mayor resolución
+                       (fotoDetalleUrl) — la tarjeta nunca la descarga por
+                       adelantado, solo cuando el cliente de verdad pide
+                       verla grande (ver sección T de la homologación). -->
                   <button
                     type="button"
                     class="tienda-tarjeta-foto-boton"
                     title="Ver imagen grande"
                     aria-label="Ver imagen grande de {{ producto.nombre }}"
-                    (click)="ampliarImagen(foto)"
+                    (click)="ampliarImagen(producto.fotoDetalleUrl || foto)"
                   >
                     <img class="tienda-tarjeta-foto" [src]="foto" [alt]="producto.nombre" loading="lazy" />
                     <span class="tienda-tarjeta-foto-ampliar" aria-hidden="true">🔍</span>
@@ -298,7 +306,30 @@
         </div>
       </section>
     } @empty {
-      <p class="tienda-estado">No hay productos que coincidan con tu búsqueda.</p>
+      @if (!cargandoCatalogo()) {
+        <p class="tienda-estado">No hay productos que coincidan con tu búsqueda.</p>
+      }
+    }
+
+    <!-- Estados de la carga del catálogo (ver sección X de la homologación
+         de 2026-10): buscando/cargando página nueva, cargando más, error,
+         "Cargar más" y fin del catálogo — nunca bloquean TODA la tienda,
+         solo esta franja debajo de la cuadrícula. -->
+    @if (cargandoCatalogo()) {
+      <p class="tienda-estado tienda-estado-chica">Buscando…</p>
+    } @else if (errorCatalogo()) {
+      <div class="tienda-estado tienda-estado-chica">
+        <p>{{ errorCatalogo() }}</p>
+        <button type="button" class="tienda-cargar-mas-boton" (click)="cargarMas()">Reintentar</button>
+      </div>
+    } @else if (hayMasProductos() && productos().length > 0) {
+      <div class="tienda-cargar-mas">
+        <button type="button" class="tienda-cargar-mas-boton" [disabled]="cargandoMas()" (click)="cargarMas()">
+          {{ cargandoMas() ? 'Cargando…' : 'Cargar más' }}
+        </button>
+      </div>
+    } @else if (productos().length > 0) {
+      <p class="tienda-estado tienda-estado-chica tienda-estado-fin">Ya viste todo el catálogo.</p>
     }
 
     <p class="tienda-pie-portal">
@@ -325,12 +356,12 @@
       @if (!modoVisual()) {
         <button type="button" class="tienda-nav-inferior-boton" [class.tienda-nav-inferior-boton-pulso]="pulsoCarrito()" (click)="carritoAbierto.set(true)">
           <span class="tienda-nav-inferior-icono tienda-nav-inferior-icono-carrito" aria-hidden="true">
-            🛒
+            {{ modoTienda() === 'menu_orden' ? '🧾' : '🛒' }}
             @if (cantidadArticulos() > 0) {
               <span class="tienda-nav-inferior-badge">{{ cantidadArticulos() }}</span>
             }
           </span>
-          <span>Carrito</span>
+          <span>{{ modoTienda() === 'menu_orden' ? 'Mi orden' : 'Carrito' }}</span>
         </button>
       }
     </nav>
@@ -344,7 +375,7 @@
   @if (!modoVisual() && carritoAbierto()) {
     <aside class="tienda-carrito-panel" (click)="$event.stopPropagation()">
         <div class="tienda-carrito-panel-header">
-          <h2>Tu pedido</h2>
+          <h2>{{ modoTienda() === 'menu_orden' ? 'Mi orden' : 'Tu pedido' }}</h2>
           <button type="button" class="tienda-cerrar" (click)="carritoAbierto.set(false)">✕</button>
         </div>
 
@@ -353,9 +384,15 @@
                catálogo (cierra el panel; el catálogo ya estaba debajo, no
                hace falta navegar a ningún lado). -->
           <div class="tienda-carrito-vacio">
-            <span class="tienda-carrito-vacio-icono" aria-hidden="true">🛒</span>
-            <p class="tienda-carrito-vacio-titulo">Tu carrito está vacío</p>
-            <p class="tienda-carrito-vacio-texto">Agrega tus productos favoritos para comenzar tu pedido.</p>
+            <span class="tienda-carrito-vacio-icono" aria-hidden="true">{{ modoTienda() === 'menu_orden' ? '🧾' : '🛒' }}</span>
+            <p class="tienda-carrito-vacio-titulo">
+              {{ modoTienda() === 'menu_orden' ? 'Todavía no seleccionas productos' : 'Tu carrito está vacío' }}
+            </p>
+            <p class="tienda-carrito-vacio-texto">
+              {{ modoTienda() === 'menu_orden'
+                ? 'Elige tus productos del menú para armar tu orden.'
+                : 'Agrega tus productos favoritos para comenzar tu pedido.' }}
+            </p>
             <button type="button" class="tienda-ubicacion-boton" (click)="carritoAbierto.set(false)">Ver productos</button>
           </div>
         } @else {
@@ -390,23 +427,40 @@
           </div>
 
           <div class="tienda-carrito-total">
-            <span>Total</span>
+            <span>{{ modoTienda() === 'menu_orden' ? 'Total estimado' : 'Total' }}</span>
             <strong>${{ totalCarrito().toFixed(2) }}</strong>
           </div>
 
-          @if (faltaParaMinimo() > 0) {
-            <p class="tienda-minimo-aviso">
-              Te faltan ${{ faltaParaMinimo().toFixed(2) }} para llegar al pedido mínimo de ${{ pedidoMinimo()!.toFixed(2) }}.
+          @if (modoTienda() === 'menu_orden') {
+            <!-- Bloque B: solo selección local + revisión. "Mostrar en caja"
+                 (folio/QR y creación de la orden en servidor) llega en el
+                 siguiente bloque — se deja visible mas deshabilitado para no
+                 prometer algo que todavía no existe. -->
+            <p class="tienda-nota-manual">
+              {{ cantidadArticulos() }} artículo{{ cantidadArticulos() === 1 ? '' : 's' }} · total estimado, sujeto a
+              confirmación en caja. No se descuenta inventario ni se genera una venta todavía.
+            </p>
+            <div class="tienda-mi-orden-acciones">
+              <button type="button" class="tienda-ubicacion-boton" (click)="carritoAbierto.set(false)">Seguir viendo menú</button>
+              <button type="button" class="tienda-enviar-boton tienda-enviar-boton-continuar" (click)="abrirMostrarEnCaja()">
+                Mostrar en caja
+              </button>
+            </div>
+          } @else {
+            @if (faltaParaMinimo() > 0) {
+              <p class="tienda-minimo-aviso">
+                Te faltan ${{ faltaParaMinimo().toFixed(2) }} para llegar al pedido mínimo de ${{ pedidoMinimo()!.toFixed(2) }}.
+              </p>
+            }
+            <button type="button" class="tienda-enviar-boton tienda-enviar-boton-continuar" [disabled]="!cumpleMinimo()" (click)="abrirEnvio()">
+              Continuar pedido →
+            </button>
+            <p class="tienda-nota-manual">
+              Al enviar, se abre WhatsApp con el pedido ya armado para que {{ d.empresa.nombre }} lo reciba. El pedido
+              queda sujeto a confirmación de disponibilidad por parte del negocio — esto no hace ningún cobro ni
+              reserva de stock.
             </p>
           }
-          <button type="button" class="tienda-enviar-boton tienda-enviar-boton-continuar" [disabled]="!cumpleMinimo()" (click)="abrirEnvio()">
-            Continuar pedido →
-          </button>
-          <p class="tienda-nota-manual">
-            Al enviar, se abre WhatsApp con el pedido ya armado para que {{ d.empresa.nombre }} lo reciba. El pedido
-            queda sujeto a confirmación de disponibilidad por parte del negocio — esto no hace ningún cobro ni
-            reserva de stock.
-          </p>
         }
       </aside>
   }
@@ -888,6 +942,83 @@
           }
         </div>
       </form>
+    </div>
+  }
+
+  <!-- ── Modal: "Mostrar en caja" (modo 'menu_orden' — Bloque C). Independiente
+       del modal de arriba: aquí no hay datos de entrega/GPS/WhatsApp, solo un
+       nombre opcional y la creación de la orden en el servidor. Se queda
+       abierto hasta que el cliente lo cierra (necesita ver el folio/QR el
+       tiempo que haga falta para mostrarlo en caja). ── -->
+  @if (modalMenuQrAbierto()) {
+    <div class="tienda-overlay" (click)="pasoMenuQr() === 'creando' ? null : cerrarModalMenuQr()">
+      <div class="tienda-modal" (click)="$event.stopPropagation()">
+        <div class="tienda-modal-header">
+          <h3>
+            @switch (pasoMenuQr()) {
+              @case ('resultado') { Tu orden }
+              @case ('error') { No se pudo mostrar tu orden }
+              @default { ¿A nombre de quién? }
+            }
+          </h3>
+          @if (pasoMenuQr() !== 'creando') {
+            <button type="button" class="tienda-cerrar" (click)="cerrarModalMenuQr()">✕</button>
+          }
+        </div>
+
+        @switch (pasoMenuQr()) {
+          @case ('nombre') {
+            <label class="tienda-campo">
+              Nombre (opcional)
+              <input
+                type="text"
+                [value]="nombreMenuQr()"
+                (input)="nombreMenuQr.set($any($event.target).value)"
+                placeholder="¿Cómo te llamas?"
+                maxlength="60"
+              />
+            </label>
+            <p class="tienda-nota-manual">
+              {{ cantidadArticulos() }} artículo{{ cantidadArticulos() === 1 ? '' : 's' }} · total estimado ${{
+                totalCarrito().toFixed(2)
+              }}. Esto NO es un pedido en línea ni un cobro — solo te daremos un folio y un código para mostrar en
+              caja.
+            </p>
+            <div class="tienda-modal-footer-pasos">
+              <button type="button" class="tienda-paso-volver" (click)="cerrarModalMenuQr()">Cancelar</button>
+              <button type="button" class="tienda-enviar-boton" (click)="confirmarMostrarEnCaja()">Mostrar en caja</button>
+            </div>
+          }
+          @case ('creando') {
+            <p class="tienda-nota-manual">Creando tu orden…</p>
+          }
+          @case ('resultado') {
+            @if (resultadoMenuQr(); as r) {
+              <div class="tienda-menu-qr-resultado">
+                <p class="tienda-menu-qr-folio">Orden {{ r.folio }}</p>
+                <p class="tienda-nota-manual">
+                  {{ r.articulos }} artículo{{ r.articulos === 1 ? '' : 's' }} · total estimado ${{ r.total.toFixed(2) }}
+                </p>
+                @if (r.qrDataUrl) {
+                  <img class="tienda-menu-qr-imagen" [src]="r.qrDataUrl" alt="Código QR de tu orden {{ r.folio }}" />
+                  <p class="tienda-nota-manual">Muestra este código en caja.</p>
+                }
+                <p class="tienda-nota-manual">También puedes decir: Orden {{ r.folio }}</p>
+              </div>
+              <div class="tienda-modal-footer-pasos">
+                <button type="button" class="tienda-enviar-boton" (click)="cerrarModalMenuQr()">Entendido</button>
+              </div>
+            }
+          }
+          @case ('error') {
+            <p class="tienda-nota-manual">{{ errorMenuQr() }}</p>
+            <div class="tienda-modal-footer-pasos">
+              <button type="button" class="tienda-paso-volver" (click)="cerrarModalMenuQr()">Cerrar</button>
+              <button type="button" class="tienda-enviar-boton" (click)="pasoMenuQr.set('nombre')">Reintentar</button>
+            </div>
+          }
+        }
+      </div>
     </div>
   }
 

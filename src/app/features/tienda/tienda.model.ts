@@ -1,12 +1,15 @@
 /**
- * Formas que devuelve seguridad.tienda_detalle()/tiendas_activas() (ver
- * supabase/migrations/27_tienda_publica.sql) — reflejan EXACTAMENTE las
- * claves del jsonb armado ahí (camelCase, porque esas 2 funciones ya
- * devuelven los nombres así, a diferencia del resto del sistema que pasa
- * por filaACamel() en supabase-data-client.service.ts: aquí no aplica
- * porque no son tablas leídas por el contrato DataClientService, son RPC
- * de solo lectura pública, llamadas directo con el cliente de Supabase —
- * ver tienda-publica.service.ts).
+ * Formas que devuelven las funciones RPC públicas del sistema (ver
+ * supabase/migrations/27_tienda_publica.sql y la homologación de
+ * rendimiento de 2026-10: seguridad.tienda_detalle() ahora solo trae la
+ * configuración de la tienda — el catálogo se carga aparte, paginado, vía
+ * fn_catalogo_tienda_pagina()/fn_tienda_categorias()/fn_tienda_destacados())
+ * — llamadas directo con el cliente de Supabase, sin pasar por
+ * DataClientService, porque NO son tablas: son funciones security definer
+ * que ya filtran por empresa_id adentro. No requieren sesión (se llaman
+ * con el rol `anon`) — por eso esta pantalla funciona sin login, a
+ * diferencia de todo lo demás en Saurix. Los nombres de los campos vienen
+ * en camelCase directo del RPC (no pasan por filaACamel()).
  */
 export interface TiendaActiva {
   clave: string;
@@ -38,7 +41,17 @@ export interface ProductoTienda {
   nombre: string;
   descripcion: string | null;
   precio: number;
-  foto: string | null;
+  /** URL pública (Supabase Storage, bucket "catalogo-publico") para la
+   *  tarjeta de catálogo/carrusel de destacados/miniatura del carrito —
+   *  null = sin foto (se muestra el placeholder 📦). Antes era base64
+   *  incrustado en el mismo JSON del catálogo; ahora es una URL aparte que
+   *  el navegador pide solo cuando de verdad va a pintar esa tarjeta (y
+   *  puede quedar cacheada por el navegador entre visitas). */
+  fotoThumbUrl: string | null;
+  /** URL pública de mayor resolución — se usa SOLO al ampliar la imagen
+   *  (ver ampliarImagen() en catalogo-tienda.component.ts), para no bajar
+   *  la versión grande mientras se navega el catálogo normal. */
+  fotoDetalleUrl: string | null;
   /** false = sin existencia (no es servicio) — se muestra pero no se puede agregar al carrito. */
   disponible: boolean;
   /** Categoría de inventario.categoria_producto — para agrupar/separar el
@@ -54,7 +67,8 @@ export interface ProductoTienda {
   fechaCreacion: string;
   /** true = existencia baja (por debajo de su nivel mínimo configurado en
    *  Productos) pero no agotado — para la insignia "⚡ Pocas piezas". Nunca
-   *  expone la cantidad exacta, solo esta bandera (calculada en el RPC). */
+   *  expone la cantidad exacta, solo esta bandera (calculada en el RPC,
+   *  reutilizando inventario.existencia_producto_resumen cuando existe). */
   pocasExistencias: boolean;
 }
 
@@ -66,12 +80,19 @@ export interface HorarioDiaTienda {
   cerrado: boolean;
 }
 
+/** Modo de funcionamiento de la tienda pública — ver EmpresaTienda.modo y
+ *  seguridad.empresa.modo_tienda. */
+export type ModoTienda = 'menu_visual' | 'menu_orden' | 'pedidos_online';
+
 export interface EmpresaTienda {
   clave: string;
   nombre: string;
   descripcion: string | null;
   telefono: string | null;
   correo: string | null;
+  /** URL pública del logo (antes base64) — también usada para
+   *  og:image/twitter:image (ver actualizarMetadatos()): con URL real, la
+   *  vista previa al compartir por WhatsApp/redes ya funciona. */
   logo: string | null;
   /** Arreglo vacío = sin horario configurado (no se muestra el badge de
    *  abierto/cerrado). */
@@ -101,12 +122,15 @@ export interface EmpresaTienda {
   envioPrecioKm: number | null;
   envioMinimo: number | null;
   envioDistanciaMaximaKm: number | null;
-  /** false = "menú visual": catálogo solo informativo, sin carrito ni envío
-   *  de pedido (ver 42_tienda_catalogo_visual.sql) — el negocio solo quiere
-   *  mostrar su menú/catálogo bonito, accesible por el mismo QR de siempre,
-   *  pero no toma pedidos en línea. Default true (no cambia tiendas ya
-   *  configuradas, ver catalogo-tienda.component.ts: modoVisual()). */
-  aceptaPedidos: boolean;
+  /** Modo de funcionamiento de la tienda pública (ver empresas.component.ts
+   *  y catalogo-tienda.component.ts: modoVisual()/modoTienda()):
+   *  - 'menu_visual': catálogo solo informativo, sin carrito ni pedido.
+   *  - 'menu_orden': "Menú + Mi orden" — el cliente arma una orden local y
+   *    la muestra en caja (folio/QR), NO es un pedido en línea ni una venta.
+   *  - 'pedidos_online': flujo completo actual de carrito/entrega/envío.
+   *  Sustituye al antiguo booleano aceptaPedidos (ver modo_tienda en
+   *  seguridad.empresa). */
+  modo: ModoTienda;
   // ── Modalidades de entrega (ver 43_tienda_modalidades_entrega.sql) ────
   /** Apaga/prende TEMPORALMENTE el envío por distancia ya configurado
    *  arriba (envioOrigenLat/envioPrecioKm, etc. — esos campos NO se
@@ -149,9 +173,40 @@ export type ModalidadEntregaTienda = 'envio_propio' | 'recoleccion' | 'plataform
  *  configurables usa este pedido en concreto. */
 export type VariantePlataformaTienda = 'negocio' | 'cliente';
 
-export interface TiendaDetalle {
+/** seguridad.tienda_detalle(p_clave) — SOLO la configuración de la tienda
+ *  (desde la homologación de rendimiento de 2026-10, ya no trae
+ *  "productos": eso se carga aparte y paginado, ver abajo). */
+export interface ConfiguracionTienda {
   empresa: EmpresaTienda;
+}
+
+/** seguridad.fn_tienda_categorias(p_clave) — chips de categoría, consulta
+ *  chica e independiente del catálogo paginado (ver sección K de la
+ *  homologación: nunca se derivan descargando el catálogo completo). */
+export interface CategoriaTienda {
+  id: number;
+  nombre: string;
+}
+
+/** Cursor de keyset para seguir pidiendo páginas del catálogo — se manda
+ *  tal cual lo regresó la página anterior; el campo que de verdad importa
+ *  depende del orden activo ('categoria' usa categoriaNombre+nombre+id,
+ *  'precio' usa precio+id), pero se guarda completo para no tener que
+ *  recordar qué orden estaba activo cuando se pidió. */
+export interface CursorCatalogoTienda {
+  categoriaNombre: string | null;
+  nombre: string | null;
+  precio: number | null;
+  id: number | null;
+}
+
+/** seguridad.fn_catalogo_tienda_pagina(...) — una página del catálogo. */
+export interface PaginaCatalogoTienda {
   productos: ProductoTienda[];
+  hayMas: boolean;
+  cursor: CursorCatalogoTienda | null;
+  /** Solo presente si la clave no resolvió a una tienda válida. */
+  error?: string;
 }
 
 /** Una línea del carrito — vive SOLO en memoria del navegador (signal del
@@ -169,10 +224,12 @@ export interface LineaCarritoTienda {
   /** Para la miniatura en el panel del carrito — null si el producto no
    *  tiene foto (se usa el mismo placeholder que en la tarjeta). Un
    *  carrito guardado de ANTES de este campo (localStorage, "volver a
-   *  pedir") simplemente no lo trae — se trata como null, no rompe nada. */
+   *  pedir") simplemente no lo trae — se trata como null, no rompe nada.
+   *  Desde la homologación de 2026-10 guarda la URL del thumbnail, no
+   *  base64. */
   fotoProducto: string | null;
   /** Cada valor elegido, de cualquier grupo, ya "aplanado" — para el
    *  mensaje y para sumar el total. */
-  opcionesElegidas: { grupoNombre: string; valorNombre: string; precioAdicional: number }[];
+  opcionesElegidas: { grupoNombre: string; valorNombre: string; precioAdicional: number; valorId: number }[];
   cantidad: number;
 }

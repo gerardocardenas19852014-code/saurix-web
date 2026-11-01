@@ -29,10 +29,49 @@
     display: inline-block;
     margin-top: 10px;
   }
+
+  /* Estados chicos de la carga del catálogo (buscando/error/fin) — no
+   * deben verse como la pantalla completa de "cargando…"/error inicial,
+   * son solo una franja debajo de la cuadrícula ya cargada. */
+  &-chica {
+    padding: 16px;
+    font-size: 0.9rem;
+  }
+
+  &-fin {
+    color: var(--texto-tenue, #9ca3af);
+    font-style: italic;
+  }
+}
+
+.tienda-cargar-mas {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 24px;
+}
+
+.tienda-cargar-mas-boton {
+  border: 1px solid var(--borde, #e5e7eb);
+  background: var(--fondo-tarjeta, #fff);
+  color: var(--color-primario, #2563eb);
+  font-weight: 600;
+  padding: 10px 28px;
+  border-radius: 999px;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
 }
 
 .tienda-catalogo {
-  max-width: 1100px;
+  /* Antes 1100px (ver homologación de rendimiento de 2026-10, sección S):
+   * en pantallas grandes dejaba demasiado espacio vacío a los lados. Al
+   * ampliarlo, .tienda-grid (más abajo) ya agrega más columnas solo —
+   * usa auto-fill con minmax(230px, 1fr), así que con más ancho entran
+   * más tarjetas de tamaño razonable en vez de estirarlas. */
+  max-width: 1560px;
   margin: 0 auto;
   padding: 20px 16px 80px;
 }
@@ -1351,5 +1390,39 @@
     font-weight: 700;
     font-size: 0.85rem;
     white-space: nowrap;
+  }
+}
+
+// Bloque B — acciones de "Mi orden" (menú + mi orden): reutiliza los
+// botones ya existentes (.tienda-ubicacion-boton / .tienda-enviar-boton-
+// continuar), solo los pone en fila en vez de apilados.
+.tienda-mi-orden-acciones {
+  display: flex;
+  gap: 10px;
+
+  .tienda-ubicacion-boton,
+  .tienda-enviar-boton-continuar {
+    flex: 1;
+  }
+}
+
+// Bloque C — resultado de "Mostrar en caja" (folio + QR) dentro del modal
+// dedicado (modalMenuQrAbierto) — ver catalogo-tienda.component.html.
+.tienda-menu-qr-resultado {
+  text-align: center;
+
+  .tienda-menu-qr-folio {
+    font-size: 1.6rem;
+    font-weight: 800;
+    margin: 4px 0 2px;
+  }
+
+  .tienda-menu-qr-imagen {
+    width: 220px;
+    height: 220px;
+    margin: 14px auto 4px;
+    display: block;
+    border-radius: 8px;
+    border: 1px solid var(--borde-tenue, #e5e7eb);
   }
 }

@@ -9,6 +9,7 @@ import { PreferenciasGridService } from '../../../shared/services/preferencias-g
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { hashPassword } from '../../../shared/utils/password.util';
+import type { ModoTienda } from '../../tienda/tienda.model';
 
 /** Nombre de cada día, en el mismo orden/índice que Date.getDay() en JS
  *  (0 = domingo) — así horarioAtencion[].dia se puede usar directo para
@@ -67,11 +68,13 @@ export interface Empresa {
   /** Si está en false, /tienda/:clave de esta empresa no muestra nada (y no
    *  aparece en el portal /tienda), aunque la empresa esté activa. */
   catalogoPublicoActivo?: boolean;
-  /** false = "menú visual": el catálogo público es solo informativo (sin
-   *  carrito ni botón de enviar pedido) — para negocios que solo quieren
-   *  mostrar su menú/catálogo bonito, accesible por el mismo QR, sin tomar
-   *  pedidos en línea. Default true (no cambia tiendas ya configuradas). */
-  catalogoPublicoAceptaPedidos?: boolean;
+  /** Modo de funcionamiento de la tienda pública (sustituye al antiguo
+   *  catalogoPublicoAceptaPedidos): 'menu_visual' (solo consulta, sin
+   *  carrito), 'menu_orden' (Menú + Mi orden: el cliente arma una orden y
+   *  la muestra en caja con folio/QR, NO es un pedido en línea ni una
+   *  venta), 'pedidos_online' (flujo completo actual de carrito/entrega).
+   *  Default 'pedidos_online' (no cambia tiendas ya configuradas). */
+  modoTienda?: ModoTienda;
   /** null/vacío = sin horario configurado (la tienda no muestra el badge de
    *  abierto/cerrado). Un arreglo con los 7 días = horario completo. */
   horarioAtencion?: HorarioDiaEmpresa[] | null;
@@ -193,10 +196,12 @@ export class EmpresasComponent implements OnInit, OnDestroy {
     {
       campo: 'catalogoPublicoActivo',
       etiqueta: 'Tienda pública',
-      formatear: (f) =>
-        f.catalogoPublicoActivo
-          ? `/tienda/${f.clave}${f.catalogoPublicoAceptaPedidos === false ? ' (solo visual)' : ''}`
-          : 'Apagada',
+      formatear: (f) => {
+        if (!f.catalogoPublicoActivo) return 'Apagada';
+        const sufijo =
+          f.modoTienda === 'menu_visual' ? ' (menú visual)' : f.modoTienda === 'menu_orden' ? ' (menú + mi orden)' : '';
+        return `/tienda/${f.clave}${sufijo}`;
+      },
       claseValor: (f) => (f.catalogoPublicoActivo ? 'grid-badge-success' : 'grid-badge-muted'),
     },
   ];
@@ -209,7 +214,7 @@ export class EmpresasComponent implements OnInit, OnDestroy {
     maxUsuarios: this.fb.control<number | null>(null, [Validators.min(1)]),
     // ── Tienda pública ────────────────────────────────────────────────
     catalogoPublicoActivo: [false],
-    catalogoPublicoAceptaPedidos: [true],
+    modoTienda: this.fb.nonNullable.control<ModoTienda>('pedidos_online'),
     descripcionPublica: ['', [Validators.maxLength(200)]],
     telefonoPedidos: ['', [Validators.maxLength(30)]],
     correoPedidos: ['', [Validators.maxLength(120)]],
@@ -304,7 +309,7 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       activo: true,
       maxUsuarios: null,
       catalogoPublicoActivo: false,
-      catalogoPublicoAceptaPedidos: true,
+      modoTienda: 'pedidos_online' as ModoTienda,
       descripcionPublica: '',
       telefonoPedidos: '',
       correoPedidos: '',
@@ -346,7 +351,7 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       activo: empresa.activo,
       maxUsuarios: empresa.maxUsuarios ?? null,
       catalogoPublicoActivo: empresa.catalogoPublicoActivo ?? false,
-      catalogoPublicoAceptaPedidos: empresa.catalogoPublicoAceptaPedidos ?? true,
+      modoTienda: empresa.modoTienda ?? ('pedidos_online' as ModoTienda),
       descripcionPublica: empresa.descripcionPublica ?? '',
       telefonoPedidos: empresa.telefonoPedidos ?? '',
       correoPedidos: empresa.correoPedidos ?? '',
@@ -435,7 +440,7 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       .filter((m) => m.length > 0);
     const tiendaPublica = {
       catalogoPublicoActivo: valor.catalogoPublicoActivo,
-      catalogoPublicoAceptaPedidos: valor.catalogoPublicoAceptaPedidos,
+      modoTienda: valor.modoTienda,
       descripcionPublica: valor.descripcionPublica.trim() || null,
       telefonoPedidos: valor.telefonoPedidos.trim() || null,
       correoPedidos: valor.correoPedidos.trim() || null,

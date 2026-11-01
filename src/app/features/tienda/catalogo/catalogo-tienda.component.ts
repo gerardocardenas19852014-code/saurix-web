@@ -3,8 +3,20 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Meta, Title } from '@angular/platform-browser';
+import QRCode from 'qrcode';
 import { TiendaPublicaService } from '../tienda-publica.service';
-import { EmpresaTienda, LineaCarritoTienda, ModalidadEntregaTienda, ProductoTienda, TiendaDetalle, VariantePlataformaTienda } from '../tienda.model';
+import {
+  CategoriaTienda,
+  ConfiguracionTienda,
+  CursorCatalogoTienda,
+  EmpresaTienda,
+  LineaCarritoTienda,
+  ModalidadEntregaTienda,
+  ModoTienda,
+  ProductoTienda,
+  VariantePlataformaTienda,
+} from '../tienda.model';
+import { OrdenCatalogoTienda } from '../tienda-publica.service';
 
 /** Selección en curso dentro del modal de un producto: por cada grupo de
  *  opciones, los id de valor marcados (radio = 1 elemento, checkbox =
@@ -71,8 +83,41 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
 
   protected readonly cargando = signal(true);
   protected readonly error = signal<string | null>(null);
-  protected readonly detalle = signal<TiendaDetalle | null>(null);
+  /** Config de la tienda (ver fn_tienda_detalle/tienda_detalle) — NO trae
+   *  el catálogo, que se carga aparte y paginado (ver productos() abajo),
+   *  desde la homologación de rendimiento de 2026-10. */
+  protected readonly config = signal<ConfiguracionTienda | null>(null);
   protected readonly busqueda = signal('');
+
+  // ── Catálogo paginado (fn_catalogo_tienda_pagina) — ver cargarPrimeraPagina()/
+  //    cargarMas() más abajo. productos() acumula TODAS las páginas ya
+  //    pedidas en esta sesión de navegación (24 → "Cargar más" → 48 → …);
+  //    PostgreSQL nunca repite una página ya traída, solo entrega la
+  //    siguiente según el cursor. ──────────────────────────────────────
+  protected readonly productos = signal<ProductoTienda[]>([]);
+  /** true SOLO mientras se pide una página nueva por búsqueda/categoría/
+   *  orden (no la inicial, que ya cubre cargando() de arriba, ni "cargar
+   *  más", que tiene su propio cargandoMas()) — para no tapar la
+   *  cuadrícula ya cargada con el aviso de "sin resultados" mientras la
+   *  respuesta todavía viene en camino. */
+  protected readonly cargandoCatalogo = signal(false);
+  protected readonly cargandoMas = signal(false);
+  protected readonly hayMasProductos = signal(true);
+  protected readonly errorCatalogo = signal<string | null>(null);
+  private cursorCatalogo: CursorCatalogoTienda | null = null;
+  /** Igual patrón que secuenciaListado en Kardex/Lotes/Órdenes de compra:
+   *  una respuesta vieja (de una búsqueda/categoría/orden ya abandonados)
+   *  nunca sobrescribe el resultado de la más reciente. */
+  private secuenciaCatalogo = 0;
+  private temporizadorBusqueda: ReturnType<typeof setTimeout> | null = null;
+
+  /** Categorías (chips) — consulta chica aparte (fn_tienda_categorias), NO
+   *  derivada del catálogo cargado (ver sección K de la homologación). */
+  protected readonly categoriasDisponibles = signal<CategoriaTienda[]>([]);
+  /** Carrusel "⭐ Destacados" — consulta chica aparte (fn_tienda_destacados),
+   *  acotada del lado del servidor, independiente de qué páginas del
+   *  catálogo normal se hayan cargado. */
+  protected readonly productosDestacados = signal<ProductoTienda[]>([]);
   /** Cuadrícula (tarjetas) o lista (renglones compactos) — se recuerda por
    *  navegador (localStorage) para que no se tenga que elegir cada visita;
    *  si no está disponible (modo privado, etc.) simplemente no se recuerda. */
@@ -155,62 +200,127 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
     setTimeout(() => this.mensajeExitoEnvio.set(null), 4500);
   }
 
-  protected readonly productosFiltrados = computed<ProductoTienda[]>(() => {
-    const texto = this.busqueda().trim().toLowerCase();
-    const productos = this.detalle()?.productos ?? [];
-    if (!texto) return productos;
-    return productos.filter(
-      (p) => p.nombre.toLowerCase().includes(texto) || (p.descripcion ?? '').toLowerCase().includes(texto),
-    );
-  });
+  // ── "Mostrar en caja" (modo 'menu_orden' — Bloque C) ──────────────────
+  //    Modal independiente del de 'pedidos_online' (modalEnviarAbierto/
+  //    pasoModal): aquí NO hay datos de entrega/GPS/WhatsApp, solo un
+  //    nombre opcional y, al confirmar, la creación de la orden en el
+  //    servidor (seguridad.crear_orden_menu_qr) — el servidor reconstruye
+  //    el precio/total de forma autoritativa, nunca se manda el total ya
+  //    calculado en el navegador (sección 30 del plan). No es una venta:
+  //    no descuenta inventario ni genera un pedido en línea. ─────────────
+  protected readonly modalMenuQrAbierto = signal(false);
+  protected readonly pasoMenuQr = signal<'nombre' | 'creando' | 'resultado' | 'error'>('nombre');
+  protected readonly nombreMenuQr = signal('');
+  protected readonly errorMenuQr = signal<string | null>(null);
+  protected readonly resultadoMenuQr = signal<{
+    folio: string;
+    articulos: number;
+    total: number;
+    qrDataUrl: string;
+  } | null>(null);
 
-  // ── Chips de categoría (arriba del catálogo) — null = "Todas". Un filtro
-  // MÁS sobre productosFiltrados() (la búsqueda), no lo reemplaza: se
-  // pueden combinar los dos. Si la categoría activa deja de existir (p.ej.
-  // la búsqueda ya no trae ningún producto de esa categoría), el filtro
-  // sigue aplicado pero simplemente no hay resultados — no se resetea solo,
-  // para no perder la selección del cliente mientras sigue escribiendo. ──
-  protected readonly categoriaActiva = signal<number | null>(null);
+  /** Mensajes amigables por código de error del RPC — el código tal cual
+   *  lo manda el servidor nunca se muestra directo al cliente. */
+  private static readonly MENSAJES_ERROR_MENU_QR: Record<string, string> = {
+    tienda_no_encontrada: 'No pudimos encontrar esta tienda. Actualiza la página e intenta de nuevo.',
+    modo_no_disponible: 'Esta tienda no tiene disponible "Mostrar en caja" en este momento.',
+    orden_vacia: 'Tu orden está vacía.',
+    item_invalido: 'Hay un problema con tu orden. Actualiza la página e intenta de nuevo.',
+    producto_no_disponible: 'Uno de los productos de tu orden ya no está disponible. Revísala e intenta de nuevo.',
+    opcion_invalida: 'Una de las opciones elegidas ya no es válida. Revisa tu orden e intenta de nuevo.',
+  };
 
-  /** Lista de categorías con al menos un producto disponible para mostrar
-   *  como chips — se arma de los productos YA filtrados por búsqueda, para
-   *  que no aparezcan chips de categorías sin resultados mientras se busca. */
-  protected readonly categoriasDisponibles = computed<{ id: number; nombre: string }[]>(() => {
-    const vistas = new Map<number, string>();
-    for (const p of this.productosFiltrados()) {
-      if (!vistas.has(p.categoriaId)) vistas.set(p.categoriaId, p.categoriaNombre);
-    }
-    return [...vistas.entries()]
-      .map(([id, nombre]) => ({ id, nombre }))
-      .sort((a, b) => a.nombre.localeCompare(b.nombre));
-  });
-
-  protected elegirCategoria(id: number | null): void {
-    this.categoriaActiva.set(id);
+  /** Botón "Mostrar en caja" del panel de Mi orden — abre el paso del
+   *  nombre opcional ENCIMA del panel (que se queda abierto detrás, igual
+   *  que modalEnviarAbierto encima del carrito en 'pedidos_online'). */
+  protected abrirMostrarEnCaja(): void {
+    if (this.modoTienda() !== 'menu_orden' || this.carrito().length === 0) return;
+    this.nombreMenuQr.set('');
+    this.errorMenuQr.set(null);
+    this.resultadoMenuQr.set(null);
+    this.pasoMenuQr.set('nombre');
+    this.modalMenuQrAbierto.set(true);
   }
 
-  /** productosFiltrados() + el chip de categoría — es lo que de verdad
-   *  alimenta gruposProductos() de abajo. */
-  protected readonly productosVisibles = computed<ProductoTienda[]>(() => {
-    const categoriaId = this.categoriaActiva();
-    const productos = this.productosFiltrados();
-    return categoriaId == null ? productos : productos.filter((p) => p.categoriaId === categoriaId);
-  });
+  /** Crea la orden en el servidor — ver crearOrdenMenuQr() en
+   *  tienda-publica.service.ts y seguridad.crear_orden_menu_qr(). */
+  protected async confirmarMostrarEnCaja(): Promise<void> {
+    if (this.carrito().length === 0) return;
+    this.pasoMenuQr.set('creando');
+    try {
+      const resultado = await this.tiendaService.crearOrdenMenuQr(
+        this.clave,
+        this.nombreMenuQr().trim() || null,
+        this.carrito(),
+      );
+      if (!resultado.ok) {
+        this.errorMenuQr.set(
+          CatalogoTiendaComponent.MENSAJES_ERROR_MENU_QR[resultado.error] ??
+            'No se pudo mostrar tu orden en caja. Intenta de nuevo.',
+        );
+        this.pasoMenuQr.set('error');
+        return;
+      }
+      const qrDataUrl = await QRCode.toDataURL(`SAURIX:ORDER:${resultado.token}`, { width: 260, margin: 1 }).catch(
+        () => '',
+      );
+      this.resultadoMenuQr.set({
+        folio: resultado.folio,
+        articulos: resultado.articulos,
+        total: resultado.total,
+        qrDataUrl,
+      });
+      this.pasoMenuQr.set('resultado');
+      // La orden ya quedó creada en el servidor — se vacía la selección
+      // local, igual que enviarPorWhatsapp() vacía el carrito al confirmar
+      // el envío en 'pedidos_online'.
+      this.carrito.set([]);
+    } catch {
+      this.errorMenuQr.set('No se pudo mostrar tu orden en caja. Revisa tu conexión e intenta de nuevo.');
+      this.pasoMenuQr.set('error');
+    }
+  }
+
+  /** Cierra el modal — si la orden ya se creó (pasoMenuQr === 'resultado'),
+   *  también cierra el panel de Mi orden detrás (ya quedó vacío, igual que
+   *  pedidos_online cierra el carrito tras enviarPorWhatsapp()). */
+  protected cerrarModalMenuQr(): void {
+    if (this.pasoMenuQr() === 'resultado') {
+      this.carritoAbierto.set(false);
+    }
+    this.modalMenuQrAbierto.set(false);
+  }
+
+  // ── Chips de categoría (arriba del catálogo) — null = "Todas". Desde la
+  // homologación de 2026-10 es un filtro SERVER-SIDE (igual que la
+  // búsqueda): cambiarlo reinicia el cursor y vuelve a pedir la primera
+  // página ya filtrada por PostgreSQL, sobre TODO el catálogo de la
+  // tienda, no solo sobre lo ya cargado (ver elegirCategoria()). ──────
+  protected readonly categoriaActiva = signal<number | null>(null);
+
+  /** Cambiar de categoría filtra sobre TODO el catálogo de la tienda (ya
+   *  no solo sobre lo ya cargado) — reinicia cursor y vuelve a pedir la
+   *  primera página server-side (ver sección I de la homologación). */
+  protected elegirCategoria(id: number | null): void {
+    if (this.categoriaActiva() === id) return;
+    this.categoriaActiva.set(id);
+    this.cargarPrimeraPagina();
+  }
 
   /** true = "menú visual" (ver 42_tienda_catalogo_visual.sql): la empresa
    *  apagó los pedidos en línea — el catálogo se muestra igual (mismo QR),
    *  pero sin carrito, sin "Agregar"/"Elegir" y sin botón de enviar pedido.
    *  Se deriva del detalle cargado, no es un signal propio: no hay forma de
    *  cambiarlo desde el navegador del cliente. */
-  protected readonly modoVisual = computed(() => this.detalle()?.empresa.aceptaPedidos === false);
-
-  /** Carrusel "⭐ Destacados" arriba del catálogo — los que la empresa marcó
-   *  como destacado() en Productos y que sigan disponibles. A propósito NO
-   *  se filtran por la búsqueda (busqueda()): es una vitrina fija, no otra
-   *  lista de resultados; si se vacía, el carrusel completo desaparece. */
-  protected readonly productosDestacados = computed<ProductoTienda[]>(() =>
-    (this.detalle()?.productos ?? []).filter((p) => p.destacado && p.disponible),
-  );
+  /** Modo de funcionamiento real de esta tienda ('pedidos_online' hasta que
+   *  llegue la config, para no mostrar carrito antes de tiempo). */
+  protected readonly modoTienda = computed<ModoTienda>(() => this.config()?.empresa.modo ?? 'pedidos_online');
+  /** SOLO 'menu_visual' es modo visual puro (sin selección de productos).
+   *  'menu_orden' SÍ permite seleccionar productos y abrir "Mi orden" (ver
+   *  el panel de carrito más abajo) — simplemente no entra al flujo de
+   *  datos/entrega/GPS/WhatsApp, que sigue exclusivo de 'pedidos_online'
+   *  (ver abrirEnvio()). */
+  protected readonly modoVisual = computed(() => this.modoTienda() === 'menu_visual');
 
   /** "🆕 Nuevo" en la tarjeta si se dio de alta hace 14 días o menos (no hay
    *  "más vendido": el RPC público no tiene acceso a datos de ventas). */
@@ -225,7 +335,7 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
    *  por nombre (ver migración 29), así que basta con juntar consecutivos en
    *  el mismo grupo; por precio se ordenan aquí mismo de menor a mayor. */
   protected readonly gruposProductos = computed<{ clave: string; titulo: string; productos: ProductoTienda[] }[]>(() => {
-    const productos = this.productosVisibles();
+    const productos = this.productos();
     const porPrecio = this.agruparPorPrecio();
     const ordenados = porPrecio
       ? [...productos].sort((a, b) => a.precio - b.precio || a.nombre.localeCompare(b.nombre))
@@ -282,7 +392,7 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
    *  navegador contra detalle().empresa.horario — null si la empresa no
    *  configuró horario (no se muestra ningún badge en ese caso). */
   protected readonly estadoHorario = computed<{ abierto: boolean; texto: string } | null>(() => {
-    const horario = this.detalle()?.empresa.horario ?? [];
+    const horario = this.config()?.empresa.horario ?? [];
     if (horario.length === 0) return null;
     const ahora = new Date();
     const diaHoy = ahora.getDay();
@@ -307,7 +417,7 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
   });
 
   /** null = sin pedido mínimo configurado. */
-  protected readonly pedidoMinimo = computed(() => this.detalle()?.empresa.pedidoMinimo ?? null);
+  protected readonly pedidoMinimo = computed(() => this.config()?.empresa.pedidoMinimo ?? null);
   /** Cuánto falta para llegar al mínimo — 0 si ya se alcanzó o no hay mínimo. */
   protected readonly faltaParaMinimo = computed(() => {
     const minimo = this.pedidoMinimo();
@@ -323,7 +433,7 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
    *  todavía no comparte su ubicación. fueraDeZona es solo informativo, NO
    *  bloquea el envío (la empresa de todas formas valida el pedido a mano). */
   protected readonly envioInfo = computed<{ km: number; costo: number; fueraDeZona: boolean } | null>(() => {
-    const empresa = this.detalle()?.empresa;
+    const empresa = this.config()?.empresa;
     const miUbicacion = this.ubicacion();
     if (!empresa || !miUbicacion || empresa.envioOrigenLat == null || empresa.envioOrigenLng == null || !empresa.envioPrecioKm) {
       return null;
@@ -353,12 +463,12 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
   protected readonly variantePlataforma = signal<VariantePlataformaTienda | null>(null);
 
   protected readonly envioPropioDisponible = computed(() => {
-    const e = this.detalle()?.empresa;
+    const e = this.config()?.empresa;
     return !!e && e.envioPropioActivo && e.envioOrigenLat != null && e.envioOrigenLng != null && !!e.envioPrecioKm;
   });
-  protected readonly recoleccionDisponible = computed(() => !!this.detalle()?.empresa.recoleccionActiva);
+  protected readonly recoleccionDisponible = computed(() => !!this.config()?.empresa.recoleccionActiva);
   protected readonly plataformaDisponible = computed(() => {
-    const e = this.detalle()?.empresa;
+    const e = this.config()?.empresa;
     return !!e && e.envioPlataformaActivo && (e.envioPlataformaNegocioSolicita || e.envioPlataformaClienteSolicita);
   });
 
@@ -391,7 +501,7 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
    *  negocio" O "Envío por plataforma" (cualquiera de sus 2 variantes) —
    *  "Pasar a recoger" nunca lo exige. Distinto del pedidoMinimo general
    *  (ese sí es dinero y aplica siempre, sin importar la modalidad). */
-  protected readonly envioPropioPedidoMinimo = computed(() => this.detalle()?.empresa.envioPropioPedidoMinimo ?? null);
+  protected readonly envioPropioPedidoMinimo = computed(() => this.config()?.empresa.envioPropioPedidoMinimo ?? null);
   protected readonly envioPropioFaltaMinimo = computed(() => {
     const minimo = this.envioPropioPedidoMinimo();
     if (!minimo) return 0;
@@ -419,7 +529,7 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
     }
     // Si la empresa solo activó una de las 2 variantes, se autoselecciona
     // — el cliente no ve una elección de un solo botón.
-    const e = this.detalle()?.empresa;
+    const e = this.config()?.empresa;
     if (e?.envioPlataformaNegocioSolicita && !e.envioPlataformaClienteSolicita) {
       this.variantePlataforma.set('negocio');
     } else if (!e?.envioPlataformaNegocioSolicita && e?.envioPlataformaClienteSolicita) {
@@ -440,7 +550,7 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
     if (!modalidad) return false; // debe elegir una tarjeta
 
     if (modalidad === 'plataforma') {
-      const e = this.detalle()?.empresa;
+      const e = this.config()?.empresa;
       const dosVariantes = !!e?.envioPlataformaNegocioSolicita && !!e?.envioPlataformaClienteSolicita;
       if (dosVariantes && !this.variantePlataforma()) return false; // debe elegir variante primero
     }
@@ -471,21 +581,130 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
     } catch {
       this.ultimoPedidoDisponible.set(false);
     }
+
+    // 4 llamadas chicas en paralelo (config + categorías + destacados +
+    // primera página) en vez de 1 sola llamada gigante con el catálogo
+    // completo — mismo criterio ya usado en el Dashboard de Inventario.
+    // Cada una aísla su propio error: si "destacados" falla, por ejemplo,
+    // no tira abajo el catálogo ni la config.
     this.tiendaService
-      .tiendaDetalle(this.clave)
-      .then((detalle) => {
-        if (!detalle) {
+      .tiendaConfig(this.clave)
+      .then((config) => {
+        if (!config) {
           this.error.set('Esta tienda no existe o todavía no está disponible.');
           return;
         }
-        this.detalle.set(detalle);
-        this.actualizarMetadatos(detalle.empresa);
+        this.config.set(config);
+        this.actualizarMetadatos(config.empresa);
       })
-      .catch(() => this.error.set('No se pudo cargar el catálogo. Intenta de nuevo en un momento.'))
-      .finally(() => this.cargando.set(false));
+      .catch(() => this.error.set('No se pudo cargar la tienda. Intenta de nuevo en un momento.'));
+
+    this.tiendaService
+      .tiendaCategorias(this.clave)
+      .then((categorias) => this.categoriasDisponibles.set(categorias))
+      .catch(() => {
+        // No crítico: sin categorías solo no se muestran los chips.
+      });
+
+    this.tiendaService
+      .tiendaDestacados(this.clave)
+      .then((destacados) => this.productosDestacados.set(destacados))
+      .catch(() => {
+        // No crítico: sin destacados solo no se muestra el carrusel.
+      });
+
+    this.cargarPrimeraPagina().finally(() => this.cargando.set(false));
+  }
+
+  /** Reinicia cursor/acumulado y pide la primera página con los filtros
+   *  (búsqueda/categoría/orden) actuales — se usa al entrar, al cambiar de
+   *  categoría/orden y al terminar de escribir en el buscador (con
+   *  debounce, ver onBusquedaInput()). */
+  private async cargarPrimeraPagina(): Promise<void> {
+    const miSecuencia = ++this.secuenciaCatalogo;
+    this.cursorCatalogo = null;
+    this.hayMasProductos.set(true);
+    this.errorCatalogo.set(null);
+    this.cargandoCatalogo.set(true);
+    try {
+      const pagina = await this.tiendaService.catalogoPagina(this.clave, {
+        busqueda: this.busqueda(),
+        categoriaId: this.categoriaActiva(),
+        orden: this.ordenCatalogoActual(),
+      });
+      if (miSecuencia !== this.secuenciaCatalogo) return; // respuesta vieja — descartar
+      if (pagina.error) {
+        this.productos.set([]);
+        this.hayMasProductos.set(false);
+        this.errorCatalogo.set('No se pudo cargar el catálogo.');
+        return;
+      }
+      this.productos.set(pagina.productos);
+      this.cursorCatalogo = pagina.cursor;
+      this.hayMasProductos.set(pagina.hayMas);
+    } catch {
+      if (miSecuencia !== this.secuenciaCatalogo) return;
+      this.productos.set([]);
+      this.hayMasProductos.set(false);
+      this.errorCatalogo.set('No se pudo cargar el catálogo. Intenta de nuevo en un momento.');
+    } finally {
+      if (miSecuencia === this.secuenciaCatalogo) this.cargandoCatalogo.set(false);
+    }
+  }
+
+  /** "Cargar más" — pide SOLO la siguiente página (nunca vuelve a traer las
+   *  ya cargadas) y la agrega al final de productos(). Con guard de
+   *  cargandoMas()/hayMasProductos() para no disparar 2 veces ni seguir
+   *  pidiendo cuando ya no hay más. */
+  protected cargarMas(): void {
+    if (this.cargandoMas() || !this.hayMasProductos() || !this.cursorCatalogo) return;
+    const miSecuencia = this.secuenciaCatalogo;
+    this.cargandoMas.set(true);
+    this.tiendaService
+      .catalogoPagina(this.clave, {
+        busqueda: this.busqueda(),
+        categoriaId: this.categoriaActiva(),
+        orden: this.ordenCatalogoActual(),
+        cursor: this.cursorCatalogo,
+      })
+      .then((pagina) => {
+        if (miSecuencia !== this.secuenciaCatalogo) return; // la búsqueda/categoría/orden ya cambiaron
+        if (pagina.error) {
+          this.hayMasProductos.set(false);
+          return;
+        }
+        this.productos.update((actuales) => [...actuales, ...pagina.productos]);
+        this.cursorCatalogo = pagina.cursor;
+        this.hayMasProductos.set(pagina.hayMas);
+      })
+      .catch(() => {
+        if (miSecuencia !== this.secuenciaCatalogo) return;
+        this.errorCatalogo.set('No se pudieron cargar más productos. Intenta de nuevo.');
+      })
+      .finally(() => {
+        if (miSecuencia === this.secuenciaCatalogo) this.cargandoMas.set(false);
+      });
+  }
+
+  private ordenCatalogoActual(): OrdenCatalogoTienda {
+    return this.agruparPorPrecio() ? 'precio' : 'categoria';
+  }
+
+  /** Buscador server-side: actualiza el texto al instante (para que el
+   *  cuadro de texto se sienta normal) pero espera ~300ms sin que el
+   *  cliente siga tecleando antes de volver a pedir el catálogo — evita
+   *  mandar una consulta por cada letra. */
+  protected onBusquedaInput(valor: string): void {
+    this.busqueda.set(valor);
+    if (this.temporizadorBusqueda) clearTimeout(this.temporizadorBusqueda);
+    this.temporizadorBusqueda = setTimeout(() => {
+      this.temporizadorBusqueda = null;
+      this.cargarPrimeraPagina();
+    }, 300);
   }
 
   ngOnDestroy(): void {
+    if (this.temporizadorBusqueda) clearTimeout(this.temporizadorBusqueda);
     // No deja el título/metadatos de ESTA tienda puestos si el navegador
     // sigue vivo (SPA) y el cliente navega a otra pantalla.
     this.titleService.setTitle('Saurix');
@@ -531,12 +750,16 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
   }
 
   cambiarAgrupacion(porPrecio: boolean): void {
+    if (this.agruparPorPrecio() === porPrecio) return;
     this.agruparPorPrecio.set(porPrecio);
     try {
       localStorage.setItem('tienda-agrupacion', porPrecio ? 'precio' : 'categoria');
     } catch {
       // localStorage puede no estar disponible (modo privado, etc.) — no es crítico.
     }
+    // El orden server-side cambia (precio vs. categoría+nombre) — hay que
+    // volver a pedir desde la primera página con el cursor correspondiente.
+    this.cargarPrimeraPagina();
   }
 
   // ── Agregar al carrito ────────────────────────────────────────────
@@ -618,7 +841,7 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
       (seleccion[grupo.id] ?? [])
         .map((valorId) => grupo.valores.find((v) => v.id === valorId))
         .filter((v): v is NonNullable<typeof v> => !!v)
-        .map((v) => ({ grupoNombre: grupo.nombre, valorNombre: v.nombre, precioAdicional: v.precioAdicional })),
+        .map((v) => ({ grupoNombre: grupo.nombre, valorNombre: v.nombre, precioAdicional: v.precioAdicional, valorId: v.id })),
     );
     this.agregarLineaAlCarrito(producto, opcionesElegidas, this.cantidadModal());
     this.cerrarModal();
@@ -657,7 +880,7 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
           productoId: producto.id,
           nombreProducto: producto.nombre,
           precioBase: producto.precio,
-          fotoProducto: producto.foto,
+          fotoProducto: producto.fotoThumbUrl,
           opcionesElegidas,
           cantidad,
         },
@@ -737,7 +960,9 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
   //    mensaje, valida con el cliente y ella captura la venta a mano en
   //    Ventas → Cobro (usando el campo "Canal" para marcarla). ────────────
   abrirEnvio(): void {
-    if (this.modoVisual() || this.carrito().length === 0) return;
+    // Exclusivo de 'pedidos_online' — en 'menu_orden' el cierre es "Mostrar en
+    // caja", no este flujo de datos/entrega/GPS/WhatsApp.
+    if (this.modoTienda() !== 'pedidos_online' || this.carrito().length === 0) return;
     // Limpio para no arrastrar nota/ubicación de un pedido anterior ya
     // enviado en esta misma visita.
     this.formCliente.patchValue({ notas: '' });
@@ -847,7 +1072,7 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
    *  la inmensa mayoria de las tiendas hoy), se manda EXACTO el mismo
    *  mensaje de siempre, sin ningun cambio. */
   private construirMensaje(nombreCliente: string, telefonoCliente: string, notas: string): string {
-    const empresa = this.detalle()?.empresa;
+    const empresa = this.config()?.empresa;
     const nombreEmpresa = (empresa?.nombre ?? '').toUpperCase();
     const ubicacion = this.ubicacion();
     const modalidad = this.modalidadEntrega();
@@ -992,7 +1217,7 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
     // Defensa extra — el botón ya viene deshabilitado en el template si no
     // se alcanza el mínimo (ver cumpleMinimo()).
     if (!this.cumpleMinimo()) return;
-    const empresa = this.detalle()?.empresa;
+    const empresa = this.config()?.empresa;
     const telefono = (empresa?.telefono ?? '').replace(/\D/g, '');
     if (!telefono) return;
     const v = this.formCliente.getRawValue();
