@@ -1406,23 +1406,7 @@
   }
 }
 
-// Bloque C — resultado de "Mostrar en caja" (folio + QR) dentro del modal
-// dedicado (modalMenuQrAbierto) — ver catalogo-tienda.component.html.
-.tienda-menu-qr-resultado {
-  text-align: center;
-
-  .tienda-menu-qr-folio {
-    font-size: 1.6rem;
-    font-weight: 800;
-    margin: 4px 0 2px;
-  }
-
-  .tienda-menu-qr-imagen {
-    width: 220px;
-    height: 220px;
-    margin: 14px auto 4px;
-    display: block;
-    border-radius: 8px;
-    border: 1px solid var(--borde-tenue, #e5e7eb);
-  }
-}
+// Bloque C — el resultado de "Mostrar en caja" (folio + QR) usa estilos
+// inline en el HTML (ver catalogo-tienda.component.html) para no empujar
+// este archivo sobre el presupuesto por componente (20kB) — mismo
+// resultado visual, sin costo de CSS compilado.

@@ -29,7 +29,13 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        # --legacy-peer-deps: evita un bug real de npm 10.x (arborist
+        # revienta con "Cannot read properties of null (reading
+        # 'edgesOut')") al resolver el peer-set de vitest/msw/typescript
+        # en este árbol de dependencias — confirmado reproduciendo el
+        # build de este workflow en un entorno limpio. El lockfile ya
+        # viene resuelto en consecuencia (ver package-lock.json).
+        run: npm ci --legacy-peer-deps
 
       - name: Build Angular app
         run: npm run build -- --base-href /saurix-web/

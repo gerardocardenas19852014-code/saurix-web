@@ -994,13 +994,13 @@
           }
           @case ('resultado') {
             @if (resultadoMenuQr(); as r) {
-              <div class="tienda-menu-qr-resultado">
-                <p class="tienda-menu-qr-folio">Orden {{ r.folio }}</p>
+              <div style="text-align:center;">
+                <p style="font-size:1.6rem;font-weight:800;margin:4px 0 2px;">Orden {{ r.folio }}</p>
                 <p class="tienda-nota-manual">
                   {{ r.articulos }} artículo{{ r.articulos === 1 ? '' : 's' }} · total estimado ${{ r.total.toFixed(2) }}
                 </p>
                 @if (r.qrDataUrl) {
-                  <img class="tienda-menu-qr-imagen" [src]="r.qrDataUrl" alt="Código QR de tu orden {{ r.folio }}" />
+                  <img style="width:220px;height:220px;margin:14px auto 4px;display:block;" [src]="r.qrDataUrl" alt="Código QR de tu orden {{ r.folio }}" />
                   <p class="tienda-nota-manual">Muestra este código en caja.</p>
                 }
                 <p class="tienda-nota-manual">También puedes decir: Orden {{ r.folio }}</p>
