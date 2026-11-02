@@ -1,0 +1,60 @@
+❯ Building...
+✔ Building...
+Initial chunk files | Names                         |  Raw size
+chunk-HIWPLYHA.js   | -                             | 921.02 kB | 
+chunk-QNTUM5VW.js   | -                             | 747.00 kB | 
+styles.css          | styles                        | 418.55 kB | 
+chunk-USUCEYI7.js   | -                             | 348.53 kB | 
+main.js             | main                          | 195.61 kB | 
+chunk-ILW6V2AT.js   | -                             | 169.77 kB | 
+chunk-5272JOON.js   | -                             | 165.17 kB | 
+chunk-RQXFCFGR.js   | -                             |  55.48 kB | 
+chunk-YJNCCIOB.js   | -                             |  10.00 kB | 
+chunk-IH4RHS24.js   | -                             |   6.58 kB | 
+chunk-DEXO2VTA.js   | -                             |   6.28 kB | 
+chunk-NBNPN6QP.js   | -                             |   4.03 kB | 
+chunk-XBTFA2XY.js   | -                             |   3.19 kB | 
+chunk-U54XARWU.js   | -                             |   2.93 kB | 
+chunk-GNTNGVXU.js   | -                             |   1.48 kB | 
+chunk-64EXFBL7.js   | -                             |   1.47 kB | 
+chunk-H2EWQI7K.js   | -                             | 600 bytes | 
+chunk-7XTA6O7G.js   | -                             | 413 bytes | 
+chunk-4DUWFYQG.js   | -                             | 332 bytes | 
+chunk-D5UH7DEG.js   | -                             | 208 bytes | 
+
+                    | Initial total                 |   3.06 MB
+
+Lazy chunk files    | Names                         |  Raw size
+chunk-P7NDDMVQ.js   | -                             |   1.06 MB | 
+chunk-LE3VW5GX.js   | -                             |   1.05 MB | 
+chunk-KT2QIHHN.js   | -                             | 657.65 kB | 
+chunk-GQH2MW4Q.js   | presupuesto-routes            | 520.59 kB | 
+chunk-ALVQJKS7.js   | -                             | 399.47 kB | 
+chunk-O6YV75PZ.js   | index-es                      | 368.72 kB | 
+chunk-GRXMSKD5.js   | catalogo-tienda-component     | 312.44 kB | 
+chunk-WC673FKM.js   | productos-component           | 265.51 kB | 
+chunk-3JPLXCBV.js   | miembros-component            | 243.57 kB | 
+chunk-XK23V47P.js   | kanban-component              | 224.22 kB | 
+chunk-SN3KA2PY.js   | documentos-list-component     | 167.98 kB | 
+chunk-CUZLCO2B.js   | backlog-component             | 151.17 kB | 
+chunk-6KSMINGI.js   | reportes-ejecutivos-component | 122.72 kB | 
+chunk-73VTMO5Q.js   | empresas-component            | 109.11 kB | 
+chunk-RTI7EDPE.js   | movimientos-bodega-component  | 105.95 kB | 
+...and 120 more lazy chunks files. Use "--verbose" to show all the files.
+
+Application bundle generation complete. [73.121 seconds] - 2026-11-02T16:24:52.924Z
+
+An unhandled exception occurred: EPERM: operation not permitted, unlink '/sessions/rcw-01puahqm57tpsfzfepeuteaz/mnt/Angular/saurix-web/dist/saurix-web/3rdpartylicenses.txt'
+See "/sessions/rcw-01puahqm57tpsfzfepeuteaz/tmp/ng-edCE0K/angular-errors.log" for further details.
+/sessions/rcw-01puahqm57tpsfzfepeuteaz/mnt/Angular/saurix-web/node_modules/rxjs/dist/cjs/internal/util/reportUnhandledError.js:13
+            throw err;
+            ^
+
+[Error: EPERM: operation not permitted, unlink '/sessions/rcw-01puahqm57tpsfzfepeuteaz/mnt/Angular/saurix-web/dist/saurix-web/3rdpartylicenses.txt'] {
+  errno: -1,
+  code: 'EPERM',
+  syscall: 'unlink',
+  path: '/sessions/rcw-01puahqm57tpsfzfepeuteaz/mnt/Angular/saurix-web/dist/saurix-web/3rdpartylicenses.txt'
+}
+
+Node.js v22.23.4
