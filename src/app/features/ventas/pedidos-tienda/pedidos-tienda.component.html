@@ -3,12 +3,26 @@
 </div>
 
 <p class="hint" style="margin-top:-6px;">
-  Pedidos enviados desde tu tienda pública — el pedido real se manda por WhatsApp, esto es solo
-  para no volver a teclearlo: confírmalo para registrar la venta o descártalo si no aplica.
+  Pedidos y órdenes de tu tienda pública — "pedido web" se manda por WhatsApp (esto es solo
+  registro, para no volver a teclearlo); "menú QR" es una orden mostrada en caja con folio/QR, no
+  es una venta todavía. Confirma o descarta desde "Ver detalle" — una orden de menú QR que nadie
+  pasa a caja en 2 horas se marca "Expirado" sola.
 </p>
 
 <div class="grid-toolbar">
+  <button type="button" class="btn-primary small" (click)="cambiarFiltro()">🔍 Buscar</button>
+
   <div class="grid-filter">
+    <select
+      class="toolbar-select"
+      aria-label="Filtrar por origen"
+      [value]="filtroOrigen()"
+      (change)="filtroOrigen.set($any($event.target).value)"
+    >
+      <option value="Todos">Todos los orígenes</option>
+      <option value="pedido_web">Pedido web</option>
+      <option value="menu_qr">Menú QR</option>
+    </select>
     <select
       class="toolbar-select"
       aria-label="Filtrar por estado"
@@ -19,6 +33,7 @@
       <option value="Pendiente">Pendiente</option>
       <option value="Confirmado">Confirmado</option>
       <option value="Descartado">Descartado</option>
+      <option value="Expirado">Expirado</option>
     </select>
     <label class="grid-filter-fecha-label">
       Desde
@@ -30,33 +45,87 @@
     </label>
     <input
       type="search"
-      placeholder="Buscar por cliente o teléfono…"
+      placeholder="Buscar por folio, cliente o teléfono…"
       [value]="busqueda()"
       (input)="busqueda.set($any($event.target).value)"
+      (keyup.enter)="cambiarFiltro()"
     />
   </div>
 </div>
 
-<app-data-table
-  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
-  [columnas]="columnas"
-  [filas]="pedidosFiltrados()"
-  [cargando]="cargando()"
-  [ocultarEditarEliminar]="true"
-  accionExtraEtiqueta="Ver detalle"
-  accionExtraTitulo="Ver productos y confirmar/descartar este pedido"
-  (accionExtra)="verDetalle($event)"
-  accionExtra3Etiqueta="🗑"
-  [accionExtra3Icono]="true"
-  accionExtra3Titulo="Eliminar pedido"
-  (accionExtra3)="pedirEliminar($event)"
-/>
+<div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-bottom:10px;">
+  <span class="hint" style="margin:0;">
+    Página {{ paginaActual() }} de {{ totalPaginas() }} — {{ totalFilas() }} pedido(s)
+  </span>
+  <button type="button" class="btn-secondary small" [disabled]="paginaActual() <= 1 || cargando()" (click)="irAPaginaAnterior()">
+    ← Anterior
+  </button>
+  <button type="button" class="btn-secondary small" [disabled]="paginaActual() >= totalPaginas() || cargando()" (click)="irAPaginaSiguiente()">
+    Siguiente →
+  </button>
+</div>
+
+<div class="grid-table-scroll">
+  <table class="grid-table">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Folio</th>
+        <th>Origen</th>
+        <th>Cliente</th>
+        <th>Teléfono</th>
+        <th>Total</th>
+        <th>Estado</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      @if (cargando()) {
+        <tr><td colspan="8"><p class="empty">Cargando…</p></td></tr>
+      } @else {
+        @for (fila of filas(); track fila.id) {
+          <tr>
+            <td data-label="Fecha">{{ fila.fechaCreacion | date: 'short' }}</td>
+            <td data-label="Folio">{{ fila.folio ?? '—' }}</td>
+            <td data-label="Origen">
+              <span class="tag" [style.background]="fila.origen === 'menu_qr' ? 'var(--amber-soft)' : 'var(--client-soft)'" [style.color]="fila.origen === 'menu_qr' ? 'var(--amber)' : 'var(--client)'">
+                {{ fila.origen === 'menu_qr' ? 'Menú QR' : 'Pedido web' }}
+              </span>
+            </td>
+            <td data-label="Cliente">{{ fila.cliente || '—' }}</td>
+            <td data-label="Teléfono">{{ fila.telefonoCliente ?? '—' }}</td>
+            <td data-label="Total">{{ formatMoneda(fila.total) }}</td>
+            <td data-label="Estado">
+              <span class="grid-badge" [class]="fila.estado === 'Pendiente' ? 'grid-badge-warning' : fila.estado === 'Confirmado' ? 'grid-badge-success' : 'grid-badge-muted'">
+                {{ fila.estado }}
+              </span>
+            </td>
+            <td data-label="Acciones">
+              <button type="button" class="btn-secondary small" (click)="verDetalle(fila)">Ver detalle</button>
+              <button type="button" class="btn-danger small grid-action-icon" title="Eliminar pedido" aria-label="Eliminar pedido" (click)="pedirEliminar(fila)">🗑</button>
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="8"><p class="empty">Ningún pedido coincide con estos filtros.</p></td></tr>
+        }
+      }
+    </tbody>
+  </table>
+</div>
+
+@if (cargandoDetalle()) {
+  <div class="modal-overlay show">
+    <div class="modal-box" style="max-width: 300px; text-align:center;">
+      <p class="hint" style="margin:0;">Cargando pedido…</p>
+    </div>
+  </div>
+}
 
 @if (pedidoDetalle(); as pedido) {
   <div class="modal-overlay show" (click)="cerrarDetalle()">
     <div class="modal-box" style="max-width: 600px; width: 94%;" (click)="$event.stopPropagation()">
-      <div class="page-header" style="margin-bottom: 12px;">
-        <h3>Pedido de {{ pedido.nombreCliente }}</h3>
+      <div class="page-header" style="margin-bottom: 4px;">
+        <h3>{{ pedido.folio ?? ('Pedido #' + pedido.id) }} — {{ pedido.nombreCliente ?? pedido.nombreMostrarEn ?? 'Sin nombre' }}</h3>
         <span
           class="grid-badge"
           [class]="pedido.estado === 'Pendiente' ? 'grid-badge-warning' : pedido.estado === 'Confirmado' ? 'grid-badge-success' : 'grid-badge-muted'"
@@ -64,9 +133,12 @@
           {{ pedido.estado }}
         </span>
       </div>
-
       <p class="hint" style="margin-top:-6px;">
-        {{ pedido.telefonoCliente }} · {{ pedido.fechaCreacion | date: 'short' }}
+        <span class="tag" [style.background]="pedido.origen === 'menu_qr' ? 'var(--amber-soft)' : 'var(--client-soft)'" [style.color]="pedido.origen === 'menu_qr' ? 'var(--amber)' : 'var(--client)'">
+          {{ pedido.origen === 'menu_qr' ? 'Menú QR' : 'Pedido web' }}
+        </span>
+        @if (pedido.telefonoCliente) { · {{ pedido.telefonoCliente }} }
+        · {{ pedido.fechaCreacion | date: 'short' }}
       </p>
       @if (pedido.notasCliente) {
         <p class="hint">Nota: {{ pedido.notasCliente }}</p>
@@ -108,7 +180,12 @@
         <button type="button" class="btn-secondary" (click)="cerrarDetalle()">Cerrar</button>
         @if (pedido.estado === 'Pendiente') {
           <button type="button" class="btn-secondary" style="background: var(--danger-soft); color: var(--danger);" (click)="pedirDescartar(pedido)">Descartar</button>
-          <button type="button" class="btn-primary" (click)="abrirConfirmar()">Confirmar venta</button>
+          <button type="button" class="btn-secondary" (click)="cargarAVenta(pedido)" title="Revisa/edita todo en Cobro antes de cobrar — revalida precio y disponibilidad">
+            Cargar a venta →
+          </button>
+          @if (pedido.origen === 'pedido_web') {
+            <button type="button" class="btn-primary" (click)="abrirConfirmar()">Confirmar venta</button>
+          }
         }
       </div>
     </div>
@@ -153,7 +230,7 @@
 <app-confirm-dialog
   [visible]="pedidoADescartar() !== null"
   titulo="Descartar pedido"
-  [mensaje]="'¿Descartar el pedido de ' + (pedidoADescartar()?.nombreCliente ?? '') + '?'"
+  [mensaje]="'¿Descartar el pedido de ' + (pedidoADescartar()?.nombreCliente ?? pedidoADescartar()?.nombreMostrarEn ?? 'este cliente') + '?'"
   (confirmar)="confirmarDescartar()"
   (cancelar)="pedidoADescartar.set(null)"
 />
@@ -161,7 +238,7 @@
 <app-confirm-dialog
   [visible]="pedidoAEliminar() !== null"
   titulo="Eliminar pedido"
-  [mensaje]="'¿Eliminar el pedido de ' + (pedidoAEliminar()?.nombreCliente ?? '') + '? Esta acción no se puede deshacer.'"
+  [mensaje]="'¿Eliminar el pedido ' + (pedidoAEliminar()?.folio ?? '') + ' de ' + (pedidoAEliminar()?.cliente || 'este cliente') + '? Esta acción no se puede deshacer.'"
   (confirmar)="confirmarEliminar()"
   (cancelar)="pedidoAEliminar.set(null)"
 />

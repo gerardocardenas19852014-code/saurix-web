@@ -25,6 +25,8 @@ import { TurnoCaja } from '../turno/turno-caja.model';
 import { TurnoCajaService } from '../turno/turno-caja.service';
 import { CANALES_SUGERIDOS, folioSugeridoVenta, VentaService } from '../venta/venta.service';
 import { MetodoPago, METODOS_PAGO, Venta } from '../venta/venta.model';
+import { CargaVentaPedidoTienda, CargaVentaPedidoTiendaService } from '../carga-venta-pedido-tienda.service';
+import { PedidoTiendaService } from '../pedidos-tienda/pedido-tienda.service';
 
 /** Un renglón del carrito, antes de convertirse en VentaItem (ver venta.model.ts).
  *  `productoId: null` = renglón de "Venta simple". */
@@ -82,6 +84,8 @@ interface PagoTicket {
 export class CobroComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     document.documentElement.removeAttribute('data-wide');
+    const pedidoOrigenId = this.pedidoTiendaOrigenId();
+    if (pedidoOrigenId !== null) this.pedidoTiendaService.liberar(pedidoOrigenId).catch(() => {});
   }
 
   private readonly data = inject(DataClientService);
@@ -92,6 +96,8 @@ export class CobroComponent implements OnInit, OnDestroy {
   private readonly clienteService = inject(ClienteService);
   private readonly turnoCajaService = inject(TurnoCajaService);
   private readonly ventaService = inject(VentaService);
+  private readonly cargaVentaPedidoTienda = inject(CargaVentaPedidoTiendaService);
+  private readonly pedidoTiendaService = inject(PedidoTiendaService);
   protected readonly lealtadService = inject(ProgramaLealtadService);
 
   protected readonly formatMoneda = formatMoneda;
@@ -121,6 +127,13 @@ export class CobroComponent implements OnInit, OnDestroy {
   protected readonly canalesSugeridos = CANALES_SUGERIDOS;
 
   protected readonly carrito = signal<ItemCarrito[]>([]);
+  /** Distinto de null mientras el carrito actual viene de "Cargar a
+   *  venta" (ver Pedidos web) — solo para, AL COBRAR, vincular ese
+   *  pedido/orden con la Venta resultante (nunca antes: "cargar a venta"
+   *  ≠ "venta cobrada", sección 19 del plan). Se limpia si el carrito se
+   *  vacía por completo antes de cobrar, para no vincular por error una
+   *  venta que ya no tiene nada que ver con ese pedido. */
+  protected readonly pedidoTiendaOrigenId = signal<number | null>(null);
 
   protected readonly modalVentaSimpleAbierto = signal(false);
   protected readonly modalClienteAbierto = signal(false);
@@ -245,6 +258,52 @@ export class CobroComponent implements OnInit, OnDestroy {
     this.clienteId.set(generico.id);
 
     this.cargando.set(false);
+
+    // "Cargar a venta" desde Pedidos web (ver CargaVentaPedidoTiendaService)
+    // — se consume UNA sola vez, después de que ya está todo lo necesario
+    // para precargar el carrito (productos/bodegaVentaId). Si no hay nada
+    // pendiente, tomar() regresa null y no pasa nada.
+    const carga = this.cargaVentaPedidoTienda.tomar();
+    if (carga) this.cargarDesdePedidoTienda(carga);
+  }
+
+  /** Ver el comentario grande de pedidoTiendaOrigenId arriba. Nunca
+   *  bloquea nada: cada renglón se agrega tal cual, con el precio YA
+   *  revalidado por el servidor (ver PedidoTiendaService.revalidarItems())
+   *  — aquí solo se revisa EXISTENCIA (ver existenciaDisponible(), que
+   *  depende de bodegaVentaId() y por eso se checa aquí, no en el
+   *  servidor) y se avisa, sin impedir cobrar igual. */
+  private cargarDesdePedidoTienda(carga: CargaVentaPedidoTienda): void {
+    this.pedidoTiendaOrigenId.set(carga.pedidoId);
+    this.canalVenta.set(carga.canal);
+
+    const advertencias: string[] = [];
+    const nuevasLineas: ItemCarrito[] = carga.lineas.map((linea) => {
+      const producto = linea.productoId !== null ? this.productos().find((p) => p.id === linea.productoId) : undefined;
+      if (!linea.disponible) {
+        advertencias.push(`${linea.descripcion}: ${linea.motivo ?? 'revisar'}`);
+      } else if (producto) {
+        const disponible = this.existenciaDisponible(producto);
+        if (disponible !== null && linea.cantidad > disponible) {
+          advertencias.push(`${linea.descripcion}: solo hay ${disponible} disponible(s)`);
+        }
+      }
+      return {
+        productoId: linea.productoId,
+        descripcion: linea.descripcion,
+        cantidad: linea.cantidad,
+        precioUnitario: linea.precioUnitario,
+        descuentoPct: 0,
+        bodegaId: producto && producto.existencia !== null ? this.bodegaVentaId() : null,
+      };
+    });
+
+    this.carrito.set(nuevasLineas);
+    if (advertencias.length > 0) {
+      this.toast.advertencia('Pedido cargado — revisa antes de cobrar: ' + advertencias.join(' · '));
+    } else {
+      this.toast.exito('Pedido cargado al carrito. Revisa y cobra normalmente.');
+    }
   }
 
   // ── Catálogo / filtros ──────────────────────────────────────────────
@@ -271,8 +330,21 @@ export class CobroComponent implements OnInit, OnDestroy {
   /** Agrega un producto escaneando su código de barras (app-escaneo-codigo,
    *  mismo componente que ya usan Movimientos entre bodegas e Inventario) —
    *  mismo criterio de búsqueda normalizada (trim + minúsculas) que
-   *  MovimientosBodegaComponent.seleccionarPorCodigo(). */
-  seleccionarProductoPorCodigo(codigo: string): void {
+   *  MovimientosBodegaComponent.seleccionarPorCodigo(). Bloque F (ver la
+   *  sección 8 del plan "Menú + Mi orden"): el MISMO lector, sin agregar
+   *  ninguno nuevo, también distingue un código de barras de producto (de
+   *  siempre) de un "QR de orden Saurix" (SAURIX:ORDER:<token>, ver
+   *  catalogo-tienda.component.ts) y en ese caso carga la orden completa
+   *  en vez de buscar un producto — reutiliza exactamente la misma
+   *  revalidación/carga de "Cargar a venta" del Bloque E
+   *  (cargarDesdePedidoTienda()), nunca una segunda implementación. */
+  async seleccionarProductoPorCodigo(codigo: string): Promise<void> {
+    const token = this.extraerTokenOrdenSaurix(codigo);
+    if (token) {
+      await this.cargarOrdenPorToken(token);
+      return;
+    }
+
     const encontrado = this.productos().find(
       (p) => p.activo !== false && (p.codigo ?? '').trim().toLowerCase() === codigo.trim().toLowerCase(),
     );
@@ -281,6 +353,60 @@ export class CobroComponent implements OnInit, OnDestroy {
       return;
     }
     this.agregarProducto(encontrado);
+  }
+
+  /** null = no es un QR de orden Saurix (es un código de barras normal,
+   *  sigue el camino de siempre). El token son los 32 caracteres hex de
+   *  ventas.pedido_tienda.token_publico (ver
+   *  ventas.fn_asignar_folio_pedido_tienda()). */
+  private extraerTokenOrdenSaurix(codigo: string): string | null {
+    const coincidencia = codigo.trim().match(/^SAURIX:ORDER:([0-9a-f]{32})$/i);
+    return coincidencia ? coincidencia[1].toLowerCase() : null;
+  }
+
+  /** PedidoTiendaService.resolverPorToken() ya viene filtrado por RLS a la
+   *  empresa actual (ver su comentario) — un QR de la empresa A escaneado
+   *  en la caja de la empresa B simplemente no encuentra nada, nunca
+   *  expone ni carga el pedido de otra empresa (sección 23 del plan). */
+  private async cargarOrdenPorToken(token: string): Promise<void> {
+    const pedido = await this.pedidoTiendaService.resolverPorToken(token);
+    if (!pedido) {
+      this.toast.advertencia('Ese código QR de orden no corresponde a ningún pedido de esta tienda.');
+      return;
+    }
+    if (pedido.estado !== 'Pendiente') {
+      this.toast.advertencia(`La orden ${pedido.folio ?? pedido.id} ya quedó "${pedido.estado}" — ya no se puede cargar.`);
+      return;
+    }
+
+    // Reclamo atómico (Bloque G, sección 21 del plan): el estado recién
+    // leído arriba es solo para un mensaje rápido y amable — quien de
+    // verdad decide si esta caja puede tomar la orden es este UPDATE
+    // condicionado del lado del servidor (ver
+    // PedidoTiendaService.reclamar()), igual que en
+    // PedidosTiendaComponent.cargarAVenta()/abrirConfirmar(): nunca se
+    // confía solo en lo que ya se tenía cargado en Angular.
+    const reclamado = await this.pedidoTiendaService.reclamar(pedido.id);
+    if (!reclamado) {
+      this.toast.advertencia(`La orden ${pedido.folio ?? pedido.id} ya está siendo atendida en otra caja (o ya cambió de estado).`);
+      return;
+    }
+
+    try {
+      const lineas = await this.pedidoTiendaService.revalidarItems(pedido.id);
+      if (lineas.length === 0) {
+        this.toast.advertencia('Esa orden no tiene productos que cargar.');
+        this.pedidoTiendaService.liberar(pedido.id).catch(() => {});
+        return;
+      }
+      const nombre = pedido.nombreCliente ?? pedido.nombreMostrarEn;
+      const etiquetaOrigen = pedido.origen === 'menu_qr' ? 'Menú QR' : 'Tienda en línea';
+      const canal = [etiquetaOrigen, pedido.folio, nombre].filter(Boolean).join(' — ');
+      this.cargarDesdePedidoTienda({ pedidoId: pedido.id, canal, lineas });
+    } catch (e) {
+      this.toast.error('No se pudo cargar la orden escaneada: ' + (e instanceof Error ? e.message : 'error desconocido'));
+      this.pedidoTiendaService.liberar(pedido.id).catch(() => {});
+    }
   }
 
   agregarProducto(producto: Producto): void {
@@ -332,10 +458,27 @@ export class CobroComponent implements OnInit, OnDestroy {
       if (item.cantidad <= 1) return lista.filter((_, idx) => idx !== index);
       return lista.map((i, idx) => (idx === index ? { ...i, cantidad: i.cantidad - 1 } : i));
     });
+    this.limpiarOrigenSiCarritoVacio();
   }
 
   quitarLinea(index: number): void {
     this.carrito.update((lista) => lista.filter((_, idx) => idx !== index));
+    this.limpiarOrigenSiCarritoVacio();
+  }
+
+  /** Ver el comentario grande de pedidoTiendaOrigenId arriba: si el
+   *  cajero vació el carrito que venía de "Cargar a venta" antes de
+   *  cobrar, esa vinculación ya no aplica (lo que se cobre después, si
+   *  algo, ya no tiene que ver con ese pedido/orden). También suelta el
+   *  reclamo (Bloque G, sección 21 del plan) para que OTRA caja pueda
+   *  tomar esa orden de inmediato, en vez de esperar los 5 minutos de
+   *  caducidad automática del reclamo — best-effort, no bloquea. */
+  private limpiarOrigenSiCarritoVacio(): void {
+    if (this.carrito().length === 0) {
+      const pedidoOrigenId = this.pedidoTiendaOrigenId();
+      this.pedidoTiendaOrigenId.set(null);
+      if (pedidoOrigenId !== null) this.pedidoTiendaService.liberar(pedidoOrigenId).catch(() => {});
+    }
   }
 
   /** Descuento por renglón (VentaItem.descuentoPct, ver venta.model.ts) —
@@ -348,6 +491,7 @@ export class CobroComponent implements OnInit, OnDestroy {
   cancelarVentaActual(): void {
     if (this.carrito().length === 0) return;
     this.carrito.set([]);
+    this.limpiarOrigenSiCarritoVacio();
     this.toast.info('Venta cancelada.');
   }
 
@@ -504,6 +648,20 @@ export class CobroComponent implements OnInit, OnDestroy {
       });
 
       this.toast.exito(`Venta ${venta.folio} registrada.`);
+
+      // Vincula el pedido/orden de origen ("Cargar a venta" desde Pedidos
+      // web) con la Venta que acaba de quedar registrada — SOLO hasta
+      // ahora, nunca antes (ver pedidoTiendaOrigenId arriba). Si falla, la
+      // venta ya registrada NO se deshace: solo se avisa, el pedido se
+      // queda "Pendiente" y el staff lo puede resolver a mano.
+      const pedidoOrigenId = this.pedidoTiendaOrigenId();
+      if (pedidoOrigenId !== null) {
+        this.pedidoTiendaOrigenId.set(null);
+        this.pedidoTiendaService.marcarConfirmadoDesdeVenta(pedidoOrigenId, venta.id).catch(() => {
+          this.toast.advertencia('La venta se registró, pero no se pudo actualizar el pedido de origen en Pedidos web.');
+        });
+      }
+
       this.carrito.set([]);
       this.pagos.set([]);
       this.puntosACanjear.set(0);
