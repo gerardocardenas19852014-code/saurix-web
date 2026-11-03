@@ -94,6 +94,12 @@ export interface EmpresaTienda {
    *  og:image/twitter:image (ver actualizarMetadatos()): con URL real, la
    *  vista previa al compartir por WhatsApp/redes ya funciona. */
   logo: string | null;
+  /** URL pública de la imagen de portada (hero) configurada por la
+   *  empresa en Empresas — mismo mecanismo que el logo (base64 -> trigger
+   *  -> edge function tienda-imagenes -> Storage). null = la empresa no
+   *  configuró una; en ese caso heroImagenUrl() en catalogo-tienda.component.ts
+   *  devuelve null y se muestra el degradado con el color de marca. */
+  imagenPortada: string | null;
   /** Arreglo vacío = sin horario configurado (no se muestra el badge de
    *  abierto/cerrado). */
   horario: HorarioDiaTienda[];

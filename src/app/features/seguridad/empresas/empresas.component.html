@@ -388,6 +388,32 @@
                 </div>
               </div>
             </div>
+
+            <div class="full-span foto-producto-campo">
+              <span class="foto-producto-etiqueta">Imagen de portada (hero de la tienda)</span>
+              <div class="foto-producto-fila">
+                @if (portadaActual()) {
+                  <button type="button" class="foto-producto-preview-boton" title="Ver en tamaño completo" (click)="portadaAmpliada.set(true)">
+                    <img class="foto-producto-preview" [src]="portadaActual()" alt="Imagen de portada" />
+                  </button>
+                } @else {
+                  <div class="foto-producto-preview foto-producto-preview-vacia">🖼️</div>
+                }
+                <div class="foto-producto-acciones">
+                  <label class="btn-secondary small foto-producto-boton">
+                    {{ portadaActual() ? 'Cambiar portada' : 'Subir portada' }}
+                    <input #portadaInput type="file" accept="image/*" hidden (change)="onPortadaSeleccionada($event)" />
+                  </label>
+                  @if (portadaActual()) {
+                    <button type="button" class="btn-secondary small" (click)="quitarPortada(portadaInput)">Quitar portada</button>
+                  }
+                </div>
+              </div>
+              <p class="hint full-span" style="margin:4px 0 0;">
+                Opcional. Se muestra como fondo del encabezado de la tienda pública; una foto horizontal se ve mejor. Si no subes
+                ninguna, se muestra un degradado con el color de marca.
+              </p>
+            </div>
           </div>
         }
       </div>
@@ -405,6 +431,15 @@
     <div class="foto-producto-lightbox" (click)="$event.stopPropagation()">
       <button type="button" class="foto-producto-lightbox-cerrar" title="Cerrar" (click)="logoAmpliado.set(false)">✕</button>
       <img [src]="logoActual()" alt="Logo de la tienda en tamaño completo" />
+    </div>
+  </div>
+}
+
+@if (portadaAmpliada() && portadaActual()) {
+  <div class="modal-overlay show foto-producto-lightbox-overlay" (click)="portadaAmpliada.set(false)">
+    <div class="foto-producto-lightbox" (click)="$event.stopPropagation()">
+      <button type="button" class="foto-producto-lightbox-cerrar" title="Cerrar" (click)="portadaAmpliada.set(false)">✕</button>
+      <img [src]="portadaActual()" alt="Imagen de portada en tamaño completo" />
     </div>
   </div>
 }

@@ -123,16 +123,14 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
    *  foto que ya haya llegado al navegador entre los destacados o el
    *  catálogo normal (cero peticiones nuevas de DATOS; el navegador sí
    *  descarga esa imagen una vez, como recurso visual legítimo del hero —
-   *  ver mandato de rediseño visual, sección 6/37). Prefiere
-   *  fotoDetalleUrl (más resolución, apropiada para una foto grande) y
-   *  cae a fotoThumbUrl si no hay detalle. Sin ningún producto con foto,
-   *  null — el .scss cae a un degradado liso con el color de marca. */
-  protected readonly heroImagenUrl = computed(() => {
-    const conFoto = (lista: ProductoTienda[]) => lista.find((p) => p.fotoDetalleUrl || p.fotoThumbUrl);
-    const deDestacados = conFoto(this.productosDestacados());
-    const deCatalogo = deDestacados ?? conFoto(this.productos());
-    return deCatalogo ? deCatalogo.fotoDetalleUrl || deCatalogo.fotoThumbUrl : null;
-  });
+   *  ver mandato de rediseño visual, sección 6/37, y addendum "imagen de
+   *  portada"). Solo depende de lo que la empresa configuró en Empresas
+   *  (campo imagenPortada): si no configuró ninguna, YA NO se deriva de la
+   *  foto de un producto cualquiera (podía salir recortada/con zoom raro
+   *  si la foto no era panorámica) — en su lugar el .scss cae directo al
+   *  degradado liso con el color de marca (.tienda-hero-sin-foto, usa
+   *  --store-primary/--store-primary-dark, derivados de colorAcento). */
+  protected readonly heroImagenUrl = computed(() => this.config()?.empresa.imagenPortada ?? null);
   /** Cuadrícula (tarjetas) o lista (renglones compactos) — se recuerda por
    *  navegador (localStorage) para que no se tenga que elegir cada visita;
    *  si no está disponible (modo privado, etc.) simplemente no se recuerda. */

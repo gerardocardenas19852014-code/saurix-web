@@ -2151,6 +2151,116 @@ button { font-family: inherit; }
   opacity: 0.85;
 }
 
+/* ── AJUSTES VISUALES MÓVIL (noviembre 2026) — debajo de 1024px (el mismo
+ * punto de quiebre que ya usa todo este componente para "sin panel lateral
+ * de escritorio") se compacta header/hero/categorías/favoritos/nav para
+ * aprovechar mejor la altura de pantalla, sin tocar ningún dato ni lógica:
+ * 100% tamaños/espaciados. Colocado DESPUÉS de todas las reglas base de
+ * arriba (mismo selector, misma especificidad) para que sí las sobreescriba
+ * por orden de aparición. El botón "Mi orden" del header se oculta siempre
+ * abajo de 1024px porque YA existe acceso en la barra inferior
+ * (.tienda-nav-inferior con su botón Carrito, o .tienda-nav-carrito-bar
+ * cuando hay artículos) — mostrarlo arriba también era duplicar el mismo
+ * control dos veces en la misma pantalla. ── */
+@media (max-width: 1023px) {
+  .tienda-header {
+    padding: 10px 14px;
+  }
+
+  .tienda-header-logo {
+    width: 34px;
+    height: 34px;
+  }
+
+  .tienda-header-nombre {
+    font-size: 0.95rem;
+  }
+
+  .tienda-header-telefono {
+    font-size: 0.72rem;
+  }
+
+  .tienda-carrito-boton {
+    display: none;
+  }
+
+  .tienda-compartir-boton {
+    padding: 8px 10px;
+    font-size: 0.85rem;
+  }
+
+  .tienda-hero {
+    min-height: 140px;
+    margin: 0 -14px 12px;
+    border-radius: 0 0 16px 16px;
+  }
+
+  .tienda-hero-overlay {
+    padding: 16px 14px 14px;
+  }
+
+  .tienda-hero-titulo {
+    font-size: 1.3rem;
+    margin-bottom: 4px;
+  }
+
+  .tienda-hero-texto {
+    font-size: 0.82rem;
+    margin: 0 0 10px;
+    max-width: none;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .tienda-hero-cta {
+    padding: 7px 16px;
+    font-size: 0.82rem;
+  }
+
+  .tienda-categorias-chips {
+    gap: 8px;
+    padding: 2px 2px 8px;
+  }
+
+  .tienda-chip {
+    min-width: 56px;
+    padding: 8px 10px;
+  }
+
+  .tienda-favoritos {
+    margin-bottom: 14px;
+  }
+
+  .tienda-favoritos-titulo {
+    font-size: 1rem;
+    margin-bottom: 8px;
+  }
+
+  .tienda-favoritos-item {
+    flex: 0 0 160px;
+  }
+
+  .tienda-todos-titulo {
+    margin: 0 0 10px;
+    font-size: 1rem;
+  }
+
+  .tienda-nav-inferior-boton {
+    padding: 6px 4px 8px;
+    font-size: 0.68rem;
+  }
+
+  .tienda-nav-inferior-icono {
+    font-size: 1.1rem;
+  }
+
+  .tienda-nav-carrito-bar {
+    padding: 11px 14px calc(11px + env(safe-area-inset-bottom));
+    font-size: 0.85rem;
+  }
+}
 
 .tienda-carrito-linea-foto,
 .tienda-carrito-linea-foto-vacia {

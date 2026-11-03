@@ -105,6 +105,12 @@ export interface Empresa {
   correoPedidos?: string | null;
   /** Logo en base64 (data URL) para el portal — mismo criterio que Producto.foto. */
   logoPublico?: string | null;
+  /** Imagen de portada (hero de la tienda) en base64 (data URL) — mismo
+   *  mecanismo que logoPublico (trigger -> edge function tienda-imagenes ->
+   *  Storage -> imagen_portada_url). Opcional: si la empresa no la
+   *  configura, el hero muestra un degradado con el color de marca (ver
+   *  heroImagenUrl() en catalogo-tienda.component.ts). */
+  imagenPortadaPublica?: string | null;
   /** Si está en false, /tienda/:clave de esta empresa no muestra nada (y no
    *  aparece en el portal /tienda), aunque la empresa esté activa. */
   catalogoPublicoActivo?: boolean;
@@ -302,6 +308,8 @@ export class EmpresasComponent implements OnInit, OnDestroy {
   // ── Logo de la tienda pública (mismo patrón que fotoActual en productos.component.ts) ──
   protected readonly logoActual = signal<string>('');
   protected readonly logoAmpliado = signal(false);
+  protected readonly portadaActual = signal<string>('');
+  protected readonly portadaAmpliada = signal(false);
 
   // ── Horario de atención (ver HorarioDiaEmpresa arriba) — vive en un
   // signal aparte (no en el FormGroup) porque son 7 filas editables, mismo
@@ -387,6 +395,8 @@ export class EmpresasComponent implements OnInit, OnDestroy {
     });
     this.logoActual.set('');
     this.logoAmpliado.set(false);
+    this.portadaActual.set('');
+    this.portadaAmpliada.set(false);
     this.horarioFilas.set(horarioPorDefecto());
     this.errorUbicacionEnvio.set(null);
     this.formEmpresa.controls.clave.enable();
@@ -431,6 +441,8 @@ export class EmpresasComponent implements OnInit, OnDestroy {
     this.errorUbicacionEnvio.set(null);
     this.logoActual.set(empresa.logoPublico ?? '');
     this.logoAmpliado.set(false);
+    this.portadaActual.set(empresa.imagenPortadaPublica ?? '');
+    this.portadaAmpliada.set(false);
     // Rellena los 7 días — si falta alguno en lo guardado (dato viejo/
     // incompleto), se completa con el valor por defecto de ese día.
     const porDia = new Map(horarioGuardado.map((f) => [f.dia, f]));
@@ -502,6 +514,7 @@ export class EmpresasComponent implements OnInit, OnDestroy {
       telefonoPedidos: valor.telefonoPedidos.trim() || null,
       correoPedidos: valor.correoPedidos.trim() || null,
       logoPublico: this.logoActual() || null,
+      imagenPortadaPublica: this.portadaActual() || null,
       pedidoMinimo: valor.pedidoMinimo,
       metodosPago: metodosPago.length > 0 ? metodosPago : null,
       horarioAtencion: valor.horarioActivo ? this.horarioFilas() : null,
@@ -761,6 +774,77 @@ export class EmpresasComponent implements OnInit, OnDestroy {
   quitarLogo(input: HTMLInputElement): void {
     this.logoActual.set('');
     this.logoAmpliado.set(false);
+    input.value = '';
+  }
+
+  // ── Imagen de portada del hero de la tienda pública ─────────────────
+  /** Igual que redimensionarLogo(), pero con más resolución: la portada se
+   *  usa como foto de fondo panorámica de ancho completo (ver hero en
+   *  catalogo-tienda.component), no como miniatura, así que necesita más
+   *  pixeles para no verse borrosa en desktop grande. El edge function
+   *  tienda-imagenes vuelve a comprimir del lado del servidor (1600px,
+   *  calidad 82) para la versión pública — este resize del navegador solo
+   *  evita mandar a la base de datos la foto completa de una cámara/celular
+   *  (varios MB) sin necesidad. */
+  private redimensionarPortada(archivo: File): Promise<string> {
+    const MAX_LADO = 1600;
+    return new Promise((resolve, reject) => {
+      const lector = new FileReader();
+      lector.onload = () => {
+        const imagen = new Image();
+        imagen.onload = () => {
+          let { width, height } = imagen;
+          if (width > height && width > MAX_LADO) {
+            height = Math.round((height * MAX_LADO) / width);
+            width = MAX_LADO;
+          } else if (height >= width && height > MAX_LADO) {
+            width = Math.round((width * MAX_LADO) / height);
+            height = MAX_LADO;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const contexto = canvas.getContext('2d');
+          if (!contexto) {
+            reject(new Error('Sin contexto de canvas.'));
+            return;
+          }
+          contexto.drawImage(imagen, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        imagen.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+        imagen.src = lector.result as string;
+      };
+      lector.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+      lector.readAsDataURL(archivo);
+    });
+  }
+
+  onPortadaSeleccionada(evento: Event): void {
+    const input = evento.target as HTMLInputElement;
+    const archivo = input.files?.[0];
+    if (!archivo) return;
+    if (!archivo.type.startsWith('image/')) {
+      this.toast.advertencia('Elige un archivo de imagen (JPG, PNG, etc.).');
+      input.value = '';
+      return;
+    }
+    if (archivo.size > 8 * 1024 * 1024) {
+      this.toast.advertencia('La imagen no puede pesar más de 8 MB.');
+      input.value = '';
+      return;
+    }
+    this.redimensionarPortada(archivo)
+      .then((dataUrl) => this.portadaActual.set(dataUrl))
+      .catch(() => this.toast.error('No se pudo procesar la imagen. Intenta con otra.'))
+      .finally(() => {
+        input.value = '';
+      });
+  }
+
+  quitarPortada(input: HTMLInputElement): void {
+    this.portadaActual.set('');
+    this.portadaAmpliada.set(false);
     input.value = '';
   }
 }

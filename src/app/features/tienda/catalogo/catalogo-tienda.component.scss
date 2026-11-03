@@ -304,11 +304,17 @@
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 20px;
 
-  // En celular se queda 1 columna: con tarjetas/fotos grandes, 2 columnas
-  // angostas se ven apretadas.
-  @media (max-width: 480px) {
-    grid-template-columns: 1fr;
-    gap: 16px;
+  // Ajuste visual móvil (nov 2026): antes se forzaba 1 columna aquí — con
+  // la tarjeta más compacta de abajo (aspect-ratio de foto más bajo,
+  // cuerpo con menos padding) sí caben 2 columnas cómodas en la mayoría
+  // de los celulares actuales. minmax(150px,…) es el único número mágico:
+  // auto-fill ya resuelve solo si de verdad caben 2 (se probó por cálculo
+  // a 320/360/390/412/430px, ver addendum del mandato) — en un celular
+  // angosto de verdad (320px) el propio grid cae a 1 columna solo, sin
+  // necesidad de otro breakpoint aparte.
+  @media (max-width: 639px) {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 14px;
   }
 
   /* Lista: una sola columna de renglones compactos (foto chica a la
@@ -1370,3 +1376,59 @@
 // inline en el HTML (ver catalogo-tienda.component.html) para no empujar
 // este archivo sobre el presupuesto por componente (20kB) — mismo
 // resultado visual, sin costo de CSS compilado.
+
+// ── Ajuste visual móvil (nov 2026) — continúa el bloque de arriba sobre
+// .tienda-grid: compacta tarjeta/búsqueda/categoría abajo de 1024px para
+// que quepan más productos por pantalla sin perder legibilidad (mismo
+// objetivo que la nota del comentario sobre el presupuesto de 20kB, más
+// abajo: todo lo nuevo concentrado en UN solo bloque al final, nada de
+// datos/lógica, solo tamaños). Colocado al final del archivo para que
+// gane por orden de aparición sobre cada regla base de arriba (misma
+// especificidad). ──
+@media (max-width: 1023px) {
+  .tienda-tarjeta-foto-contenedor,
+  .tienda-tarjeta-foto {
+    // Antes 4/3 en todos lados — en celular, con tarjetas/placeholder
+    // ocupando casi 1 pantalla completa (mandato: "1 imagen = casi 1
+    // pantalla"), una proporción más horizontal baja la altura ~17% sin
+    // recortar nada (sigue siendo object-fit:contain).
+    aspect-ratio: 16 / 10;
+  }
+
+  .tienda-tarjeta-foto-vacia {
+    font-size: 1.5rem;
+  }
+
+  .tienda-tarjeta-cuerpo {
+    padding: 10px 12px 12px;
+    gap: 5px;
+
+    p {
+      -webkit-line-clamp: 2;
+    }
+  }
+
+  .tienda-busqueda,
+  .tienda-agrupar-toggle {
+    margin-bottom: 10px;
+  }
+
+  .tienda-categoria {
+    margin-bottom: 26px;
+  }
+
+  .tienda-categoria-titulo {
+    margin: 0 0 12px;
+    gap: 8px;
+
+    &::before,
+    &::after {
+      max-width: 28px;
+    }
+  }
+
+  .tienda-categoria-titulo-texto {
+    font-size: 0.82rem;
+    padding: 5px 14px;
+  }
+}
