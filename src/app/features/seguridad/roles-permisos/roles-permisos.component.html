@@ -10,11 +10,59 @@
       <select (change)="seleccionarRol($any($event.target).value)">
         <option value="">Selecciona un rol...</option>
         @for (rol of roles(); track rol.id) {
-          <option [value]="rol.id">{{ rol.nombre }}</option>
+          <option [value]="rol.id">{{ rol.nombre }}{{ rol.activo === false ? ' (inactivo)' : '' }}</option>
         }
       </select>
     </label>
   </div>
+
+  <div class="edit-form" style="margin-top: 12px;">
+    <label class="full-span">
+      Nuevo rol
+      <div class="toolbar-group">
+        <input
+          type="text"
+          placeholder="Nombre del rol…"
+          [value]="nombreNuevoRol()"
+          (input)="nombreNuevoRol.set($any($event.target).value)"
+          (keyup.enter)="agregarRol()"
+        />
+        <button type="button" class="btn-secondary small" [disabled]="creandoRol() || !nombreNuevoRol().trim()" (click)="agregarRol()">
+          + Agregar rol
+        </button>
+      </div>
+    </label>
+  </div>
+
+  @if (roles().length > 0) {
+    <div class="grid-table-scroll" style="margin-top: 12px;">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th>Rol</th>
+            <th class="grid-actions-col">Activo</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (rol of roles(); track rol.id) {
+            <tr>
+              <td data-label="Rol">{{ rol.nombre }}</td>
+              <td class="grid-actions-col" data-label="Activo">
+                <label class="checkbox-inline">
+                  <input
+                    type="checkbox"
+                    [checked]="rol.activo !== false"
+                    [disabled]="cambiandoActivoRolId() === rol.id"
+                    (change)="alternarActivoRol(rol)"
+                  />
+                </label>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
 </div>
 
 @if (rolSeleccionadoId() === null) {

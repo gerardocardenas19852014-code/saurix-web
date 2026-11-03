@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, from, of } from 'rxjs';
 import { FunctionsHttpError, PostgrestError } from '@supabase/supabase-js';
-import { DataClientService, FiltroNulo, FiltroRango, ResultadoPagina } from './data-client.service';
+import { DataClientService, FiltroNulo, FiltroRango, ResultadoPagina, OrdenPagina, FiltroBusqueda, FILTRO_BUSQUEDA } from './data-client.service';
 
 function esFiltroRango(valor: unknown): valor is FiltroRango {
   return typeof valor === 'object' && valor !== null && !Array.isArray(valor) && ('gte' in valor || 'lte' in valor);
@@ -146,9 +146,10 @@ export class SupabaseDataClientService extends DataClientService {
     filtro: Record<string, unknown> | undefined,
     desde: number,
     cantidad: number,
+    orden?: OrdenPagina,
   ): Observable<ResultadoPagina<T>> {
     if (!entidadExiste(entidad)) return of({ filas: [], total: 0 });
-    return from(this.conToast(() => this.listarUnaPagina(entidad, filtro, desde, cantidad))) as Observable<
+    return from(this.conToast(() => this.listarUnaPagina(entidad, filtro, desde, cantidad, orden))) as Observable<
       ResultadoPagina<T>
     >;
   }
@@ -166,6 +167,7 @@ export class SupabaseDataClientService extends DataClientService {
   private filtroImposible(def: DefinicionTabla, filtro?: Record<string, unknown>): boolean {
     for (const [clave, valor] of Object.entries(filtro ?? {})) {
       if (valor === null || valor === undefined || valor === '') continue;
+      if (clave === FILTRO_BUSQUEDA) continue; // se valida aparte en aplicarFiltros()
       if (!def.columnas.get(clave)) return true;
       if (Array.isArray(valor) && valor.length === 0) return true;
     }
@@ -176,13 +178,32 @@ export class SupabaseDataClientService extends DataClientService {
    *  describe DataClientService.list() (valor simple, arreglo/IN, FiltroRango)
    *  — compartido entre listar() (trae todo, paginando internamente) y
    *  listarPagina() (trae solo una página, con total real vía `count`). */
-  private aplicarFiltros<Consulta extends { ilike: Function; eq: Function; in: Function; gte: Function; lte: Function; is: Function }>(
-    consulta: Consulta,
-    def: DefinicionTabla,
-    filtro?: Record<string, unknown>,
-  ): Consulta {
+  private aplicarFiltros<
+    Consulta extends { ilike: Function; eq: Function; in: Function; gte: Function; lte: Function; is: Function; or: Function },
+  >(consulta: Consulta, def: DefinicionTabla, filtro?: Record<string, unknown>): Consulta {
     for (const [clave, valor] of Object.entries(filtro ?? {})) {
       if (valor === null || valor === undefined || valor === '') continue;
+      // Caja de búsqueda sobre varias columnas de texto a la vez (OR) — ver
+      // FiltroBusqueda en data-client.service.ts. Las columnas inexistentes
+      // en ESTA entidad se descartan en silencio (nunca se manda al ORDER/
+      // WHERE un nombre de columna que no exista).
+      if (clave === FILTRO_BUSQUEDA) {
+        const { columnas, texto } = valor as FiltroBusqueda;
+        const textoLimpio = texto?.trim();
+        if (!textoLimpio) continue;
+        const columnasReales = columnas
+          .map((c) => def.columnas.get(c)?.snake)
+          .filter((snake): snake is string => !!snake);
+        if (columnasReales.length === 0) continue;
+        // El valor va entre comillas dobles (sintaxis de .or() de PostgREST)
+        // para que una coma o un paréntesis en lo que alguien escriba no
+        // rompa el parseo de la condición combinada; escaparLike() ya cuida
+        // el significado de %/_/\ dentro del propio patrón LIKE.
+        const patron = `%${escaparLike(textoLimpio).replace(/"/g, '\\"')}%`;
+        const condicion = columnasReales.map((snake) => `${snake}.ilike."${patron}"`).join(',');
+        consulta = consulta.or(condicion);
+        continue;
+      }
       const columna = def.columnas.get(clave);
       if (!columna) continue;
       // Un arreglo = "está en esta lista" (ver DashboardVentasComponent:
@@ -266,11 +287,27 @@ export class SupabaseDataClientService extends DataClientService {
     filtro: Record<string, unknown> | undefined,
     desde: number,
     cantidad: number,
+    orden?: OrdenPagina,
   ): Promise<ResultadoPagina<Fila>> {
     const def = definicionTabla(entidad);
     if (this.filtroImposible(def, filtro)) return { filas: [], total: 0 };
-    const consulta = this.aplicarFiltros(this.tabla(def).select('*', { count: 'exact' }), def, filtro);
-    const { data, error, count } = await consulta.order('id').range(desde, desde + cantidad - 1);
+    let consulta = this.aplicarFiltros(this.tabla(def).select('*', { count: 'exact' }), def, filtro);
+    // Whitelist de la columna de orden: solo se acepta si es un campo real
+    // y conocido de ESTA entidad (def.columnas, el mismo mapa camelCase ->
+    // snake_case que ya usa aplicarFiltros()) — nunca se manda tal cual al
+    // ORDER BY un nombre de columna que vino del cliente. Si no coincide con
+    // ninguna columna conocida, se ignora y se mantiene el orden por `id` de
+    // siempre (nunca se rompe por un nombre de columna inesperado).
+    const columnaOrden = orden ? def.columnas.get(orden.columna)?.snake : undefined;
+    const ascendente = orden?.direccion !== 'desc';
+    if (columnaOrden && columnaOrden !== 'id') {
+      // `id` siempre como desempate final, para un orden estable aunque
+      // haya varias filas con el mismo valor en la columna elegida.
+      consulta = consulta.order(columnaOrden, { ascending: ascendente }).order('id', { ascending: true });
+    } else {
+      consulta = consulta.order('id', { ascending: columnaOrden ? ascendente : true });
+    }
+    const { data, error, count } = await consulta.range(desde, desde + cantidad - 1);
     if (error) throw error;
     const filas = (data ?? []).map(filaACamel);
     return {
@@ -299,9 +336,8 @@ export class SupabaseDataClientService extends DataClientService {
   }
 
   private async actualizar(entidad: string, dto: Fila & { id: number }): Promise<Fila> {
+    if (entidad === 'Usuario') return this.actualizarUsuario(dto);
     const def = definicionTabla(entidad);
-    if (entidad === 'Usuario') await this.sincronizarCuenta(dto);
-
     const cambios = dtoASnake(def, dto);
     if (esTablaAdjuntos(def)) {
       delete cambios['ruta_storage'];
@@ -387,18 +423,29 @@ export class SupabaseDataClientService extends DataClientService {
     return filaACamel(respuesta.usuario);
   }
 
-  /** Si cambió el correo o viene contraseña nueva, actualiza la cuenta de
-   *  acceso antes de guardar el perfil. */
-  private async sincronizarCuenta(dto: Fila & { id: number }): Promise<void> {
-    const password = typeof dto['password'] === 'string' && dto['password'] ? dto['password'] : undefined;
-    let email: string | undefined;
-    if (typeof dto['email'] === 'string' && dto['email']) {
-      const { data } = await this.sb.schema('seguridad').from('usuario').select('email').eq('id', dto.id).maybeSingle();
-      const actual = (data as { email?: string } | null)?.email;
-      if (actual && actual.toLowerCase() !== dto['email'].toLowerCase()) email = dto['email'];
-    }
-    if (!password && !email) return;
-    await this.invocarAdminUsuarios({ accion: 'sincronizar', usuarioId: dto.id, email, password });
+  /** Perfil + cuenta de acceso (Auth) en UNA sola intención, coordinada
+   *  server-side por la Edge Function "admin-usuarios" (acción 'actualizar'):
+   *  primero actualiza seguridad.usuario (una sola instrucción SQL, todo o
+   *  nada) y SOLO DESPUÉS sincroniza correo/contraseña en Supabase Auth. Si
+   *  el perfil falla, nada cambió (Auth ni se tocó). Si el perfil se guarda
+   *  pero la sincronización de Auth falla (red, límite, etc.), el perfil YA
+   *  queda correcto y consistente — nunca se revierte, porque no hay nada
+   *  que corregir ahí — y la cuenta sigue aceptando las credenciales
+   *  anteriores (nadie queda bloqueado); el aviso que regresa la función se
+   *  muestra como advertencia para que se reintente solo la sincronización.
+   *  Supabase Auth y Postgres no comparten una transacción ACID real: esto
+   *  es deliberado, nunca se simula una atomicidad que no existe. */
+  private async actualizarUsuario(dto: Fila & { id: number }): Promise<Fila> {
+    const def = definicionTabla('Usuario');
+    const password = typeof dto['password'] === 'string' ? dto['password'] : '';
+    const respuesta = await this.invocarAdminUsuarios<{ usuario: Fila; authSincronizado: boolean; avisoAuth?: string }>({
+      accion: 'actualizar',
+      usuarioId: dto.id,
+      perfil: dtoASnake(def, dto),
+      password,
+    });
+    if (respuesta.avisoAuth) this.toast.advertencia(respuesta.avisoAuth);
+    return filaACamel(respuesta.usuario);
   }
 
   private async invocarAdminUsuarios<R = unknown>(cuerpo: Record<string, unknown>): Promise<R> {

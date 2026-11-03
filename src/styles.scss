@@ -1778,11 +1778,179 @@ button { font-family: inherit; }
  * (20kB) de Angular — mover aquí lo nuevo deja margen sin perder nada,
  * ya que las clases .tienda-* son exclusivas de esta función. ── */
 
-.tienda-categorias-chips {
+/* ── Sistema visual del rediseño (--store-primary/-dark/-soft/-text) —
+ * alias de las variables que YA trae cada tienda (--color-primario/
+ * --color-texto-banner, puestas inline en catalogo-tienda.component.html
+ * desde colorAcento/colorTextoBanner de la empresa). No son datos nuevos,
+ * nomás nombres más claros + 2 variantes derivadas con color-mix(). ── */
+.tienda-catalogo {
+  --store-primary: var(--color-primario, #2563eb);
+  --store-primary-dark: color-mix(in srgb, var(--color-primario, #2563eb) 100%, black 28%);
+  --store-primary-soft: color-mix(in srgb, var(--color-primario, #2563eb) 12%, white);
+  --store-text: var(--color-texto-banner, #fff);
+}
+
+/* ── HEADER: franja delgada, clara y comercial — logo + nombre + teléfono
+ * (si existe) a la izquierda, compartir + Mi Orden/Carrito a la derecha.
+ * Reemplaza al antiguo .tienda-banner plano (ver homologación visual de
+ * 2026-11) — ya NO lleva el color de marca de fondo (eso se queda en el
+ * HERO de abajo), usa el mismo fondo/borde neutro del resto de la tienda. ── */
+.tienda-header {
+  margin: -20px -16px 0;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--fondo-tarjeta, #fff);
+  border-bottom: 1px solid var(--borde, #e5e7eb);
+}
+
+.tienda-header-marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.tienda-header-logo {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--fondo-sutil, #f3f4f6);
+}
+
+.tienda-header-logo-vacia {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+}
+
+.tienda-header-texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tienda-header-nombre {
+  font-size: 1.05rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tienda-header-telefono {
+  font-size: 0.78rem;
+  color: var(--texto-tenue, #6b7280);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tienda-header-acciones {
   display: flex;
   gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── HERO: pieza grande y vistosa — antes no existía (el banner plano era
+ * a la vez foto-menos y toda la identidad). Sin foto disponible
+ * (.tienda-hero-sin-foto) cae a un degradado liso con el color de marca. ── */
+.tienda-hero {
+  position: relative;
+  margin: 0 -16px 18px;
+  min-height: 220px;
+  display: flex;
+  align-items: flex-end;
+  background-color: var(--store-primary-dark);
+  background-size: cover;
+  background-position: center;
+  border-radius: 0 0 24px 24px;
+  overflow: hidden;
+}
+
+.tienda-hero-sin-foto {
+  background-image: linear-gradient(135deg, var(--store-primary), var(--store-primary-dark));
+}
+
+.tienda-hero-overlay {
+  width: 100%;
+  padding: 28px 20px 24px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.68) 0%, rgba(0, 0, 0, 0.22) 65%, transparent 100%);
+  color: #fff;
+}
+
+.tienda-hero-titulo {
+  margin: 0 0 6px;
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.tienda-hero-texto {
+  margin: 0 0 14px;
+  max-width: 480px;
+  font-size: 0.95rem;
+  opacity: 0.95;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.tienda-hero-cta {
+  border: none;
+  background: var(--store-primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.92rem;
+  padding: 10px 24px;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+  }
+}
+
+.tienda-carrito-boton,
+.tienda-compartir-boton {
+  border: 1px solid var(--borde, #e5e7eb);
+  background: var(--store-primary-soft);
+  color: var(--store-primary-dark);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, background 0.15s ease;
+
+  &:hover {
+    background: var(--store-primary, #2563eb);
+    color: #fff;
+  }
+}
+
+.tienda-todos-titulo {
+  margin: 4px 0 14px;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+/* ── Chips de categoría (rediseño): icono arriba + texto abajo, como
+ * tarjeta chica — sin icono configurable por categoría (no se crea esa
+ * infraestructura solo para esto, mandato sección 8); "Todas" usa un
+ * icono estructural y el resto comparte un icono neutro (ver el .html).
+ * Estado activo mucho más claro: fondo del color de marca + borde. ── */
+.tienda-categorias-chips {
+  display: flex;
+  gap: 10px;
   overflow-x: auto;
-  padding: 2px 2px 10px;
+  padding: 2px 2px 12px;
   margin-bottom: 4px;
   scrollbar-width: none;
 
@@ -1793,21 +1961,89 @@ button { font-family: inherit; }
 
 .tienda-chip {
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 68px;
   border: 1px solid var(--borde, #e5e7eb);
-  background: var(--fondo-sutil, #f3f4f6);
-  border-radius: 999px;
-  padding: 7px 16px;
-  font-size: 0.85rem;
+  background: var(--fondo-tarjeta, #fff);
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 0.78rem;
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
 
-  &.activo {
-    background: var(--color-primario, #2563eb);
-    border-color: var(--color-primario, #2563eb);
-    color: var(--color-texto-banner, #fff);
+.tienda-chip-icono {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.tienda-chip-texto {
+  line-height: 1;
+}
+
+.tienda-chip.activo {
+  background: var(--store-primary-soft, #eff6ff);
+  border-color: var(--store-primary, #2563eb);
+  color: var(--store-primary-dark, #1d4ed8);
+}
+
+.tienda-chip:not(.activo):hover {
+  border-color: var(--store-primary, #2563eb);
+  background: var(--fondo-sutil, #f3f4f6);
+}
+
+/* ── "Los favoritos" (antes "⭐ Destacados" con una tarjeta propia más
+ * simple) — ahora reutiliza la MISMA .tienda-tarjeta del catálogo general
+ * (ver <ng-template #tarjetaProducto> en el .html), solo en una fila con
+ * scroll horizontal en vez de cuadrícula — mandato sección 9/10. ── */
+.tienda-favoritos {
+  margin-bottom: 20px;
+}
+
+.tienda-favoritos-titulo {
+  margin: 0 0 10px;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.tienda-favoritos-fila {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
   }
+}
+
+.tienda-favoritos-item {
+  flex: 0 0 200px;
+  scroll-snap-align: start;
+}
+
+/* Insignia "Destacado" sobre la foto de la tarjeta — se muestra en
+ * CUALQUIER tarjeta (catálogo general o "Los favoritos") cuando
+ * producto.destacado es true (ya existía ese campo, ver mandato
+ * sección 9/10: aprovechar el campo destacado ya existente). */
+.tienda-tarjeta-badge-destacado {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  z-index: 1;
 }
 
 
@@ -1865,6 +2101,54 @@ button { font-family: inherit; }
   line-height: 16px;
   text-align: center;
   padding: 0 3px;
+}
+
+/* ── Barra prominente de Mi Orden/Carrito (rediseño visual, mandato
+ * sección 14) — alterna con .tienda-nav-inferior (nunca las 2 juntas, ver
+ * el .html): mismo lugar fijo abajo, mismo clic que ya abría el carrito,
+ * nomás con más presencia (ancho completo, color de marca) cuando ya hay
+ * algo agregado — para que sea obvio que el pedido sigue ahí sin tener
+ * que adivinar detrás de un icono chico. ── */
+.tienda-nav-carrito-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: var(--color-primario, #2563eb);
+  color: var(--color-texto-banner, #fff);
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tienda-nav-carrito-bar-icono {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.tienda-nav-carrito-bar-texto {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tienda-nav-carrito-bar-total {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tienda-nav-carrito-bar-flecha {
+  flex-shrink: 0;
+  opacity: 0.85;
 }
 
 

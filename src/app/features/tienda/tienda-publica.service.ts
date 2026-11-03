@@ -97,9 +97,15 @@ export class TiendaPublicaService {
    *  catalogo-tienda.component.ts, esto es solo para no tener que volver a
    *  teclearlo. Se llama "en segundo plano" (sin esperar/bloquear el envío
    *  del WhatsApp) — si falla, el cliente de todas formas ya recibió su
-   *  WhatsApp, que es lo que de verdad importa. Sin cambios en esta
-   *  homologación (ver sección Q: la validación autoritativa de
-   *  precio/stock en checkout queda para un bloque posterior). */
+   *  WhatsApp, que es lo que de verdad importa.
+   *
+   *  Homologación nov-2026 (Bloque F): igual que crearOrdenMenuQr(), solo
+   *  se manda producto/cantidad/opciones elegidas — NUNCA el precio ni el
+   *  total que calculó Angular. El servidor (seguridad.crear_pedido_tienda,
+   *  vía el helper compartido fn_revalidar_items_pedido) reconstruye precio
+   *  y total desde inventario.producto antes de guardarlos; p_total se
+   *  conserva en la llamada solo por compatibilidad de forma, su valor ya
+   *  no se usa del lado del servidor. */
   async crearPedidoPendiente(
     clave: string,
     datos: {
@@ -119,7 +125,11 @@ export class TiendaPublicaService {
       p_notas: datos.notas || null,
       p_lat: datos.lat,
       p_lng: datos.lng,
-      p_items: datos.items,
+      p_items: datos.items.map((linea) => ({
+        productoId: linea.productoId,
+        cantidad: linea.cantidad,
+        opcionValorIds: linea.opcionesElegidas.map((o) => o.valorId),
+      })),
       p_total: datos.total,
     });
     if (error) throw new Error(error.message);

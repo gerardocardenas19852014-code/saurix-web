@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { DataClientService, ResultadoPagina } from './data-client.service';
+import { DataClientService, ResultadoPagina, OrdenPagina } from './data-client.service';
 
 /**
  * Implementación FUTURA: llama a los endpoints reales de PlataformaSaurix
@@ -52,6 +52,7 @@ export class HttpDataClientService extends DataClientService {
     filtro: Record<string, unknown> | undefined,
     desde: number,
     cantidad: number,
+    orden?: OrdenPagina,
   ): Observable<ResultadoPagina<T>> {
     let params = new HttpParams().set('desde', desde).set('cantidad', cantidad);
     if (filtro) {
@@ -60,6 +61,9 @@ export class HttpDataClientService extends DataClientService {
           params = params.set(clave, String(valor));
         }
       }
+    }
+    if (orden) {
+      params = params.set('orden', orden.columna).set('direccion', orden.direccion ?? 'asc');
     }
     return this.http.get<ResultadoPagina<T>>(`${this.url(entidad)}/GetListPagina`, { params });
   }

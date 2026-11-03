@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Meta, Title } from '@angular/platform-browser';
 import QRCode from 'qrcode';
@@ -62,7 +62,7 @@ function calcularIconoMetodoPago(metodo: string): string {
 @Component({
   selector: 'app-catalogo-tienda',
   standalone: true,
-  imports: [RouterLink, ReactiveFormsModule, DecimalPipe],
+  imports: [RouterLink, ReactiveFormsModule, DecimalPipe, NgTemplateOutlet],
   templateUrl: './catalogo-tienda.component.html',
   styleUrl: './catalogo-tienda.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -118,6 +118,21 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
    *  acotada del lado del servidor, independiente de qué páginas del
    *  catálogo normal se hayan cargado. */
   protected readonly productosDestacados = signal<ProductoTienda[]>([]);
+
+  /** Foto de fondo del HERO (rediseño visual) — se reutiliza la PRIMERA
+   *  foto que ya haya llegado al navegador entre los destacados o el
+   *  catálogo normal (cero peticiones nuevas de DATOS; el navegador sí
+   *  descarga esa imagen una vez, como recurso visual legítimo del hero —
+   *  ver mandato de rediseño visual, sección 6/37). Prefiere
+   *  fotoDetalleUrl (más resolución, apropiada para una foto grande) y
+   *  cae a fotoThumbUrl si no hay detalle. Sin ningún producto con foto,
+   *  null — el .scss cae a un degradado liso con el color de marca. */
+  protected readonly heroImagenUrl = computed(() => {
+    const conFoto = (lista: ProductoTienda[]) => lista.find((p) => p.fotoDetalleUrl || p.fotoThumbUrl);
+    const deDestacados = conFoto(this.productosDestacados());
+    const deCatalogo = deDestacados ?? conFoto(this.productos());
+    return deCatalogo ? deCatalogo.fotoDetalleUrl || deCatalogo.fotoThumbUrl : null;
+  });
   /** Cuadrícula (tarjetas) o lista (renglones compactos) — se recuerda por
    *  navegador (localStorage) para que no se tenga que elegir cada visita;
    *  si no está disponible (modo privado, etc.) simplemente no se recuerda. */
@@ -129,6 +144,20 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
 
   protected readonly carrito = signal<LineaCarritoTienda[]>([]);
   protected readonly carritoAbierto = signal(false);
+
+  /** true = pantalla de escritorio (≥1024px): el panel de Mi Orden se
+   *  queda SIEMPRE visible como columna lateral en vez de ser un overlay
+   *  que hay que abrir con un botón (ver mandato de rediseño visual,
+   *  sección 13). Es el ÚNICO cambio de TypeScript que necesita el
+   *  rediseño visual para este panel — el resto es puro CSS Grid (ver
+   *  .tienda-catalogo-con-panel-fijo en el .scss) — justificado porque
+   *  @if es una directiva estructural (quita el elemento del DOM) y
+   *  ninguna media query de CSS puede, por sí sola, hacer que vuelva a
+   *  aparecer. Se actualiza con un listener de matchMedia (ver ngOnInit/
+   *  ngOnDestroy), no se vuelve a calcular en cada resize a mano. */
+  protected readonly panelFijo = signal(false);
+  private mediaQueryPanelFijo: MediaQueryList | null = null;
+  private readonly onCambioPanelFijo = (e: MediaQueryListEvent) => this.panelFijo.set(e.matches);
 
   // ── Modal de "elige tus opciones" (al estilo combo de cine) ──────────
   protected readonly productoEnModal = signal<ProductoTienda | null>(null);
@@ -582,6 +611,19 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
       this.ultimoPedidoDisponible.set(false);
     }
 
+    // panelFijo: Mi Orden como columna lateral fija en escritorio (ver el
+    // comentario grande junto a la señal). try/catch por las dudas en un
+    // entorno sin matchMedia (SSR/pruebas) — sin eso, sencillamente nunca
+    // se activa el panel fijo, el comportamiento sigue siendo el de
+    // siempre (overlay con botón).
+    try {
+      this.mediaQueryPanelFijo = window.matchMedia('(min-width: 1024px)');
+      this.panelFijo.set(this.mediaQueryPanelFijo.matches);
+      this.mediaQueryPanelFijo.addEventListener('change', this.onCambioPanelFijo);
+    } catch {
+      // Sin matchMedia disponible: se queda en false, comportamiento normal.
+    }
+
     // 4 llamadas chicas en paralelo (config + categorías + destacados +
     // primera página) en vez de 1 sola llamada gigante con el catálogo
     // completo — mismo criterio ya usado en el Dashboard de Inventario.
@@ -705,6 +747,7 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.temporizadorBusqueda) clearTimeout(this.temporizadorBusqueda);
+    this.mediaQueryPanelFijo?.removeEventListener('change', this.onCambioPanelFijo);
     // No deja el título/metadatos de ESTA tienda puestos si el navegador
     // sigue vivo (SPA) y el cliente navega a otra pantalla.
     this.titleService.setTitle('Saurix');
@@ -774,8 +817,10 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
   }
 
   abrirModal(producto: ProductoTienda): void {
-    // Defensa extra — también se llama directo desde el carrusel de
-    // Destacados (ver el .html), que no pasa por agregar().
+    // Defensa extra (modoVisual no agrega/abre modal) — llamada siempre
+    // desde agregar() cuando el producto tiene variantes (ver arriba),
+    // tanto desde el catálogo general como desde "Los favoritos" (misma
+    // tarjeta compartida, ver <ng-template #tarjetaProducto> en el .html).
     if (this.modoVisual()) return;
     this.productoEnModal.set(producto);
     this.cantidadModal.set(1);
@@ -1009,7 +1054,7 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
   // ── Navegación de la barra inferior (Inicio | Productos | Carrito) —
   //    scroll normal del navegador, no cambia de ruta ni de estado. ─────
   protected irAInicio(): void {
-    document.querySelector('.tienda-banner')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.querySelector('.tienda-header')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   protected irAProductos(): void {

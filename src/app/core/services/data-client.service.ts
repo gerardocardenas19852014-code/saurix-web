@@ -36,12 +36,42 @@ export interface FiltroNulo {
   esNulo: true;
 }
 
+/** Valor especial de filtro para "busca este texto en cualquiera de estas
+ *  columnas de texto" (OR) — pensado para una sola caja de búsqueda que
+ *  cubre varios campos a la vez (p.ej. Usuario: usuario/nombre/apellidos/
+ *  correo), sin tener que traer la tabla completa para filtrarla en
+ *  Angular. `columnas` son claves reales de la entidad (se valida igual
+ *  que cualquier otro filtro: una clave que no exista se ignora). Se pasa
+ *  bajo la clave reservada FILTRO_BUSQUEDA (ver abajo), nunca como el
+ *  valor de una columna normal. */
+export interface FiltroBusqueda {
+  columnas: string[];
+  texto: string;
+}
+
+/** Clave reservada para un FiltroBusqueda dentro del objeto de filtro de
+ *  list()/listarPagina() — empieza con '_' para no poder coincidir nunca
+ *  con el nombre camelCase de una columna real. */
+export const FILTRO_BUSQUEDA = '_busqueda';
+
 /** Resultado de listarPagina(): la página pedida + el total real que hay
  *  (filtrado, antes de recortar a la página) — para poder mostrar "mostrando
  *  X de Y" y decidir si todavía hay más por cargar. */
 export interface ResultadoPagina<T> {
   filas: T[];
   total: number;
+}
+
+/** Orden opcional para listarPagina() — `columna` debe ser un campo real de
+ *  la entidad (en IndexedDB/Http, la clave camelCase del objeto; en
+ *  Supabase, cualquier clave conocida del esquema de esa entidad: ver
+ *  definicionTabla().columnas en supabase-esquema.ts, que ya funciona como
+ *  whitelist — una columna que la entidad no tiene simplemente se ignora,
+ *  nunca se manda tal cual a SQL). Sin `orden`, se mantiene el
+ *  comportamiento de siempre (orden por `id`). */
+export interface OrdenPagina {
+  columna: string;
+  direccion?: 'asc' | 'desc';
 }
 
 export abstract class DataClientService {
@@ -80,5 +110,6 @@ export abstract class DataClientService {
     filtro: Record<string, unknown> | undefined,
     desde: number,
     cantidad: number,
+    orden?: OrdenPagina,
   ): Observable<ResultadoPagina<T>>;
 }

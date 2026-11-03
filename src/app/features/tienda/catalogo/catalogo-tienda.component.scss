@@ -2,6 +2,54 @@
   display: block;
 }
 
+/* ── Mi Orden como columna lateral fija en escritorio (rediseño visual,
+ * mandato sección 13) — SIN mover nada en el HTML: .tienda-catalogo y
+ * .tienda-carrito-panel ya eran hermanos directos de este host (ver el
+ * .html — @if/@else no agregan ningún elemento envolvente), así que
+ * basta con volver el HOST mismo un grid de 2 columnas para que queden
+ * uno junto al otro. panelFijo() (ver el .ts, mismo punto de quiebre:
+ * matchMedia('(min-width: 1024px)')) es lo que hace que el <aside>
+ * exista en el DOM aquí arriba de 1024px — abajo de ese ancho sigue
+ * siendo el overlay de toda la vida (position:fixed, controlado por
+ * carritoAbierto()), esta regla ni se activa. La barra inferior/botón de
+ * carrito del header se ocultan porque ya son redundantes: el panel
+ * nunca se cierra en escritorio. ── */
+@media (min-width: 1024px) {
+  :host {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    align-items: start;
+    gap: 24px;
+  }
+
+  .tienda-catalogo {
+    grid-column: 1;
+    min-width: 0;
+  }
+
+  .tienda-carrito-panel {
+    grid-column: 2;
+    position: sticky;
+    top: 16px;
+    right: auto;
+    height: auto;
+    max-height: calc(100vh - 32px);
+    z-index: 1;
+    border-radius: 16px;
+    border: 1px solid var(--borde, #e5e7eb);
+  }
+
+  .tienda-cerrar {
+    display: none;
+  }
+
+  .tienda-nav-inferior,
+  .tienda-nav-carrito-bar,
+  .tienda-carrito-boton {
+    display: none;
+  }
+}
+
 /* Modo oscuro de la tienda pública — el resto del archivo ya usa
  * var(--texto-tenue, …)/var(--borde, …)/var(--fondo-tarjeta, …)/
  * var(--fondo-sutil, …)/var(--color-error, …) con un valor de respaldo
@@ -76,117 +124,13 @@
   padding: 20px 16px 80px;
 }
 
-/* ── Banner de portada: degradado del color de marca (color-acento de la
- * empresa, o el azul por defecto) con el logo "montado" sobre su borde
- * inferior — ver el comentario grande en el .html. Las esquinas redondeadas
- * y el overflow:hidden del banner son justo por lo que el logo NO puede ir
- * adentro de él (se recortaría); va en .tienda-banner-logo-fila, aparte. ── */
-.tienda-banner {
-  margin: -20px -16px 0;
-  padding: 16px;
-  padding-bottom: 36px;
-  background: linear-gradient(
-    135deg,
-    var(--color-primario, #2563eb),
-    color-mix(in srgb, var(--color-primario, #2563eb) 100%, black 28%)
-  );
-  border-radius: 0 0 24px 24px;
-  /* --color-texto-banner: ver colorTextoBanner — independiente del color
-   * de FONDO de arriba (--color-primario), para que el texto se siga
-   * leyendo bien cuando la empresa elige un color de marca claro/pastel. */
-  color: var(--color-texto-banner, #fff);
-}
-
-.tienda-banner-acciones {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.tienda-banner-nombre {
-  text-align: center;
-  padding: 0 8px;
-
-  h1 {
-    margin: 0;
-    font-size: 1.7rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    /* Con "color" nomás no bastaba: hay una regla global "h1, h2 { color:
-     * var(--heading-navy); }" (src/styles.scss) que, aunque el banner
-     * declara su propio color, GANA porque un valor heredado siempre
-     * pierde contra cualquier regla explícita (aunque sea de un simple
-     * "h1") — por eso el título se seguía viendo en azul marino fijo,
-     * sin importar lo que el .tienda-banner trajera. Hay que pisarla aquí
-     * mismo, explícitamente, con el color configurable del banner. */
-    color: var(--color-texto-banner, #fff);
-    /* La sombra ayuda sobre todo con el blanco por defecto; con un color
-     * de letra propio elegido a propósito no estorba, así que se deja
-     * siempre encendida. */
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-
-    // Barrita de acento (color de marca) debajo del título — como el
-    // "letrero" de un menú.
-    &::after {
-      content: '';
-      display: block;
-      width: 56px;
-      height: 3px;
-      margin: 8px auto 0;
-      background: var(--color-texto-banner, #fff);
-      border-radius: 999px;
-      opacity: 0.85;
-    }
-  }
-
-  p {
-    margin: 4px 0 0;
-    font-size: 0.9rem;
-    opacity: 0.9;
-  }
-}
-
-.tienda-banner-logo-fila {
-  display: flex;
-  justify-content: center;
-  /* Lo "monta" sobre el borde inferior redondeado del banner, jalándolo
-   * hacia arriba sin que el overflow:hidden de .tienda-banner lo recorte
-   * (es un elemento hermano, no un hijo de .tienda-banner). */
-  margin-top: -32px;
-  margin-bottom: 14px;
-}
-
-.tienda-banner-logo {
-  width: 76px;
-  height: 76px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 3px solid var(--fondo-tarjeta, #fff);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  background: var(--fondo-tarjeta, #fff);
-}
-
-.tienda-banner-logo-vacia {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.8rem;
-}
-
-.tienda-carrito-boton,
-.tienda-compartir-boton {
-  border: 1px solid color-mix(in srgb, var(--color-texto-banner, #fff) 100%, transparent 50%);
-  background: color-mix(in srgb, var(--color-texto-banner, #fff) 100%, transparent 82%);
-  color: var(--color-texto-banner, #fff);
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 0.95rem;
-  cursor: pointer;
-  flex-shrink: 0;
-  backdrop-filter: blur(4px);
-  transition: transform 0.15s ease;
-}
+/* Variables del sistema visual (--store-primary/-dark/-soft/-text) y los
+ * estilos de .tienda-header/.tienda-hero/.tienda-carrito-boton/
+ * .tienda-compartir-boton del rediseño viven en src/styles.scss (global),
+ * NO aquí — este archivo ya está muy cerca del presupuesto
+ * anyComponentStyle (20kB) de Angular, mismo criterio que ya se usó antes
+ * para .tienda-categorias-chips/.tienda-chip/.tienda-nav-inferior (ver el
+ * comentario grande en styles.scss, sección "Tienda pública"). */
 
 /* Pulso breve al agregar algo al carrito — ver dispararPulsoCarrito() en
  * el .ts, se enciende y apaga solo medio segundo después. */
@@ -522,61 +466,6 @@
   }
 }
 
-// ── Carrusel "⭐ Destacados" — fila horizontal con scroll táctil, arriba
-// del buscador. Tarjetas angostas, pensadas para "ver varias y deslizar"
-// más que para leer descripción (esa vive en la tarjeta normal de abajo). ──
-.tienda-destacados {
-  margin-bottom: 18px;
-}
-
-.tienda-destacados-titulo {
-  margin: 0 0 10px;
-  text-align: center;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 1rem;
-  color: var(--color-primario, #2563eb);
-}
-
-.tienda-destacados-fila {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-}
-
-// Letrero/anuncio (foto con nombre+precio superpuestos abajo, ver
-// .tienda-destacado-leyenda) — mismo estilo para las 2 modalidades de
-// tienda, nomás que en modo visual no hace nada al tocarlo (abrirModal()
-// ya se protege en el .ts).
-.tienda-destacado-tarjeta {
-  position: relative;
-  flex: 0 0 auto;
-  width: 190px;
-  scroll-snap-align: start;
-  border-radius: 12px;
-  overflow: hidden;
-  cursor: pointer;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
-}
-
-.tienda-destacado-foto {
-  width: 100%;
-  height: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-  background: var(--fondo-sutil, #f3f4f6);
-
-  &-vacia {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.6rem;
-  }
-}
-
 .tienda-tarjeta-foto-contenedor {
   position: relative;
   width: 100%;
@@ -811,7 +700,13 @@
   height: 100%;
   background: var(--fondo-tarjeta, #fff);
   padding: 18px;
-  overflow-y: auto;
+  /* Homologación nov-2026 (Bloque G): el panel ya NO scrollea completo —
+   * solo .tienda-carrito-lineas (abajo) lo hace. Antes, con un carrito
+   * largo en un teléfono angosto, el total y el botón de enviar podían
+   * quedar fuera de la vista al hacer scroll (el panel entero era un solo
+   * contenedor overflow-y:auto). Ahora header/total/botón quedan siempre
+   * visibles y solo las líneas del carrito se desplazan. */
+  overflow-y: hidden;
   display: flex;
   flex-direction: column;
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.18);
@@ -840,6 +735,13 @@
   flex-direction: column;
   gap: 12px;
   margin-bottom: 14px;
+  /* Única zona que de verdad scrollea dentro del panel (ver comentario en
+   * .tienda-carrito-panel) — min-height:0 es necesario para que un hijo
+   * flex con overflow realmente se encoja en vez de empujar el total y el
+   * botón fuera de la vista. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .tienda-carrito-linea {
@@ -902,6 +804,9 @@
   align-items: center;
   font-size: 1.1rem;
   margin: 10px 0 14px;
+  /* Pinned debajo de .tienda-carrito-lineas (que es lo único que scrollea
+   * en el panel) — nunca se va con el scroll. */
+  flex-shrink: 0;
 }
 
 .tienda-enviar-boton {
@@ -948,6 +853,74 @@
 
   h3 {
     margin: 0;
+  }
+}
+
+.tienda-modal-resumen {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.tienda-modal-foto-contenedor {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.tienda-modal-foto {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: var(--fondo-sutil, #f3f4f6);
+
+  &-vacia {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+  }
+}
+
+.tienda-modal-resumen-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tienda-modal-precio-base {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--color-primario, #2563eb);
+}
+
+.tienda-modal-descripcion {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--texto-tenue, #6b7280);
+}
+
+/* Solo el modal de "elegir opciones" (.tienda-modal-opciones) se ensancha
+ * y pone foto/información lado a lado en escritorio — los demás modales
+ * (datos del cliente, menú QR) siguen angostos, tal cual. */
+@media (min-width: 640px) {
+  .tienda-modal-opciones {
+    width: min(620px, 92vw);
+  }
+
+  .tienda-modal-opciones .tienda-modal-resumen {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .tienda-modal-opciones .tienda-modal-foto-contenedor {
+    width: 220px;
+    aspect-ratio: 4 / 3;
   }
 }
 
@@ -1118,7 +1091,7 @@
 
 // ── Horario, métodos de pago, volver a pedir, mínimo, resumen ──
 // (el "look" de .tienda-compartir-boton/.tienda-carrito-boton ya se definió
-// arriba, junto con .tienda-banner, porque ahora viven dentro del banner).
+// arriba, junto con .tienda-header/.tienda-hero.
 
 .tienda-horario-badge {
   display: inline-block;
@@ -1360,36 +1333,6 @@
 .tienda-tarjeta-visual-valor {
   &:not(:last-child)::after {
     content: ', ';
-  }
-}
-
-.tienda-destacado-leyenda {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 18px 10px 8px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.75), transparent);
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px;
-
-  strong {
-    margin: 0;
-    color: #fff;
-    font-size: 0.85rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  span {
-    margin: 0;
-    color: #fff;
-    font-weight: 700;
-    font-size: 0.85rem;
-    white-space: nowrap;
   }
 }
 

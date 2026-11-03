@@ -48,6 +48,46 @@ interface ModuloEmpresaFila {
   activo: boolean;
 }
 
+/** Pestañas del modal "Editar/Nueva empresa" (ver empresas.component.html) —
+ *  solo reorganiza visualmente el mismo formGroup de siempre, ningun campo
+ *  cambia de control ni de nombre. */
+type TabEmpresa = 'general' | 'tienda' | 'entrega' | 'apariencia';
+
+/** A que pestaña pertenece cada control — se usa solo para saltar a la
+ *  pestaña correcta si "Guardar" falla por un campo invalido que quedo en
+ *  una pestaña no visible en ese momento (ver guardarEmpresa()). */
+const TAB_POR_CONTROL: Record<string, TabEmpresa> = {
+  clave: 'general',
+  nombre: 'general',
+  activo: 'general',
+  maxUsuarios: 'general',
+  catalogoPublicoActivo: 'tienda',
+  modoTienda: 'tienda',
+  descripcionPublica: 'tienda',
+  telefonoPedidos: 'tienda',
+  correoPedidos: 'tienda',
+  pedidoMinimo: 'tienda',
+  metodosPagoTexto: 'tienda',
+  horarioActivo: 'tienda',
+  volverPedirActivo: 'tienda',
+  envioOrigenLat: 'entrega',
+  envioOrigenLng: 'entrega',
+  envioPrecioKm: 'entrega',
+  envioMinimo: 'entrega',
+  envioDistanciaMaximaKm: 'entrega',
+  envioPropioActivo: 'entrega',
+  envioPropioPedidoMinimo: 'entrega',
+  recoleccionActiva: 'entrega',
+  direccionPublica: 'entrega',
+  envioPlataformaActivo: 'entrega',
+  envioPlataformaNegocioSolicita: 'entrega',
+  envioPlataformaClienteSolicita: 'entrega',
+  colorAcentoActivo: 'apariencia',
+  colorAcento: 'apariencia',
+  colorTextoBannerActivo: 'apariencia',
+  colorTextoBanner: 'apariencia',
+};
+
 export interface Empresa {
   id: number;
   clave: string;
@@ -154,6 +194,8 @@ export class EmpresasComponent implements OnInit, OnDestroy {
   protected readonly cargando = signal(false);
   protected readonly empresaEnEdicion = signal<Empresa | null>(null);
   protected readonly modalEmpresa = signal(false);
+  /** Pestaña visible del modal de Editar/Nueva empresa — ver TabEmpresa. */
+  protected readonly tabActivaEmpresa = signal<TabEmpresa>('general');
   protected readonly aEliminar = signal<Empresa | null>(null);
   /** Eliminar una empresa ahora SÍ borra todo lo suyo (ver eliminar_empresa()
    *  en la migración 31) — por lo irreversible/destructivo que es, se pide
@@ -283,6 +325,15 @@ export class EmpresasComponent implements OnInit, OnDestroy {
     // igual que Usuarios, en vez del ancho angosto por defecto.
     document.documentElement.setAttribute('data-wide', 'grid');
     if (this.permitido) this.cargar();
+    // Si el modo deja de ser "pedidos_online" la pestaña "Entrega" se oculta
+    // (ver .html) — si el usuario estaba parado ahi, lo manda a "Tienda
+    // pública" para que no se quede en una pestaña que ya no existe. Esto
+    // NUNCA borra valores de envío/entrega, solo cambia qué pestaña se ve.
+    this.formEmpresa.controls.modoTienda.valueChanges.subscribe((modo) => {
+      if (modo !== 'pedidos_online' && this.tabActivaEmpresa() === 'entrega') {
+        this.tabActivaEmpresa.set('tienda');
+      }
+    });
   }
 
   ngOnDestroy(): void {
@@ -339,6 +390,7 @@ export class EmpresasComponent implements OnInit, OnDestroy {
     this.horarioFilas.set(horarioPorDefecto());
     this.errorUbicacionEnvio.set(null);
     this.formEmpresa.controls.clave.enable();
+    this.tabActivaEmpresa.set('general');
     this.modalEmpresa.set(true);
   }
 
@@ -385,6 +437,7 @@ export class EmpresasComponent implements OnInit, OnDestroy {
     this.horarioFilas.set(horarioPorDefecto().map((d) => porDia.get(d.dia) ?? d));
     // La clave identifica a la empresa (p.ej. en ?conexion= o subdominios): no se cambia.
     this.formEmpresa.controls.clave.disable();
+    this.tabActivaEmpresa.set('general');
     this.modalEmpresa.set(true);
   }
 
@@ -429,6 +482,10 @@ export class EmpresasComponent implements OnInit, OnDestroy {
   guardarEmpresa(): void {
     if (this.formEmpresa.invalid) {
       this.formEmpresa.markAllAsTouched();
+      const controles = this.formEmpresa.controls as Record<string, { invalid: boolean }>;
+      const primerInvalido = Object.keys(controles).find((nombre) => controles[nombre].invalid);
+      const tabDestino = primerInvalido ? TAB_POR_CONTROL[primerInvalido] : undefined;
+      if (tabDestino) this.tabActivaEmpresa.set(tabDestino);
       this.toast.error('Clave: 2 a 30 letras minúsculas, números o guiones. Nombre: obligatorio.');
       return;
     }

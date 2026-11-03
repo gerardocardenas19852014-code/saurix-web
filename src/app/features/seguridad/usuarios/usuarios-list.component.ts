@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { Subscription, debounceTime, distinctUntilChanged, firstValueFrom, skip } from 'rxjs';
 import {
   AbstractControl,
   FormsModule,
@@ -8,7 +9,7 @@ import {
   ValidationErrors,
   Validators,
 } from '@angular/forms';
-import { DataClientService } from '../../../core/services/data-client.service';
+import { DataClientService, FiltroBusqueda, FILTRO_BUSQUEDA, OrdenPagina } from '../../../core/services/data-client.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -18,11 +19,36 @@ import { PreferenciasGridService } from '../../../shared/services/preferencias-g
 import { ToastService } from '../../../shared/services/toast.service';
 import { exportarCsv } from '../../../shared/utils/csv.util';
 import { evaluarFortaleza, generarPasswordTemporal, hashPassword } from '../../../shared/utils/password.util';
-import { debeDesactivarsePorVigenciaVencida, hoyIso } from '../../../shared/utils/vigencia.util';
+import { hoyIso } from '../../../shared/utils/vigencia.util';
 import { Usuario, nombreCompletoUsuario } from './usuario.model';
 import { Rol } from '../roles-permisos/rol-permiso.model';
 
 type FiltroEstado = 'todos' | 'activos' | 'inactivos';
+
+/** Columnas por las que de verdad tiene sentido ordenar en este grid —
+ *  coinciden 1:1 con columnas reales de seguridad.usuario (ver
+ *  supabase-esquema.ts), así que listarUnaPagina() las acepta sin más
+ *  (esa whitelist la da def.columnas, no esta lista — esto es solo lo que
+ *  la UI ofrece). */
+type ColumnaOrdenUsuario = 'nombreUsuario' | 'nombre' | 'email' | 'role' | 'activo' | 'fechaFinVigencia' | 'ultimoAcceso';
+
+/** Columnas de texto sobre las que busca la caja de búsqueda — mismo
+ *  conjunto que antes se filtraba en memoria, ahora server-side (ver
+ *  FiltroBusqueda en data-client.service.ts). */
+const COLUMNAS_BUSQUEDA: (keyof Usuario & string)[] = [
+  'nombreUsuario',
+  'nombre',
+  'apellidoPaterno',
+  'apellidoMaterno',
+  'email',
+];
+
+/** Tamaño de lote al exportar CSV: nunca se descarga todo en una sola
+ *  petición gigante — mismo criterio que TAMANO_LOTE_EXPORTAR en
+ *  movimientos-bodega.component.ts / valor-stock.component.ts. A la escala
+ *  real de Usuarios (cientos, quizá unos pocos miles por empresa) esto
+ *  normalmente termina en 1-2 vueltas. */
+const TAMANO_LOTE_EXPORTAR = 1000;
 
 /** Si escribieron contraseña, debe coincidir con la confirmación. En blanco (edición sin cambio) no valida nada. */
 function passwordsCoincidenValidator(grupo: AbstractControl): ValidationErrors | null {
@@ -51,7 +77,10 @@ function passwordSeguraValidator(control: AbstractControl): ValidationErrors | n
 
 /** Texto + clase de badge del estado de vigencia para la columna de la tabla
  *  (además del check de Activo). Una sola función para que el texto mostrado
- *  y el color de la píldora nunca queden desincronizados. */
+ *  y el color de la píldora nunca queden desincronizados. Se calcula 100%
+ *  en cliente sobre la fila ya cargada (fechaFinVigencia + activo) — nunca
+ *  hace falta una consulta extra para esto, ni siquiera con paginación
+ *  server-side, porque ambos datos ya vienen en la misma fila. */
 function estadoVigenciaInfo(usuario: Usuario): { texto: string; clase: string } {
   if (!usuario.activo) return { texto: '—', clase: 'grid-badge-muted' };
   const hoy = hoyIso();
@@ -81,32 +110,34 @@ export class UsuariosListComponent implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
 
-  protected readonly usuariosTodos = signal<Usuario[]>([]);
+  /**
+   * Homologación de rendimiento (auditoría nov-2026): esta pantalla dejó de
+   * descargar la tabla completa (`list('Usuario')`) y filtrar/ordenar/
+   * paginar en Angular — ahora `usuariosPagina` guarda SOLO la página que
+   * el servidor ya devolvió filtrada, ordenada y recortada
+   * (`listarPagina()`, infraestructura que ya existía y usan otras
+   * pantallas homologadas). `totalFiltrado` es el total real que cumple el
+   * filtro actual (antes de paginar), para "N resultados" y el total de
+   * páginas — ver DataTableComponent en modo servidor.
+   */
+  protected readonly usuariosPagina = signal<Usuario[]>([]);
+  protected readonly totalFiltrado = signal(0);
+  protected readonly paginaActual = signal(1);
   protected readonly roles = signal<Rol[]>([]);
   protected readonly cargando = signal(false);
   protected readonly busqueda = signal('');
   protected readonly filtroEstado = signal<FiltroEstado>('todos');
+  /** null = sin orden explícito todavía (mismo aspecto visual de antes: ↕
+   *  en todos los encabezados, orden por id de siempre). */
+  protected readonly columnaOrden = signal<ColumnaOrdenUsuario | null>(null);
+  protected readonly direccionOrden = signal<'asc' | 'desc'>('asc');
 
-  /** Búsqueda por usuario/nombre/apellidos/correo + filtro de estado, todo en cliente
-   *  (la lista completa ya se trae una sola vez en `cargar()`). */
-  protected readonly usuarios = computed(() => {
-    const texto = this.busqueda().trim().toLowerCase();
-    const estado = this.filtroEstado();
-
-    return this.usuariosTodos().filter((usuario) => {
-      if (estado === 'activos' && !usuario.activo) return false;
-      if (estado === 'inactivos' && usuario.activo) return false;
-      if (!texto) return true;
-      const campos = [
-        usuario.nombreUsuario,
-        usuario.nombre,
-        usuario.apellidoPaterno ?? '',
-        usuario.apellidoMaterno ?? '',
-        usuario.email,
-      ];
-      return campos.some((campo) => campo.toLowerCase().includes(texto));
-    });
-  });
+  /** Contador de secuencia para descartar respuestas tardías de una
+   *  búsqueda/página/orden que el usuario ya superó (mismo patrón que
+   *  secuenciaExistencia/secuenciaHistorial en movimientos-bodega.component.ts)
+   *  — nunca se deja que una respuesta vieja pise a una más nueva. */
+  private secuencia = 0;
+  private busquedaSub?: Subscription;
 
   protected readonly modalAbierto = signal(false);
   protected readonly usuarioEnEdicion = signal<Usuario | null>(null);
@@ -169,14 +200,15 @@ export class UsuariosListComponent implements OnInit, OnDestroy {
   });
   protected readonly etiquetaActivo = computed(() => (this.activoEnVivo() ? 'Activo' : 'Inactivo'));
 
-  /** El campo Rol pasó de texto libre a un <select> alimentado por el catálogo Rol,
-   *  para consistencia de datos (sin validar permisos client-side: eso, según indica
-   *  el propio comentario de roles-permisos.component.ts, se deja para cuando se
-   *  conecte el backend real). Como Usuario.role sigue siendo un STRING (no un id),
-   *  si el valor actual no calza con ningún Rol activo del catálogo (rol desactivado,
-   *  dato legado, o catálogo vacío) se agrega como opción adicional "sintética" para
-   *  no perderlo/blanquearlo silenciosamente — mismo espíritu que tiposSeleccionables/
-   *  prioridadesSeleccionables/modulosSeleccionables en el tablero Kanban. */
+  /** El campo Rol pasó de texto libre a un <select> alimentado por el catálogo Rol.
+   *  Homologación de roles (auditoría nov-2026): el catálogo de cada empresa ya se
+   *  rellenó con sus valores reales (admin/Usuario) y "Roles y permisos" ahora
+   *  permite dar de alta más — este fallback "sintético" YA NO existe para
+   *  esconder un catálogo vacío, se conserva solo como red de seguridad para un
+   *  valor legado/huérfano que de verdad no esté en el catálogo (mismo espíritu
+   *  que tiposSeleccionables/prioridadesSeleccionables/modulosSeleccionables en
+   *  el tablero Kanban): nunca se pierde/blanquea silenciosamente el rol actual
+   *  de un usuario. */
   private readonly rolEnVivo = toSignal(this.form.controls.role.valueChanges, {
     initialValue: this.form.controls.role.value,
   });
@@ -189,18 +221,40 @@ export class UsuariosListComponent implements OnInit, OnDestroy {
     return activos;
   });
 
+  protected readonly totalPaginas = computed(() =>
+    Math.max(1, Math.ceil(this.totalFiltrado() / Math.max(1, this.preferenciasGrid.tamanoPagina()))),
+  );
+
   ngOnInit(): void {
     // Esta pantalla tiene muchas columnas (grid de usuarios); usa el ancho
     // "wide" del layout para aprovechar el espacio en vez de quedarse en el
     // ancho angosto por defecto (ver html[data-wide='grid'] en styles.scss).
     document.documentElement.setAttribute('data-wide', 'grid');
-    this.cargar();
     this.cargarRoles();
+    this.cargar();
     this.sincronizarErrorConfirmacionPassword();
-    this.sincronizarErrorUsuarioDuplicado();
+    this.sincronizarErrorDuplicado(this.form.controls.nombreUsuario, 'usuarioDuplicado');
+    this.sincronizarErrorDuplicado(this.form.controls.email, 'usuarioDuplicado');
+
+    // Búsqueda con debounce: el signal `busqueda` se actualiza en cada tecla
+    // (para que el campo de texto responda al instante), pero la petición
+    // real al servidor espera 300ms de silencio y descarta valores
+    // intermedios (debounceTime + distinctUntilChanged) — nunca una
+    // petición por tecla. skip(1) evita una recarga duplicada con el valor
+    // inicial (la carga inicial ya la hace cargar() arriba).
+    this.busquedaSub = toObservable(this.busqueda)
+      .pipe(skip(1), debounceTime(300), distinctUntilChanged())
+      .subscribe(() => this.reiniciarYCargar());
   }
 
-  /** Catálogo de Roles para el <select> del modal (ver rolesSeleccionables). */
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
+    this.busquedaSub?.unsubscribe();
+  }
+
+  /** Catálogo de Roles para el <select> del modal — se carga UNA sola vez al
+   *  entrar a la pantalla (no por cada apertura del modal, ver
+   *  nuevoUsuario()/editarUsuario()). */
   private cargarRoles(): void {
     this.data.list<Rol>('Rol').subscribe({
       next: (roles) => this.roles.set(roles),
@@ -208,15 +262,14 @@ export class UsuariosListComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** El error "usuarioDuplicado" (ver guardar()) es una comprobación asíncrona que solo
-   *  se corre al intentar guardar — en cuanto se vuelve a escribir el campo, se limpia
-   *  (ya no está verificado ni a favor ni en contra), para no dejar un borde rojo
-   *  "pegado" con un nombre que la persona ya cambió. */
-  private sincronizarErrorUsuarioDuplicado(): void {
-    this.form.controls.nombreUsuario.valueChanges.subscribe(() => {
-      const control = this.form.controls.nombreUsuario;
-      if (!control.errors?.['usuarioDuplicado']) return;
-      const { usuarioDuplicado: _quitado, ...resto } = control.errors;
+  /** El error de "ya existe" (ver guardar()) es una respuesta del servidor que
+   *  solo se sabe al intentar guardar — en cuanto se vuelve a escribir el campo,
+   *  se limpia (ya no está verificado ni a favor ni en contra), para no dejar un
+   *  borde rojo "pegado" con un valor que la persona ya cambió. */
+  private sincronizarErrorDuplicado(control: AbstractControl, clave: string): void {
+    control.valueChanges.subscribe(() => {
+      if (!control.errors?.[clave]) return;
+      const { [clave]: _quitado, ...resto } = control.errors;
       control.setErrors(Object.keys(resto).length ? resto : null);
     });
   }
@@ -242,55 +295,78 @@ export class UsuariosListComponent implements OnInit, OnDestroy {
     });
   }
 
-  ngOnDestroy(): void {
-    document.documentElement.removeAttribute('data-wide');
+  /** Filtro actual (búsqueda + estado) en el formato que entiende
+   *  listarPagina() — compartido entre la carga normal (cargar()) y la
+   *  exportación a CSV (exportarUsuariosCsv()), para que ambas respeten
+   *  exactamente los mismos filtros. */
+  private filtroActual(): Record<string, unknown> {
+    const filtro: Record<string, unknown> = {};
+    const texto = this.busqueda().trim();
+    if (texto) {
+      filtro[FILTRO_BUSQUEDA] = { columnas: COLUMNAS_BUSQUEDA, texto } satisfies FiltroBusqueda;
+    }
+    if (this.filtroEstado() !== 'todos') filtro['activo'] = this.filtroEstado() === 'activos';
+    return filtro;
   }
 
-  cargar(): void {
+  private ordenActual(): OrdenPagina | undefined {
+    const columna = this.columnaOrden();
+    return columna ? { columna, direccion: this.direccionOrden() } : undefined;
+  }
+
+  /** Carga SOLO la página actual, con los filtros/orden vigentes — nunca la
+   *  tabla completa. Se usa tanto para la carga inicial como para cualquier
+   *  cambio de búsqueda/filtro/orden/página. */
+  private cargar(): void {
     this.cargando.set(true);
-    this.data.list<Usuario>('Usuario').subscribe({
-      next: (usuarios) => {
-        this.usuariosTodos.set(usuarios);
+    const miSecuencia = ++this.secuencia;
+    const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
+    const desde = (this.paginaActual() - 1) * tamanio;
+
+    this.data.listarPagina<Usuario>('Usuario', this.filtroActual(), desde, tamanio, this.ordenActual()).subscribe({
+      next: ({ filas, total }) => {
+        if (miSecuencia !== this.secuencia) return; // respuesta vieja, se descarta
+        this.usuariosPagina.set(filas);
+        this.totalFiltrado.set(total);
         this.cargando.set(false);
-        this.sincronizarVigenciasVencidas(usuarios);
       },
-      error: () => this.cargando.set(false),
+      error: () => {
+        if (miSecuencia !== this.secuencia) return;
+        this.cargando.set(false);
+      },
     });
   }
 
-  /** Un usuario "Activo" cuya vigencia ya venció se desactiva solo, para que
-   *  la columna Activo no se quede mintiendo (el login ya lo bloqueaba de
-   *  todos modos por vigencia — esto es solo para que el dato sea honesto). */
-  private sincronizarVigenciasVencidas(usuarios: Usuario[]): void {
-    const hoy = hoyIso();
-    const vencidos = usuarios.filter((u) => debeDesactivarsePorVigenciaVencida(u, hoy));
-    for (const usuario of vencidos) {
-      this.data.modificacion<Usuario>('Usuario', { ...usuario, activo: false }).subscribe({
-        next: (actualizado) => {
-          this.usuariosTodos.update((lista) => lista.map((u) => (u.id === actualizado.id ? actualizado : u)));
-          this.bitacora
-            .registrar({
-              modulo: 'Seguridad / Usuarios',
-              entidad: 'Usuario',
-              accion: 'Desactivación automática (vigencia vencida)',
-              usuario: 'Sistema',
-              registroId: actualizado.id,
-              anterior: { activo: true },
-              actual: { activo: false },
-            })
-            .subscribe();
-        },
-        // Sincronización silenciosa best-effort: si falla, se reintenta en la
-        // próxima carga de la pantalla; el login ya bloquea por vigencia de todos modos.
-        error: () => undefined,
-      });
-    }
+  /** Vuelve a página 1 y recarga — para cualquier cambio que invalide la
+   *  página en la que el usuario estaba parado (nueva búsqueda, cambio de
+   *  filtro de estado). */
+  private reiniciarYCargar(): void {
+    this.paginaActual.set(1);
+    this.cargar();
+  }
+
+  protected cambiarFiltroEstado(valor: FiltroEstado): void {
+    this.filtroEstado.set(valor);
+    this.reiniciarYCargar();
+  }
+
+  protected onPaginaCambio(pagina: number): void {
+    this.paginaActual.set(pagina);
+    this.cargar();
+  }
+
+  protected onOrdenCambio(evento: { campo: keyof Usuario & string; direccion: 'asc' | 'desc' }): void {
+    this.columnaOrden.set(evento.campo as ColumnaOrdenUsuario);
+    this.direccionOrden.set(evento.direccion);
+    this.reiniciarYCargar();
   }
 
   alternarMostrarPassword(): void {
     this.mostrarPassword.update((v) => !v);
   }
 
+  /** Abrir "+ Nuevo" no hace ninguna petición: el catálogo de Roles ya está
+   *  cargado (ver cargarRoles(), una sola vez al entrar a la pantalla). */
   nuevoUsuario(): void {
     this.usuarioEnEdicion.set(null);
     this.form.controls.password.setValidators([Validators.required, passwordSeguraValidator]);
@@ -316,6 +392,8 @@ export class UsuariosListComponent implements OnInit, OnDestroy {
     this.modalAbierto.set(true);
   }
 
+  /** Abrir "Editar" tampoco hace ninguna petición: se llena directamente con
+   *  la fila ya cargada en la página actual — nunca se vuelve a pedir por id. */
   editarUsuario(usuario: Usuario): void {
     this.usuarioEnEdicion.set(usuario);
     // En edición la contraseña es opcional (se conserva si se deja en blanco);
@@ -344,7 +422,17 @@ export class UsuariosListComponent implements OnInit, OnDestroy {
     this.modalAbierto.set(true);
   }
 
-  guardar(): void {
+  /**
+   * Guarda alta/edición en UNA sola intención (ver
+   * SupabaseDataClientService.actualizarUsuario(): perfil + cuenta de acceso
+   * coordinados server-side por la Edge Function admin-usuarios). Ya NO
+   * vuelve a traer la tabla completa para revisar duplicados antes de
+   * guardar — la base (índices únicos) y, ahora también, la Edge Function
+   * (tanto en alta como en edición) ya validan esto del lado del servidor;
+   * si el servidor reporta un duplicado, el campo correspondiente se marca
+   * en rojo igual que antes (ver sincronizarErrorDuplicado()).
+   */
+  async guardar(): Promise<void> {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       this.mostrarErroresValidacion();
@@ -354,68 +442,60 @@ export class UsuariosListComponent implements OnInit, OnDestroy {
     const { confirmacionPassword: _confirmacion, ...valor } = this.form.getRawValue();
     const usuarioPrevio = this.usuarioEnEdicion();
     const esEdicion = usuarioPrevio !== null;
-    const nombreUsuarioNuevo = valor.nombreUsuario.trim().toLowerCase();
     const usuarioActual = this.auth.usuarioActual()?.nombreUsuario ?? 'Sistema';
 
-    // El nombre de usuario debe ser único: se revisa contra el catálogo completo
-    // (no la lista filtrada por búsqueda) antes de dar de alta o modificar.
-    this.data.list<Usuario>('Usuario').subscribe({
-      // El propio DataClientService (conToast) ya muestra un toast con el
-      // mensaje real del error (incluido el de la Edge Function, p.ej. el
-      // límite de usuarios de la empresa); un segundo toast genérico aquí
-      // solo lo tapaba con texto menos útil.
-      error: () => {},
-      next: async (usuarios) => {
-        const yaExiste = usuarios.some(
-          (u) => u.nombreUsuario.toLowerCase() === nombreUsuarioNuevo && u.id !== valor.id,
-        );
-        if (yaExiste) {
-          // Igual que con la contraseña: además del toast, se marca el campo en rojo
-          // (se limpia solo en cuanto se vuelve a escribir, más abajo en el subscribe
-          // de nombreUsuario.valueChanges).
-          const control = this.form.controls.nombreUsuario;
-          control.setErrors({ ...control.errors, usuarioDuplicado: true });
-          control.markAsTouched();
-          this.toast.error('Ya existe un usuario con ese nombre.');
-          return;
-        }
+    // Si escribieron una contraseña nueva se guarda su hash; si la dejaron en
+    // blanco en edición, se conserva la que ya tenía (relevante en modo
+    // IndexedDB, donde el registro sí guarda `password`; en modo Supabase la
+    // tabla no tiene esa columna, así que este valor simplemente se ignora
+    // del lado del servidor — ver dtoASnake()).
+    const dto = valor.password
+      ? { ...valor, password: await hashPassword(valor.password) }
+      : esEdicion && usuarioPrevio
+        ? { ...valor, password: usuarioPrevio.password }
+        : valor;
 
-        // Si escribieron una contraseña nueva se guarda su hash; si la dejaron en
-        // blanco en edición, se conserva la que ya tenía (que ya es un hash).
-        const dto = valor.password
-          ? { ...valor, password: await hashPassword(valor.password) }
-          : esEdicion && usuarioPrevio
-            ? { ...valor, password: usuarioPrevio.password }
-            : valor;
+    const peticion = esEdicion
+      ? this.data.modificacion<Usuario>('Usuario', dto)
+      : this.data.alta<Usuario>('Usuario', dto);
 
-        const peticion = esEdicion
-          ? this.data.modificacion<Usuario>('Usuario', dto)
-          : this.data.alta<Usuario>('Usuario', dto);
-
-        peticion.subscribe({
-          next: (resultado) => {
-            this.bitacora
-              .registrar({
-                modulo: 'Seguridad / Usuarios',
-                entidad: 'Usuario',
-                accion: esEdicion ? 'Modificación' : 'Alta',
-                usuario: usuarioActual,
-                registroId: resultado.id,
-                anterior: usuarioPrevio as unknown as Record<string, unknown> | null,
-                actual: resultado as unknown as Record<string, unknown>,
-              })
-              .subscribe();
-            this.toast.exito(esEdicion ? 'Usuario actualizado.' : 'Usuario creado.');
-            this.modalAbierto.set(false);
-            this.cargar();
-          },
-          // Igual que arriba: conToast ya mostró el toast con el mensaje
-          // específico (por ejemplo, el límite de usuarios de la empresa),
-          // así que aquí no se repite con uno genérico.
-          error: () => {},
-        });
+    peticion.subscribe({
+      next: (resultado) => {
+        this.bitacora
+          .registrar({
+            modulo: 'Seguridad / Usuarios',
+            entidad: 'Usuario',
+            accion: esEdicion ? 'Modificación' : 'Alta',
+            usuario: usuarioActual,
+            registroId: resultado.id,
+            anterior: usuarioPrevio as unknown as Record<string, unknown> | null,
+            actual: resultado as unknown as Record<string, unknown>,
+          })
+          .subscribe();
+        this.toast.exito(esEdicion ? 'Usuario actualizado.' : 'Usuario creado.');
+        this.modalAbierto.set(false);
+        this.cargar();
       },
+      // El propio DataClientService (conToast) ya muestra un toast con el
+      // mensaje real del error (incluido el de la Edge Function — límite de
+      // usuarios de la empresa, nombre/correo duplicado, etc.); aquí solo se
+      // marca en rojo el campo correspondiente cuando el mensaje lo permite
+      // distinguir, sin repetir el toast.
+      error: (error: unknown) => this.marcarErrorDuplicadoSiAplica(error),
     });
+  }
+
+  private marcarErrorDuplicadoSiAplica(error: unknown): void {
+    const mensaje = error instanceof Error ? error.message : '';
+    if (!mensaje.startsWith('Ya existe un usuario con ese')) return;
+    const control = mensaje.includes('nombre de usuario')
+      ? this.form.controls.nombreUsuario
+      : mensaje.includes('correo')
+        ? this.form.controls.email
+        : null;
+    if (!control) return;
+    control.setErrors({ ...control.errors, usuarioDuplicado: true });
+    control.markAsTouched();
   }
 
   /**
@@ -444,8 +524,27 @@ export class UsuariosListComponent implements OnInit, OnDestroy {
     }
   }
 
-  exportarUsuariosCsv(): void {
-    const filas = this.usuarios().map((u) => ({
+  /** Exporta TODOS los usuarios que cumplen la búsqueda/filtro actuales (no
+   *  solo la página visible), pidiéndolos en lotes de TAMANO_LOTE_EXPORTAR —
+   *  nunca en una sola petición gigante ni descargando de más: mismo patrón
+   *  ya usado por exportarCsvHistorial() en movimientos-bodega.component.ts. */
+  async exportarUsuariosCsv(): Promise<void> {
+    const filtro = this.filtroActual();
+    const orden = this.ordenActual();
+    const todas: Usuario[] = [];
+    let desde = 0;
+    let total = Infinity;
+    while (desde < total) {
+      const { filas, total: totalReal } = await firstValueFrom(
+        this.data.listarPagina<Usuario>('Usuario', filtro, desde, TAMANO_LOTE_EXPORTAR, orden),
+      );
+      if (filas.length === 0) break;
+      todas.push(...filas);
+      total = totalReal;
+      desde += TAMANO_LOTE_EXPORTAR;
+    }
+
+    const filas = todas.map((u) => ({
       ...u,
       nombreCompletoTexto: nombreCompletoUsuario(u),
       ultimoAccesoTexto: u.ultimoAcceso ? new Date(u.ultimoAcceso).toLocaleString('es-MX') : 'Nunca',
@@ -486,6 +585,10 @@ export class UsuariosListComponent implements OnInit, OnDestroy {
    * que ese usuario entre, "Mi Perfil" lo obligue a cambiarla antes de dejarlo
    * usar el resto de la app. También limpia cualquier bloqueo por intentos
    * fallidos que tuviera activo.
+   *
+   * No recarga nada después: ninguna columna visible del grid cambia con un
+   * reseteo de contraseña (ver auditoría de rendimiento, nov-2026) — el toast
+   * ya confirma el resultado.
    */
   confirmarResetearPassword(): void {
     const usuario = this.usuarioAResetearPassword();
@@ -518,7 +621,6 @@ export class UsuariosListComponent implements OnInit, OnDestroy {
               /* portapapeles no disponible; no es crítico */
             }
             this.usuarioAResetearPassword.set(null);
-            this.cargar();
             this.toast.exito(
               `Contraseña temporal para ${usuario.nombreUsuario}: ${temporal} (copiada al portapapeles). Deberá cambiarla en su próximo inicio de sesión.`,
             );
@@ -552,6 +654,12 @@ export class UsuariosListComponent implements OnInit, OnDestroy {
           .subscribe();
         this.toast.exito('Usuario eliminado.');
         this.usuarioAEliminar.set(null);
+        // Si era la última fila de una página que no es la primera, se
+        // retrocede una página antes de recargar — nunca se deja la grid
+        // mostrando una página vacía (ver pruebas obligatorias).
+        if (this.usuariosPagina().length === 1 && this.paginaActual() > 1) {
+          this.paginaActual.update((p) => p - 1);
+        }
         this.cargar();
       },
       error: () => this.toast.error('No se pudo eliminar el usuario. Intenta de nuevo.'),

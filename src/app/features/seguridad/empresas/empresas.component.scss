@@ -1,10 +1,113 @@
 /* El sistema visual global (.modal-box, .edit-form, .form-grid-3col, etc.)
- * vive en src/styles.scss. Lo único propio de este componente es ensanchar
- * el modal de Editar/Nueva empresa (mismo patrón que
- * .modal-box.plantilla-modal en plantillas-list.component.scss) para que
- * quepan las 3 columnas de .form-grid-3col sin que .modal-box lo recorte a
- * su max-width por default (400px). */
-.modal-box.empresa-modal { max-width: 980px; }
+ * vive en src/styles.scss. Este modal se reorganizó en pestañas (General /
+ * Tienda pública / Entrega / Apariencia, ver empresas.component.html) y se
+ * ensanchó bastante más que el resto de los modales (mismo patrón que
+ * .modal-box.plantilla-modal en plantillas-list.component.scss, pero a un
+ * ancho propio) para aprovechar el espacio en escritorio sin scroll
+ * horizontal. Header y pestañas quedan fijos, el cuerpo scrollea solo él y
+ * el footer (Cancelar/Guardar) queda siempre visible — para eso el modal
+ * entero es un flex-column (reforzando el que ya trae .modal-content de
+ * Bootstrap) con el padding movido a cada sección en vez de vivir en la
+ * caja completa. */
+.modal-box.empresa-modal {
+  max-width: 1360px;
+  width: 92%;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 0 0;
+  overflow: hidden; // el único scroll vive en .empresa-modal-body
+
+  > .modal-title {
+    flex-shrink: 0;
+    margin: 0 0 12px;
+    padding: 0 28px;
+  }
+
+  > .empresa-modal-tabs {
+    flex-shrink: 0;
+    padding: 0 28px;
+  }
+
+  > .empresa-modal-body {
+    flex: 1 1 auto;
+    min-height: 0; // sin esto el hijo flex no puede scrollear, solo desborda
+    overflow-y: auto;
+    padding: 18px 28px;
+  }
+
+  > .empresa-modal-footer {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 14px 28px 18px;
+    border-top: 1px solid var(--line);
+  }
+}
+
+/* Las grillas de este modal usan TODO el ancho ya ganado arriba — sin este
+ * modificador quedarían acotadas al max-width genérico de .form-grid-3col/
+ * .form-grid-2col (980px/760px, pensado para modales angostos), dejando
+ * espacio vacío a los lados dentro de un modal que ya es más ancho. Mismo
+ * criterio que .edit-form--plantilla en plantillas-list.component.scss. */
+.form-grid-3col.empresa-grid,
+.form-grid-2col.empresa-grid {
+  max-width: none;
+}
+
+// Tarjetas seleccionables de "Modo de funcionamiento" — reemplazan al
+// antiguo grupo de radios verticales (.tipo-producto-toggle, que se deja
+// abajo porque sigue en uso en productos.component.html). Mismos 3 valores
+// de siempre (formControlName="modoTienda"), solo cambia la presentación:
+// la seleccionada debe verse evidente de un vistazo (borde + fondo).
+.modo-tienda-tarjetas {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 2px 0;
+}
+
+@media (max-width: 760px) {
+  .modo-tienda-tarjetas { grid-template-columns: 1fr; }
+}
+
+.modo-tienda-tarjeta {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 36px 14px 16px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+  background: var(--paper-raised);
+  transition: border-color .12s ease, background .12s ease;
+
+  input[type='radio'] {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: auto;
+    margin: 0;
+  }
+
+  &:hover { border-color: var(--accent); }
+
+  &.is-selected {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+}
+
+.modo-tienda-tarjeta-titulo {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-strong);
+}
+
+.modo-tienda-tarjeta-desc {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
 
 /* Las 7 filas del horario de atención (ver horarioFilas() en el .ts) — una
  * fila por día: nombre, checkbox "Cerrado" y, si no está cerrado, 2

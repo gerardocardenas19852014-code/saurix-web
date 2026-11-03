@@ -125,14 +125,14 @@
   </table>
 </div>
 
-@if (filasOrdenadas().length > 0) {
+@if (totalFilasMostrado() > 0) {
   <div class="grid-footer">
-    <span class="hint" style="margin:0;">{{ filasOrdenadas().length }} resultado{{ filasOrdenadas().length === 1 ? '' : 's' }}</span>
+    <span class="hint" style="margin:0;">{{ totalFilasMostrado() }} resultado{{ totalFilasMostrado() === 1 ? '' : 's' }}</span>
     @if (totalPaginas() > 1) {
       <div class="grid-pagination">
-        <button type="button" [disabled]="paginaActual() === 1" (click)="irAPagina(paginaActual() - 1)">‹ Anterior</button>
-        <span>Página {{ paginaActual() }} de {{ totalPaginas() }}</span>
-        <button type="button" [disabled]="paginaActual() === totalPaginas()" (click)="irAPagina(paginaActual() + 1)">Siguiente ›</button>
+        <button type="button" [disabled]="paginaActualEfectiva() === 1" (click)="irAPagina(paginaActualEfectiva() - 1)">‹ Anterior</button>
+        <span>Página {{ paginaActualEfectiva() }} de {{ totalPaginas() }}</span>
+        <button type="button" [disabled]="paginaActualEfectiva() === totalPaginas()" (click)="irAPagina(paginaActualEfectiva() + 1)">Siguiente ›</button>
       </div>
     }
   </div>

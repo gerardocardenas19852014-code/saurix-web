@@ -26,7 +26,7 @@
       class="toolbar-select"
       aria-label="Filtrar por estado"
       [value]="filtroEstado()"
-      (change)="filtroEstado.set($any($event.target).value)"
+      (change)="cambiarFiltroEstado($any($event.target).value)"
     >
       <option value="todos">Todos</option>
       <option value="activos">Solo activos</option>
@@ -43,14 +43,21 @@
 
 <app-data-table
   [columnas]="columnas"
-  [filas]="usuarios()"
+  [filas]="usuariosPagina()"
   [cargando]="cargando()"
   [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+  [modoServidor]="true"
+  [paginaExterna]="paginaActual()"
+  [totalExterno]="totalFiltrado()"
+  [campoOrdenExterno]="columnaOrden()"
+  [direccionOrdenExterno]="direccionOrden()"
   accionExtraEtiqueta="Resetear"
   accionExtraTitulo="Resetear contraseña"
   (accionExtra)="pedirResetearPassword($event)"
   (editar)="editarUsuario($event)"
   (eliminar)="pedirEliminar($event)"
+  (paginaCambio)="onPaginaCambio($event)"
+  (ordenCambio)="onOrdenCambio($event)"
 />
 
 @if (modalAbierto()) {

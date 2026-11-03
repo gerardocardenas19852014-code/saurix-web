@@ -114,11 +114,47 @@ export class DataTableComponent<T extends { id: number }> {
   readonly accionExtra3Icono = input<boolean>(false);
   readonly accionExtra3 = output<T>();
 
+  /**
+   * Modo servidor (opcional, por defecto false — ver auditoría de
+   * rendimiento de Usuarios, nov-2026): cuando está activo, [filas] ya
+   * viene exactamente como se debe mostrar (ya filtrada, ordenada y
+   * paginada por el servidor) — esta tabla deja de ordenar/paginar en
+   * cliente y en vez de eso EMITE lo que el usuario pide (ordenCambio al
+   * hacer click en un encabezado, paginaCambio al cambiar de página), para
+   * que el componente padre decida qué pedir. Por defecto (false) el
+   * comportamiento es IDÉNTICO al de siempre — ninguna otra pantalla que ya
+   * usa <app-data-table> se ve afectada.
+   */
+  readonly modoServidor = input<boolean>(false);
+  /** Modo servidor: página actual (1-based) que ya traen las `filas`. */
+  readonly paginaExterna = input<number>(1);
+  /** Modo servidor: total de filas que cumplen el filtro actual (antes de
+   *  paginar) — para "N resultados" y para calcular el total de páginas. */
+  readonly totalExterno = input<number>(0);
+  /** Modo servidor: columna/dirección de orden actual (para pintar la
+   *  flechita ↑/↓ en el encabezado correcto). */
+  readonly campoOrdenExterno = input<(keyof T & string) | null>(null);
+  readonly direccionOrdenExterno = input<'asc' | 'desc'>('asc');
+  /** Modo servidor: se emite al hacer click en "Anterior"/"Siguiente". */
+  readonly paginaCambio = output<number>();
+  /** Modo servidor: se emite al hacer click en un encabezado ordenable. */
+  readonly ordenCambio = output<{ campo: keyof T & string; direccion: 'asc' | 'desc' }>();
+
   readonly paginaActual = signal(1);
   readonly campoOrden = signal<keyof T & string | null>(null);
   readonly direccionOrden = signal<'asc' | 'desc'>('asc');
 
+  private readonly campoOrdenEfectivo = computed(() =>
+    this.modoServidor() ? this.campoOrdenExterno() : this.campoOrden(),
+  );
+  private readonly direccionOrdenEfectiva = computed(() =>
+    this.modoServidor() ? this.direccionOrdenExterno() : this.direccionOrden(),
+  );
+
+  /** En modo servidor, `filas()` ya viene ordenada por el backend — aquí no
+   *  se reordena nada (evita un doble criterio de orden silencioso). */
   readonly filasOrdenadas = computed(() => {
+    if (this.modoServidor()) return this.filas();
     const campo = this.campoOrden();
     if (!campo) return this.filas();
 
@@ -132,11 +168,26 @@ export class DataTableComponent<T extends { id: number }> {
       .map(({ fila }) => fila);
   });
 
-  readonly totalPaginas = computed(() =>
-    Math.max(1, Math.ceil(this.filasOrdenadas().length / this.tamanoPagina())),
+  /** "N resultados" del pie — en modo servidor es el total filtrado real
+   *  (no solo las filas de esta página). */
+  readonly totalFilasMostrado = computed(() =>
+    this.modoServidor() ? this.totalExterno() : this.filasOrdenadas().length,
   );
 
+  /** Página actual a mostrar en el pie — en modo servidor es la que el
+   *  padre dice que trajo (paginaExterna), nunca el signal interno (que en
+   *  ese modo no se usa: los clicks de página se emiten, no se aplican
+   *  aquí). */
+  readonly paginaActualEfectiva = computed(() => (this.modoServidor() ? this.paginaExterna() : this.paginaActual()));
+
+  readonly totalPaginas = computed(() =>
+    Math.max(1, Math.ceil(this.totalFilasMostrado() / Math.max(1, this.tamanoPagina()))),
+  );
+
+  /** En modo servidor, `filas()` ya viene exactamente paginada por el
+   *  backend — aquí no se vuelve a recortar. */
   readonly filasPagina = computed(() => {
+    if (this.modoServidor()) return this.filas();
     const inicio = (this.paginaActual() - 1) * this.tamanoPagina();
     return this.filasOrdenadas().slice(inicio, inicio + this.tamanoPagina());
   });
@@ -150,7 +201,13 @@ export class DataTableComponent<T extends { id: number }> {
   readonly columnaSubfila = computed(() => this.columnas().find((c) => c.subfila) ?? null);
 
   ordenarPor(columna: ColumnaTabla<T>): void {
-    if (this.campoOrden() === columna.campo) {
+    const mismaColumna = this.campoOrdenEfectivo() === columna.campo;
+    const nuevaDireccion: 'asc' | 'desc' = mismaColumna && this.direccionOrdenEfectiva() === 'asc' ? 'desc' : 'asc';
+    if (this.modoServidor()) {
+      this.ordenCambio.emit({ campo: columna.campo, direccion: nuevaDireccion });
+      return;
+    }
+    if (mismaColumna) {
       this.direccionOrden.update((direccion) => (direccion === 'asc' ? 'desc' : 'asc'));
     } else {
       this.campoOrden.set(columna.campo);
@@ -160,8 +217,8 @@ export class DataTableComponent<T extends { id: number }> {
   }
 
   indicadorOrden(columna: ColumnaTabla<T>): string {
-    if (this.campoOrden() !== columna.campo) return '↕';
-    return this.direccionOrden() === 'asc' ? '↑' : '↓';
+    if (this.campoOrdenEfectivo() !== columna.campo) return '↕';
+    return this.direccionOrdenEfectiva() === 'asc' ? '↑' : '↓';
   }
 
   valorCelda(fila: T, columna: ColumnaTabla<T>): string {
@@ -173,9 +230,12 @@ export class DataTableComponent<T extends { id: number }> {
   }
 
   irAPagina(pagina: number): void {
-    if (pagina >= 1 && pagina <= this.totalPaginas()) {
-      this.paginaActual.set(pagina);
+    if (pagina < 1 || pagina > this.totalPaginas()) return;
+    if (this.modoServidor()) {
+      this.paginaCambio.emit(pagina);
+      return;
     }
+    this.paginaActual.set(pagina);
   }
 
   private compararValores(a: unknown, b: unknown): number {

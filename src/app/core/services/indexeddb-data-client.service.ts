@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, from } from 'rxjs';
-import { DataClientService, FiltroNulo, FiltroRango, ResultadoPagina } from './data-client.service';
+import { DataClientService, FiltroNulo, FiltroRango, ResultadoPagina, OrdenPagina } from './data-client.service';
 
 function esFiltroRango(valor: unknown): valor is FiltroRango {
   return typeof valor === 'object' && valor !== null && !Array.isArray(valor) && ('gte' in valor || 'lte' in valor);
@@ -96,12 +96,36 @@ export class IndexedDbDataClientService extends DataClientService {
     filtro: Record<string, unknown> | undefined,
     desde: number,
     cantidad: number,
+    orden?: OrdenPagina,
   ): Observable<ResultadoPagina<T>> {
     return from(
       this.engine.getAll<T & Record<string, unknown>>(entidad).then((filas) => {
         const filtradas = filtro ? filas.filter((fila) => coincideFiltro(fila, filtro)) : filas;
-        return { filas: filtradas.slice(desde, desde + cantidad), total: filtradas.length } as ResultadoPagina<T>;
+        const ordenadas = orden ? ordenarFilas(filtradas, orden) : filtradas;
+        return { filas: ordenadas.slice(desde, desde + cantidad), total: ordenadas.length } as ResultadoPagina<T>;
       }),
     );
   }
+}
+
+/** Mismo criterio de comparación que DataTableComponent.compararValores()
+ *  (números/booleanos por valor, resto por texto con numeric:true), con
+ *  `id` como desempate para un orden estable — igual que listarUnaPagina()
+ *  en el modo Supabase. */
+function ordenarFilas<T extends Record<string, unknown>>(filas: T[], orden: OrdenPagina): T[] {
+  const direccion = orden.direccion === 'desc' ? -1 : 1;
+  return [...filas].sort((a, b) => {
+    const resultado = compararValoresOrden(a[orden.columna], b[orden.columna]) * direccion;
+    if (resultado !== 0) return resultado;
+    return Number((a as { id?: number }).id ?? 0) - Number((b as { id?: number }).id ?? 0);
+  });
+}
+
+function compararValoresOrden(a: unknown, b: unknown): number {
+  if (a === b) return 0;
+  if (a === null || a === undefined || a === '') return -1;
+  if (b === null || b === undefined || b === '') return 1;
+  if (typeof a === 'number' && typeof b === 'number') return a < b ? -1 : 1;
+  if (typeof a === 'boolean' && typeof b === 'boolean') return a === false ? -1 : 1;
+  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
 }

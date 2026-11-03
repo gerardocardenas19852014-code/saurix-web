@@ -9,6 +9,15 @@ import { Permiso, Rol, RolPermiso } from './rol-permiso.model';
  * para no ampliar el alcance), Rol/Permiso sí son relacionales de
  * verdad en el backend (RolPermiso), así que aquí se administra esa
  * relación completa: eliges un Rol y activas/desactivas cada Permiso.
+ *
+ * "+ Nuevo rol" (auditoría de rendimiento, nov-2026): antes de esto no
+ * existía NINGUNA pantalla para dar de alta un Rol — por eso
+ * seguridad.rol estaba vacío y el <select> de Rol en Usuarios dependiía
+ * por completo del valor "sintético" que inyecta rolesSeleccionables()
+ * (ver usuarios-list.component.ts). RLS (solo_mi_empresa + catalogo_admin_*,
+ * ver pg_policies) ya exige ser admin/superadmin para alta/baja/edición y
+ * ya acota por empresa mediante el DEFAULT de empresa_id — esta pantalla
+ * no necesita repetir esa validación, solo ofrecer el formulario.
  */
 @Component({
   selector: 'app-roles-permisos',
@@ -33,6 +42,10 @@ export class RolesPermisosComponent implements OnInit {
   protected readonly cargando = signal(false);
   protected readonly guardandoPermisoId = signal<number | null>(null);
 
+  protected readonly nombreNuevoRol = signal('');
+  protected readonly creandoRol = signal(false);
+  protected readonly cambiandoActivoRolId = signal<number | null>(null);
+
   protected readonly permisoIdsAsignados = computed(
     () => new Set(this.asignaciones().map((a) => a.permisoId)),
   );
@@ -46,6 +59,45 @@ export class RolesPermisosComponent implements OnInit {
     this.data.list<Permiso>('Permiso').subscribe({
       next: (permisos) => this.permisos.set(permisos),
       error: () => this.toast.error('No se pudieron cargar los permisos.'),
+    });
+  }
+
+  /** Da de alta un Rol nuevo en el catálogo de la empresa (empresa_id lo
+   *  pone solo el DEFAULT de la columna —ver privado.empresa_actual_id()—,
+   *  nunca se manda desde aquí). RLS rechaza el intento si quien llama no
+   *  es admin/superadmin, igual que ya pasa en cualquier otro catálogo. */
+  agregarRol(): void {
+    const nombre = this.nombreNuevoRol().trim();
+    if (!nombre) return;
+    if (this.roles().some((r) => r.nombre.toLowerCase() === nombre.toLowerCase())) {
+      this.toast.advertencia('Ya existe un rol con ese nombre.');
+      return;
+    }
+    this.creandoRol.set(true);
+    this.data.alta<Rol>('Rol', { nombre, activo: true }).subscribe({
+      next: (creado) => {
+        this.roles.update((lista) => [...lista, creado]);
+        this.nombreNuevoRol.set('');
+        this.creandoRol.set(false);
+        this.toast.exito('Rol creado.');
+      },
+      error: () => this.creandoRol.set(false),
+    });
+  }
+
+  /** Activar/desactivar un rol existente (p.ej. uno que ya no se use, sin
+   *  borrarlo — borrar podría chocar con usuarios que ya lo tienen asignado
+   *  o con sus permisos en RolPermiso). Un rol inactivo sigue
+   *  mostrándose para quien ya lo tenía (ver rolesSeleccionables() en
+   *  usuarios-list.component.ts), pero deja de ofrecerse para nuevas altas. */
+  alternarActivoRol(rol: Rol): void {
+    this.cambiandoActivoRolId.set(rol.id);
+    this.data.modificacion<Rol>('Rol', { ...rol, activo: !rol.activo }).subscribe({
+      next: (actualizado) => {
+        this.roles.update((lista) => lista.map((r) => (r.id === actualizado.id ? actualizado : r)));
+        this.cambiandoActivoRolId.set(null);
+      },
+      error: () => this.cambiandoActivoRolId.set(null),
     });
   }
 

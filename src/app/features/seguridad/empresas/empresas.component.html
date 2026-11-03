@@ -46,305 +46,353 @@
 @if (modalEmpresa()) {
   <div class="modal-overlay modal show d-block" (click)="modalEmpresa.set(false)">
     <form class="modal-box modal-dialog modal-content empresa-modal" [formGroup]="formEmpresa" (click)="$event.stopPropagation()" (ngSubmit)="guardarEmpresa()">
-      <h3 class="modal-title mb-3">{{ empresaEnEdicion() ? 'Editar empresa' : 'Nueva empresa' }}</h3>
-      <div class="edit-form form-grid-3col">
-        <label>
-          <span class="label-con-tip">
-            Clave
-            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Minúsculas, números o guiones. No se puede cambiar después.</span></button>
-          </span>
-          <input type="text" class="form-control" formControlName="clave" placeholder="p.ej. acme" />
-        </label>
-        <label>
-          Nombre
-          <input type="text" class="form-control" formControlName="nombre" placeholder="p.ej. ACME S.A. de C.V." />
-        </label>
-        <label class="checkbox-inline">
-          <input type="checkbox" formControlName="activo" />
-          Activa (si la desactivas, sus usuarios dejan de ver datos)
-        </label>
-        <label>
-          <span class="label-con-tip">
-            Máximo de usuarios
-            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Vacío = sin límite. Al llegar al tope, no se pueden dar de alta más usuarios.</span></button>
-          </span>
-          <input type="number" class="form-control" formControlName="maxUsuarios" min="1" placeholder="Sin límite" />
-        </label>
+      <h3 class="modal-title">{{ empresaEnEdicion() ? 'Editar empresa' : 'Nueva empresa' }}</h3>
 
-        <hr class="full-span" style="width:100%; margin:4px 0;" />
-        <p class="hint full-span" style="margin:0;">
-          <strong>Tienda pública</strong> — catálogo sin login para que un cliente arme su pedido y lo
-          envíe por WhatsApp/correo; tú lo validas y lo capturas manualmente en Ventas.
-        </p>
+      <div class="tab-bar empresa-modal-tabs">
+        <button type="button" class="tab-btn" [class.is-active]="tabActivaEmpresa() === 'general'" (click)="tabActivaEmpresa.set('general')">General</button>
+        <button type="button" class="tab-btn" [class.is-active]="tabActivaEmpresa() === 'tienda'" (click)="tabActivaEmpresa.set('tienda')">Tienda pública</button>
+        @if (formEmpresa.controls.modoTienda.value === 'pedidos_online') {
+          <button type="button" class="tab-btn" [class.is-active]="tabActivaEmpresa() === 'entrega'" (click)="tabActivaEmpresa.set('entrega')">Entrega</button>
+        }
+        <button type="button" class="tab-btn" [class.is-active]="tabActivaEmpresa() === 'apariencia'" (click)="tabActivaEmpresa.set('apariencia')">Apariencia</button>
+      </div>
 
-        <label class="checkbox-inline full-span">
-          <input type="checkbox" formControlName="catalogoPublicoActivo" />
-          Activar catálogo público
-        </label>
+      <div class="empresa-modal-body">
+        @if (tabActivaEmpresa() === 'general') {
+          <div class="edit-form form-grid-3col empresa-grid">
+            <label>
+              <span class="label-con-tip">
+                Clave
+                <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Minúsculas, números o guiones. No se puede cambiar después.</span></button>
+              </span>
+              <input type="text" class="form-control" formControlName="clave" placeholder="p.ej. acme" />
+            </label>
+            <label>
+              Nombre
+              <input type="text" class="form-control" formControlName="nombre" placeholder="p.ej. ACME S.A. de C.V." />
+            </label>
+            <label class="checkbox-inline">
+              <input type="checkbox" formControlName="activo" />
+              Activa (si la desactivas, sus usuarios dejan de ver datos)
+            </label>
+            <label>
+              <span class="label-con-tip">
+                Máximo de usuarios
+                <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Vacío = sin límite. Al llegar al tope, no se pueden dar de alta más usuarios.</span></button>
+              </span>
+              <input type="number" class="form-control" formControlName="maxUsuarios" min="1" placeholder="Sin límite" />
+            </label>
+          </div>
+        }
 
-        @if (formEmpresa.controls.catalogoPublicoActivo.value) {
-          <p class="hint full-span" style="margin:0;">
-            Disponible en <code>/tienda/{{ formEmpresa.controls.clave.value || '…' }}</code>
-            (y listada en el portal <code>/tienda</code>).
-          </p>
+        @if (tabActivaEmpresa() === 'tienda') {
+          <div class="edit-form form-grid-3col empresa-grid">
+            <p class="hint full-span" style="margin:0;">
+              <strong>Tienda pública</strong> — catálogo sin login para que un cliente consulte el menú, arme una
+              orden o envíe su pedido por WhatsApp/correo, según el modo que elijas abajo.
+            </p>
 
-          <div class="full-span">
-            <p class="hint" style="margin:0 0 4px;"><strong>Modo de funcionamiento</strong></p>
-            <div class="tipo-producto-toggle" role="group" aria-label="Modo de funcionamiento de la tienda">
-              <label class="checkbox-inline">
-                <input type="radio" formControlName="modoTienda" value="menu_visual" />
-                Menú visual
-              </label>
-              <label class="checkbox-inline">
-                <input type="radio" formControlName="modoTienda" value="menu_orden" />
-                Menú + Mi orden
-              </label>
-              <label class="checkbox-inline">
-                <input type="radio" formControlName="modoTienda" value="pedidos_online" />
-                Pedidos en línea
-              </label>
-            </div>
-            @if (formEmpresa.controls.modoTienda.value === 'menu_visual') {
-              <p class="hint" style="margin:4px 0 0;">
-                Los clientes consultan el catálogo por el enlace o QR, pero no pueden seleccionar
-                productos ni enviar pedidos — pensado para un menú digital bonito accesible por QR.
+            <label class="checkbox-inline full-span">
+              <input type="checkbox" formControlName="catalogoPublicoActivo" />
+              Activar catálogo público
+            </label>
+
+            @if (formEmpresa.controls.catalogoPublicoActivo.value) {
+              <p class="hint full-span" style="margin:0;">
+                Disponible en <code>/tienda/{{ formEmpresa.controls.clave.value || '…' }}</code>
+                (y listada en el portal <code>/tienda</code>).
               </p>
-            } @else if (formEmpresa.controls.modoTienda.value === 'menu_orden') {
-              <p class="hint" style="margin:4px 0 0;">
-                Los clientes seleccionan productos mientras consultan el menú y generan una orden con
-                folio/QR para mostrarla en caja. No es un pedido en línea ni una venta: no pide domicilio,
-                GPS ni envío, y no descuenta inventario.
-              </p>
-            } @else {
-              <p class="hint" style="margin:4px 0 0;">
-                Los clientes arman y envían su pedido con el flujo completo actual: carrito, datos,
-                entrega/recolección/envío y WhatsApp.
-              </p>
+
+              <div class="full-span">
+                <p class="hint" style="margin:0 0 8px;"><strong>Modo de funcionamiento</strong></p>
+                <div class="modo-tienda-tarjetas" role="group" aria-label="Modo de funcionamiento de la tienda">
+                  <label class="modo-tienda-tarjeta" [class.is-selected]="formEmpresa.controls.modoTienda.value === 'menu_visual'">
+                    <input type="radio" formControlName="modoTienda" value="menu_visual" />
+                    <span class="modo-tienda-tarjeta-titulo">📋 Menú visual</span>
+                    <span class="modo-tienda-tarjeta-desc">Solo catálogo y QR — sin carrito ni pedidos.</span>
+                  </label>
+                  <label class="modo-tienda-tarjeta" [class.is-selected]="formEmpresa.controls.modoTienda.value === 'menu_orden'">
+                    <input type="radio" formControlName="modoTienda" value="menu_orden" />
+                    <span class="modo-tienda-tarjeta-titulo">🧾 Menú + Mi orden</span>
+                    <span class="modo-tienda-tarjeta-desc">El cliente arma su orden y muestra folio/QR en caja.</span>
+                  </label>
+                  <label class="modo-tienda-tarjeta" [class.is-selected]="formEmpresa.controls.modoTienda.value === 'pedidos_online'">
+                    <input type="radio" formControlName="modoTienda" value="pedidos_online" />
+                    <span class="modo-tienda-tarjeta-titulo">🛵 Pedidos en línea</span>
+                    <span class="modo-tienda-tarjeta-desc">Flujo completo: carrito, entrega y WhatsApp.</span>
+                  </label>
+                </div>
+                @if (formEmpresa.controls.modoTienda.value === 'menu_visual') {
+                  <p class="hint" style="margin:8px 0 0;">
+                    Los clientes consultan el catálogo por el enlace o QR, pero no pueden seleccionar
+                    productos ni enviar pedidos — pensado para un menú digital bonito accesible por QR.
+                  </p>
+                } @else if (formEmpresa.controls.modoTienda.value === 'menu_orden') {
+                  <p class="hint" style="margin:8px 0 0;">
+                    Los clientes seleccionan productos mientras consultan el menú y generan una orden con
+                    folio/QR para mostrarla en caja. No es un pedido en línea ni una venta: no pide domicilio,
+                    GPS ni envío, y no descuenta inventario.
+                  </p>
+                } @else {
+                  <p class="hint" style="margin:8px 0 0;">
+                    Los clientes arman y envían su pedido con el flujo completo actual: carrito, datos,
+                    entrega/recolección/envío y WhatsApp.
+                  </p>
+                }
+              </div>
+            }
+
+            <hr class="full-span" style="width:100%; margin:4px 0;" />
+
+            <label class="full-span">
+              Descripción corta (para el portal)
+              <input type="text" class="form-control" formControlName="descripcionPublica" maxlength="200" placeholder="p.ej. Ferretería y materiales de construcción" />
+            </label>
+
+            @if (formEmpresa.controls.modoTienda.value === 'pedidos_online') {
+              <label>
+                <span class="label-con-tip">
+                  Teléfono para pedidos (WhatsApp)
+                  <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Incluye código de país, sin espacios ni signos, para que el enlace de WhatsApp funcione (p.ej. 521xxxxxxxxxx para México).</span></button>
+                </span>
+                <input type="text" class="form-control" formControlName="telefonoPedidos" maxlength="30" placeholder="p.ej. 521xxxxxxxxxx" />
+              </label>
+              <label>
+                Correo para pedidos (opcional)
+                <input type="text" class="form-control" formControlName="correoPedidos" maxlength="120" placeholder="p.ej. pedidos@miempresa.com" />
+              </label>
+              <label>
+                <span class="label-con-tip">
+                  Pedido mínimo (opcional)
+                  <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Vacío = sin mínimo. Si lo pones, el cliente no puede enviar su pedido hasta llegar a ese total.</span></button>
+                </span>
+                <input type="number" class="form-control" formControlName="pedidoMinimo" min="0" step="0.01" placeholder="Sin mínimo" />
+              </label>
+              <label class="full-span">
+                Métodos de pago que aceptas (separados por coma, opcional)
+                <input type="text" class="form-control" formControlName="metodosPagoTexto" maxlength="200" placeholder="p.ej. Efectivo, Transferencia" />
+              </label>
+            }
+
+            <hr class="full-span" style="width:100%; margin:4px 0;" />
+
+            <label class="checkbox-inline full-span">
+              <input type="checkbox" formControlName="horarioActivo" />
+              Mostrar horario de atención en la tienda ("Abierto ahora"/"Cerrado")
+            </label>
+            @if (formEmpresa.controls.horarioActivo.value) {
+              <div class="full-span horario-tienda-grid">
+                @for (fila of horarioFilas(); track fila.dia) {
+                  <div class="horario-tienda-fila">
+                    <span class="horario-tienda-dia">{{ nombresDias[fila.dia] }}</span>
+                    <label class="checkbox-inline">
+                      <input
+                        type="checkbox"
+                        [checked]="fila.cerrado"
+                        (change)="actualizarHorarioFila(fila.dia, { cerrado: $any($event.target).checked })"
+                      />
+                      Cerrado
+                    </label>
+                    @if (!fila.cerrado) {
+                      <input
+                        type="time"
+                        class="form-control"
+                        [value]="fila.abre"
+                        (input)="actualizarHorarioFila(fila.dia, { abre: $any($event.target).value })"
+                      />
+                      <span>a</span>
+                      <input
+                        type="time"
+                        class="form-control"
+                        [value]="fila.cierra"
+                        (input)="actualizarHorarioFila(fila.dia, { cierra: $any($event.target).value })"
+                      />
+                    }
+                  </div>
+                }
+              </div>
+            }
+
+            @if (formEmpresa.controls.modoTienda.value === 'pedidos_online') {
+              <label class="checkbox-inline full-span">
+                <input type="checkbox" formControlName="volverPedirActivo" />
+                Ofrecer "¿Pedir lo mismo que la última vez?" cuando el cliente vuelva a entrar
+              </label>
             }
           </div>
         }
 
-        <label class="full-span">
-          Descripción corta (para el portal)
-          <input type="text" class="form-control" formControlName="descripcionPublica" maxlength="200" placeholder="p.ej. Ferretería y materiales de construcción" />
-        </label>
-        <label>
-          <span class="label-con-tip">
-            Teléfono para pedidos (WhatsApp)
-            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Incluye código de país, sin espacios ni signos, para que el enlace de WhatsApp funcione (p.ej. 521xxxxxxxxxx para México).</span></button>
-          </span>
-          <input type="text" class="form-control" formControlName="telefonoPedidos" maxlength="30" placeholder="p.ej. 521xxxxxxxxxx" />
-        </label>
-        <label>
-          Correo para pedidos (opcional)
-          <input type="text" class="form-control" formControlName="correoPedidos" maxlength="120" placeholder="p.ej. pedidos@miempresa.com" />
-        </label>
-        <label>
-          <span class="label-con-tip">
-            Pedido mínimo (opcional)
-            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Vacío = sin mínimo. Si lo pones, el cliente no puede enviar su pedido hasta llegar a ese total.</span></button>
-          </span>
-          <input type="number" class="form-control" formControlName="pedidoMinimo" min="0" step="0.01" placeholder="Sin mínimo" />
-        </label>
-        <label class="full-span">
-          Métodos de pago que aceptas (separados por coma, opcional)
-          <input type="text" class="form-control" formControlName="metodosPagoTexto" maxlength="200" placeholder="p.ej. Efectivo, Transferencia" />
-        </label>
+        @if (tabActivaEmpresa() === 'entrega') {
+          @if (formEmpresa.controls.modoTienda.value === 'pedidos_online') {
+            <div class="edit-form form-grid-3col empresa-grid">
+              <p class="hint full-span" style="margin:0;">
+                <strong>Envío por distancia</strong> — cobra el envío según los kilómetros en línea recta entre tu
+                negocio y la ubicación que comparte el cliente. Deja "Precio por km" vacío para desactivarlo.
+              </p>
 
-        <label class="checkbox-inline full-span">
-          <input type="checkbox" formControlName="horarioActivo" />
-          Mostrar horario de atención en la tienda ("Abierto ahora"/"Cerrado")
-        </label>
-        <label class="checkbox-inline full-span">
-          <input type="checkbox" formControlName="volverPedirActivo" />
-          Ofrecer "¿Pedir lo mismo que la última vez?" cuando el cliente vuelva a entrar
-        </label>
-        <label class="checkbox-inline full-span">
-          <input type="checkbox" formControlName="colorAcentoActivo" />
-          Usar un color de marca propio (si no, se usa el azul por defecto)
-        </label>
-        @if (formEmpresa.controls.colorAcentoActivo.value) {
-          <label>
-            Color de marca
-            <input type="color" class="form-control" formControlName="colorAcento" style="height:38px; padding:4px;" />
-          </label>
-        }
-        <label class="checkbox-inline full-span">
-          <input type="checkbox" formControlName="colorTextoBannerActivo" />
-          <span class="label-con-tip">
-            Usar un color de letra propio en el banner (si no, blanco)
-            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Si tu color de marca es claro (pastel), el texto blanco del banner casi no se alcanza a leer — aquí puedes elegir otro color de letra, por ejemplo uno oscuro.</span></button>
-          </span>
-        </label>
-        @if (formEmpresa.controls.colorTextoBannerActivo.value) {
-          <label>
-            Color de letra del banner
-            <input type="color" class="form-control" formControlName="colorTextoBanner" style="height:38px; padding:4px;" />
-          </label>
-        }
+              <div class="full-span">
+                <button type="button" class="btn-secondary small" [disabled]="obteniendoUbicacionEnvio()" (click)="usarUbicacionActualEnvio()">
+                  {{ obteniendoUbicacionEnvio() ? 'Obteniendo ubicación…' : '📍 Usar mi ubicación actual como el negocio' }}
+                </button>
+                @if (errorUbicacionEnvio(); as err) {
+                  <p class="hint" style="color:var(--danger); margin:4px 0 0;">{{ err }}</p>
+                }
+              </div>
+              <label>
+                Latitud del negocio
+                <input type="number" class="form-control" formControlName="envioOrigenLat" step="0.000001" placeholder="p.ej. 19.432608" />
+              </label>
+              <label>
+                Longitud del negocio
+                <input type="number" class="form-control" formControlName="envioOrigenLng" step="0.000001" placeholder="p.ej. -99.133209" />
+              </label>
+              <label>
+                <span class="label-con-tip">
+                  Precio por km
+                  <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Vacío = envío por distancia desactivado (no se muestra en la tienda).</span></button>
+                </span>
+                <input type="number" class="form-control" formControlName="envioPrecioKm" min="0" step="0.01" placeholder="Desactivado" />
+              </label>
+              <label>
+                Cargo mínimo de envío (opcional)
+                <input type="number" class="form-control" formControlName="envioMinimo" min="0" step="0.01" placeholder="Sin mínimo" />
+              </label>
+              <label>
+                <span class="label-con-tip">
+                  Radio máximo de entrega en km (opcional)
+                  <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Si el cliente está más lejos Y tienes otra modalidad activada (recolección o plataforma), la tienda le ofrece cambiar de modalidad; si no tienes ninguna otra, solo se lo advierte, igual que antes.</span></button>
+                </span>
+                <input type="number" class="form-control" formControlName="envioDistanciaMaximaKm" min="0" step="0.1" placeholder="Sin límite" />
+              </label>
+              <label>
+                <span class="label-con-tip">
+                  Cantidad mínima de productos para entrega a domicilio (opcional)
+                  <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Es una CANTIDAD de piezas en el carrito, no un monto en dinero. Distinto del "Pedido mínimo" general de la pestaña Tienda pública. Aplica si el cliente elige "Envío del negocio" o "Envío por plataforma" (cualquiera de sus 2 variantes) — si elige "Pasar a recoger", nunca se exige. Vacío = sin mínimo específico.</span></button>
+                </span>
+                <input type="number" class="form-control" formControlName="envioPropioPedidoMinimo" min="0" step="1" placeholder="Sin mínimo" />
+              </label>
 
-        <hr class="full-span" style="width:100%; margin:4px 0;" />
-        <p class="hint full-span" style="margin:0;">
-          <strong>Envío por distancia</strong> — cobra el envío según los kilómetros en línea recta entre tu
-          negocio y la ubicación que comparte el cliente. Deja "Precio por km" vacío para desactivarlo.
-        </p>
+              <hr class="full-span" style="width:100%; margin:4px 0;" />
+              <p class="hint full-span" style="margin:0;">
+                <strong>Modalidades de entrega</strong> — además del envío por distancia de arriba, puedes ofrecer que el
+                cliente pase a recoger su pedido o que use su propio servicio de transporte (Uber, inDrive, etc.). El
+                cliente elige en el paso "Entrega" solo entre las que actives aquí; si solo tienes una activa, no ve
+                ninguna pantalla de elegir, pasa derecho como hasta ahora.
+              </p>
 
-        <div class="full-span">
-          <button type="button" class="btn-secondary small" [disabled]="obteniendoUbicacionEnvio()" (click)="usarUbicacionActualEnvio()">
-            {{ obteniendoUbicacionEnvio() ? 'Obteniendo ubicación…' : '📍 Usar mi ubicación actual como el negocio' }}
-          </button>
-          @if (errorUbicacionEnvio(); as err) {
-            <p class="hint" style="color:var(--danger); margin:4px 0 0;">{{ err }}</p>
-          }
-        </div>
-        <label>
-          Latitud del negocio
-          <input type="number" class="form-control" formControlName="envioOrigenLat" step="0.000001" placeholder="p.ej. 19.432608" />
-        </label>
-        <label>
-          Longitud del negocio
-          <input type="number" class="form-control" formControlName="envioOrigenLng" step="0.000001" placeholder="p.ej. -99.133209" />
-        </label>
-        <label>
-          <span class="label-con-tip">
-            Precio por km
-            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Vacío = envío por distancia desactivado (no se muestra en la tienda).</span></button>
-          </span>
-          <input type="number" class="form-control" formControlName="envioPrecioKm" min="0" step="0.01" placeholder="Desactivado" />
-        </label>
-        <label>
-          Cargo mínimo de envío (opcional)
-          <input type="number" class="form-control" formControlName="envioMinimo" min="0" step="0.01" placeholder="Sin mínimo" />
-        </label>
-        <label>
-          <span class="label-con-tip">
-            Radio máximo de entrega en km (opcional)
-            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Si el cliente está más lejos Y tienes otra modalidad activada (recolección o plataforma), la tienda le ofrece cambiar de modalidad; si no tienes ninguna otra, solo se lo advierte, igual que antes.</span></button>
-          </span>
-          <input type="number" class="form-control" formControlName="envioDistanciaMaximaKm" min="0" step="0.1" placeholder="Sin límite" />
-        </label>
-        <label>
-          <span class="label-con-tip">
-            Cantidad mínima de productos para entrega a domicilio (opcional)
-            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Es una CANTIDAD de piezas en el carrito, no un monto en dinero. Distinto del "Pedido mínimo" general de arriba. Aplica si el cliente elige "Envío del negocio" o "Envío por plataforma" (cualquiera de sus 2 variantes) — si elige "Pasar a recoger", nunca se exige. Vacío = sin mínimo específico.</span></button>
-          </span>
-          <input type="number" class="form-control" formControlName="envioPropioPedidoMinimo" min="0" step="1" placeholder="Sin mínimo" />
-        </label>
+              <label class="checkbox-inline full-span">
+                <input type="checkbox" formControlName="envioPropioActivo" />
+                🛵 Ofrecer envío del negocio ahora mismo
+              </label>
+              @if (!formEmpresa.controls.envioPropioActivo.value) {
+                <p class="hint full-span" style="margin:0;">
+                  Apagado temporalmente = aunque tengas precio por km configurado arriba, el cliente NO ve la opción de
+                  envío (útil si por ahora no tienes quién reparta) — tu configuración de origen/precio se conserva.
+                </p>
+              }
 
-        <hr class="full-span" style="width:100%; margin:4px 0;" />
-        <p class="hint full-span" style="margin:0;">
-          <strong>Modalidades de entrega</strong> — además del envío por distancia de arriba, puedes ofrecer que el
-          cliente pase a recoger su pedido o que use su propio servicio de transporte (Uber, inDrive, etc.). El
-          cliente elige en el paso "Entrega" solo entre las que actives aquí; si solo tienes una activa, no ve
-          ninguna pantalla de elegir, pasa derecho como hasta ahora.
-        </p>
+              <label class="checkbox-inline full-span">
+                <input type="checkbox" formControlName="recoleccionActiva" />
+                🏪 Ofrecer "Pasar a recoger"
+              </label>
+              @if (formEmpresa.controls.recoleccionActiva.value) {
+                <label class="full-span">
+                  Dirección para mostrar al cliente
+                  <input type="text" class="form-control" formControlName="direccionPublica" maxlength="200" placeholder="p.ej. Calle Falsa 123, Col. Centro" />
+                </label>
+                <p class="hint full-span" style="margin:0;">
+                  Se muestra junto con tu nombre y tu horario de atención (si lo configuraste en Tienda pública) — la
+                  recolección siempre es gratis, no se cobra envío.
+                </p>
+              }
 
-        <label class="checkbox-inline full-span">
-          <input type="checkbox" formControlName="envioPropioActivo" />
-          🛵 Ofrecer envío del negocio ahora mismo
-        </label>
-        @if (!formEmpresa.controls.envioPropioActivo.value) {
-          <p class="hint full-span" style="margin:0;">
-            Apagado temporalmente = aunque tengas precio por km configurado arriba, el cliente NO ve la opción de
-            envío (útil si por ahora no tienes quién reparta) — tu configuración de origen/precio se conserva.
-          </p>
-        }
-
-        <label class="checkbox-inline full-span">
-          <input type="checkbox" formControlName="recoleccionActiva" />
-          🏪 Ofrecer "Pasar a recoger"
-        </label>
-        @if (formEmpresa.controls.recoleccionActiva.value) {
-          <label class="full-span">
-            Dirección para mostrar al cliente
-            <input type="text" class="form-control" formControlName="direccionPublica" maxlength="200" placeholder="p.ej. Calle Falsa 123, Col. Centro" />
-          </label>
-          <p class="hint full-span" style="margin:0;">
-            Se muestra junto con tu nombre y tu horario de atención (si lo configuraste abajo) — la recolección
-            siempre es gratis, no se cobra envío.
-          </p>
-        }
-
-        <label class="checkbox-inline full-span">
-          <input type="checkbox" formControlName="envioPlataformaActivo" />
-          🚗 Ofrecer "Envío por plataforma"
-        </label>
-        @if (formEmpresa.controls.envioPlataformaActivo.value) {
-          <p class="hint full-span" style="margin:0;">
-            Saurix no cobra ni calcula el costo del repartidor — solo le pide al cliente su ubicación/referencias
-            para que tú cotices el servicio aparte y se lo confirmes antes de solicitarlo.
-          </p>
-          <label class="checkbox-inline full-span">
-            <input type="checkbox" formControlName="envioPlataformaNegocioSolicita" />
-            Nosotros solicitamos el repartidor (cotizamos y confirmamos el costo con el cliente)
-          </label>
-          <label class="checkbox-inline full-span">
-            <input type="checkbox" formControlName="envioPlataformaClienteSolicita" />
-            El cliente solicita su propio repartidor (nosotros solo avisamos cuándo está listo)
-          </label>
-          @if (!formEmpresa.controls.envioPlataformaNegocioSolicita.value && !formEmpresa.controls.envioPlataformaClienteSolicita.value) {
-            <p class="hint full-span" style="margin:0; color:var(--danger);">
-              Activa al menos una de las 2 variantes de arriba, o el cliente no podrá completar esta modalidad.
+              <label class="checkbox-inline full-span">
+                <input type="checkbox" formControlName="envioPlataformaActivo" />
+                🚗 Ofrecer "Envío por plataforma"
+              </label>
+              @if (formEmpresa.controls.envioPlataformaActivo.value) {
+                <p class="hint full-span" style="margin:0;">
+                  Saurix no cobra ni calcula el costo del repartidor — solo le pide al cliente su ubicación/referencias
+                  para que tú cotices el servicio aparte y se lo confirmes antes de solicitarlo.
+                </p>
+                <label class="checkbox-inline full-span">
+                  <input type="checkbox" formControlName="envioPlataformaNegocioSolicita" />
+                  Nosotros solicitamos el repartidor (cotizamos y confirmamos el costo con el cliente)
+                </label>
+                <label class="checkbox-inline full-span">
+                  <input type="checkbox" formControlName="envioPlataformaClienteSolicita" />
+                  El cliente solicita su propio repartidor (nosotros solo avisamos cuándo está listo)
+                </label>
+                @if (!formEmpresa.controls.envioPlataformaNegocioSolicita.value && !formEmpresa.controls.envioPlataformaClienteSolicita.value) {
+                  <p class="hint full-span" style="margin:0; color:var(--danger);">
+                    Activa al menos una de las 2 variantes de arriba, o el cliente no podrá completar esta modalidad.
+                  </p>
+                }
+              }
+            </div>
+          } @else {
+            <p class="hint" style="margin:0;">
+              Esta empresa no usa entrega en el modo actual de tienda — tu configuración de envío se conserva y
+              vuelve a aplicar en cuanto cambies el "Modo de funcionamiento" a "Pedidos en línea" (pestaña Tienda
+              pública).
             </p>
           }
         }
 
-        @if (formEmpresa.controls.horarioActivo.value) {
-          <div class="full-span horario-tienda-grid">
-            @for (fila of horarioFilas(); track fila.dia) {
-              <div class="horario-tienda-fila">
-                <span class="horario-tienda-dia">{{ nombresDias[fila.dia] }}</span>
-                <label class="checkbox-inline">
-                  <input
-                    type="checkbox"
-                    [checked]="fila.cerrado"
-                    (change)="actualizarHorarioFila(fila.dia, { cerrado: $any($event.target).checked })"
-                  />
-                  Cerrado
-                </label>
-                @if (!fila.cerrado) {
-                  <input
-                    type="time"
-                    class="form-control"
-                    [value]="fila.abre"
-                    (input)="actualizarHorarioFila(fila.dia, { abre: $any($event.target).value })"
-                  />
-                  <span>a</span>
-                  <input
-                    type="time"
-                    class="form-control"
-                    [value]="fila.cierra"
-                    (input)="actualizarHorarioFila(fila.dia, { cierra: $any($event.target).value })"
-                  />
-                }
-              </div>
-            }
-          </div>
-        }
-
-        <div class="full-span foto-producto-campo">
-          <span class="foto-producto-etiqueta">Logo de la tienda</span>
-          <div class="foto-producto-fila">
-            @if (logoActual()) {
-              <button type="button" class="foto-producto-preview-boton" title="Ver en tamaño completo" (click)="logoAmpliado.set(true)">
-                <img class="foto-producto-preview" [src]="logoActual()" alt="Logo de la tienda" />
-              </button>
-            } @else {
-              <div class="foto-producto-preview foto-producto-preview-vacia">🏬</div>
-            }
-            <div class="foto-producto-acciones">
-              <label class="btn-secondary small foto-producto-boton">
-                {{ logoActual() ? 'Cambiar logo' : 'Subir logo' }}
-                <input #logoInput type="file" accept="image/*" hidden (change)="onLogoSeleccionado($event)" />
+        @if (tabActivaEmpresa() === 'apariencia') {
+          <div class="edit-form form-grid-2col empresa-grid">
+            <label class="checkbox-inline full-span">
+              <input type="checkbox" formControlName="colorAcentoActivo" />
+              Usar un color de marca propio (si no, se usa el azul por defecto)
+            </label>
+            @if (formEmpresa.controls.colorAcentoActivo.value) {
+              <label>
+                Color de marca
+                <input type="color" class="form-control" formControlName="colorAcento" style="height:38px; padding:4px;" />
               </label>
-              @if (logoActual()) {
-                <button type="button" class="btn-secondary small" (click)="quitarLogo(logoInput)">Quitar logo</button>
-              }
+            }
+            <label class="checkbox-inline full-span">
+              <input type="checkbox" formControlName="colorTextoBannerActivo" />
+              <span class="label-con-tip">
+                Usar un color de letra propio en el banner (si no, blanco)
+                <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Si tu color de marca es claro (pastel), el texto blanco del banner casi no se alcanza a leer — aquí puedes elegir otro color de letra, por ejemplo uno oscuro.</span></button>
+              </span>
+            </label>
+            @if (formEmpresa.controls.colorTextoBannerActivo.value) {
+              <label>
+                Color de letra del banner
+                <input type="color" class="form-control" formControlName="colorTextoBanner" style="height:38px; padding:4px;" />
+              </label>
+            }
+
+            <hr class="full-span" style="width:100%; margin:4px 0;" />
+
+            <div class="full-span foto-producto-campo">
+              <span class="foto-producto-etiqueta">Logo de la tienda</span>
+              <div class="foto-producto-fila">
+                @if (logoActual()) {
+                  <button type="button" class="foto-producto-preview-boton" title="Ver en tamaño completo" (click)="logoAmpliado.set(true)">
+                    <img class="foto-producto-preview" [src]="logoActual()" alt="Logo de la tienda" />
+                  </button>
+                } @else {
+                  <div class="foto-producto-preview foto-producto-preview-vacia">🏬</div>
+                }
+                <div class="foto-producto-acciones">
+                  <label class="btn-secondary small foto-producto-boton">
+                    {{ logoActual() ? 'Cambiar logo' : 'Subir logo' }}
+                    <input #logoInput type="file" accept="image/*" hidden (change)="onLogoSeleccionado($event)" />
+                  </label>
+                  @if (logoActual()) {
+                    <button type="button" class="btn-secondary small" (click)="quitarLogo(logoInput)">Quitar logo</button>
+                  }
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        }
       </div>
-      <div class="modal-actions">
+
+      <div class="modal-actions empresa-modal-footer">
         <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="modalEmpresa.set(false)">Cancelar</button>
         <button type="submit" class="btn-primary btn btn-primary">Guardar</button>
       </div>
