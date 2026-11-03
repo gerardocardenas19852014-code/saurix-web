@@ -3,7 +3,6 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { SupabaseService } from '../../../core/services/supabase.service';
-import { fuenteDatosActual } from '../../../core/services/fuente-datos';
 import { ToastService } from '../../../shared/services/toast.service';
 import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
@@ -192,9 +191,9 @@ export class EmpresasComponent implements OnInit, OnDestroy {
   private readonly fb = inject(FormBuilder);
   protected readonly toast = inject(ToastService);
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
-  private readonly sb = fuenteDatosActual() === 'supabase' ? inject(SupabaseService).cliente : null;
+  private readonly sb = inject(SupabaseService).cliente;
 
-  protected readonly permitido = !!this.sb && this.auth.usuarioActual()?.esSuperadmin === true;
+  protected readonly permitido = this.auth.usuarioActual()?.esSuperadmin === true;
 
   protected readonly empresas = signal<Empresa[]>([]);
   protected readonly cargando = signal(false);

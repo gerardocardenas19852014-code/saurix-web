@@ -1,0 +1,155 @@
+<div class="modal-overlay show" (click)="cerrar.emit()">
+  <div class="modal-box etiquetas-modal" style="max-width: 1180px; width: 95%;" (click)="$event.stopPropagation()">
+    <div class="etiquetas-header">
+      <div>
+        <h3>Imprimir etiquetas con código de barras</h3>
+        <p class="hint" style="margin:2px 0 0;">
+          Elige los productos (solo los que tienen código/SKU) y cuántas copias de cada etiqueta necesitas.
+          Cada etiqueta trae el código de barras, el nombre y el precio.
+        </p>
+      </div>
+      <div class="etiquetas-header-acciones">
+        <button type="button" class="btn-secondary" [disabled]="imprimiendo()" (click)="cerrar.emit()">Cancelar</button>
+        <button type="button" class="btn-primary" [disabled]="imprimiendo() || totalProductosSeleccionados() === 0" (click)="confirmarImpresion()">
+          @if (imprimiendo()) {
+            Preparando…
+          } @else {
+            Imprimir {{ totalEtiquetas() }} etiqueta{{ totalEtiquetas() === 1 ? '' : 's' }}
+          }
+        </button>
+      </div>
+    </div>
+
+    <div class="grid-filter" style="margin-bottom:12px;">
+      <input
+        type="search"
+        placeholder="Buscar por nombre o código…"
+        [value]="busqueda()"
+        (input)="onBuscarInput($any($event.target).value)"
+      />
+      <div class="etiquetas-filtro-categoria">
+        <app-select-buscable
+          [opciones]="categoriasOpciones()"
+          [value]="categoriaId()"
+          placeholder="Filtrar por categoría…"
+          [permiteLimpiar]="true"
+          (valueChange)="onCambiarCategoria($event)"
+        />
+      </div>
+    </div>
+
+    <div class="etiquetas-herramientas-seleccion">
+      @if (modoSeleccion() === 'ninguno') {
+        <span class="hint">Nada seleccionado.</span>
+      } @else if (modoSeleccion() === 'ids') {
+        <span class="hint">{{ totalProductosSeleccionados() }} producto{{ totalProductosSeleccionados() === 1 ? '' : 's' }} seleccionado{{ totalProductosSeleccionados() === 1 ? '' : 's' }}.</span>
+      } @else {
+        <span class="hint">
+          Seleccionados los {{ totalProductosSeleccionados() }} productos que cumplen el filtro
+          <strong>{{ etiquetaFiltroCongelado() }}</strong>. Cambiar la búsqueda o la categoría no quita ni agrega nada
+          a esta selección — solo marcar o desmarcar a mano.
+        </span>
+      }
+      <div class="etiquetas-herramientas-botones">
+        @if (totalFiltrado() > 0 && !(modoSeleccion() === 'todos-filtrados')) {
+          <button type="button" class="btn-secondary small" (click)="seleccionarTodosLosResultados()">
+            Seleccionar los {{ totalFiltrado() }} resultados filtrados
+          </button>
+        }
+        @if (modoSeleccion() !== 'ninguno') {
+          <button type="button" class="btn-secondary small" (click)="limpiarSeleccion()">Limpiar selección</button>
+        }
+      </div>
+    </div>
+
+    @if (cargando()) {
+      <p class="hint" style="margin:-4px 0 12px;">Buscando…</p>
+    }
+
+    <div class="grid-table-scroll" style="max-height:360px;">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th>
+              <input
+                type="checkbox"
+                [checked]="estadoCheckPagina() === 'todos'"
+                [indeterminate]="estadoCheckPagina() === 'algunos'"
+                [disabled]="filas().length === 0"
+                (change)="toggleSeleccionPagina()"
+              />
+            </th>
+            <th>Código</th>
+            <th>Producto</th>
+            <th>Categoría</th>
+            <th>Precio</th>
+            <th>Copias</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (p of filas(); track p.id) {
+            <tr>
+              <td data-label="Seleccionar">
+                <input
+                  type="checkbox"
+                  [checked]="estaSeleccionado(p.id)"
+                  [disabled]="!p.codigo"
+                  [title]="!p.codigo ? 'Este producto no tiene código — no se puede imprimir etiqueta.' : ''"
+                  (change)="toggleSeleccion(p)"
+                />
+              </td>
+              <td data-label="Código">{{ p.codigo || 'Sin código' }}</td>
+              <td data-label="Producto">{{ p.nombre }}</td>
+              <td data-label="Categoría">{{ nombreCategoria(p.categoriaProductoId) }}</td>
+              <td data-label="Precio">{{ formatMoneda(p.precioUnitario) }}</td>
+              <td data-label="Copias">
+                @if (estaSeleccionado(p.id)) {
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    class="precio-lista-input"
+                    style="width:70px;"
+                    [value]="copiasDe(p.id)"
+                    (change)="cambiarCopias(p.id, $any($event.target).value)"
+                  />
+                } @else {
+                  <span class="hint">—</span>
+                }
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="6"><p class="empty">Sin resultados.</p></td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin:10px 0;">
+      <span class="hint">Página {{ pagina() }} de {{ totalPaginas() }} — {{ totalFiltrado() }} producto(s)</span>
+      <button type="button" class="btn-secondary small" [disabled]="pagina() <= 1 || cargando()" (click)="irAPaginaAnterior()">← Anterior</button>
+      <button type="button" class="btn-secondary small" [disabled]="pagina() >= totalPaginas() || cargando()" (click)="irAPaginaSiguiente()">Siguiente →</button>
+    </div>
+
+    <div class="etiquetas-resumen-bar">
+      <div class="etiquetas-copias-globales">
+        <label>
+          Copias para todos
+          <input
+            type="number"
+            step="1"
+            min="1"
+            class="precio-lista-input"
+            [value]="copiasGlobalTexto()"
+            (input)="copiasGlobalTexto.set($any($event.target).value)"
+          />
+        </label>
+        <button type="button" class="btn-secondary small" (click)="aplicarCopiasGlobales()">Aplicar a seleccionados</button>
+      </div>
+      <span class="hint">
+        {{ totalProductosSeleccionados() }} producto{{ totalProductosSeleccionados() === 1 ? '' : 's' }} seleccionado{{ totalProductosSeleccionados() === 1 ? '' : 's' }}
+        · {{ totalEtiquetas() }} etiqueta{{ totalEtiquetas() === 1 ? '' : 's' }} en total
+      </span>
+    </div>
+  </div>
+</div>

@@ -7,8 +7,7 @@ import { Observable } from 'rxjs';
  * en el backend, p.ej. 'Usuario', 'Proyecto', 'MovimientoPresupuesto') y
  * una acción {GetList, GetById, Alta, Modificacion, Baja}.
  *
- * HOY la implementación activa (ver app.config.ts) es `IndexedDbDataClientService`:
- * todo se guarda localmente en el navegador con IndexedDB, sin backend.
+ * HOY la implementación activa (ver app.config.ts) es `SupabaseDataClientService`.
  *
  * CUANDO se conecte PlataformaSaurix (.NET) de verdad, existe ya
  * `HttpDataClientService`, que llama a los mismos endpoints

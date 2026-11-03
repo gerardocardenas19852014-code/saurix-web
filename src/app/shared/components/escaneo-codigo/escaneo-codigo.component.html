@@ -1,12 +1,14 @@
 <div class="escaneo-codigo-fila">
-  <input
-    #inputCodigo
-    type="text"
-    [placeholder]="placeholder"
-    [value]="texto()"
-    (input)="texto.set($any($event.target).value)"
-    (keyup.enter)="confirmarTexto()"
-  />
+  @if (!soloBoton) {
+    <input
+      #inputCodigo
+      type="text"
+      [placeholder]="placeholder"
+      [value]="texto()"
+      (input)="texto.set($any($event.target).value)"
+      (keyup.enter)="confirmarTexto()"
+    />
+  }
   <button type="button" class="btn-secondary small" title="Escanear con la cámara" aria-label="Escanear con la cámara" (click)="abrirCamara()">📷</button>
 </div>
 

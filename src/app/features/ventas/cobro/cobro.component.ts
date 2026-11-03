@@ -2,8 +2,9 @@ import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { DataClientService } from '../../../core/services/data-client.service';
+import { DataClientService, FILTRO_BUSQUEDA } from '../../../core/services/data-client.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { SupabaseService } from '../../../core/services/supabase.service';
 import { ToastService } from '../../../shared/services/toast.service';
 import { ProgramaLealtadService } from '../lealtad/lealtad.service';
 import { SelectBuscableComponent, OpcionBuscable } from '../../../shared/components/select-buscable/select-buscable.component';
@@ -23,7 +24,7 @@ import { ClienteService } from '../clientes/cliente.service';
 import { ClienteFormModalComponent } from '../clientes/cliente-form-modal.component';
 import { TurnoCaja } from '../turno/turno-caja.model';
 import { TurnoCajaService } from '../turno/turno-caja.service';
-import { CANALES_SUGERIDOS, folioSugeridoVenta, VentaService } from '../venta/venta.service';
+import { CANALES_SUGERIDOS, folioSugeridoDespuesDe, folioSugeridoVenta, VentaService } from '../venta/venta.service';
 import { MetodoPago, METODOS_PAGO, Venta } from '../venta/venta.model';
 import { CargaVentaPedidoTienda, CargaVentaPedidoTiendaService } from '../carga-venta-pedido-tienda.service';
 import { PedidoTiendaService } from '../pedidos-tienda/pedido-tienda.service';
@@ -61,6 +62,16 @@ interface PagoTicket {
   cambio: number | null;
 }
 
+/** Cuántos productos trae cada página de la cuadrícula de búsqueda — ver
+ *  el informe "eliminar 8 cargas" (2026-11): 30 cabe sin scroll pesado en
+ *  una pantalla de POS típica, dentro del rango 20-40 pedido. */
+const TAMANO_PAGINA_PRODUCTOS = 30;
+/** Tope de ExistenciaBodega/PrecioLista por producto nuevo que se pide de
+ *  golpe (ver cargarExistenciaYPrecioPara()) — generoso a propósito (nunca
+ *  se ha visto un producto con más de un puñado de bodegas o listas) para
+ *  no tener que leer bodegas()/listasPrecio() antes de poder pedir esto. */
+const TOPE_FILAS_POR_PRODUCTO = 20;
+
 /**
  * Pantalla principal de Ventas — "Cobro": pensada para móvil/touch, con
  * cuadrícula de productos + búsqueda/categoría a la izquierda y el ticket
@@ -72,6 +83,23 @@ interface PagoTicket {
  *
  * Sin un turno de caja Abierto no se puede cobrar — ver ngOnInit(), que
  * manda a Apertura de turno si turnoAbierto() da null.
+ *
+ * BÚSQUEDA Y PAGINACIÓN SERVER-SIDE (2026-11, ver claude/
+ * ventas-cobro-homologacion-integral-2026-11.md — bloque "eliminar las 8
+ * cargas completas"): esta pantalla dejó de descargar el catálogo de
+ * Producto/Cliente/ExistenciaBodega/PrecioLista/Venta completos al abrir.
+ * Reutiliza DataClientService.listarPagina()/FILTRO_BUSQUEDA (ya existente,
+ * pensado para catálogos grandes — ver su comentario de clase), NO una RPC
+ * nueva. `productos()` ahora es solo la PÁGINA visible de la búsqueda
+ * actual, nunca el catálogo entero — por eso cualquier código que necesite
+ * resolver un producto que pudo haber salido de la página visible
+ * (incrementar() de una línea del carrito, "Cargar a venta" desde Pedidos
+ * web) usa `productosConocidos` (caché por id, nunca se vacía durante la
+ * sesión de Cobro) en vez de buscar dentro de `productos()`.
+ * `existenciasBodega()`/`preciosLista()` siguen siendo los mismos arreglos
+ * de siempre (producto.util.ts no se tocó) pero ahora solo contienen filas
+ * de los productos ya conocidos (página visible + carrito), nunca de todo
+ * el catálogo — ver cargarExistenciaYPrecioPara().
  */
 @Component({
   selector: 'app-cobro',
@@ -84,12 +112,18 @@ interface PagoTicket {
 export class CobroComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     document.documentElement.removeAttribute('data-wide');
+    if (this.debounceBusquedaProductos) clearTimeout(this.debounceBusquedaProductos);
     const pedidoOrigenId = this.pedidoTiendaOrigenId();
     if (pedidoOrigenId !== null) this.pedidoTiendaService.liberar(pedidoOrigenId).catch(() => {});
   }
 
   private readonly data = inject(DataClientService);
   private readonly auth = inject(AuthService);
+  /** SOLO para fn_cobro_producto_por_codigo (ver seleccionarProductoPorCodigo
+   *  más abajo) — el resto de la pantalla sigue usando exclusivamente
+   *  DataClientService, que no expone rpc(). Mismo patrón que
+   *  VentaService.sb. */
+  private readonly sb = inject(SupabaseService).cliente;
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
@@ -107,13 +141,51 @@ export class CobroComponent implements OnInit, OnDestroy {
   protected readonly turno = signal<TurnoCaja | null>(null);
   protected readonly proximoFolio = signal('');
 
+  // ── Catálogo de productos: página actual de la búsqueda (NUNCA el
+  // catálogo completo) + caché de productos ya resueltos por id ──────────
   protected readonly productos = signal<Producto[]>([]);
+  protected readonly totalProductos = signal(0);
+  protected readonly cargandoProductos = signal(false);
+  protected readonly hayMasProductos = computed(() => this.productos().length < this.totalProductos());
+  /** Todo producto que Cobro ya resolvió una vez (página visible, código
+   *  escaneado, o línea de un pedido web cargado) — se consulta por id
+   *  desde incrementar()/cargarDesdePedidoTienda() en vez de buscar dentro
+   *  de productos() (que ya NO contiene el catálogo completo). No es un
+   *  signal a propósito: solo se lee desde código TS síncrono, nunca desde
+   *  el template. */
+  private readonly productosConocidos = new Map<number, Producto>();
+  /** ids de producto cuya ExistenciaBodega/PrecioLista ya se pidió, para
+   *  no volver a pedirla cada vez que el mismo id sigue siendo conocido
+   *  (ver cargarExistenciaYPrecioPara()). */
+  private readonly idsConExistenciaYPrecioCargados = new Set<number>();
+
   protected readonly categorias = signal<CategoriaProducto[]>([]);
   protected readonly bodegas = signal<Bodega[]>([]);
+  /** Acumulador — solo contiene filas de productos ya conocidos (ver
+   *  arriba), nunca de todo ExistenciaBodega. existenciaTotal()/
+   *  tieneBodegaAsignada() (producto.util.ts) no cambiaron: siguen
+   *  esperando el arreglo completo de ExistenciaBodega "relevante", que
+   *  ahora es chico por construcción en vez de ser literalmente toda la
+   *  tabla. */
   protected readonly existenciasBodega = signal<ExistenciaBodega[]>([]);
-  protected readonly clientes = signal<Cliente[]>([]);
-  protected readonly listasPrecio = signal<TipoListaPrecio[]>([]);
+  /** Igual que arriba, pero para PrecioLista. Se pide SIN filtrar por
+   *  tipoListaPrecioId (ver informe: el número de listas por empresa está
+   *  acotado por el mismo catálogo pequeño TipoListaPrecio, así que traer
+   *  todas las listas de un puñado de productos es insignificante) — así
+   *  cambiar el combo de "lista de precio" no dispara ninguna petición
+   *  nueva. */
   protected readonly preciosLista = signal<PrecioLista[]>([]);
+  protected readonly listasPrecio = signal<TipoListaPrecio[]>([]);
+
+  // ── Cliente: autocomplete remoto, nunca el catálogo completo ───────────
+  /** Cliente elegido ahora mismo (o el genérico al abrir) — ya NO se deriva
+   *  de un arreglo completo de Cliente; se asigna explícitamente en
+   *  elegirCliente()/alGuardarCliente()/ngOnInit(). */
+  protected readonly clienteSeleccionado = signal<Cliente | null>(null);
+  /** Mismo propósito que productosConocidos: cliente ya resuelto por id
+   *  (resultado de autocomplete, el genérico, o uno recién creado), para
+   *  poder leer su listaPrecioPredeterminadaId al elegirlo. */
+  private readonly clientesConocidos = new Map<number, Cliente>();
 
   protected readonly busquedaProducto = signal('');
   protected readonly categoriaFiltro = signal<number | null>(null);
@@ -139,6 +211,9 @@ export class CobroComponent implements OnInit, OnDestroy {
   protected readonly modalClienteAbierto = signal(false);
   protected readonly modalPagoAbierto = signal(false);
   protected readonly procesandoVenta = signal(false);
+  /** Doble clic / doble Enter en "Agregar" de Venta simple (ver informe,
+   *  sección de validaciones): mismo criterio que procesandoVenta arriba. */
+  protected readonly procesandoVentaSimple = signal(false);
   protected readonly pagos = signal<PagoUI[]>([]);
 
   /** Panel de "Venta registrada" que aparece justo después de cobrar, con
@@ -158,25 +233,6 @@ export class CobroComponent implements OnInit, OnDestroy {
     monto: [0, [Validators.required, Validators.min(0.01)]],
     montoRecibido: [null as number | null],
   });
-
-  protected readonly productosFiltrados = computed(() => {
-    const texto = this.busquedaProducto().trim().toLowerCase();
-    const categoria = this.categoriaFiltro();
-    return this.productos().filter((p) => {
-      if (p.activo === false) return false;
-      if (categoria !== null && p.categoriaProductoId !== categoria) return false;
-      if (!texto) return true;
-      return p.nombre.toLowerCase().includes(texto) || (p.codigo ?? '').toLowerCase().includes(texto);
-    });
-  });
-
-  protected readonly opcionesClientes = computed<OpcionBuscable[]>(() =>
-    this.clientes()
-      .filter((c) => c.activo !== false)
-      .map((c) => ({ valor: c.id, etiqueta: c.esGenerico ? c.nombre : `${c.nombre} — ${c.rfc}` })),
-  );
-
-  protected readonly clienteSeleccionado = computed(() => this.clientes().find((c) => c.id === this.clienteId()) ?? null);
 
   protected readonly subtotalCarrito = computed(() =>
     redondear(this.carrito().reduce((acc, i) => acc + i.cantidad * i.precioUnitario, 0)),
@@ -210,6 +266,11 @@ export class CobroComponent implements OnInit, OnDestroy {
 
   protected readonly totalPagado = computed(() => redondear(this.pagos().reduce((acc, p) => acc + p.monto, 0)));
   protected readonly faltantePorPagar = computed(() => redondear(this.totalConPuntos() - this.totalPagado()));
+  /** Suma del cambio de TODOS los pagos en efectivo ya agregados — para la
+   *  jerarquía visual del modal Cobrar (ver informe, sección de UX):
+   *  "Falta" si todavía falta cubrir el total; si no, "Cambio: $X.XX" si de
+   *  verdad hay algo que entregar, o "Pagado ✓" si quedó exacto. */
+  protected readonly cambioTotalPagos = computed(() => redondear(this.pagos().reduce((acc, p) => acc + (p.cambio ?? 0), 0)));
 
   async ngOnInit(): Promise<void> {
     document.documentElement.setAttribute('data-wide', 'grid');
@@ -230,83 +291,131 @@ export class CobroComponent implements OnInit, OnDestroy {
     }
     this.turno.set(turno);
 
-    const [productos, categorias, bodegas, existenciasBodega, clientes, listasPrecio, preciosLista, ventas] =
-      await Promise.all([
-        firstValueFrom(this.data.list<Producto>('Producto')),
-        firstValueFrom(this.data.list<CategoriaProducto>('CategoriaProducto')),
-        firstValueFrom(this.data.list<Bodega>('Bodega')),
-        firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega')),
-        firstValueFrom(this.data.list<Cliente>('Cliente')),
-        firstValueFrom(this.data.list<TipoListaPrecio>('TipoListaPrecio')),
-        firstValueFrom(this.data.list<PrecioLista>('PrecioLista')),
-        firstValueFrom(this.data.list<Venta>('Venta')),
-      ]);
+    // Catálogos chicos (Categoría/Bodega/TipoListaPrecio): se quedan
+    // full-load tal cual — decenas de filas cuando mucho, cambian poco, y
+    // alimentan selects/chips que necesitan verse completos de entrada
+    // (ver informe "eliminar 8 cargas", clasificación de catálogos
+    // pequeños). El folio sugerido ya no descarga Venta completa: solo la
+    // fila con el id más alto (los folios los asigna fn_venta_registrar()
+    // en orden estrictamente creciente, así que el id más alto siempre
+    // tiene el folio más alto).
+    const [categorias, bodegas, listasPrecio, ultimaVenta] = await Promise.all([
+      firstValueFrom(this.data.list<CategoriaProducto>('CategoriaProducto')),
+      firstValueFrom(this.data.list<Bodega>('Bodega')),
+      firstValueFrom(this.data.list<TipoListaPrecio>('TipoListaPrecio')),
+      firstValueFrom(this.data.listarPagina<Venta>('Venta', undefined, 0, 1, { columna: 'id', direccion: 'desc' })),
+    ]);
 
-    this.productos.set(productos);
     this.categorias.set(categorias.filter((c) => c.activo !== false));
     this.bodegas.set(bodegas.filter((b) => b.activo !== false));
-    this.existenciasBodega.set(existenciasBodega);
     this.listasPrecio.set(listasPrecio.filter((l) => l.activo !== false));
-    this.preciosLista.set(preciosLista);
-    this.proximoFolio.set(folioSugeridoVenta(ventas));
+    this.proximoFolio.set(
+      ultimaVenta.filas[0] ? folioSugeridoDespuesDe(ultimaVenta.filas[0].folio) : folioSugeridoVenta([]),
+    );
 
     this.bodegaVentaId.set(this.bodegas()[0]?.id ?? null);
 
     const generico = await this.clienteService.obtenerOCrearGenerico();
-    const clientesConGenerico = clientes.some((c) => c.id === generico.id) ? clientes : [...clientes, generico];
-    this.clientes.set(clientesConGenerico);
+    this.clientesConocidos.set(generico.id, generico);
     this.clienteId.set(generico.id);
+    this.clienteSeleccionado.set(generico);
+
+    // Primera página del catálogo de productos (server-side, ver
+    // buscarProductos()) — reemplaza el antiguo `data.list('Producto')`
+    // sin filtro.
+    await this.buscarProductos(true);
 
     this.cargando.set(false);
 
     // "Cargar a venta" desde Pedidos web (ver CargaVentaPedidoTiendaService)
     // — se consume UNA sola vez, después de que ya está todo lo necesario
-    // para precargar el carrito (productos/bodegaVentaId). Si no hay nada
-    // pendiente, tomar() regresa null y no pasa nada.
+    // para precargar el carrito (bodegaVentaId). Si no hay nada pendiente,
+    // tomar() regresa null y no pasa nada.
     const carga = this.cargaVentaPedidoTienda.tomar();
-    if (carga) this.cargarDesdePedidoTienda(carga);
+    if (carga) await this.cargarDesdePedidoTienda(carga);
   }
 
-  /** Ver el comentario grande de pedidoTiendaOrigenId arriba. Nunca
-   *  bloquea nada: cada renglón se agrega tal cual, con el precio YA
-   *  revalidado por el servidor (ver PedidoTiendaService.revalidarItems())
-   *  — aquí solo se revisa EXISTENCIA (ver existenciaDisponible(), que
-   *  depende de bodegaVentaId() y por eso se checa aquí, no en el
-   *  servidor) y se avisa, sin impedir cobrar igual. */
-  private cargarDesdePedidoTienda(carga: CargaVentaPedidoTienda): void {
-    this.pedidoTiendaOrigenId.set(carga.pedidoId);
-    this.canalVenta.set(carga.canal);
+  // ── Catálogo / búsqueda server-side ─────────────────────────────────────
+  /** Caja de búsqueda: debounce manual ~300ms (mismo criterio que
+   *  SelectBuscableComponent en modo remoto, sin agregar RxJS a esta
+   *  pantalla) + descarte de respuestas obsoletas (secuenciaBusquedaProductos
+   *  en buscarProductos()). */
+  private debounceBusquedaProductos: ReturnType<typeof setTimeout> | null = null;
+  private secuenciaBusquedaProductos = 0;
 
-    const advertencias: string[] = [];
-    const nuevasLineas: ItemCarrito[] = carga.lineas.map((linea) => {
-      const producto = linea.productoId !== null ? this.productos().find((p) => p.id === linea.productoId) : undefined;
-      if (!linea.disponible) {
-        advertencias.push(`${linea.descripcion}: ${linea.motivo ?? 'revisar'}`);
-      } else if (producto) {
-        const disponible = this.existenciaDisponible(producto);
-        if (disponible !== null && linea.cantidad > disponible) {
-          advertencias.push(`${linea.descripcion}: solo hay ${disponible} disponible(s)`);
-        }
-      }
-      return {
-        productoId: linea.productoId,
-        descripcion: linea.descripcion,
-        cantidad: linea.cantidad,
-        precioUnitario: linea.precioUnitario,
-        descuentoPct: 0,
-        bodegaId: producto && producto.existencia !== null ? this.bodegaVentaId() : null,
-      };
-    });
+  protected alEscribirBusqueda(texto: string): void {
+    this.busquedaProducto.set(texto);
+    if (this.debounceBusquedaProductos) clearTimeout(this.debounceBusquedaProductos);
+    this.debounceBusquedaProductos = setTimeout(() => this.buscarProductos(true), texto.trim() ? 300 : 0);
+  }
 
-    this.carrito.set(nuevasLineas);
-    if (advertencias.length > 0) {
-      this.toast.advertencia('Pedido cargado — revisa antes de cobrar: ' + advertencias.join(' · '));
-    } else {
-      this.toast.exito('Pedido cargado al carrito. Revisa y cobra normalmente.');
+  protected alCambiarCategoria(categoriaId: number | null): void {
+    if (this.categoriaFiltro() === categoriaId) return;
+    this.categoriaFiltro.set(categoriaId);
+    this.buscarProductos(true);
+  }
+
+  /** Única función que de verdad consulta Producto — con filtro de texto
+   *  (nombre/código, OR) y categoría aplicados del lado del servidor
+   *  (listarPagina + FILTRO_BUSQUEDA, ver DataClientService), nunca
+   *  descargando el catálogo completo para filtrarlo en Angular.
+   *  reset=true: nueva búsqueda (reemplaza la página); reset=false:
+   *  "cargar más" (desde = lo que ya se tiene). */
+  private async buscarProductos(reset: boolean): Promise<void> {
+    const miSecuencia = ++this.secuenciaBusquedaProductos;
+    const desde = reset ? 0 : this.productos().length;
+    this.cargandoProductos.set(true);
+    try {
+      const texto = this.busquedaProducto().trim();
+      const filtro: Record<string, unknown> = { activo: true };
+      const categoria = this.categoriaFiltro();
+      if (categoria !== null) filtro['categoriaProductoId'] = categoria;
+      if (texto) filtro[FILTRO_BUSQUEDA] = { columnas: ['nombre', 'codigo'], texto };
+
+      const resultado = await firstValueFrom(
+        this.data.listarPagina<Producto>('Producto', filtro, desde, TAMANO_PAGINA_PRODUCTOS, { columna: 'nombre' }),
+      );
+      if (miSecuencia !== this.secuenciaBusquedaProductos) return; // ya hay una búsqueda más nueva en curso
+
+      this.productos.set(reset ? resultado.filas : [...this.productos(), ...resultado.filas]);
+      this.totalProductos.set(resultado.total);
+      for (const p of resultado.filas) this.productosConocidos.set(p.id, p);
+      await this.cargarExistenciaYPrecioPara(resultado.filas.map((p) => p.id));
+    } finally {
+      if (miSecuencia === this.secuenciaBusquedaProductos) this.cargandoProductos.set(false);
     }
   }
 
-  // ── Catálogo / filtros ──────────────────────────────────────────────
+  protected cargarMasProductos(): void {
+    if (this.cargandoProductos() || !this.hayMasProductos()) return;
+    this.buscarProductos(false);
+  }
+
+  /** Pide ExistenciaBodega/PrecioLista SOLO para los ids de producto que
+   *  todavía no se conocían (página nueva de búsqueda, código escaneado, o
+   *  línea de un pedido web) — nunca el catálogo completo de ninguna de
+   *  las dos tablas. Se pide SIN filtrar por bodega: así, al cambiar la
+   *  "Bodega de venta" en el selector, ya no hace falta ninguna petición
+   *  nueva (ya se tiene la existencia de TODAS las bodegas de estos pocos
+   *  productos) — más eficiente que filtrar por la bodega seleccionada y
+   *  tener que volver a pedir en cada cambio, y sin esa diferencia
+   *  tieneBodegaAsignada() (que necesita saber si el producto tiene ALGÚN
+   *  registro, en cualquier bodega) dejaría de funcionar igual que antes.
+   *  Ver informe, precisión 1. */
+  private async cargarExistenciaYPrecioPara(ids: number[]): Promise<void> {
+    const nuevos = [...new Set(ids)].filter((id) => !this.idsConExistenciaYPrecioCargados.has(id));
+    if (nuevos.length === 0) return;
+    for (const id of nuevos) this.idsConExistenciaYPrecioCargados.add(id);
+
+    const tope = nuevos.length * TOPE_FILAS_POR_PRODUCTO;
+    const [existencias, precios] = await Promise.all([
+      firstValueFrom(this.data.listarPagina<ExistenciaBodega>('ExistenciaBodega', { productoId: nuevos }, 0, tope)),
+      firstValueFrom(this.data.listarPagina<PrecioLista>('PrecioLista', { productoId: nuevos }, 0, tope)),
+    ]);
+    this.existenciasBodega.update((lista) => [...lista, ...existencias.filas]);
+    this.preciosLista.update((lista) => [...lista, ...precios.filas]);
+  }
+
   precioProducto(producto: Producto): number {
     const lista = this.listaPrecioId();
     if (lista !== null) {
@@ -316,7 +425,9 @@ export class CobroComponent implements OnInit, OnDestroy {
     return producto.precioUnitario;
   }
 
-  /** null = servicio (sin inventario que controlar, ver producto.model.ts). */
+  /** null = servicio (sin inventario que controlar, ver producto.model.ts).
+   *  Sin cambios de lógica respecto a la versión anterior (producto.util.ts
+   *  no se tocó) — solo cambió qué tan grande es existenciasBodega(). */
   existenciaDisponible(producto: Producto): number | null {
     if (producto.existencia === null) return null;
     const bodegaId = this.bodegaVentaId();
@@ -326,7 +437,7 @@ export class CobroComponent implements OnInit, OnDestroy {
     return existenciaTotal(producto, this.existenciasBodega());
   }
 
-  // ── Carrito ───────────────────────────────────────────────────────────
+  // ── Escáner de código de barras ──────────────────────────────────────
   /** Agrega un producto escaneando su código de barras (app-escaneo-codigo,
    *  mismo componente que ya usan Movimientos entre bodegas e Inventario) —
    *  mismo criterio de búsqueda normalizada (trim + minúsculas) que
@@ -337,7 +448,16 @@ export class CobroComponent implements OnInit, OnDestroy {
    *  catalogo-tienda.component.ts) y en ese caso carga la orden completa
    *  en vez de buscar un producto — reutiliza exactamente la misma
    *  revalidación/carga de "Cargar a venta" del Bloque E
-   *  (cargarDesdePedidoTienda()), nunca una segunda implementación. */
+   *  (cargarDesdePedidoTienda()), nunca una segunda implementación.
+   *
+   *  BÚSQUEDA SERVER-SIDE (2026-11): independiente de la página visible de
+   *  productos() — antes buscaba dentro del catálogo completo ya
+   *  descargado; ahora usa inventario.fn_cobro_producto_por_codigo(), una
+   *  función puntual de coincidencia EXACTA (mismo patrón ya existente en
+   *  Órdenes de compra, fn_ordenes_compra_producto_por_codigo) porque el
+   *  filtro genérico de DataClientService solo sabe hacer "contiene"
+   *  (ilike %texto%) sobre columnas de texto, nunca una igualdad exacta —
+   *  justo lo que un código de barras escaneado necesita. */
   async seleccionarProductoPorCodigo(codigo: string): Promise<void> {
     const token = this.extraerTokenOrdenSaurix(codigo);
     if (token) {
@@ -345,13 +465,24 @@ export class CobroComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const encontrado = this.productos().find(
-      (p) => p.activo !== false && (p.codigo ?? '').trim().toLowerCase() === codigo.trim().toLowerCase(),
-    );
-    if (!encontrado) {
+    const codigoNormalizado = codigo.trim();
+    if (!codigoNormalizado) return;
+
+    const { data: fila, error } = await this.sb
+      .schema('inventario')
+      .rpc('fn_cobro_producto_por_codigo', { p_codigo: codigoNormalizado })
+      .maybeSingle();
+    if (error) {
+      this.toast.error('No se pudo buscar el código: ' + error.message);
+      return;
+    }
+    if (!fila) {
       this.toast.advertencia(`No se encontró ningún producto activo con el código "${codigo}".`);
       return;
     }
+    const encontrado = this.filaProductoACamel(fila as Record<string, unknown>);
+    this.productosConocidos.set(encontrado.id, encontrado);
+    await this.cargarExistenciaYPrecioPara([encontrado.id]);
     this.agregarProducto(encontrado);
   }
 
@@ -402,14 +533,73 @@ export class CobroComponent implements OnInit, OnDestroy {
       const nombre = pedido.nombreCliente ?? pedido.nombreMostrarEn;
       const etiquetaOrigen = pedido.origen === 'menu_qr' ? 'Menú QR' : 'Tienda en línea';
       const canal = [etiquetaOrigen, pedido.folio, nombre].filter(Boolean).join(' — ');
-      this.cargarDesdePedidoTienda({ pedidoId: pedido.id, canal, lineas });
+      await this.cargarDesdePedidoTienda({ pedidoId: pedido.id, canal, lineas });
     } catch (e) {
       this.toast.error('No se pudo cargar la orden escaneada: ' + (e instanceof Error ? e.message : 'error desconocido'));
       this.pedidoTiendaService.liberar(pedido.id).catch(() => {});
     }
   }
 
+  /** Ver el comentario grande de pedidoTiendaOrigenId arriba. Nunca
+   *  bloquea nada: cada renglón se agrega tal cual, con el precio YA
+   *  revalidado por el servidor (ver PedidoTiendaService.revalidarItems())
+   *  — aquí solo se revisa EXISTENCIA (ver existenciaDisponible(), que
+   *  depende de bodegaVentaId() y por eso se checa aquí, no en el
+   *  servidor) y se avisa, sin impedir cobrar igual.
+   *
+   *  2026-11: ahora resuelve cualquier productoId que todavía no esté en
+   *  productosConocidos (un pedido web puede traer productos que esta
+   *  caja nunca buscó/agregó antes) con UNA consulta acotada a esos pocos
+   *  ids — nunca con el catálogo completo, que es justo lo que garantizaba
+   *  (por descarga total) que `.find()` siempre encontrara el producto en
+   *  la versión anterior. */
+  private async cargarDesdePedidoTienda(carga: CargaVentaPedidoTienda): Promise<void> {
+    this.pedidoTiendaOrigenId.set(carga.pedidoId);
+    this.canalVenta.set(carga.canal);
+
+    const idsFaltantes = [
+      ...new Set(carga.lineas.map((l) => l.productoId).filter((id): id is number => id !== null)),
+    ].filter((id) => !this.productosConocidos.has(id));
+    if (idsFaltantes.length > 0) {
+      const resultado = await firstValueFrom(
+        this.data.listarPagina<Producto>('Producto', { id: idsFaltantes }, 0, idsFaltantes.length),
+      );
+      for (const p of resultado.filas) this.productosConocidos.set(p.id, p);
+      await this.cargarExistenciaYPrecioPara(resultado.filas.map((p) => p.id));
+    }
+
+    const advertencias: string[] = [];
+    const nuevasLineas: ItemCarrito[] = carga.lineas.map((linea) => {
+      const producto = linea.productoId !== null ? this.productosConocidos.get(linea.productoId) : undefined;
+      if (!linea.disponible) {
+        advertencias.push(`${linea.descripcion}: ${linea.motivo ?? 'revisar'}`);
+      } else if (producto) {
+        const disponible = this.existenciaDisponible(producto);
+        if (disponible !== null && linea.cantidad > disponible) {
+          advertencias.push(`${linea.descripcion}: solo hay ${disponible} disponible(s)`);
+        }
+      }
+      return {
+        productoId: linea.productoId,
+        descripcion: linea.descripcion,
+        cantidad: linea.cantidad,
+        precioUnitario: linea.precioUnitario,
+        descuentoPct: 0,
+        bodegaId: producto && producto.existencia !== null ? this.bodegaVentaId() : null,
+      };
+    });
+
+    this.carrito.set(nuevasLineas);
+    if (advertencias.length > 0) {
+      this.toast.advertencia('Pedido cargado — revisa antes de cobrar: ' + advertencias.join(' · '));
+    } else {
+      this.toast.exito('Pedido cargado al carrito. Revisa y cobra normalmente.');
+    }
+  }
+
+  // ── Carrito ───────────────────────────────────────────────────────────
   agregarProducto(producto: Producto): void {
+    this.productosConocidos.set(producto.id, producto);
     const existente = this.carrito().find((i) => i.productoId === producto.id);
     const cantidadNueva = (existente?.cantidad ?? 0) + 1;
 
@@ -441,7 +631,7 @@ export class CobroComponent implements OnInit, OnDestroy {
     const item = this.carrito()[index];
     if (!item) return;
     if (item.productoId !== null) {
-      const producto = this.productos().find((p) => p.id === item.productoId);
+      const producto = this.productosConocidos.get(item.productoId) ?? null;
       const disponible = producto ? this.existenciaDisponible(producto) : null;
       if (disponible !== null && item.cantidad + 1 > disponible) {
         this.toast.advertencia('No hay más existencia disponible.');
@@ -501,29 +691,68 @@ export class CobroComponent implements OnInit, OnDestroy {
     this.modalVentaSimpleAbierto.set(true);
   }
 
+  /** Protegida contra doble clic / doble Enter (ver informe, validaciones
+   *  de Venta simple): procesandoVentaSimple() deshabilita el botón de
+   *  "Agregar" en el template mientras esta función corre. */
   agregarVentaSimple(): void {
+    if (this.procesandoVentaSimple()) return;
     if (this.ventaSimpleForm.invalid) {
       this.ventaSimpleForm.markAllAsTouched();
       return;
     }
-    const valor = this.ventaSimpleForm.getRawValue();
-    this.carrito.update((lista) => [
-      ...lista,
-      { productoId: null, descripcion: valor.descripcion, cantidad: 1, precioUnitario: valor.monto, descuentoPct: 0, bodegaId: null },
-    ]);
-    this.modalVentaSimpleAbierto.set(false);
+    this.procesandoVentaSimple.set(true);
+    try {
+      const valor = this.ventaSimpleForm.getRawValue();
+      this.carrito.update((lista) => [
+        ...lista,
+        { productoId: null, descripcion: valor.descripcion, cantidad: 1, precioUnitario: redondear(valor.monto), descuentoPct: 0, bodegaId: null },
+      ]);
+      this.modalVentaSimpleAbierto.set(false);
+    } finally {
+      this.procesandoVentaSimple.set(false);
+    }
   }
 
   // ── Cliente ───────────────────────────────────────────────────────────
+  /** Autocomplete remoto para app-select-buscable (ver su comentario de
+   *  clase, "MODO REMOTO" — ya usado en Movimientos entre bodegas →
+   *  Historial → Producto, no es infraestructura nueva). Busca por
+   *  nombre/RFC/teléfono (FILTRO_BUSQUEDA, OR) entre clientes activos,
+   *  máximo 20 a la vez — reemplaza la descarga completa de Cliente.
+   *  Arrow function (no método normal) porque el componente hijo invoca
+   *  esta referencia directamente, sin "this": debe venir ya enlazada. */
+  protected readonly buscarClientesRemoto = async (texto: string): Promise<OpcionBuscable[]> => {
+    const filtro: Record<string, unknown> = { activo: true };
+    const limpio = texto.trim();
+    if (limpio) filtro[FILTRO_BUSQUEDA] = { columnas: ['nombre', 'rfc', 'telefono'], texto: limpio };
+    const resultado = await firstValueFrom(this.data.listarPagina<Cliente>('Cliente', filtro, 0, 20, { columna: 'nombre' }));
+    for (const c of resultado.filas) this.clientesConocidos.set(c.id, c);
+    return resultado.filas.map((c) => ({ valor: c.id, etiqueta: this.etiquetaCliente(c) }));
+  };
+
+  private etiquetaCliente(c: Cliente): string {
+    return c.esGenerico ? c.nombre : `${c.nombre} — ${c.rfc}`;
+  }
+
+  /** Etiqueta del cliente ya elegido, para que app-select-buscable (en
+   *  modo remoto no tiene el catálogo completo para resolverla sola) la
+   *  muestre sin tener que volver a buscar. */
+  protected readonly etiquetaClienteSeleccionado = computed(() => {
+    const c = this.clienteSeleccionado();
+    return c ? this.etiquetaCliente(c) : '';
+  });
+
   elegirCliente(id: number | string | null): void {
     const nuevoId = id === null ? null : Number(id);
     this.clienteId.set(nuevoId);
     this.puntosACanjear.set(0); // cambiar de cliente invalida cualquier canje que se tuviera capturado
 
+    const cliente = nuevoId === null ? null : this.clientesConocidos.get(nuevoId) ?? null;
+    this.clienteSeleccionado.set(cliente);
+
     // "Información de venta" del cliente (ver cliente-form-modal.component.ts):
     // su lista de precio predeterminada se preselecciona aquí — sigue siendo
     // un valor por default, el cajero puede cambiarla luego con el selector.
-    const cliente = this.clientes().find((c) => c.id === nuevoId);
     this.listaPrecioId.set(cliente?.listaPrecioPredeterminadaId ?? null);
   }
 
@@ -532,8 +761,9 @@ export class CobroComponent implements OnInit, OnDestroy {
   }
 
   alGuardarCliente(cliente: Cliente): void {
-    this.clientes.update((lista) => [...lista, cliente]);
+    this.clientesConocidos.set(cliente.id, cliente);
     this.clienteId.set(cliente.id);
+    this.clienteSeleccionado.set(cliente);
     this.puntosACanjear.set(0);
     this.modalClienteAbierto.set(false);
   }
@@ -617,7 +847,9 @@ export class CobroComponent implements OnInit, OnDestroy {
     }
 
     // Copia "congelada" para el ticket — carrito/pagos se limpian abajo en
-    // cuanto la venta queda registrada.
+    // cuanto la venta queda registrada. idsVendidos se captura AQUÍ (antes
+    // de vaciar el carrito) para poder refrescar solo esa existencia
+    // después de cobrar (ver abajo).
     const itemsParaTicket: ItemTicket[] = this.carrito().map((i) => ({
       cantidad: i.cantidad,
       descripcion: i.descripcion,
@@ -626,6 +858,7 @@ export class CobroComponent implements OnInit, OnDestroy {
     }));
     const pagosParaTicket: PagoTicket[] = this.pagos().map((p) => ({ metodoPago: p.metodoPago, monto: p.monto, cambio: p.cambio }));
     const nombreCliente = this.clienteSeleccionado()?.nombre ?? '';
+    const idsVendidos = [...new Set(this.carrito().map((i) => i.productoId).filter((id): id is number => id !== null))];
 
     this.procesandoVenta.set(true);
     try {
@@ -673,14 +906,21 @@ export class CobroComponent implements OnInit, OnDestroy {
       this.itemsTicket.set(itemsParaTicket);
       this.pagosTicket.set(pagosParaTicket);
 
-      // Refresca existencia (para que el grid refleje lo recién vendido) y
-      // el folio sugerido para el siguiente ticket.
-      const [existenciasBodega, ventas] = await Promise.all([
-        firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega')),
-        firstValueFrom(this.data.list<Venta>('Venta')),
-      ]);
-      this.existenciasBodega.set(existenciasBodega);
-      this.proximoFolio.set(folioSugeridoVenta(ventas));
+      // Refresca SOLO la existencia de los productos que acaban de
+      // venderse (para que el grid refleje lo recién vendido) — nunca
+      // ExistenciaBodega completa. El folio del siguiente ticket ya no
+      // necesita ninguna petición: viene directo de venta.folio, que ya
+      // regresó fn_venta_registrar() del lado del servidor.
+      if (idsVendidos.length > 0) {
+        const existencias = await firstValueFrom(
+          this.data.listarPagina<ExistenciaBodega>('ExistenciaBodega', { productoId: idsVendidos }, 0, idsVendidos.length * TOPE_FILAS_POR_PRODUCTO),
+        );
+        this.existenciasBodega.update((lista) => [
+          ...lista.filter((e) => !idsVendidos.includes(e.productoId)),
+          ...existencias.filas,
+        ]);
+      }
+      this.proximoFolio.set(folioSugeridoDespuesDe(venta.folio));
     } finally {
       this.procesandoVenta.set(false);
     }
@@ -713,5 +953,29 @@ export class CobroComponent implements OnInit, OnDestroy {
 
   cerrarPanelVentaRegistrada(): void {
     this.ventaRecienCobrada.set(null);
+  }
+
+  // ── Helper interno para fn_cobro_producto_por_codigo (ver arriba) ──────
+  private filaProductoACamel(fila: Record<string, unknown>): Producto {
+    return {
+      id: fila['id'] as number,
+      nombre: fila['nombre'] as string,
+      codigo: (fila['codigo'] as string | null) ?? null,
+      categoriaProductoId: fila['categoria_producto_id'] as number,
+      unidadMedidaId: fila['unidad_medida_id'] as number,
+      descripcion: (fila['descripcion'] as string | null) ?? null,
+      costo: fila['costo'] as number,
+      precioUnitario: fila['precio_unitario'] as number,
+      existencia: (fila['existencia'] as number | null) ?? null,
+      nivelMinimo: (fila['nivel_minimo'] as number | null) ?? null,
+      nivelMaximo: (fila['nivel_maximo'] as number | null) ?? null,
+      proveedorId: (fila['proveedor_id'] as number | null) ?? null,
+      unidadCompraId: (fila['unidad_compra_id'] as number | null) ?? null,
+      manejaLotes: fila['maneja_lotes'] as boolean,
+      factorConversionCompra: (fila['factor_conversion_compra'] as number | null) ?? null,
+      foto: (fila['foto'] as string | undefined) ?? undefined,
+      destacado: fila['destacado'] as boolean,
+      activo: fila['activo'] as boolean,
+    };
   }
 }

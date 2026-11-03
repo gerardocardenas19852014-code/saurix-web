@@ -4,9 +4,7 @@ import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/
 import { provideServiceWorker } from '@angular/service-worker';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
 import { DataClientService } from './core/services/data-client.service';
-import { IndexedDbDataClientService } from './core/services/indexeddb-data-client.service';
 import { SupabaseDataClientService } from './core/services/supabase-data-client.service';
-import { fuenteDatosActual } from './core/services/fuente-datos';
 import { SeedService } from './core/services/seed.service';
 import { routes } from './app.routes';
 
@@ -22,18 +20,12 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withFetch(), withInterceptors([errorInterceptor])),
 
     // ── Fuente de datos activa ──────────────────────────────────────────
-    // Se elige en la pantalla de login (ver core/services/fuente-datos.ts):
-    //   'supabase'  → base de datos en la nube (Supabase), compartida entre
-    //                 dispositivos, con login de Supabase Auth.
-    //   'indexeddb' → todo local en este navegador, sin backend (modo anterior).
-    // Ningún componente cambia: todos dependen solo de DataClientService.
-    {
-      provide: DataClientService,
-      useClass: fuenteDatosActual() === 'supabase' ? SupabaseDataClientService : IndexedDbDataClientService,
-    },
+    // Base de datos en la nube (Supabase), compartida entre dispositivos,
+    // con login de Supabase Auth. Ningún componente cambia: todos dependen
+    // solo de DataClientService.
+    { provide: DataClientService, useClass: SupabaseDataClientService },
 
-    // IndexedDB: garantiza el usuario 'root' y las listas de valores.
-    // Supabase: restaura la sesión guardada antes de que arranque la app.
+    // Restaura la sesión guardada antes de que arranque la app.
     provideAppInitializer(() => inject(SeedService).ejecutar()),
 
     // PWA: service worker de solo caché de app shell/estáticos (sin manejo de

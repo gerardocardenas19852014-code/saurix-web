@@ -4,13 +4,11 @@ import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { SupabaseService } from '../../../core/services/supabase.service';
-import { fuenteDatosActual } from '../../../core/services/fuente-datos';
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { SelectBuscableComponent, OpcionBuscable } from '../../../shared/components/select-buscable/select-buscable.component';
 import { ToastService } from '../../../shared/services/toast.service';
 import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
-import { Producto } from '../productos/producto.model';
 import { Bodega } from '../bodegas/bodega.model';
 import { Proveedor } from '../proveedores/proveedor.model';
 import { UnidadMedida } from '../unidades-medida/unidad-medida.model';
@@ -18,7 +16,7 @@ import { MovimientoInventario } from '../movimientos-bodega/movimiento-inventari
 import { formatMoneda } from '../productos/producto.util';
 import { OrdenCompra, EstadoOrdenCompra } from './orden-compra.model';
 import { OrdenCompraItem } from './orden-compra-item.model';
-import { OrdenCompraService, folioSugeridoOrdenCompra, LineaRecepcion } from './orden-compra.service';
+import { OrdenCompraService, LineaRecepcion } from './orden-compra.service';
 import { OrdenCompraBorradorService } from './orden-compra-borrador.service';
 import { EscaneoCodigoComponent } from '../../../shared/components/escaneo-codigo/escaneo-codigo.component';
 
@@ -142,13 +140,11 @@ const CLASE_ESTADO: Record<EstadoOrdenCompra, string> = {
  *    mostrar o recalcular una línea ya agregada.
  *  - agregarLinea() (fila vacía) desapareció — una línea solo existe una
  *    vez que de verdad se eligió un producto (ver agregarProductoALaOrden()).
- *  - guardar() en modo Supabase ya no hace baja/alta secuenciales sueltas:
- *    llama a fn_orden_compra_guardar(), una función transaccional que crea/
+ *  - guardar() ya no hace baja/alta secuenciales sueltas: llama a
+ *    fn_orden_compra_guardar(), una función transaccional que crea/
  *    actualiza el encabezado y reemplaza sus líneas en una sola operación
  *    atómica — si algo falla a mitad, Postgres revierte TODO (ya no puede
- *    quedar un encabezado creado con líneas a medias). En modo IndexedDB
- *    local (catálogos de prueba, sin el problema de escala) se conserva
- *    el flujo secuencial de siempre — ver guardarLocal().
+ *    quedar un encabezado creado con líneas a medias).
  */
 @Component({
   selector: 'app-ordenes-compra',
@@ -173,8 +169,7 @@ export class OrdenesCompraComponent implements OnInit, OnDestroy {
   protected readonly etiquetaEstado = ETIQUETA_ESTADO;
   protected readonly claseEstado = CLASE_ESTADO;
 
-  private readonly esSupabase = fuenteDatosActual() === 'supabase';
-  private readonly sb = this.esSupabase ? inject(SupabaseService).cliente : null;
+  private readonly sb = inject(SupabaseService).cliente;
 
   /** Campo Código de la barra de captura — para regresarle el foco
    *  explícitamente después de agregar por el camino de nombre+Cantidad+
@@ -183,8 +178,6 @@ export class OrdenesCompraComponent implements OnInit, OnDestroy {
   @ViewChild('escaneoCodigoBarra') private escaneoCodigoBarra?: EscaneoCodigoComponent;
 
   protected readonly vista = signal<'lista' | 'ficha'>('lista');
-  protected readonly ordenes = signal<OrdenCompra[]>([]);
-  protected readonly items = signal<OrdenCompraItem[]>([]);
   protected readonly bodegas = signal<Bodega[]>([]);
   protected readonly proveedores = signal<Proveedor[]>([]);
   protected readonly unidades = signal<UnidadMedida[]>([]);
@@ -193,11 +186,11 @@ export class OrdenesCompraComponent implements OnInit, OnDestroy {
   protected readonly guardando = signal(false);
 
   // ── Listado de órdenes — filtros + paginación SERVER-SIDE (homologación
-  // 27-oct-2026, ver cargarListado()/cargarListadoSupabase()/
-  // cargarListadoLocal() más abajo). Ningún filtro dispara una consulta
-  // por sí solo — solo cambiarFiltro() (botón "🔍 Buscar" o Enter en el
-  // campo de texto) lo hace, igual que Productos y servicios/Movimientos
-  // entre bodegas (historial)/Valor de stock. ──────────────────────────
+  // 27-oct-2026, ver cargarListado()/cargarListadoSupabase() más abajo).
+  // Ningún filtro dispara una consulta por sí solo — solo cambiarFiltro()
+  // (botón "🔍 Buscar" o Enter en el campo de texto) lo hace, igual que
+  // Productos y servicios/Movimientos entre bodegas (historial)/Valor de
+  // stock. ──────────────────────────────────────────────────────────────
   protected readonly filtroBusqueda = signal('');
   protected readonly filtroProveedorId = signal(0);
   protected readonly filtroBodegaId = signal(0);
@@ -222,12 +215,6 @@ export class OrdenesCompraComponent implements OnInit, OnDestroy {
    *  una búsqueda/página más reciente — mismo patrón que
    *  MovimientosBodegaComponent.secuenciaHistorial. */
   private secuenciaListado = 0;
-
-  /** Catálogo completo de productos — SOLO se llena en modo IndexedDB
-   *  local (catálogos de prueba, chicos: no tienen el problema de escala
-   *  que motivó esta homologación). En modo Supabase esto NUNCA se llena
-   *  — los productos se consultan bajo demanda (ver clase de arriba). */
-  private productosLocal: Producto[] = [];
 
   protected readonly ordenActiva = signal<OrdenCompra | null>(null);
   protected readonly ordenAEliminar = signal<FilaOrdenCompra | null>(null);
@@ -397,36 +384,22 @@ export class OrdenesCompraComponent implements OnInit, OnDestroy {
     );
   }
 
-  /** Catálogos chicos (bodegas/proveedores/unidades, + productos en modo
-   *  IndexedDB local) — se cargan UNA sola vez (ngOnInit), nunca cambian
-   *  por guardar/recibir/eliminar una orden, así que no hace falta
-   *  recargarlos después de cada una de esas operaciones (mismo criterio
-   *  que ProductosComponent.cargarCatalogos()). El histórico de órdenes
-   *  en sí vive en cargarListado()/cargarListadoSupabase()/
-   *  cargarListadoLocal() — ver ahí el detalle de la homologación
+  /** Catálogos chicos (bodegas/proveedores/unidades) — se cargan UNA sola
+   *  vez (ngOnInit), nunca cambian por guardar/recibir/eliminar una orden,
+   *  así que no hace falta recargarlos después de cada una de esas
+   *  operaciones (mismo criterio que ProductosComponent.cargarCatalogos()).
+   *  El histórico de órdenes en sí vive en cargarListado()/
+   *  cargarListadoSupabase() — ver ahí el detalle de la homologación
    *  27-oct-2026 (paginación + filtros SERVER-SIDE). */
   private async cargarCatalogos(): Promise<void> {
-    if (this.esSupabase) {
-      const [bodegas, proveedores, unidades] = await Promise.all([
-        firstValueFrom(this.data.list<Bodega>('Bodega')),
-        firstValueFrom(this.data.list<Proveedor>('Proveedor')),
-        firstValueFrom(this.data.list<UnidadMedida>('UnidadMedida')),
-      ]);
-      this.bodegas.set(bodegas);
-      this.proveedores.set(proveedores);
-      this.unidades.set(unidades);
-    } else {
-      const [productos, bodegas, proveedores, unidades] = await Promise.all([
-        firstValueFrom(this.data.list<Producto>('Producto')),
-        firstValueFrom(this.data.list<Bodega>('Bodega')),
-        firstValueFrom(this.data.list<Proveedor>('Proveedor')),
-        firstValueFrom(this.data.list<UnidadMedida>('UnidadMedida')),
-      ]);
-      this.productosLocal = productos;
-      this.bodegas.set(bodegas);
-      this.proveedores.set(proveedores);
-      this.unidades.set(unidades);
-    }
+    const [bodegas, proveedores, unidades] = await Promise.all([
+      firstValueFrom(this.data.list<Bodega>('Bodega')),
+      firstValueFrom(this.data.list<Proveedor>('Proveedor')),
+      firstValueFrom(this.data.list<UnidadMedida>('UnidadMedida')),
+    ]);
+    this.bodegas.set(bodegas);
+    this.proveedores.set(proveedores);
+    this.unidades.set(unidades);
     this.movimientos.set([]);
   }
 
@@ -441,7 +414,7 @@ export class OrdenesCompraComponent implements OnInit, OnDestroy {
   async cargarListado(): Promise<void> {
     this.cargando.set(true);
     const miSecuencia = ++this.secuenciaListado;
-    const resultado = this.esSupabase ? await this.cargarListadoSupabase() : await this.cargarListadoLocal();
+    const resultado = await this.cargarListadoSupabase();
     if (miSecuencia !== this.secuenciaListado) return; // ya respondió una búsqueda/página más nueva — descartar esta
     const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
     // Si la página en la que estábamos quedó vacía (p.ej. se acaba de
@@ -470,7 +443,7 @@ export class OrdenesCompraComponent implements OnInit, OnDestroy {
   private async cargarListadoSupabase(): Promise<{ filas: FilaOrdenCompra[]; total: number }> {
     const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
     const desde = (this.paginaActual() - 1) * tamanio;
-    const { data, error } = await this.sb!.schema('inventario').rpc('fn_ordenes_compra_listar', {
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_ordenes_compra_listar', {
       p_busqueda: this.filtroBusqueda().trim() || null,
       p_proveedor_id: this.filtroProveedorId() || null,
       p_bodega_id: this.filtroBodegaId() || null,
@@ -506,65 +479,6 @@ export class OrdenesCompraComponent implements OnInit, OnDestroy {
       }),
       total: Number(filas[0]?.['total_filas'] ?? 0),
     };
-  }
-
-  /** Filtra/ordena en memoria sobre this.ordenes()/this.items() — solo para
-   *  modo IndexedDB local (catálogos de prueba, chicos: sin el problema de
-   *  escala de 200,000+ órdenes que sí aplica en modo Supabase). Mismo
-   *  orden (fecha DESC, id DESC como criterio de desempate estable) y
-   *  mismo cálculo de total/vencida que antes de esta homologación. */
-  private filasListadoLocalFiltradas(): FilaOrdenCompra[] {
-    const texto = this.filtroBusqueda().trim().toLowerCase();
-    const proveedorId = this.filtroProveedorId();
-    const bodegaId = this.filtroBodegaId();
-    const estado = this.filtroEstado();
-    const desde = this.filtroDesde();
-    const hasta = this.filtroHasta();
-    const hoyTexto = new Date().toISOString().slice(0, 10);
-    const items = this.items();
-    return this.ordenes()
-      .filter((o) => {
-        if (proveedorId && o.proveedorId !== proveedorId) return false;
-        if (bodegaId && o.bodegaDestinoId !== bodegaId) return false;
-        if (estado && o.estado !== estado) return false;
-        if (desde && o.fecha.slice(0, 10) < desde) return false;
-        if (hasta && o.fecha.slice(0, 10) > hasta) return false;
-        if (texto) {
-          const proveedorNombre = this.nombreProveedor(o.proveedorId).toLowerCase();
-          if (!o.folio.toLowerCase().includes(texto) && !proveedorNombre.includes(texto)) return false;
-        }
-        return true;
-      })
-      .map((o) => ({
-        id: o.id,
-        folio: o.folio,
-        proveedorNombre: this.nombreProveedor(o.proveedorId),
-        bodegaNombre: this.nombreBodega(o.bodegaDestinoId),
-        fecha: o.fecha,
-        estado: o.estado,
-        total: items.filter((i) => i.ordenCompraId === o.id).reduce((acc, i) => acc + i.cantidad * i.costoUnitario, 0),
-        vencida:
-          (o.estado === 'pendiente' || o.estado === 'recibida_parcial') &&
-          !!o.fechaEntregaEstimada &&
-          o.fechaEntregaEstimada.slice(0, 10) < hoyTexto,
-      }))
-      .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
-  }
-
-  /** Modo IndexedDB local — recarga encabezados + líneas COMPLETOS (igual
-   *  que antes de esta homologación: catálogos de prueba, chicos, sin el
-   *  problema de escala) y pagina/filtra en memoria. */
-  private async cargarListadoLocal(): Promise<{ filas: FilaOrdenCompra[]; total: number }> {
-    const [ordenes, items] = await Promise.all([
-      firstValueFrom(this.data.list<OrdenCompra>('OrdenCompra')),
-      firstValueFrom(this.data.list<OrdenCompraItem>('OrdenCompraItem')),
-    ]);
-    this.ordenes.set(ordenes);
-    this.items.set(items);
-    const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
-    const todas = this.filasListadoLocalFiltradas();
-    const desde = (this.paginaActual() - 1) * tamanio;
-    return { filas: todas.slice(desde, desde + tamanio), total: todas.length };
   }
 
   /** Cualquier cambio de filtro (texto, proveedor, bodega, estado, fechas)
@@ -705,33 +619,15 @@ export class OrdenesCompraComponent implements OnInit, OnDestroy {
     };
   }
 
-  private productoLocalAResumen(p: Producto): ProductoCompraResumen {
-    return {
-      id: p.id,
-      codigo: p.codigo ?? '',
-      nombre: p.nombre,
-      costo: p.costo,
-      activo: p.activo !== false,
-      unidadMedidaId: p.unidadMedidaId,
-      unidadMedidaNombre: this.unidades().find((u) => u.id === p.unidadMedidaId)?.nombre ?? '—',
-      unidadCompraId: p.unidadCompraId ?? null,
-      unidadCompraNombre: p.unidadCompraId ? (this.unidades().find((u) => u.id === p.unidadCompraId)?.nombre ?? '—') : null,
-      factorConversionCompra: p.factorConversionCompra ?? null,
-    };
-  }
-
   /** Hidrata SOLO los productos cuyos ids se piden — acotado por quien
    *  llama a cuántas líneas tiene una orden/borrador (decenas, nunca
    *  200,000). Usado al abrir una orden ya guardada y al aplicar un
    *  borrador de Sugerencia de reposición. */
   private async hidratarProductosPorIds(ids: number[]): Promise<ProductoCompraResumen[]> {
     if (ids.length === 0) return [];
-    if (this.esSupabase) {
-      const { data, error } = await this.sb!.schema('inventario').rpc('fn_ordenes_compra_productos_por_ids', { p_ids: ids });
-      if (error) return [];
-      return (data as Record<string, unknown>[]).map((f) => this.mapearProductoCompra(f));
-    }
-    return this.productosLocal.filter((p) => ids.includes(p.id)).map((p) => this.productoLocalAResumen(p));
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_ordenes_compra_productos_por_ids', { p_ids: ids });
+    if (error) return [];
+    return (data as Record<string, unknown>[]).map((f) => this.mapearProductoCompra(f));
   }
 
   /** Campo "Código / escanear…" de la barra de captura — responde tanto al
@@ -752,7 +648,7 @@ export class OrdenesCompraComponent implements OnInit, OnDestroy {
     const codigo = codigoCrudo.trim();
     if (!codigo) return;
 
-    const encontrado = this.esSupabase ? await this.buscarProductoPorCodigoSupabase(codigo) : this.buscarProductoPorCodigoLocal(codigo);
+    const encontrado = await this.buscarProductoPorCodigoSupabase(codigo);
     if (!encontrado) {
       this.toast.advertencia(`No se encontró un producto con ese código.`);
       return;
@@ -765,15 +661,9 @@ export class OrdenesCompraComponent implements OnInit, OnDestroy {
   }
 
   private async buscarProductoPorCodigoSupabase(codigo: string): Promise<ProductoCompraResumen | undefined> {
-    const { data, error } = await this.sb!.schema('inventario').rpc('fn_ordenes_compra_producto_por_codigo', { p_codigo: codigo });
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_ordenes_compra_producto_por_codigo', { p_codigo: codigo });
     if (error || !data || (data as unknown[]).length === 0) return undefined;
     return this.mapearProductoCompra((data as Record<string, unknown>[])[0]);
-  }
-
-  private buscarProductoPorCodigoLocal(codigo: string): ProductoCompraResumen | undefined {
-    const normalizado = codigo.trim().toLowerCase();
-    const p = this.productosLocal.find((p) => (p.codigo ?? '').trim().toLowerCase() === normalizado);
-    return p ? this.productoLocalAResumen(p) : undefined;
   }
 
   /** busquedaRemota de app-select-buscable para "Buscar producto por
@@ -784,7 +674,7 @@ export class OrdenesCompraComponent implements OnInit, OnDestroy {
    *  resultadosAutocompleteActual para no tener que volver a consultar al
    *  elegir uno (ver onSeleccionarProductoAutocomplete()). */
   protected buscarProductoAutocomplete = async (texto: string): Promise<OpcionBuscable[]> => {
-    const resultados = this.esSupabase ? await this.autocompletarProductoSupabase(texto) : this.autocompletarProductoLocal(texto);
+    const resultados = await this.autocompletarProductoSupabase(texto);
     this.resultadosAutocompleteActual = resultados;
     return resultados.map((r) => ({
       valor: r.id,
@@ -793,22 +683,12 @@ export class OrdenesCompraComponent implements OnInit, OnDestroy {
   };
 
   private async autocompletarProductoSupabase(texto: string): Promise<ProductoCompraResumen[]> {
-    const { data, error } = await this.sb!.schema('inventario').rpc('fn_ordenes_compra_autocomplete_producto', {
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_ordenes_compra_autocomplete_producto', {
       p_busqueda: texto || null,
       p_limite: 15,
     });
     if (error) return [];
     return (data as Record<string, unknown>[]).map((f) => this.mapearProductoCompra(f));
-  }
-
-  private autocompletarProductoLocal(texto: string): ProductoCompraResumen[] {
-    const termino = texto.trim().toLowerCase();
-    return this.productosLocal
-      .filter((p) => p.activo !== false)
-      .filter((p) => !termino || p.nombre.toLowerCase().includes(termino) || (p.codigo ?? '').toLowerCase().includes(termino))
-      .sort((a, b) => a.nombre.localeCompare(b.nombre))
-      .slice(0, 15)
-      .map((p) => this.productoLocalAResumen(p));
   }
 
   /** Al elegir una opción del autocomplete por nombre: guarda el producto
@@ -930,11 +810,7 @@ export class OrdenesCompraComponent implements OnInit, OnDestroy {
 
     this.guardando.set(true);
     try {
-      if (this.esSupabase) {
-        await this.guardarSupabase(lineasValidas);
-      } else {
-        await this.guardarLocal(lineasValidas);
-      }
+      await this.guardarSupabase(lineasValidas);
     } finally {
       this.guardando.set(false);
     }
@@ -960,7 +836,7 @@ export class OrdenesCompraComponent implements OnInit, OnDestroy {
         }))
       : null; // ya no se pueden editar líneas (ver puedeEditarItems()) — no se tocan
 
-    const { error } = await this.sb!.schema('inventario').rpc('fn_orden_compra_guardar', {
+    const { error } = await this.sb.schema('inventario').rpc('fn_orden_compra_guardar', {
       p_orden_id: ordenExistente?.id ?? null,
       p_proveedor_id: valor.proveedorId,
       p_bodega_destino_id: valor.bodegaDestinoId,
@@ -974,65 +850,6 @@ export class OrdenesCompraComponent implements OnInit, OnDestroy {
       return;
     }
     this.toast.exito(ordenExistente ? 'Orden actualizada.' : 'Orden creada correctamente.');
-    this.volverALista();
-  }
-
-  /** Modo IndexedDB local — comportamiento IDÉNTICO al de antes de esta
-   *  homologación (baja/alta secuenciales vía DataClientService): los
-   *  catálogos de prueba son chicos y no tienen el problema de escala ni
-   *  el riesgo de inconsistencia a gran volumen que motivó la RPC
-   *  transaccional de arriba. */
-  private async guardarLocal(lineasValidas: FilaItemForm[]): Promise<void> {
-    const valor = this.form.getRawValue();
-    const ordenExistente = this.ordenActiva();
-
-    let orden: OrdenCompra;
-    if (ordenExistente) {
-      orden = await firstValueFrom(
-        this.data.modificacion<OrdenCompra>('OrdenCompra', {
-          ...ordenExistente,
-          proveedorId: valor.proveedorId,
-          bodegaDestinoId: valor.bodegaDestinoId,
-          fecha: valor.fecha,
-          fechaEntregaEstimada: valor.fechaEntregaEstimada || null,
-          notas: valor.notas || null,
-        }),
-      );
-    } else {
-      orden = await firstValueFrom(
-        this.data.alta<OrdenCompra>('OrdenCompra', {
-          folio: folioSugeridoOrdenCompra(this.ordenes()),
-          proveedorId: valor.proveedorId,
-          bodegaDestinoId: valor.bodegaDestinoId,
-          fecha: valor.fecha,
-          fechaEntregaEstimada: valor.fechaEntregaEstimada || null,
-          notas: valor.notas || null,
-          estado: 'pendiente',
-        }),
-      );
-    }
-
-    if (this.puedeEditarItems()) {
-      const itemsPrevios = this.items().filter((i) => i.ordenCompraId === orden.id);
-      for (const previo of itemsPrevios) {
-        await firstValueFrom(this.data.baja('OrdenCompraItem', previo.id));
-      }
-      for (const linea of lineasValidas) {
-        await firstValueFrom(
-          this.data.alta<OrdenCompraItem>('OrdenCompraItem', {
-            ordenCompraId: orden.id,
-            productoId: linea.productoId,
-            cantidad: Number(linea.cantidadTexto),
-            costoUnitario: Number(linea.costoUnitarioTexto) || 0,
-            cantidadRecibida: 0,
-            unidadId: linea.unidadId,
-            factorConversion: linea.unidadId ? (linea.factorConversionCompra ?? 1) : 1,
-          }),
-        );
-      }
-    }
-
-    this.toast.exito(ordenExistente ? 'Orden actualizada.' : `Orden ${orden.folio} creada.`);
     this.volverALista();
   }
 

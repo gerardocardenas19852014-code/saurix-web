@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { fuenteDatosActual } from '../../../core/services/fuente-datos';
 import { SupabaseService } from '../../../core/services/supabase.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { ToastService } from '../../../shared/services/toast.service';
@@ -27,8 +26,7 @@ export class RestablecerComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
-  protected readonly enNube = fuenteDatosActual() === 'supabase';
-  private readonly sb = this.enNube ? inject(SupabaseService).cliente : null;
+  private readonly sb = inject(SupabaseService).cliente;
 
   protected readonly listo = signal(false);
   protected readonly sesionValida = signal(false);
@@ -41,10 +39,6 @@ export class RestablecerComponent implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    if (!this.sb) {
-      this.listo.set(true);
-      return;
-    }
     // El cliente procesa el enlace del correo al cargar; se da un momento.
     for (let i = 0; i < 10; i++) {
       const { data } = await this.sb.auth.getSession();
@@ -67,7 +61,6 @@ export class RestablecerComponent implements OnInit {
       this.toast.error('Las contraseñas no coinciden.');
       return;
     }
-    if (!this.sb) return;
     this.guardando.set(true);
     const { error } = await this.sb.auth.updateUser({ password: await hashPassword(password) });
     this.guardando.set(false);

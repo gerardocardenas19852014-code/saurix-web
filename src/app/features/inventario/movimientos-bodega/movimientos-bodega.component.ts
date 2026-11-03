@@ -4,7 +4,6 @@ import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { Subscription, firstValueFrom } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { SupabaseService } from '../../../core/services/supabase.service';
-import { fuenteDatosActual } from '../../../core/services/fuente-datos';
 import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { ToastService } from '../../../shared/services/toast.service';
 import { SelectBuscableComponent, OpcionBuscable } from '../../../shared/components/select-buscable/select-buscable.component';
@@ -12,8 +11,8 @@ import { EscaneoCodigoComponent } from '../../../shared/components/escaneo-codig
 import { Producto } from '../productos/producto.model';
 import { Bodega } from '../bodegas/bodega.model';
 import { ExistenciaBodega } from './existencia-bodega.model';
-import { MovimientoInventario } from './movimiento-inventario.model';
 import { MovimientoInventarioService } from './movimiento-inventario.service';
+import { MovimientoMasivoComponent } from './movimiento-masivo/movimiento-masivo.component';
 import { exportarCsv } from '../../../shared/utils/csv.util';
 import { exportarTablaPdf } from '../../../shared/utils/pdf-tabla.util';
 
@@ -89,26 +88,21 @@ const TOPE_FILAS_PDF = 200;
  * mientras un producto no tenga todavía ningún registro aquí.
  *
  * Homologación visual + escalabilidad (27-oct, ver auditoría del proyecto):
- * pensado para 200,000+ productos y millones de movimientos — en modo
- * Supabase (ver fuenteDatosActual()) las 3 pestañas usan RPC paginadas
- * (inventario.fn_movimientos_* — ver migración movimientos_bodega_rpc_*),
- * nunca cargan el catálogo de productos ni el historial completo. Al abrir
- * la pantalla solo se carga "Existencia por bodega" (más el bloque de
- * productos sin asignar); Historial y En tránsito cargan hasta que se
- * visita esa pestaña por primera vez (igual que Rotación en
- * valor-stock.component.ts). El selector de Producto (filtro de Historial
- * y el campo del modal "Nuevo movimiento") es un autocomplete remoto con
- * debounce (ver buscarProductosAutocomplete() y el modo remoto nuevo de
- * SelectBuscableComponent) — nunca descarga el catálogo completo.
- *
- * En modo IndexedDB (navegador sin backend) se mantiene el cálculo en
- * memoria de siempre, cargado una sola vez bajo demanda (cargarBaseLocal())
- * — a esa escala nunca es un problema real de rendimiento.
+ * pensado para 200,000+ productos y millones de movimientos — las 3
+ * pestañas usan RPC paginadas (inventario.fn_movimientos_* — ver migración
+ * movimientos_bodega_rpc_*), nunca cargan el catálogo de productos ni el
+ * historial completo. Al abrir la pantalla solo se carga "Existencia por
+ * bodega" (más el bloque de productos sin asignar); Historial y En tránsito
+ * cargan hasta que se visita esa pestaña por primera vez (igual que
+ * Rotación en valor-stock.component.ts). El selector de Producto (filtro
+ * de Historial y el campo del modal "Nuevo movimiento") es un autocomplete
+ * remoto con debounce (ver buscarProductosAutocomplete() y el modo remoto
+ * nuevo de SelectBuscableComponent) — nunca descarga el catálogo completo.
  */
 @Component({
   selector: 'app-movimientos-bodega',
   standalone: true,
-  imports: [ReactiveFormsModule, SelectBuscableComponent, EscaneoCodigoComponent, DatePipe],
+  imports: [ReactiveFormsModule, SelectBuscableComponent, EscaneoCodigoComponent, DatePipe, MovimientoMasivoComponent],
   templateUrl: './movimientos-bodega.component.html',
   styleUrl: './movimientos-bodega.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -120,22 +114,44 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
   private readonly movimientoService = inject(MovimientoInventarioService);
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
 
-  private readonly esSupabase = fuenteDatosActual() === 'supabase';
-  private readonly sb = this.esSupabase ? inject(SupabaseService).cliente : null;
+  private readonly sb = inject(SupabaseService).cliente;
 
-  // ── Catálogo de bodegas (chico, siempre completo en ambos modos) ───────
+  // ── Catálogo de bodegas (chico, siempre completo) ──────────────────────
   protected readonly bodegas = signal<Bodega[]>([]);
   protected readonly bodegasActivas = computed(() => this.bodegas().filter((b) => b.activo !== false));
   protected readonly opcionesBodega = computed<OpcionBuscable[]>(() =>
     this.bodegasActivas().map((b) => ({ valor: b.id, etiqueta: b.nombre })),
   );
-  private nombreBodega(id: number | null): string | null {
-    if (id === null) return null;
-    return this.bodegas().find((b) => b.id === id)?.nombre ?? '—';
-  }
 
   protected readonly tabActiva = signal<TabMovimientosBodega>('existencia');
   private readonly transitoTabCargada = signal(false);
+
+  // ── "Movimiento masivo" (requerimiento nuevo, nov-2026) — pantalla ancha
+  // integrada en el módulo (NUNCA un modal), alterna con el contenido de
+  // las pestañas de arriba sin afectar en nada el modal "Nuevo movimiento"
+  // existente (mismas guardas de entrada que nuevoMovimiento()). ───────────
+  protected readonly vistaMasiva = signal(false);
+
+  async abrirMovimientoMasivo(): Promise<void> {
+    if (this.bodegasActivas().length === 0) {
+      this.toast.advertencia('Antes crea al menos una Bodega activa (Inventario → Bodegas).');
+      return;
+    }
+    if (!(await this.hayProductosFisicosActivos())) {
+      this.toast.advertencia('No hay productos físicos activos — da de alta alguno en Productos y servicios.');
+      return;
+    }
+    this.vistaMasiva.set(true);
+  }
+
+  cancelarMasiva(): void {
+    this.vistaMasiva.set(false);
+  }
+
+  alCompletarMasiva(): void {
+    this.vistaMasiva.set(false);
+    this.refrescarTrasGuardar();
+  }
 
   seleccionarTab(tab: TabMovimientosBodega): void {
     this.tabActiva.set(tab);
@@ -151,28 +167,18 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
   // filtro "Producto" de Historial y por el campo "Producto" del modal
   // "Nuevo movimiento". Referencia estable (campo de clase) para pasarla
   // como [busquedaRemota] sin recrear la función en cada detección de
-  // cambios. En modo Supabase llama a fn_productos_autocomplete; en modo
-  // IndexedDB filtra la base local (cargada una sola vez, bajo demanda). ──
+  // cambios — llama a fn_productos_autocomplete. ──────────────────────────
   protected readonly buscarProductosAutocomplete = async (texto: string): Promise<OpcionBuscable[]> => {
     const limite = 15;
-    if (this.esSupabase) {
-      const { data, error } = await this.sb!.schema('inventario').rpc('fn_productos_autocomplete', {
-        p_busqueda: texto || null,
-        p_limite: limite,
-      });
-      if (error) return [];
-      return ((data ?? []) as Record<string, unknown>[]).map((f) => ({
-        valor: Number(f['id']),
-        etiqueta: f['codigo'] ? `${f['codigo']} — ${f['nombre']}` : String(f['nombre']),
-      }));
-    }
-    await this.cargarBaseLocal();
-    const termino = texto.trim().toLowerCase();
-    const candidatos = this.productosLocal.filter((p) => p.activo && p.existencia !== null);
-    const filtrados = termino
-      ? candidatos.filter((p) => p.nombre.toLowerCase().includes(termino) || (p.codigo ?? '').toLowerCase().includes(termino))
-      : candidatos;
-    return filtrados.slice(0, limite).map((p) => ({ valor: p.id, etiqueta: p.codigo ? `${p.codigo} — ${p.nombre}` : p.nombre }));
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_productos_autocomplete', {
+      p_busqueda: texto || null,
+      p_limite: limite,
+    });
+    if (error) return [];
+    return ((data ?? []) as Record<string, unknown>[]).map((f) => ({
+      valor: Number(f['id']),
+      etiqueta: f['codigo'] ? `${f['codigo']} — ${f['nombre']}` : String(f['nombre']),
+    }));
   };
 
   // ── Pestaña "Existencia por bodega" (carga automática al abrir, ver
@@ -223,7 +229,7 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
   private async cargarExistencia(): Promise<void> {
     this.cargandoExistencia.set(true);
     const miSecuencia = ++this.secuenciaExistencia;
-    const resultado = this.esSupabase ? await this.cargarExistenciaSupabase() : await this.cargarExistenciaLocal();
+    const resultado = await this.cargarExistenciaSupabase();
     if (miSecuencia !== this.secuenciaExistencia) return; // respuesta vieja, se descarta
     this.existenciaPagina.set(resultado.filas);
     this.totalExistenciaFiltrada.set(resultado.total);
@@ -233,7 +239,7 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
   private async cargarExistenciaSupabase(): Promise<{ filas: FilaExistencia[]; total: number }> {
     const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
     const desde = (this.paginaActualExistencia() - 1) * tamanio;
-    const { data, error } = await this.sb!.schema('inventario').rpc('fn_movimientos_existencia_bodega', {
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_movimientos_existencia_bodega', {
       p_busqueda: this.busquedaExistencia().trim() || null,
       p_bodega_id: this.bodegaIdFiltroExistencia() || null,
       p_solo_con_existencia: this.soloConExistencia(),
@@ -258,48 +264,14 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
     };
   }
 
-  private existenciaFilasLocalFiltradas(): FilaExistencia[] {
-    const texto = this.busquedaExistencia().trim().toLowerCase();
-    const bodegaId = this.bodegaIdFiltroExistencia();
-    const soloCon = this.soloConExistencia();
-    const productosPorId = new Map(this.productosLocal.filter((p) => p.activo && p.existencia !== null).map((p) => [p.id, p]));
-    let filas: FilaExistencia[] = this.existenciasBodegaLocal
-      .filter((e) => productosPorId.has(e.productoId))
-      .map((e) => {
-        const p = productosPorId.get(e.productoId)!;
-        return {
-          existenciaId: e.id,
-          productoId: e.productoId,
-          productoCodigo: p.codigo ?? '',
-          productoNombre: p.nombre,
-          bodegaId: e.bodegaId,
-          bodegaNombre: this.nombreBodega(e.bodegaId) ?? '—',
-          existencia: e.existencia,
-          ubicacion: e.ubicacion ?? null,
-        };
-      });
-    if (texto) filas = filas.filter((f) => f.productoNombre.toLowerCase().includes(texto) || f.productoCodigo.toLowerCase().includes(texto));
-    if (bodegaId) filas = filas.filter((f) => f.bodegaId === bodegaId);
-    if (soloCon) filas = filas.filter((f) => f.existencia > 0);
-    return filas.sort((a, b) => a.productoNombre.localeCompare(b.productoNombre) || a.bodegaNombre.localeCompare(b.bodegaNombre));
-  }
-
-  private async cargarExistenciaLocal(): Promise<{ filas: FilaExistencia[]; total: number }> {
-    await this.cargarBaseLocal();
-    const todas = this.existenciaFilasLocalFiltradas();
-    const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
-    const desde = (this.paginaActualExistencia() - 1) * tamanio;
-    return { filas: todas.slice(desde, desde + tamanio), total: todas.length };
-  }
-
   private async cargarProductosSinAsignar(): Promise<void> {
-    const resultado = this.esSupabase ? await this.cargarSinAsignarSupabase() : await this.cargarSinAsignarLocal();
+    const resultado = await this.cargarSinAsignarSupabase();
     this.productosSinAsignar.set(resultado.filas);
     this.totalSinAsignar.set(resultado.total);
   }
 
   private async cargarSinAsignarSupabase(): Promise<{ filas: FilaSinAsignar[]; total: number }> {
-    const { data, error } = await this.sb!.schema('inventario').rpc('fn_movimientos_productos_sin_asignar', {
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_movimientos_productos_sin_asignar', {
       p_desde: 0,
       p_cantidad: 100,
     });
@@ -314,15 +286,6 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
       })),
       total: Number(filas[0]?.['total'] ?? 0),
     };
-  }
-
-  private async cargarSinAsignarLocal(): Promise<{ filas: FilaSinAsignar[]; total: number }> {
-    await this.cargarBaseLocal();
-    const idsConBodega = new Set(this.existenciasBodegaLocal.map((e) => e.productoId));
-    const filas = this.productosLocal
-      .filter((p) => p.activo && p.existencia !== null && !idsConBodega.has(p.id) && (p.existencia ?? 0) > 0)
-      .map((p) => ({ productoId: p.id, codigo: p.codigo ?? '', nombre: p.nombre, cantidad: p.existencia ?? 0 }));
-    return { filas, total: filas.length };
   }
 
   /** Guarda la ubicación física (pasillo/anaquel, texto libre) de una fila
@@ -390,7 +353,7 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
   private async cargarHistorial(): Promise<void> {
     this.cargandoHistorial.set(true);
     const miSecuencia = ++this.secuenciaHistorial;
-    const resultado = this.esSupabase ? await this.cargarHistorialSupabase() : await this.cargarHistorialLocal();
+    const resultado = await this.cargarHistorialSupabase();
     if (miSecuencia !== this.secuenciaHistorial) return;
     this.historialPagina.set(resultado.filas);
     this.totalHistorialFiltrado.set(resultado.total);
@@ -411,7 +374,7 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
   private async cargarHistorialSupabase(): Promise<{ filas: FilaHistorial[]; total: number }> {
     const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
     const desde = (this.paginaActualHistorial() - 1) * tamanio;
-    const { data, error } = await this.sb!.schema('inventario').rpc('fn_movimientos_historial', this.parametrosHistorial(desde, tamanio));
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_movimientos_historial', this.parametrosHistorial(desde, tamanio));
     if (error) return { filas: [], total: 0 };
     const filas = (data ?? []) as Record<string, unknown>[];
     return { filas: filas.map((f) => this.mapearFilaHistorial(f)), total: Number(filas[0]?.['total'] ?? 0) };
@@ -436,51 +399,6 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
     };
   }
 
-  private historialFilasLocalFiltradas(): FilaHistorial[] {
-    const nombreProducto = (id: number) => this.productosLocal.find((p) => p.id === id)?.nombre ?? '—';
-    const codigoProducto = (id: number) => this.productosLocal.find((p) => p.id === id)?.codigo ?? '';
-    const productoId = this.filtroProductoId();
-    const bodegaId = this.filtroBodegaId();
-    const desde = this.filtroDesde();
-    const hasta = this.filtroHasta();
-    return this.movimientosLocal
-      .map((m) => {
-        const tipo: TipoMovimiento = m.bodegaOrigenId === null ? 'entrada' : m.bodegaDestinoId === null ? 'salida' : 'traspaso';
-        return {
-          id: m.id,
-          fecha: m.fecha,
-          productoId: m.productoId,
-          productoNombre: nombreProducto(m.productoId),
-          productoCodigo: codigoProducto(m.productoId),
-          bodegaOrigenId: m.bodegaOrigenId,
-          origenNombre: this.nombreBodega(m.bodegaOrigenId),
-          bodegaDestinoId: m.bodegaDestinoId,
-          destinoNombre: this.nombreBodega(m.bodegaDestinoId),
-          tipo,
-          cantidad: m.cantidad,
-          nota: m.nota,
-          enTransito: m.enTransito ?? false,
-          fechaRecepcion: m.fechaRecepcion ?? null,
-        };
-      })
-      .filter((f) => {
-        if (productoId && f.productoId !== productoId) return false;
-        if (bodegaId && f.bodegaOrigenId !== bodegaId && f.bodegaDestinoId !== bodegaId) return false;
-        if (desde && f.fecha.slice(0, 10) < desde) return false;
-        if (hasta && f.fecha.slice(0, 10) > hasta) return false;
-        return true;
-      })
-      .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
-  }
-
-  private async cargarHistorialLocal(): Promise<{ filas: FilaHistorial[]; total: number }> {
-    await this.cargarBaseLocal();
-    const todas = this.historialFilasLocalFiltradas();
-    const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
-    const desde = (this.paginaActualHistorial() - 1) * tamanio;
-    return { filas: todas.slice(desde, desde + tamanio), total: todas.length };
-  }
-
   private nombreTipoHistorial(fila: FilaHistorial): string {
     if (fila.tipo === 'traspaso') return fila.enTransito ? 'Traspaso (en tránsito)' : 'Traspaso';
     return fila.tipo === 'entrada' ? 'Entrada' : 'Salida/Ajuste';
@@ -500,30 +418,11 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
       { clave: 'nota' as const, etiqueta: 'Nota' },
     ];
 
-    if (!this.esSupabase) {
-      await this.cargarBaseLocal();
-      const filas = this.historialFilasLocalFiltradas();
-      exportarCsv(
-        'movimientos_bodega.csv',
-        columnas,
-        filas.map((f) => ({
-          fecha: f.fecha,
-          productoNombre: f.productoNombre,
-          tipo: this.nombreTipoHistorial(f),
-          origenNombre: f.origenNombre ?? '',
-          destinoNombre: f.destinoNombre ?? '',
-          cantidad: f.cantidad,
-          nota: f.nota ?? '',
-        })),
-      );
-      return;
-    }
-
     const todas: Record<string, unknown>[] = [];
     let desde = 0;
     let total = Infinity;
     while (desde < total) {
-      const { data, error } = await this.sb!.schema('inventario').rpc('fn_movimientos_historial', this.parametrosHistorial(desde, TAMANO_LOTE_EXPORTAR));
+      const { data, error } = await this.sb.schema('inventario').rpc('fn_movimientos_historial', this.parametrosHistorial(desde, TAMANO_LOTE_EXPORTAR));
       if (error) break;
       const filas = (data ?? []) as Record<string, unknown>[];
       if (filas.length === 0) break;
@@ -548,19 +447,10 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
   /** PDF acotado a TOPE_FILAS_PDF (reporte, no un volcado completo) —
    *  mismo criterio que valor-stock.component.ts → exportarPdfProductos(). */
   async exportarPdfHistorial(): Promise<void> {
-    let filasListado: FilaHistorial[];
-    let totalFiltrado: number;
-    if (this.esSupabase) {
-      const { data, error } = await this.sb!.schema('inventario').rpc('fn_movimientos_historial', this.parametrosHistorial(0, TOPE_FILAS_PDF));
-      const filas = !error ? ((data ?? []) as Record<string, unknown>[]) : [];
-      filasListado = filas.map((f) => this.mapearFilaHistorial(f));
-      totalFiltrado = Number(filas[0]?.['total'] ?? filasListado.length);
-    } else {
-      await this.cargarBaseLocal();
-      const todas = this.historialFilasLocalFiltradas();
-      totalFiltrado = todas.length;
-      filasListado = todas.slice(0, TOPE_FILAS_PDF);
-    }
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_movimientos_historial', this.parametrosHistorial(0, TOPE_FILAS_PDF));
+    const filas = !error ? ((data ?? []) as Record<string, unknown>[]) : [];
+    const filasListado = filas.map((f) => this.mapearFilaHistorial(f));
+    const totalFiltrado = Number(filas[0]?.['total'] ?? filasListado.length);
 
     const notaListado =
       totalFiltrado > filasListado.length
@@ -628,7 +518,7 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
   private async cargarTransito(): Promise<void> {
     this.cargandoTransito.set(true);
     const miSecuencia = ++this.secuenciaTransito;
-    const resultado = this.esSupabase ? await this.cargarTransitoSupabase() : await this.cargarTransitoLocal();
+    const resultado = await this.cargarTransitoSupabase();
     if (miSecuencia !== this.secuenciaTransito) return;
     this.transitoPagina.set(resultado.filas);
     this.totalTransitoFiltrado.set(resultado.total);
@@ -638,7 +528,7 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
   private async cargarTransitoSupabase(): Promise<{ filas: FilaTransito[]; total: number }> {
     const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
     const desde = (this.paginaActualTransito() - 1) * tamanio;
-    const { data, error } = await this.sb!.schema('inventario').rpc('fn_movimientos_transito', {
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_movimientos_transito', {
       p_bodega_origen_id: this.filtroBodegaOrigenTransito() || null,
       p_bodega_destino_id: this.filtroBodegaDestinoTransito() || null,
       p_desde: desde,
@@ -664,35 +554,6 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
     };
   }
 
-  private async cargarTransitoLocal(): Promise<{ filas: FilaTransito[]; total: number }> {
-    await this.cargarBaseLocal();
-    const nombreProducto = (id: number) => this.productosLocal.find((p) => p.id === id)?.nombre ?? '—';
-    const codigoProducto = (id: number) => this.productosLocal.find((p) => p.id === id)?.codigo ?? '';
-    const origenFiltro = this.filtroBodegaOrigenTransito();
-    const destinoFiltro = this.filtroBodegaDestinoTransito();
-    const todas = this.movimientosLocal
-      .filter((m) => m.enTransito && m.bodegaOrigenId !== null && m.bodegaDestinoId !== null)
-      .filter((m) => !origenFiltro || m.bodegaOrigenId === origenFiltro)
-      .filter((m) => !destinoFiltro || m.bodegaDestinoId === destinoFiltro)
-      .map((m) => ({
-        id: m.id,
-        fecha: m.fecha,
-        productoId: m.productoId,
-        productoNombre: nombreProducto(m.productoId),
-        productoCodigo: codigoProducto(m.productoId),
-        bodegaOrigenId: m.bodegaOrigenId!,
-        origenNombre: this.nombreBodega(m.bodegaOrigenId!) ?? '—',
-        bodegaDestinoId: m.bodegaDestinoId!,
-        destinoNombre: this.nombreBodega(m.bodegaDestinoId!) ?? '—',
-        cantidad: m.cantidad,
-        nota: m.nota,
-      }))
-      .sort((a, b) => a.fecha.localeCompare(b.fecha));
-    const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
-    const desde = (this.paginaActualTransito() - 1) * tamanio;
-    return { filas: todas.slice(desde, desde + tamanio), total: todas.length };
-  }
-
   /** Suma a la bodega destino lo que ya se restó de origen al enviarlo, y
    *  marca el traspaso como recibido — misma lógica de siempre
    *  (MovimientoInventarioService.confirmarRecepcionTransito(), sin tocar).
@@ -706,26 +567,6 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
     this.confirmandoRecepcionId.set(null);
     this.toast.exito('Recepción confirmada — se sumó a la bodega destino.');
     this.cargarTransito();
-  }
-
-  // ── Catálogos locales (solo IndexedDB) — cargados una sola vez bajo
-  // demanda, nunca al abrir la pantalla (ver cargarBaseLocal()). ──────────
-  private baseLocalCargada = false;
-  private productosLocal: Producto[] = [];
-  private existenciasBodegaLocal: ExistenciaBodega[] = [];
-  private movimientosLocal: MovimientoInventario[] = [];
-
-  private async cargarBaseLocal(): Promise<void> {
-    if (this.baseLocalCargada) return;
-    const [productos, existencias, movimientos] = await Promise.all([
-      firstValueFrom(this.data.list<Producto>('Producto')),
-      firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega')),
-      firstValueFrom(this.data.list<MovimientoInventario>('MovimientoInventario')),
-    ]);
-    this.productosLocal = productos;
-    this.existenciasBodegaLocal = existencias;
-    this.movimientosLocal = movimientos;
-    this.baseLocalCargada = true;
   }
 
   // ── Modal "Nuevo movimiento" (reglas de negocio SIN CAMBIOS — ver
@@ -792,12 +633,8 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
    *  (1 fila), nunca el catálogo completo, solo para decidir si vale la
    *  pena abrir el modal (mismo mensaje de advertencia que antes). */
   private async hayProductosFisicosActivos(): Promise<boolean> {
-    if (this.esSupabase) {
-      const { data, error } = await this.sb!.schema('inventario').rpc('fn_productos_autocomplete', { p_busqueda: null, p_limite: 1 });
-      return !error && ((data as unknown[]) ?? []).length > 0;
-    }
-    await this.cargarBaseLocal();
-    return this.productosLocal.some((p) => p.activo && p.existencia !== null);
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_productos_autocomplete', { p_busqueda: null, p_limite: 1 });
+    return !error && ((data as unknown[]) ?? []).length > 0;
   }
 
   /** Busca el producto cuyo código coincida (exacto, sin distinguir
@@ -810,16 +647,8 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
   async seleccionarPorCodigo(codigo: string): Promise<void> {
     const limpio = codigo.trim();
     if (!limpio) return;
-    let encontrado: { id: number; codigo: string | null; nombre: string } | undefined;
-    if (this.esSupabase) {
-      const { filas } = await firstValueFrom(this.data.listarPagina<Producto>('Producto', { codigo: limpio, activo: true }, 0, 5));
-      encontrado = filas.find((p) => (p.codigo ?? '').trim().toLowerCase() === limpio.toLowerCase());
-    } else {
-      await this.cargarBaseLocal();
-      encontrado = this.productosLocal.find(
-        (p) => p.activo && p.existencia !== null && (p.codigo ?? '').trim().toLowerCase() === limpio.toLowerCase(),
-      );
-    }
+    const { filas } = await firstValueFrom(this.data.listarPagina<Producto>('Producto', { codigo: limpio, activo: true }, 0, 5));
+    const encontrado = filas.find((p) => (p.codigo ?? '').trim().toLowerCase() === limpio.toLowerCase());
     if (!encontrado) {
       this.toast.advertencia(`No se encontró ningún producto activo con el código "${codigo}".`);
       return;

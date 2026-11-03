@@ -90,13 +90,13 @@ function mensajeError(error: unknown): string {
 
 /**
  * Implementación de DataClientService sobre Supabase (Postgres + Storage).
- * Mismo contrato que IndexedDbDataClientService, así que ninguna pantalla
- * cambia:
+ * Ninguna pantalla depende de esta clase directamente (todas dependen solo
+ * del contrato DataClientService):
  *  - la entidad ('MovimientoPresupuesto') se traduce a esquema.tabla
  *    (presupuesto.movimiento_presupuesto) con el mapa de supabase-esquema.ts;
  *  - los campos viajan camelCase ↔ snake_case;
- *  - el filtro de list() se comporta igual que en IndexedDB: texto =
- *    contiene (sin mayúsculas), resto = igualdad exacta;
+ *  - el filtro de list() se comporta así: texto = contiene (sin
+ *    mayúsculas), resto = igualdad exacta;
  *  - las entidades *Adjunto guardan el archivo en Storage (bucket
  *    "adjuntos") y devuelven en `contenido` una URL firmada temporal, para
  *    que `<a [href]="adjunto.contenido">` siga funcionando;
@@ -111,11 +111,11 @@ export class SupabaseDataClientService extends DataClientService {
   private readonly toast = inject(ToastService);
 
   override list<T>(entidad: string, filtro?: Record<string, unknown>): Observable<T[]> {
-    // Entidades construidas primero en el frontend (IndexedDB) y aún sin
-    // migrar a Supabase (ver esquema-tablas-saurix.md del proyecto Claude):
-    // en vez de tronar con un toast de error cada vez que la pantalla
-    // carga, se degradan a "sin datos todavía" — mismo espíritu que el
-    // resto de la app, donde el frontend va por delante del backend real.
+    // Entidades construidas primero en el frontend y aún sin migrar a
+    // Supabase (ver esquema-tablas-saurix.md del proyecto Claude): en vez
+    // de tronar con un toast de error cada vez que la pantalla carga, se
+    // degradan a "sin datos todavía" — mismo espíritu que el resto de la
+    // app, donde el frontend va por delante del backend real.
     // alta/modificacion/baja siguen fallando fuerte (nunca ocultar que una
     // escritura no se guardó).
     if (!entidadExiste(entidad)) {

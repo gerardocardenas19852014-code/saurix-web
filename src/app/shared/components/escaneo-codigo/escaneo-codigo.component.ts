@@ -21,6 +21,19 @@ import { ToastService } from '../../services/toast.service';
  * En ambos casos el resultado sale por el mismo evento (codigoEscaneado),
  * así cada pantalla que use este componente no necesita saber cuál de los
  * dos métodos se usó — solo reacciona al código ya leído.
+ *
+ * MODO [soloBoton] (nov-2026, ver Productos → Nuevo/Editar producto):
+ * cuando la pantalla que lo usa YA tiene su propio <input> de texto (p.ej.
+ * el campo "Código / SKU" del formulario de producto) no tiene sentido
+ * mostrar un SEGUNDO cuadro de texto solo para escanear — el lector
+ * USB/Bluetooth ya funciona tecleando directo en ese campo propio (es
+ * keystroke puro, no necesita este componente para nada). En ese caso se
+ * usa [soloBoton]="true": este componente deja de dibujar su <input>
+ * interno y solo muestra el botón 📷 — la cámara sigue funcionando igual,
+ * emite el mismo evento (codigoEscaneado) de siempre. Default false: cero
+ * cambio de comportamiento para los usos existentes (Cobro, Movimientos
+ * entre bodegas, Conteo físico, Órdenes de compra), que sí dependen de su
+ * propio <input> para buscar por código.
  */
 @Component({
   selector: 'app-escaneo-codigo',
@@ -34,8 +47,11 @@ export class EscaneoCodigoComponent implements OnDestroy {
   @Input() placeholder = 'Escanea o captura el código…';
   /** Se limpia el input después de cada escaneo/captura por default — en
    *  pantallas donde conviene dejarlo (p. ej. para ver qué se acaba de
-   *  escanear) se puede desactivar. */
+   *  escanear) se puede desactivar. Sin efecto en modo [soloBoton] (no hay
+   *  input interno que limpiar ahí). */
   @Input() limpiarDespues = true;
+  /** Ver comentario de clase ("MODO [soloBoton]"). */
+  @Input() soloBoton = false;
   @Output() readonly codigoEscaneado = new EventEmitter<string>();
 
   private readonly toast = inject(ToastService);

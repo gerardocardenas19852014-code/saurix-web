@@ -86,8 +86,8 @@ export class TramitesFamiliaresComponent implements OnInit {
   }
 
   /** Alta secuencial de las columnas de fábrica — no hay transacciones en
-   *  este sistema (ver indexeddb-engine.service.ts), así que se encadenan
-   *  una por una en vez de mandarlas en paralelo. */
+   *  este sistema, así que se encadenan una por una en vez de mandarlas en
+   *  paralelo. */
   private sembrarEstados(restantes: Omit<TramiteEstado, 'id'>[] = SEMILLA_TRAMITE_ESTADOS): void {
     if (restantes.length === 0) {
       this.cargarEstados();

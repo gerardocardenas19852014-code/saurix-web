@@ -19,37 +19,7 @@
   <div class="auth-box">
     <span class="eyebrow"><img class="eyebrow-icon" src="brand/saurix-icon-dark.png" alt="" /> Saurix</span>
 
-    <!-- 1. ¿Dónde vas a trabajar? (lo primero que se decide) -->
-    <p class="fuente-datos-titulo">¿Dónde vas a trabajar?</p>
-    <div class="fuente-datos" role="radiogroup" aria-label="Dónde se guardan los datos">
-      <button
-        type="button"
-        role="radio"
-        class="nube"
-        [attr.aria-checked]="enNube"
-        [class.activa]="enNube"
-        (click)="cambiarFuente('supabase')"
-      >
-        ☁️ Nube
-      </button>
-      <button
-        type="button"
-        role="radio"
-        class="local"
-        [attr.aria-checked]="!enNube"
-        [class.activa]="!enNube"
-        (click)="cambiarFuente('indexeddb')"
-      >
-        💻 Este navegador
-      </button>
-    </div>
-    <p class="fuente-datos-ayuda">
-      {{ enNube
-        ? 'Tus datos se guardan en Supabase y los ves desde cualquier dispositivo.'
-        : 'Tus datos se guardan solo en este navegador (sin internet).' }}
-    </p>
-
-    @if (enNube && conexiones.length > 1) {
+    @if (conexiones.length > 1) {
       <label class="conexion-select">
         Empresa
         <select [value]="conexion.clave" (change)="cambiarConexion($any($event.target).value)">
@@ -69,7 +39,7 @@
           <input
             type="text"
             formControlName="usuario"
-            [placeholder]="enNube ? 'Usuario o correo' : 'p.ej. ana'"
+            placeholder="Usuario o correo"
             autofocus
             autocomplete="username"
           />
@@ -104,18 +74,13 @@
             <input type="checkbox" formControlName="recordarUsuario" />
             Recordar usuario
           </label>
-          @if (enNube) {
-            <button type="button" class="link-olvide" (click)="abrirRecuperar()">¿Olvidaste tu contraseña?</button>
-          }
+          <button type="button" class="link-olvide" (click)="abrirRecuperar()">¿Olvidaste tu contraseña?</button>
         </div>
         @if (mensajeError()) {
           <p class="login-error" role="alert">{{ mensajeError() }}</p>
         }
-        @if (sugerenciaAmbiente()) {
-          <p class="login-sugerencia">{{ sugerenciaAmbiente() }}</p>
-        }
-        <button type="submit" class="btn-primary" [class.btn-local]="!enNube" [disabled]="enviando()">
-          {{ enviando() ? 'Entrando…' : enNube ? 'Entrar a la Nube' : 'Entrar (este navegador)' }}
+        <button type="submit" class="btn-primary" [disabled]="enviando()">
+          {{ enviando() ? 'Entrando…' : 'Entrar a la Nube' }}
         </button>
       </form>
     } @else {

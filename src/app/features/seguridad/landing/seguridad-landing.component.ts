@@ -1,6 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { AuthService } from '../../../core/services/auth.service';
-import { fuenteDatosActual } from '../../../core/services/fuente-datos';
 import { RouterLink } from '@angular/router';
 
 /** Mismo criterio de color que Presupuesto/Proyectos/Familia (ver
@@ -55,9 +54,9 @@ const GRUPOS: GrupoModulo[] = [
 export class SeguridadLandingComponent {
   private readonly auth = inject(AuthService);
 
-  /** Empresas solo para el superadministrador y trabajando en la Nube. */
+  /** Empresas solo para el superadministrador. */
   protected readonly grupos: GrupoModulo[] =
-    fuenteDatosActual() === 'supabase' && this.auth.usuarioActual()?.esSuperadmin
+    this.auth.usuarioActual()?.esSuperadmin
       ? [
           ...GRUPOS,
           {

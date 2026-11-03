@@ -16,7 +16,7 @@ import { Proveedor } from '../proveedores/proveedor.model';
 import { formatMoneda, existenciaTotal, tieneBodegaAsignada } from './producto.util';
 import { ExistenciaBodega } from '../movimientos-bodega/existencia-bodega.model';
 import { EscaneoCodigoComponent } from '../../../shared/components/escaneo-codigo/escaneo-codigo.component';
-import JsBarcode from 'jsbarcode';
+import { ImprimirEtiquetasComponent } from './imprimir-etiquetas/imprimir-etiquetas.component';
 
 /** Una fila ya parseada del CSV de importación masiva, con su validación
  *  resuelta — ver importarArchivo()/validarFila() más abajo. `payload` solo
@@ -31,16 +31,29 @@ interface FilaImportacion {
   precioTexto: string;
   existenciaTexto: string;
   activoTexto: string;
+  descripcionTexto: string;
+  nivelMinimoTexto: string;
+  nivelMaximoTexto: string;
+  proveedorTexto: string;
+  unidadCompraTexto: string;
+  factorConversionCompraTexto: string;
+  manejaLotesTexto: string;
+  destacadoTexto: string;
   error: string | null;
   payload: Omit<Producto, 'id'> | null;
 }
 
-const ENCABEZADOS_CSV = ['nombre', 'codigo', 'categoria', 'unidad', 'costo', 'precio', 'existencia', 'activo'] as const;
+// Las primeras 8 columnas son las originales (no se reordenan, para no
+// romper plantillas ya descargadas); las nuevas se agregan al final.
+const ENCABEZADOS_CSV = [
+  'nombre', 'codigo', 'categoria', 'unidad', 'costo', 'precio', 'existencia', 'activo',
+  'descripcion', 'nivel_minimo', 'nivel_maximo', 'proveedor', 'unidad_compra', 'factor_conversion_compra', 'maneja_lotes', 'destacado',
+] as const;
 
 @Component({
   selector: 'app-productos',
   standalone: true,
-  imports: [ReactiveFormsModule, DataTableComponent, ConfirmDialogComponent, SelectBuscableComponent, EscaneoCodigoComponent],
+  imports: [ReactiveFormsModule, DataTableComponent, ConfirmDialogComponent, SelectBuscableComponent, EscaneoCodigoComponent, ImprimirEtiquetasComponent],
   templateUrl: './productos.component.html',
   styleUrl: './productos.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -61,7 +74,6 @@ export class ProductosComponent implements OnInit, OnDestroy {
    *  etiquetas" (ver buscarProductosEtiquetas()) — ese modal busca aparte
    *  contra el servidor (no contra la página actual de la tabla), así que
    *  necesita su propio límite acotado. */
-  private static readonly LIMITE_BUSQUEDA_ETIQUETAS = 200;
 
   protected readonly productos = signal<Producto[]>([]);
   /** Total real de productos que cumplen el filtro actual (sin recortar a
@@ -410,13 +422,18 @@ export class ProductosComponent implements OnInit, OnDestroy {
     this.modalAbierto.set(true);
   }
 
-  /** Pone en el campo "Código / SKU" lo que se acaba de escanear (lector
-   *  USB/Bluetooth o cámara — ver app-escaneo-codigo) — [limpiarDespues]
-   *  en false en el template para que se vea el código capturado. Avisa
-   *  (sin bloquear) si ya hay OTRO producto activo con ese mismo código,
-   *  ya que ahora se usa para buscar por escaneo en Movimientos entre
-   *  bodegas/Conteo físico/Órdenes de compra y un duplicado haría que el
-   *  escaneo encuentre el producto equivocado. */
+  /** Pone en el campo "Código / SKU" lo que se acaba de capturar con la
+   *  cámara (homologación nov-2026: antes existía un segundo cuadro de
+   *  texto solo para escanear, aparte de "Código / SKU" -- ver
+   *  app-escaneo-codigo [soloBoton]="true" en el template, que ahora solo
+   *  aporta el botón 📷 y escribe directo en este mismo campo). Un lector
+   *  USB/Bluetooth no pasa por aquí -- teclea directo en el <input> de
+   *  "Código / SKU" como cualquier campo de texto, sin necesitar este
+   *  método. Avisa (sin bloquear) si ya hay OTRO producto activo con ese
+   *  mismo código, ya que el código también se usa para buscar por
+   *  escaneo en Movimientos entre bodegas/Conteo físico/Órdenes de compra
+   *  y un duplicado haría que ese escaneo encuentre el producto
+   *  equivocado. */
   asignarCodigoEscaneado(codigo: string): void {
     this.form.patchValue({ codigo });
     const codigoLimpio = codigo.trim();
@@ -551,6 +568,7 @@ export class ProductosComponent implements OnInit, OnDestroy {
   descargarPlantilla(): void {
     const claveCategoria = this.categorias()[0]?.clave ?? 'GENERAL';
     const claveUnidad = this.unidades()[0]?.clave ?? 'PZA';
+    const nombreProveedor = this.proveedores()[0]?.nombre ?? '';
     const filas = [
       {
         nombre: 'Ejemplo producto físico',
@@ -561,6 +579,14 @@ export class ProductosComponent implements OnInit, OnDestroy {
         precio: '89.90',
         existencia: '10',
         activo: 'si',
+        descripcion: 'Descripción opcional del producto',
+        nivel_minimo: '5',
+        nivel_maximo: '50',
+        proveedor: nombreProveedor,
+        unidad_compra: claveUnidad,
+        factor_conversion_compra: '1',
+        maneja_lotes: 'no',
+        destacado: 'no',
       },
       {
         nombre: 'Ejemplo servicio',
@@ -571,6 +597,14 @@ export class ProductosComponent implements OnInit, OnDestroy {
         precio: '350.00',
         existencia: '',
         activo: 'si',
+        descripcion: '',
+        nivel_minimo: '',
+        nivel_maximo: '',
+        proveedor: '',
+        unidad_compra: '',
+        factor_conversion_compra: '',
+        maneja_lotes: '',
+        destacado: 'si',
       },
     ];
     exportarCsv(
@@ -578,7 +612,11 @@ export class ProductosComponent implements OnInit, OnDestroy {
       ENCABEZADOS_CSV.map((clave) => ({ clave, etiqueta: clave })),
       filas,
     );
-    this.toast.info('La columna "categoria" y "unidad" deben coincidir con la Clave de esos catálogos. "existencia" vacío = servicio.');
+    this.toast.info(
+      '"categoria" y "unidad" deben coincidir con la Clave de esos catálogos; "proveedor" coincide por Nombre (no tiene Clave). ' +
+        '"existencia" vacío = servicio (en servicios se ignoran nivel_minimo/nivel_maximo/maneja_lotes). ' +
+        'Si capturas "unidad_compra" debes capturar también "factor_conversion_compra". "maneja_lotes" y "destacado" aceptan sí/no, igual que "activo".',
+    );
   }
 
   async archivoSeleccionado(evento: Event): Promise<void> {
@@ -610,7 +648,24 @@ export class ProductosComponent implements OnInit, OnDestroy {
    *  encabezado como línea 1) — así un error apunta al mismo renglón que el
    *  usuario vería si abre el CSV en Excel. */
   private validarFila(campos: string[], numeroRenglon: number): FilaImportacion {
-    const [nombre = '', codigo = '', categoriaTexto = '', unidadTexto = '', costoTexto = '', precioTexto = '', existenciaTexto = '', activoTexto = ''] = campos;
+    const [
+      nombre = '',
+      codigo = '',
+      categoriaTexto = '',
+      unidadTexto = '',
+      costoTexto = '',
+      precioTexto = '',
+      existenciaTexto = '',
+      activoTexto = '',
+      descripcionTexto = '',
+      nivelMinimoTexto = '',
+      nivelMaximoTexto = '',
+      proveedorTexto = '',
+      unidadCompraTexto = '',
+      factorConversionCompraTexto = '',
+      manejaLotesTexto = '',
+      destacadoTexto = '',
+    ] = campos;
 
     const base: Omit<FilaImportacion, 'error' | 'payload'> = {
       numero: numeroRenglon,
@@ -622,6 +677,14 @@ export class ProductosComponent implements OnInit, OnDestroy {
       precioTexto: precioTexto.trim(),
       existenciaTexto: existenciaTexto.trim(),
       activoTexto: activoTexto.trim(),
+      descripcionTexto: descripcionTexto.trim(),
+      nivelMinimoTexto: nivelMinimoTexto.trim(),
+      nivelMaximoTexto: nivelMaximoTexto.trim(),
+      proveedorTexto: proveedorTexto.trim(),
+      unidadCompraTexto: unidadCompraTexto.trim(),
+      factorConversionCompraTexto: factorConversionCompraTexto.trim(),
+      manejaLotesTexto: manejaLotesTexto.trim(),
+      destacadoTexto: destacadoTexto.trim(),
     };
 
     if (!base.nombre) {
@@ -662,6 +725,60 @@ export class ProductosComponent implements OnInit, OnDestroy {
     const activoTextoNormalizado = base.activoTexto.toLowerCase();
     const activo = !['no', 'false', '0'].includes(activoTextoNormalizado);
 
+    const descripcion = base.descripcionTexto === '' ? null : base.descripcionTexto;
+
+    // nivelMinimo/nivelMaximo/manejaLotes solo aplican a productos físicos —
+    // mismo criterio que guardar() del alta/edición individual: en un
+    // servicio (existencia === null) se ignoran aunque el CSV traiga algo.
+    const esServicioFila = existencia === null;
+
+    let nivelMinimo: number | null = null;
+    if (!esServicioFila && base.nivelMinimoTexto !== '') {
+      nivelMinimo = Number(base.nivelMinimoTexto);
+      if (Number.isNaN(nivelMinimo) || nivelMinimo < 0) {
+        return { ...base, error: `Nivel mínimo inválido: "${base.nivelMinimoTexto}".`, payload: null };
+      }
+    }
+
+    let nivelMaximo: number | null = null;
+    if (!esServicioFila && base.nivelMaximoTexto !== '') {
+      nivelMaximo = Number(base.nivelMaximoTexto);
+      if (Number.isNaN(nivelMaximo) || nivelMaximo < 0) {
+        return { ...base, error: `Nivel máximo inválido: "${base.nivelMaximoTexto}".`, payload: null };
+      }
+    }
+
+    let proveedorId: number | null = null;
+    if (base.proveedorTexto !== '') {
+      // Proveedor no tiene columna Clave (a diferencia de categoría/unidad)
+      // — el único identificador de texto disponible es el Nombre.
+      const proveedor = this.proveedores().find((p) => p.nombre.toLowerCase() === base.proveedorTexto.toLowerCase());
+      if (!proveedor) {
+        return { ...base, error: `El proveedor "${base.proveedorTexto}" no existe (coincide por Nombre, el proveedor no tiene Clave).`, payload: null };
+      }
+      proveedorId = proveedor.id;
+    }
+
+    let unidadCompraId: number | null = null;
+    let factorConversionCompra: number | null = null;
+    if (base.unidadCompraTexto !== '') {
+      const unidadCompra = this.unidades().find((u) => u.clave.toLowerCase() === base.unidadCompraTexto.toLowerCase());
+      if (!unidadCompra) {
+        return { ...base, error: `La unidad de compra "${base.unidadCompraTexto}" no existe (revisa la Clave).`, payload: null };
+      }
+      if (base.factorConversionCompraTexto === '') {
+        return { ...base, error: 'Falta "factor_conversion_compra" (a cuántas unidades base equivale la unidad de compra).', payload: null };
+      }
+      factorConversionCompra = Number(base.factorConversionCompraTexto);
+      if (Number.isNaN(factorConversionCompra) || factorConversionCompra <= 0) {
+        return { ...base, error: `Factor de conversión inválido: "${base.factorConversionCompraTexto}".`, payload: null };
+      }
+      unidadCompraId = unidadCompra.id;
+    }
+
+    const manejaLotes = !esServicioFila && !['', 'no', 'false', '0'].includes(base.manejaLotesTexto.toLowerCase());
+    const destacado = !['', 'no', 'false', '0'].includes(base.destacadoTexto.toLowerCase());
+
     return {
       ...base,
       error: null,
@@ -670,17 +787,17 @@ export class ProductosComponent implements OnInit, OnDestroy {
         codigo: base.codigo || null,
         categoriaProductoId: categoria.id,
         unidadMedidaId: unidad.id,
-        descripcion: null,
+        descripcion,
         costo,
         precioUnitario: precio,
         existencia,
-        nivelMinimo: null, // el CSV no trae esta columna — se define luego, por producto, en Productos.
-        nivelMaximo: null, // idem — se asigna después, en Productos.
-        manejaLotes: false, // idem — se activa después, por producto, en Productos.
-        destacado: false, // idem — se marca después, por producto, en Productos.
-        proveedorId: null, // idem — se asigna después, en Productos.
-        unidadCompraId: null, // idem — se asigna después, en Productos.
-        factorConversionCompra: null,
+        nivelMinimo,
+        nivelMaximo,
+        manejaLotes,
+        destacado,
+        proveedorId,
+        unidadCompraId,
+        factorConversionCompra,
         activo,
       },
     };
@@ -728,6 +845,14 @@ export class ProductosComponent implements OnInit, OnDestroy {
           precioTexto: '',
           existenciaTexto: '',
           activoTexto: '',
+          descripcionTexto: '',
+          nivelMinimoTexto: '',
+          nivelMaximoTexto: '',
+          proveedorTexto: '',
+          unidadCompraTexto: '',
+          factorConversionCompraTexto: '',
+          manejaLotesTexto: '',
+          destacadoTexto: '',
           error: mensaje,
           payload: null,
         })),
@@ -809,266 +934,14 @@ export class ProductosComponent implements OnInit, OnDestroy {
   }
 
   // ── Imprimir etiquetas con código de barras ──
-  // Modal de selección: qué productos (con código/SKU) y cuántas copias de
-  // cada uno — ver imprimirEtiquetas() más abajo, que imprime en una
-  // ventana nueva aparte, no desde esta misma pantalla.
+  // Toda la lógica (búsqueda server-side, selección masiva, copias,
+  // impresión) vive en ImprimirEtiquetasComponent (homologación integral,
+  // nov-2026) -- este componente solo controla si el modal está abierto,
+  // igual que ya hace con MovimientoMasivoComponent en Movimientos entre
+  // bodegas.
   protected readonly modalEtiquetasAbierto = signal(false);
-  protected readonly busquedaEtiquetas = signal('');
-  protected readonly cargandoEtiquetas = signal(false);
-  protected readonly seleccionEtiquetas = signal<Set<number>>(new Set());
-  protected readonly cantidadEtiquetas = signal<Record<number, number>>({});
-
-  /** Resultados de la búsqueda del modal "Imprimir etiquetas" — a
-   *  diferencia de antes (computed sobre this.productos(), que solo tenía
-   *  sentido cuando esa señal traía el catálogo completo), ahora es su
-   *  propia señal llenada por buscarProductosEtiquetas(), que pregunta al
-   *  servidor directo: la tabla principal ya solo mantiene en memoria la
-   *  página actual (ver cargar()), así que buscar aquí contra eso dejaría
-   *  de encontrar productos que no estén en esa página. */
-  protected readonly productosParaEtiquetas = signal<Producto[]>([]);
-
-  protected readonly totalEtiquetasSeleccionadas = computed(() =>
-    Array.from(this.seleccionEtiquetas()).reduce((acc, id) => acc + this.cantidadEtiquetaDe(id), 0),
-  );
 
   abrirModalEtiquetas(): void {
-    this.busquedaEtiquetas.set('');
-    this.seleccionEtiquetas.set(new Set());
-    this.cantidadEtiquetas.set({});
-    this.productosParaEtiquetas.set([]);
     this.modalEtiquetasAbierto.set(true);
-    this.buscarProductosEtiquetas();
-  }
-
-  /** Dispara la búsqueda server-side del modal (ver productosParaEtiquetas).
-   *  El cuadro de búsqueda cubre nombre Y código a la vez (igual que el
-   *  comportamiento anterior en memoria): primero intenta por nombre
-   *  (parcial); si no hay texto o si no encontró nada, intenta por código
-   *  — así un código exacto que no haga match por nombre igual aparece. */
-  protected buscarProductosEtiquetas(): void {
-    this.cargandoEtiquetas.set(true);
-    const texto = this.busquedaEtiquetas().trim();
-    this.data
-      .listarPagina<Producto>(
-        'Producto',
-        { activo: true, nombre: texto || undefined },
-        0,
-        ProductosComponent.LIMITE_BUSQUEDA_ETIQUETAS,
-      )
-      .subscribe({
-        next: ({ filas }) => {
-          if (filas.length > 0 || !texto) {
-            this.productosParaEtiquetas.set(this.ordenarPorNombre(filas));
-            this.cargandoEtiquetas.set(false);
-            return;
-          }
-          this.data
-            .listarPagina<Producto>('Producto', { activo: true, codigo: texto }, 0, ProductosComponent.LIMITE_BUSQUEDA_ETIQUETAS)
-            .subscribe({
-              next: ({ filas: filasPorCodigo }) => {
-                this.productosParaEtiquetas.set(this.ordenarPorNombre(filasPorCodigo));
-                this.cargandoEtiquetas.set(false);
-              },
-              error: () => this.cargandoEtiquetas.set(false),
-            });
-        },
-        error: () => this.cargandoEtiquetas.set(false),
-      });
-  }
-
-  private ordenarPorNombre(filas: Producto[]): Producto[] {
-    return [...filas].sort((a, b) => a.nombre.localeCompare(b.nombre));
-  }
-
-  estaSeleccionadoParaEtiqueta(id: number): boolean {
-    return this.seleccionEtiquetas().has(id);
-  }
-
-  toggleSeleccionEtiqueta(id: number): void {
-    this.seleccionEtiquetas.update((actual) => {
-      const nuevo = new Set(actual);
-      if (nuevo.has(id)) {
-        nuevo.delete(id);
-      } else {
-        nuevo.add(id);
-      }
-      return nuevo;
-    });
-  }
-
-  cantidadEtiquetaDe(id: number): number {
-    return this.cantidadEtiquetas()[id] ?? 1;
-  }
-
-  actualizarCantidadEtiqueta(id: number, valor: string): void {
-    const numero = Math.max(1, Math.round(Number(valor) || 1));
-    this.cantidadEtiquetas.update((actual) => ({ ...actual, [id]: numero }));
-  }
-
-  /** Dibuja un código de barras CODE128 en un <canvas> fuera de pantalla y
-   *  devuelve su PNG como data URL — CODE128 porque acepta cualquier texto
-   *  (Producto.codigo es libre, ver producto.model.ts), a diferencia de
-   *  EAN13/UPC que exigen un formato numérico fijo. Un <canvas> no necesita
-   *  estar insertado en el documento para dibujarse, así que esto no toca
-   *  el DOM de la pantalla para nada. */
-  /** Devuelve el código de barras como marcado <svg> (texto), NO como PNG
-   *  en un <canvas>. Antes se usaba canvas.toDataURL('image/png'), pero
-   *  varios navegadores con protección anti-"fingerprinting" (confirmado:
-   *  Brave) interceptan la lectura de un <canvas> y devuelven una imagen en
-   *  blanco/alterada en vez de los píxeles reales — el código se generaba
-   *  sin error pero salía vacío al imprimir. JsBarcode también sabe dibujar
-   *  directo a un <svg>, que no pasa por esa protección (no es lectura de
-   *  píxeles de canvas), así que el SVG se incrusta tal cual en el HTML de
-   *  la etiqueta — además imprime más nítido por ser vectorial. */
-  private dibujarCodigoBarras(codigo: string): string {
-    // JsBarcode también se expone en window.JsBarcode como efecto secundario
-    // de cargarse (ver node_modules/jsbarcode/bin/JsBarcode.js) — si el
-    // import ESM llegara a resolver mal por la interoperabilidad CJS/ESM del
-    // bundler (JsBarcode quedando como objeto en vez de función), esto cae
-    // de vuelta a esa referencia global en lugar de fallar en silencio.
-    const dibujar: typeof JsBarcode =
-      typeof JsBarcode === 'function' ? JsBarcode : (window as unknown as { JsBarcode?: typeof JsBarcode }).JsBarcode!;
-    if (typeof dibujar !== 'function') {
-      throw new Error('No se pudo cargar el generador de códigos de barras (JsBarcode).');
-    }
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    dibujar(svg, codigo, { format: 'CODE128', width: 1.6, height: 42, displayValue: false, margin: 0 });
-    return new XMLSerializer().serializeToString(svg);
-  }
-
-  /** Imprime con un <iframe> OCULTO insertado en la propia página — nada de
-   *  ventana/pestaña nueva. Se probaron dos enfoques antes y ninguno
-   *  resultó confiable: (1) ocultar el resto de la app con CSS global
-   *  (visibility/[data-print-etiquetas]) dependía de que TODO lo demás en
-   *  pantalla se ocultara bien; (2) una ventana nueva vía window.open()
-   *  depende de que el navegador no la bloquee como pop-up — y varios
-   *  navegadores lo hacen en silencio, sin avisar ni devolver un error,
-   *  dejando la sensación de que "no pasa nada". Un iframe insertado en el
-   *  DOM (aunque con tamaño 0 y fuera de la vista) SÍ se renderiza, así que
-   *  print() puede imprimir solo su contenido sin que ningún bloqueador de
-   *  pop-ups intervenga y sin tocar el resto del layout de la app. */
-  imprimirEtiquetas(event: Event): void {
-    // CLAVE: este <form> no tiene [formGroup], y el componente solo
-    // importa ReactiveFormsModule (no FormsModule) — así que no hay
-    // ninguna directiva de Angular que reconozca (ngSubmit) aquí. Por eso
-    // se usa el evento nativo (submit) con preventDefault() explícito; sin
-    // esto, el navegador hace un envío de formulario real (navegación GET
-    // a la misma URL), que es justo lo que causaba que "no pasara nada".
-    event.preventDefault();
-
-    const seleccionados = this.productosParaEtiquetas().filter((p) => this.seleccionEtiquetas().has(p.id));
-    if (seleccionados.length === 0) {
-      this.toast.advertencia('Elige al menos un producto.');
-      return;
-    }
-
-    const conCodigo = seleccionados.filter((p) => !!p.codigo);
-    const sinCodigo = seleccionados.length - conCodigo.length;
-    if (sinCodigo > 0) {
-      this.toast.advertencia(`${sinCodigo} producto(s) elegido(s) no tiene(n) código — se omiten de la impresión.`);
-    }
-    if (conCodigo.length === 0) return;
-
-    // Importante: el iframe necesita un tamaño REAL (no 0x0) — con 0x0,
-    // Chrome/Edge recientes lo tratan como "sin contenido que imprimir" y
-    // descartan la llamada a print() en silencio, sin ningún error. Por eso
-    // se posiciona fuera de la pantalla (left/top muy negativos) en vez de
-    // ponerle tamaño cero: así sigue siendo invisible para el usuario pero
-    // el navegador sí lo considera imprimible.
-    const iframe = document.createElement('iframe');
-    iframe.setAttribute('aria-hidden', 'true');
-    iframe.style.position = 'fixed';
-    iframe.style.left = '-10000px';
-    iframe.style.top = '0';
-    iframe.style.width = '900px';
-    iframe.style.height = '700px';
-    iframe.style.border = '0';
-    document.body.appendChild(iframe);
-
-    const quitarIframe = () => {
-      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-    };
-
-    try {
-      const doc = iframe.contentDocument;
-      if (!doc) throw new Error('El navegador no permitió preparar el documento de impresión.');
-
-      // Una entrada por cada copia pedida (ver cantidadEtiquetaDe()).
-      const etiquetas = conCodigo.flatMap((p) => Array.from({ length: this.cantidadEtiquetaDe(p.id) }, () => p));
-
-      const htmlEtiquetas = etiquetas
-        .map(
-          (p) => `
-        <div class="etiqueta">
-          ${this.dibujarCodigoBarras(p.codigo ?? '')}
-          <div class="nombre">${this.escaparHtml(p.nombre)}</div>
-          <div class="precio">${this.escaparHtml(formatMoneda(p.precioUnitario))}</div>
-        </div>`,
-        )
-        .join('');
-
-      doc.open();
-      doc.write(`<!doctype html>
-      <html lang="es">
-        <head>
-          <meta charset="utf-8" />
-          <title>Etiquetas</title>
-          <style>
-            * { box-sizing: border-box; }
-            body { margin: 0; font-family: Arial, Helvetica, sans-serif; }
-            .etiquetas-grid { display: flex; flex-wrap: wrap; }
-            .etiqueta {
-              width: 63.5mm; height: 29.6mm; padding: 3mm; overflow: hidden;
-              display: flex; flex-direction: column; align-items: center; justify-content: center;
-              border: 1px dashed #999; text-align: center;
-            }
-            .etiqueta svg { width: 100%; height: 11mm; }
-            .etiqueta .nombre { font-size: 9px; font-weight: 700; line-height: 1.2; max-width: 100%; overflow: hidden; margin-top: 1mm; }
-            .etiqueta .precio { font-size: 11px; font-weight: 800; margin-top: 1mm; }
-            @media print { .etiqueta { border: none; } }
-          </style>
-        </head>
-        <body>
-          <div class="etiquetas-grid">${htmlEtiquetas}</div>
-        </body>
-      </html>`);
-      doc.close();
-
-      const ventana = iframe.contentWindow;
-      if (!ventana) throw new Error('El navegador no permitió preparar la ventana de impresión.');
-
-      // CLAVE: print() se llama de forma SÍNCRONA aquí, en la misma cadena
-      // de ejecución que el clic/submit del usuario — nada de setTimeout
-      // antes. Algunos navegadores (confirmado: Brave) exigen que print()
-      // se invoque dentro del mismo "gesto de usuario" (misma activación
-      // síncrona) o lo descartan en silencio sin ningún error ni aviso, que
-      // es justo el síntoma que se vio: ni ventana, ni error, ni consola.
-      // document.write()/close() ya son síncronos, así que el documento
-      // está listo en este punto sin necesidad de esperar.
-      try {
-        ventana.focus();
-        ventana.print();
-      } catch (errPrint) {
-        console.error('Error al imprimir:', errPrint);
-      } finally {
-        // La limpieza del iframe SÍ puede ir con retraso — quitar el DOM no
-        // necesita ninguna activación de usuario, solo se espera a que el
-        // diálogo de impresión ya se haya mostrado.
-        setTimeout(quitarIframe, 1000);
-      }
-    } catch (error) {
-      // Antes, cualquier falla aquí se quedaba en silencio y no pasaba nada
-      // visible — ahora se avisa con el motivo real.
-      console.error('Error al generar las etiquetas de impresión:', error);
-      quitarIframe();
-      const motivo = error instanceof Error ? error.message : String(error);
-      this.toast.error(`No se pudieron generar las etiquetas: ${motivo}`);
-    }
-  }
-
-  private escaparHtml(texto: string): string {
-    const div = document.createElement('div');
-    div.textContent = texto;
-    return div.innerHTML;
   }
 }

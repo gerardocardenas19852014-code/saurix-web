@@ -5,9 +5,6 @@
 
     @if (!listo()) {
       <p class="hint">Verificando el enlace…</p>
-    } @else if (!enNube) {
-      <p class="hint">La recuperación de contraseña solo existe para la ☁️ Nube.</p>
-      <button type="button" class="btn-primary" (click)="irALogin()">Ir a iniciar sesión</button>
     } @else if (!sesionValida()) {
       <p class="login-error">El enlace no es válido o ya expiró. Pide uno nuevo desde "¿Olvidaste tu contraseña?".</p>
       <button type="button" class="btn-primary" (click)="irALogin()">Ir a iniciar sesión</button>

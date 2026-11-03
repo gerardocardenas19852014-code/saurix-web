@@ -151,6 +151,13 @@
 .pos-ticket-acciones { display: flex; gap: 10px; }
 .pos-ticket-acciones .btn-secondary, .pos-ticket-acciones .btn-primary { flex: 1 1 0; }
 
+/* Jerarquía visual del modal Cobrar (ver informe "eliminar 8 cargas",
+ * sección UX): "Falta" en rojo mientras falte cubrir el total; "Cambio"/
+ * "Pagado ✓" en verde una vez cubierto — ver cambioTotalPagos() en el
+ * componente. */
+.pos-ticket-total-falta { color: var(--danger); }
+.pos-ticket-total-ok { color: #256b3f; } /* mismo verde que .sx-toast--exito en styles.scss */
+
 @media (max-width: 860px) {
   .pos-layout { flex-direction: column; }
   .pos-ticket { flex: 1 1 auto; width: 100%; position: static; order: -1; }

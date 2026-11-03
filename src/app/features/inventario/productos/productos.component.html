@@ -132,12 +132,10 @@
 
         <label>
           Código / SKU (opcional)
-          <input type="text" formControlName="codigo" />
-        </label>
-
-        <label>
-          Escanear código de barras
-          <app-escaneo-codigo [limpiarDespues]="false" (codigoEscaneado)="asignarCodigoEscaneado($event)" />
+          <div class="campo-codigo-con-escaner">
+            <input type="text" formControlName="codigo" />
+            <app-escaneo-codigo [soloBoton]="true" (codigoEscaneado)="asignarCodigoEscaneado($event)" />
+          </div>
         </label>
 
         <label>
@@ -340,69 +338,6 @@
 }
 
 @if (modalEtiquetasAbierto()) {
-  <div class="modal-overlay show" (click)="modalEtiquetasAbierto.set(false)">
-    <form class="modal-box" style="max-width: 720px; width: 92%;" (click)="$event.stopPropagation()" (submit)="imprimirEtiquetas($event)">
-      <h3>Imprimir etiquetas con código de barras</h3>
-      <p class="hint" style="margin-top:-6px;">
-        Elige los productos (solo los que tienen código/SKU) y cuántas copias de cada etiqueta
-        necesitas. Cada etiqueta trae el código de barras, el nombre y el precio.
-      </p>
-
-      <div class="grid-filter" style="margin-bottom:12px;">
-        <input
-          type="search"
-          placeholder="Buscar por nombre o código…"
-          [value]="busquedaEtiquetas()"
-          (input)="busquedaEtiquetas.set($any($event.target).value); buscarProductosEtiquetas()"
-        />
-      </div>
-      @if (cargandoEtiquetas()) {
-        <p class="hint" style="margin:-6px 0 12px;">Buscando…</p>
-      }
-
-      <div class="grid-table-scroll" style="max-height:360px;">
-        <table class="grid-table">
-          <thead><tr><th></th><th>Código</th><th>Nombre</th><th>Copias</th></tr></thead>
-          <tbody>
-            @for (p of productosParaEtiquetas(); track p.id) {
-              <tr>
-                <td>
-                  <input
-                    type="checkbox"
-                    [checked]="estaSeleccionadoParaEtiqueta(p.id)"
-                    [disabled]="!p.codigo"
-                    (change)="toggleSeleccionEtiqueta(p.id)"
-                  />
-                </td>
-                <td data-label="Código">{{ p.codigo || 'Sin código' }}</td>
-                <td data-label="Nombre">{{ p.nombre }}</td>
-                <td data-label="Copias">
-                  @if (estaSeleccionadoParaEtiqueta(p.id)) {
-                    <input
-                      type="number"
-                      step="1"
-                      min="1"
-                      style="width:70px;"
-                      [value]="cantidadEtiquetaDe(p.id)"
-                      (change)="actualizarCantidadEtiqueta(p.id, $any($event.target).value)"
-                    />
-                  }
-                </td>
-              </tr>
-            } @empty {
-              <tr><td colspan="4"><p class="empty">Sin resultados.</p></td></tr>
-            }
-          </tbody>
-        </table>
-      </div>
-
-      <div class="modal-actions">
-        <button type="button" class="btn-secondary" (click)="modalEtiquetasAbierto.set(false)">Cancelar</button>
-        <button type="submit" class="btn-primary" [disabled]="totalEtiquetasSeleccionadas() === 0">
-          Imprimir {{ totalEtiquetasSeleccionadas() }} etiqueta{{ totalEtiquetasSeleccionadas() === 1 ? '' : 's' }}
-        </button>
-      </div>
-    </form>
-  </div>
+  <app-imprimir-etiquetas [categorias]="categorias()" (cerrar)="modalEtiquetasAbierto.set(false)" />
 }
 

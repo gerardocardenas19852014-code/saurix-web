@@ -11,9 +11,14 @@
   </div>
 } @else {
   <p class="hint" style="margin-top:-6px;">
-    Nivel mínimo de existencia PROPIO de cada bodega para este producto. Mientras una bodega se deje vacía, sigue usando
-    el mínimo global del producto ({{ nivelMinimoHeredado() ?? 'sin definir' }}) contra la existencia TOTAL, no la de
-    esa bodega sola — en cuanto se le pone un número aquí, esa bodega se evalúa por su cuenta.
+    Define el nivel mínimo de existencia por bodega. Si no se configura, se utilizará el mínimo general del
+    producto ({{ nivelMinimoHeredado() ?? 'sin definir' }}).
+    <button type="button" class="info-tip" aria-label="Más información">
+      <span class="info-tip-texto">
+        El mínimo general se evalúa contra la existencia TOTAL del producto, no la de una bodega sola. En cuanto
+        le pones un número a una bodega aquí, esa bodega empieza a evaluarse por su cuenta.
+      </span>
+    </button>
   </p>
 
   @if (tieneMinimosPropios()) {

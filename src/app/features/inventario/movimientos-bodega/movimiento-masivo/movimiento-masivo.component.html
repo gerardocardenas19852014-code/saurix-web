@@ -1,0 +1,251 @@
+<div class="masivo-header">
+  <h2 class="catalog-group-title" style="margin:0; border-bottom:none; padding-bottom:0;">📦 Movimiento masivo</h2>
+  <div class="masivo-header-acciones">
+    @if (paso() === 'captura') {
+      <button type="button" class="btn-secondary small" (click)="cancelarDesdeCaptura()">Cancelar</button>
+      <button type="button" class="btn-primary small" (click)="irARevision()">Siguiente</button>
+    } @else if (paso() === 'revision') {
+      <button type="button" class="btn-secondary small" (click)="volverACaptura()">Volver a captura</button>
+      <button type="button" class="btn-primary small" (click)="confirmar()">Confirmar movimiento</button>
+    } @else if (paso() === 'confirmacion' && !confirmando()) {
+      @if (resultadoConfirmacion(); as resultado) {
+        @if (resultado.exito) {
+          <button type="button" class="btn-primary small" (click)="finalizar()">Finalizar</button>
+        } @else {
+          <button type="button" class="btn-secondary small" (click)="volverARevisionDesdeError()">Volver a revisión</button>
+          <button type="button" class="btn-primary small" (click)="reintentar()">Reintentar</button>
+        }
+      }
+    }
+  </div>
+</div>
+
+<!-- Progreso de operación -->
+<div class="masivo-pasos">
+  <div class="masivo-paso" [class.masivo-paso-activo]="paso() === 'captura'" [class.masivo-paso-hecho]="paso() !== 'captura'">1. Captura</div>
+  <div class="masivo-paso" [class.masivo-paso-activo]="paso() === 'revision'" [class.masivo-paso-hecho]="paso() === 'confirmacion'">2. Revisión</div>
+  <div class="masivo-paso" [class.masivo-paso-activo]="paso() === 'confirmacion'">3. Confirmación</div>
+</div>
+
+@if (paso() === 'captura') {
+  <!-- Tipo de movimiento — mismo patrón visual de tarjetas que Empresas → Tienda pública → Modo de funcionamiento. -->
+  <div class="masivo-tipo-tarjetas" role="group" aria-label="Tipo de movimiento">
+    <label class="masivo-tipo-tarjeta" [class.is-selected]="tipo() === 'entrada'">
+      <input type="radio" name="tipoMasivo" [checked]="tipo() === 'entrada'" (change)="seleccionarTipo('entrada')" />
+      <span class="masivo-tipo-tarjeta-titulo">📥 Entrada</span>
+      <span class="masivo-tipo-tarjeta-desc">Ingreso de mercancía a una bodega.</span>
+    </label>
+    <label class="masivo-tipo-tarjeta" [class.is-selected]="tipo() === 'traspaso'">
+      <input type="radio" name="tipoMasivo" [checked]="tipo() === 'traspaso'" (change)="seleccionarTipo('traspaso')" />
+      <span class="masivo-tipo-tarjeta-titulo">🔁 Traspaso</span>
+      <span class="masivo-tipo-tarjeta-desc">Movimiento entre bodegas.</span>
+    </label>
+    <label class="masivo-tipo-tarjeta" [class.is-selected]="tipo() === 'salida'">
+      <input type="radio" name="tipoMasivo" [checked]="tipo() === 'salida'" (change)="seleccionarTipo('salida')" />
+      <span class="masivo-tipo-tarjeta-titulo">📤 Salida / Ajuste</span>
+      <span class="masivo-tipo-tarjeta-desc">Merma, daño, corrección o salida de inventario.</span>
+    </label>
+  </div>
+
+  <!-- Bodegas — campos dinámicos según el tipo. -->
+  <div class="masivo-bodegas-grid">
+    @if (tipo() === 'traspaso' || tipo() === 'salida') {
+      <label>
+        Bodega de origen
+        <app-select-buscable [opciones]="opcionesBodega()" [value]="bodegaOrigenId()" placeholder="Buscar bodega…" (valueChange)="cambiarBodegaOrigen($event)" />
+      </label>
+    }
+    @if (tipo() === 'entrada' || tipo() === 'traspaso') {
+      <label>
+        Bodega de destino
+        <app-select-buscable [opciones]="opcionesBodega()" [value]="bodegaDestinoId()" placeholder="Buscar bodega…" (valueChange)="cambiarBodegaDestino($event)" />
+      </label>
+    }
+    @if (tipo() === 'traspaso') {
+      <label class="masivo-checkbox-linea">
+        <input type="checkbox" [checked]="enTransito()" (change)="enTransito.set($any($event.target).checked)" />
+        Marcar como "en tránsito" (se confirma la recepción después, igual que en Nuevo movimiento)
+      </label>
+    }
+    <label class="masivo-nota-campo">
+      Nota (opcional)
+      <input type="text" [value]="nota()" (input)="nota.set($any($event.target).value)" placeholder="Ej. Asignación inicial de inventario" />
+    </label>
+  </div>
+
+  <!-- Productos y cantidades -->
+  <h3 style="margin:18px 0 8px;">Productos</h3>
+  <div class="oc-barra-captura">
+    <app-escaneo-codigo
+      #escaneoCodigoBarra
+      class="oc-barra-codigo"
+      placeholder="Código / escanear…"
+      [limpiarDespues]="true"
+      (codigoEscaneado)="agregarPorCodigo($event)"
+    />
+    <app-select-buscable
+      class="oc-barra-producto"
+      [busquedaRemota]="buscarProductoAutocomplete"
+      [debounceMs]="300"
+      [value]="productoSeleccionadoId()"
+      placeholder="Buscar producto por nombre…"
+      (valueChange)="onSeleccionarProductoAutocomplete($event)"
+    />
+    <input
+      type="number"
+      step="1"
+      min="1"
+      class="oc-barra-cantidad"
+      title="Cantidad"
+      [value]="cantidadCapturaTexto()"
+      (input)="cantidadCapturaTexto.set($any($event.target).value)"
+      (keyup.enter)="agregarDesdeBarra()"
+    />
+    <button type="button" class="toolbar-btn oc-barra-agregar" [disabled]="!productoSeleccionadoId()" (click)="agregarDesdeBarra()">
+      + Agregar
+    </button>
+  </div>
+
+  <div class="grid-table-scroll" style="margin-bottom:12px;">
+    <table class="grid-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Código</th>
+          <th>Producto</th>
+          <th>Existencia actual</th>
+          <th>Cantidad</th>
+          <th>Existencia final</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (fila of filas(); track fila.productoId) {
+          <tr [class.masivo-fila-advertencia]="tipo() !== 'entrada' && (+fila.cantidadTexto || 0) > fila.existenciaActual">
+            <td data-label="Foto">
+              @if (fila.fotoThumbUrl) {
+                <img [src]="fila.fotoThumbUrl" alt="" class="masivo-fila-foto" />
+              }
+            </td>
+            <td data-label="Código">{{ fila.codigo || '—' }}</td>
+            <td data-label="Producto">{{ fila.nombre }}</td>
+            <td data-label="Existencia actual">{{ fila.existenciaActual }}</td>
+            <td data-label="Cantidad">
+              <input
+                type="number"
+                step="1"
+                min="1"
+                class="precio-lista-input"
+                [value]="fila.cantidadTexto"
+                (input)="cambiarCantidad($index, $any($event.target).value)"
+              />
+            </td>
+            <td data-label="Existencia final">
+              {{ tipo() === 'salida' ? fila.existenciaActual - (+fila.cantidadTexto || 0) : fila.existenciaActual + (+fila.cantidadTexto || 0) }}
+              @if (tipo() !== 'entrada' && (+fila.cantidadTexto || 0) > fila.existenciaActual) {
+                <span class="grid-badge grid-badge-danger" title="Excede la existencia disponible">⚠️</span>
+              }
+            </td>
+            <td><button type="button" class="btn-secondary small" (click)="quitarFila($index)">Quitar</button></td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="7"><p class="empty">Sin productos todavía — búscalos o escanéalos arriba.</p></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Resumen -->
+  <div class="masivo-resumen-bar">
+    <span><strong>{{ totalProductos() }}</strong> producto{{ totalProductos() === 1 ? '' : 's' }}</span>
+    <span><strong>{{ totalUnidades() }}</strong> unidad{{ totalUnidades() === 1 ? '' : 'es' }} en total</span>
+    @if (hayAdvertenciasStock()) {
+      <span class="masivo-resumen-advertencia">⚠️ Hay productos que exceden la existencia disponible en origen.</span>
+    }
+  </div>
+
+}
+
+@if (paso() === 'revision') {
+  <div class="masivo-resumen-revision">
+    <p><strong>Tipo:</strong> {{ tipo() === 'entrada' ? 'Entrada' : tipo() === 'traspaso' ? 'Traspaso' : 'Salida / Ajuste' }}</p>
+    @if (tipo() !== 'entrada') {
+      <p><strong>Bodega de origen:</strong> {{ nombreBodegaOrigen() }}</p>
+    }
+    @if (tipo() !== 'salida') {
+      <p><strong>Bodega de destino:</strong> {{ nombreBodegaDestino() }}</p>
+    }
+    @if (tipo() === 'traspaso' && enTransito()) {
+      <p><strong>En tránsito</strong> — la bodega de destino se abonará al confirmar la recepción, igual que en Nuevo movimiento.</p>
+    }
+    <p><strong>{{ totalProductos() }}</strong> productos — <strong>{{ totalUnidades() }}</strong> unidades en total.</p>
+  </div>
+
+  <div class="grid-table-scroll" style="margin-bottom:12px;">
+    <table class="grid-table">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Producto</th>
+          <th>Cantidad</th>
+          <th>Existencia actual</th>
+          <th>Existencia resultante estimada</th>
+          <th>Advertencia</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (fila of filas(); track fila.productoId) {
+          <tr [class.masivo-fila-advertencia]="tipo() !== 'entrada' && (+fila.cantidadTexto || 0) > fila.existenciaActual">
+            <td data-label="Código">{{ fila.codigo || '—' }}</td>
+            <td data-label="Producto">{{ fila.nombre }}</td>
+            <td data-label="Cantidad">{{ fila.cantidadTexto }}</td>
+            <td data-label="Existencia actual">{{ fila.existenciaActual }}</td>
+            <td data-label="Existencia resultante estimada">
+              {{ tipo() === 'salida' ? fila.existenciaActual - (+fila.cantidadTexto || 0) : fila.existenciaActual + (+fila.cantidadTexto || 0) }}
+            </td>
+            <td data-label="Advertencia">
+              @if (tipo() !== 'entrada' && (+fila.cantidadTexto || 0) > fila.existenciaActual) {
+                <span class="grid-badge grid-badge-danger">⚠️ Excede existencia</span>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (hayAdvertenciasStock()) {
+    <p class="hint" style="color:var(--danger);">
+      ⚠️ Hay productos marcados arriba que exceden la existencia disponible en origen según el último dato consultado.
+      Esto es informativo: Postgres vuelve a validar la existencia real al confirmar — si para entonces ya no alcanza,
+      la operación completa se rechaza (no se registra ninguna línea) y se indica cuál producto la detuvo.
+    </p>
+  }
+
+}
+
+@if (paso() === 'confirmacion') {
+  @if (confirmando()) {
+    <div class="empty-state-block">
+      <p>⏳ Registrando la operación…</p>
+    </div>
+  } @else if (resultadoConfirmacion(); as resultado) {
+    @if (resultado.exito) {
+      <div class="empty-state-block">
+        <p>✅ {{ resultado.mensaje }}</p>
+        <p class="hint">
+          {{ tipo() === 'entrada' ? 'Entrada' : tipo() === 'traspaso' ? 'Traspaso' : 'Salida / Ajuste' }} —
+          {{ totalProductos() }} productos, {{ totalUnidades() }} unidades.
+          Referencia de la operación: {{ 'Ver historial de movimientos para el detalle completo.' }}
+        </p>
+      </div>
+    } @else {
+      <div class="empty-state-block">
+        <p>❌ No se registró la operación.</p>
+        <p class="hint" style="color:var(--danger);">{{ resultado.mensaje }}</p>
+      </div>
+    }
+  }
+}

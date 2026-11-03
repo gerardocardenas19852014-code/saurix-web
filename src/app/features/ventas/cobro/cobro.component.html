@@ -13,30 +13,38 @@
     <div class="pos-productos">
       <div class="pos-toolbar">
         <input
+          #buscadorInput
           type="search"
           placeholder="Buscar producto por nombre o código…"
           class="pos-buscador"
           [value]="busquedaProducto()"
-          (input)="busquedaProducto.set($any($event.target).value)"
+          (input)="alEscribirBusqueda($any($event.target).value)"
         />
         <app-escaneo-codigo [limpiarDespues]="true" (codigoEscaneado)="seleccionarProductoPorCodigo($event)" />
         <button type="button" class="toolbar-btn" (click)="abrirVentaSimple()">+ Venta simple</button>
       </div>
 
       <div class="pos-categorias">
-        <button type="button" class="pos-chip" [class.pos-chip-activo]="categoriaFiltro() === null" (click)="categoriaFiltro.set(null)">
+        <button type="button" class="pos-chip" [class.pos-chip-activo]="categoriaFiltro() === null" (click)="alCambiarCategoria(null)">
           Todas
         </button>
         @for (cat of categorias(); track cat.id) {
-          <button type="button" class="pos-chip" [class.pos-chip-activo]="categoriaFiltro() === cat.id" (click)="categoriaFiltro.set(cat.id)">
+          <button type="button" class="pos-chip" [class.pos-chip-activo]="categoriaFiltro() === cat.id" (click)="alCambiarCategoria(cat.id)">
             {{ cat.nombre }}
           </button>
         }
       </div>
 
+      @if (totalProductos() > 0) {
+        <p class="hint" style="margin: -4px 0 10px;">
+          Mostrando {{ productos().length }} de {{ totalProductos() }}
+          @if (cargandoProductos()) { — buscando… }
+        </p>
+      }
+
       <div class="pos-grid">
-        @for (producto of productosFiltrados(); track producto.id) {
-          <button type="button" class="pos-tile" (click)="agregarProducto(producto)">
+        @for (producto of productos(); track producto.id) {
+          <button type="button" class="pos-tile" (click)="agregarProducto(producto); buscadorInput.focus()">
             <span class="pos-tile-nombre">{{ producto.nombre }}</span>
             <span class="pos-tile-precio">{{ formatMoneda(precioProducto(producto)) }}</span>
             @if (existenciaDisponible(producto) !== null) {
@@ -46,21 +54,34 @@
             }
           </button>
         } @empty {
-          <p class="empty">No se encontraron productos.</p>
+          @if (cargandoProductos()) {
+            <p class="empty">Buscando…</p>
+          } @else {
+            <p class="empty">No se encontraron productos.</p>
+          }
         }
       </div>
+
+      @if (hayMasProductos()) {
+        <div style="display:flex; justify-content:center; margin-top: 14px;">
+          <button type="button" class="toolbar-btn" [disabled]="cargandoProductos()" (click)="cargarMasProductos()">
+            {{ cargandoProductos() ? 'Cargando…' : 'Cargar más productos' }}
+          </button>
+        </div>
+      }
     </div>
 
-    <!-- ── Columna derecha: ticket ── -->
+    <!-- ── Columna derecha: ticket (Cliente / Canal / Bodega / Líneas / Total / Cancelar-Cobrar, siempre visible salvo las líneas) ── -->
     <div class="pos-ticket">
       <div class="pos-ticket-config">
         <label>
           Cliente
           <span class="pos-cliente-row">
             <app-select-buscable
-              [opciones]="opcionesClientes()"
+              [busquedaRemota]="buscarClientesRemoto"
               [value]="clienteId()"
-              placeholder="Buscar cliente…"
+              [etiquetaValorExterno]="etiquetaClienteSeleccionado()"
+              placeholder="Buscar cliente por nombre, RFC o teléfono…"
               (valueChange)="elegirCliente($event)"
             />
             <button type="button" class="toolbar-btn" title="Nuevo cliente" (click)="abrirNuevoCliente()">+</button>
@@ -187,7 +208,7 @@
 
       <div class="modal-actions">
         <button type="button" class="btn-secondary" (click)="modalVentaSimpleAbierto.set(false)">Cancelar</button>
-        <button type="submit" class="btn-primary">Agregar</button>
+        <button type="submit" class="btn-primary" [disabled]="procesandoVentaSimple()">Agregar</button>
       </div>
     </form>
   </div>
@@ -222,9 +243,14 @@
       <div class="pos-ticket-totales" style="margin-bottom: 14px;">
         <div class="pos-ticket-total-linea"><span>Total de la venta</span><span>{{ formatMoneda(totalConPuntos()) }}</span></div>
         <div class="pos-ticket-total-linea"><span>Pagado</span><span>{{ formatMoneda(totalPagado()) }}</span></div>
-        <div class="pos-ticket-total-linea pos-ticket-total-grande">
-          <span>{{ faltantePorPagar() > 0.01 ? 'Falta' : 'Cambio' }}</span>
-          <span>{{ formatMoneda(faltantePorPagar() > 0.01 ? faltantePorPagar() : 0) }}</span>
+        <div class="pos-ticket-total-linea pos-ticket-total-grande" [class.pos-ticket-total-falta]="faltantePorPagar() > 0.01" [class.pos-ticket-total-ok]="faltantePorPagar() <= 0.01">
+          @if (faltantePorPagar() > 0.01) {
+            <span>Falta</span><span>{{ formatMoneda(faltantePorPagar()) }}</span>
+          } @else if (cambioTotalPagos() > 0) {
+            <span>Cambio</span><span>{{ formatMoneda(cambioTotalPagos()) }}</span>
+          } @else {
+            <span>Pagado ✓</span><span>{{ formatMoneda(0) }}</span>
+          }
         </div>
       </div>
 
@@ -277,7 +303,7 @@
       <div class="modal-actions">
         <button type="button" class="btn-secondary" (click)="modalPagoAbierto.set(false)">Seguir editando</button>
         <button type="button" class="btn-primary" [disabled]="faltantePorPagar() > 0.01 || procesandoVenta()" (click)="confirmarCobro()">
-          Confirmar cobro
+          {{ procesandoVenta() ? 'Registrando…' : 'Confirmar cobro' }}
         </button>
       </div>
     </div>

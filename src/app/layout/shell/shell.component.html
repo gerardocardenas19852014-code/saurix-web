@@ -20,7 +20,7 @@
       <nav class="sidebar-nav" aria-label="Menú de seguridad">
         <a routerLink="/seguridad" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
         <a routerLink="/seguridad/usuarios" routerLinkActive="active">👥 Usuarios</a>
-        @if (enNube && auth.usuarioActual()?.esSuperadmin) {
+        @if (auth.usuarioActual()?.esSuperadmin) {
           <a routerLink="/seguridad/empresas" routerLinkActive="active">🏢 Empresas</a>
         }
       </nav>
@@ -299,7 +299,7 @@
       <router-outlet />
     </main>
 
-    <footer class="footer">Saurix — {{ enNube ? 'datos guardados en la nube (Supabase).' : 'datos guardados localmente en este navegador (IndexedDB).' }}</footer>
+    <footer class="footer">Saurix — datos guardados en la nube (Supabase).</footer>
   </div>
 </div>
 

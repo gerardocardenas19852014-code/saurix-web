@@ -2,6 +2,26 @@
 // edit-form, table, grid-badge, etc.) vive en src/styles.scss. Lo de aquí es
 // específico de esta pantalla.
 
+// Campo "Código / SKU" con el botón de cámara integrado (homologación
+// nov-2026: antes había un segundo cuadro de texto solo para escanear,
+// redundante con este mismo campo -- ver app-escaneo-codigo [soloBoton]).
+// El <input> real sigue siendo el <input type="text"> de siempre (mismo
+// formControlName="codigo", mismo estilo .edit-form input[type=text]
+// global, sin override); solo se le agrega al lado el botón 📷 reutilizado
+// de EscaneoCodigoComponent. Un lector USB/Bluetooth sigue funcionando
+// igual que cualquier campo de texto: teclea directo aquí si el usuario lo
+// deja enfocado, sin necesitar un cuadro de texto aparte.
+.campo-codigo-con-escaner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  input[type='text'] {
+    flex: 1;
+    width: auto;
+  }
+}
+
 /* Ancho del filtro de categoría dentro de .grid-filter — sin esto,
  * app-select-buscable (:host{width:100%} en su propio componente, ver
  * select-buscable.component.scss) se comporta como un flex-item con

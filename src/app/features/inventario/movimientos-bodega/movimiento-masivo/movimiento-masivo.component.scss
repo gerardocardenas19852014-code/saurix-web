@@ -1,0 +1,352 @@
+// Pantalla ancha integrada en el módulo (ver vistaMasiva() en
+// movimientos-bodega.component.ts) — NUNCA un modal: el host no limita el
+// ancho artificialmente, aprovecha todo el espacio que ya le da
+// movimientos-bodega.component (data-wide="grid", puesto por el padre).
+:host {
+  display: block;
+}
+
+.masivo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+
+  h2 { flex: 1 1 auto; min-width: 200px; }
+}
+
+// Única zona de acciones de la pantalla (Cancelar/Siguiente, Volver a
+// captura/Confirmar movimiento, Finalizar, Volver a revisión/Reintentar según
+// el paso) — homologado con el resto de Saurix: acciones arriba a la
+// derecha del encabezado, nunca repetidas también al final del contenido.
+.masivo-header-acciones {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+// ── Indicador de pasos (1. Captura → 2. Revisión → 3. Confirmación) --
+// mismo patrón que .tienda-pasos/.tienda-paso de la tienda pública
+// (catalogo-tienda.component.scss), adaptado a las variables de color del
+// panel administrativo en vez de las de la tienda.
+.masivo-pasos {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 18px;
+}
+.masivo-paso {
+  flex: 1;
+  text-align: center;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  padding-bottom: 8px;
+  border-bottom: 3px solid var(--line);
+}
+.masivo-paso.masivo-paso-hecho {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.masivo-paso.masivo-paso-activo {
+  color: var(--text-strong);
+  border-bottom-color: var(--accent);
+}
+
+// ── Tarjetas de "Tipo de movimiento" -- mismo patrón visual y de
+// interacción que .modo-tienda-tarjeta/.modo-tienda-tarjetas de
+// empresas.component.scss (Empresas → Tienda pública → Modo de
+// funcionamiento): borde + fondo suave en la seleccionada, radio oculto a
+// la vista pero funcional. Los estilos de Angular están encapsulados por
+// componente, así que se repite aquí (no se puede compartir la clase entre
+// componentes distintos) -- mismos valores exactos, solo nombres propios.
+.masivo-tipo-tarjetas {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 2px 0 16px;
+}
+@media (max-width: 760px) {
+  .masivo-tipo-tarjetas { grid-template-columns: 1fr; }
+}
+.masivo-tipo-tarjeta {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 36px 14px 16px;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+  background: var(--paper-raised);
+  transition: border-color .12s ease, background .12s ease;
+}
+.masivo-tipo-tarjeta input[type='radio'] {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: auto;
+  margin: 0;
+}
+.masivo-tipo-tarjeta:hover { border-color: var(--accent); }
+.masivo-tipo-tarjeta.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.masivo-tipo-tarjeta-titulo {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-strong);
+}
+.masivo-tipo-tarjeta-desc {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+
+// ── Bodegas + nota -- fila flexible (no grid rígido), nunca más angosta de
+// lo necesario (sección 1 del mandato: "evitar contenedores con max-width
+// restrictivos"). Homologación 3-nov-2026: los campos de Bodega y Nota
+// usaban una apariencia de "cápsula" propia de esta pantalla (radio 20px,
+// 36px de alto) que no coincide con el estándar real de un campo de texto
+// en Saurix -- ese estándar es el que ya usa el modal "Nuevo movimiento" de
+// esta misma pantalla (.edit-form input[type=text]/.selbuscable-input:
+// Montserrat 15px, padding 10px 12px, borde 1px var(--line), radio 8px,
+// fondo var(--paper-raised)) -- se repite aquí mismo valor por valor.
+.masivo-bodegas-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px 20px;
+  margin-bottom: 8px;
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-strong);
+    flex: 1 1 220px;
+    min-width: 180px;
+  }
+
+  // Nota (texto libre) -- campo estándar, ya no cápsula.
+  input[type='text'] {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 15px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--paper-raised);
+    color: var(--text-strong);
+    width: 100%;
+  }
+  input[type='text']:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  // Bodega de origen/destino (<app-select-buscable>) -- mismo estándar de
+  // campo que arriba; se necesita ::ng-deep porque el <input> real vive
+  // dentro del template del componente hijo (encapsulación de Angular). Sin
+  // esto el campo cae al estilo genérico de Bootstrap (.form-control), que
+  // no coincide con el resto de Saurix.
+  ::ng-deep .selbuscable-input {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 15px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--paper-raised);
+    color: var(--text-strong);
+    width: 100%;
+  }
+  ::ng-deep .selbuscable-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+}
+
+// Nota ocupa más espacio que un campo de bodega (texto libre) -- "primera
+// fila: bodega correspondiente + nota" del mandato.
+.masivo-bodegas-grid .masivo-nota-campo { flex: 2 1 320px; }
+
+// El checkbox "en tránsito" tiene texto largo -- se ve mejor en su propia
+// línea completa que compitiendo por espacio con los campos angostos.
+.masivo-bodegas-grid .masivo-checkbox-linea { flex-basis: 100%; }
+
+@media (max-width: 760px) {
+  .masivo-bodegas-grid > label { flex-basis: 100%; }
+}
+
+.masivo-checkbox-linea {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+  font-weight: 500 !important;
+
+  input[type='checkbox'] { width: auto; }
+}
+
+// ── Barra de captura rápida -- copiada de .oc-barra-* en
+// ordenes-compra.component.scss (mismo patrón ya homologado: Código/escáner
+// + Buscar por nombre + Cantidad + Agregar, en una sola fila que usa todo
+// el ancho disponible) -- no se puede compartir la clase entre componentes
+// (encapsulación de Angular), así que se repite con prefijo propio.
+.oc-barra-captura {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.oc-barra-codigo {
+  flex: 2 1 200px;
+  min-width: 200px;
+}
+.oc-barra-codigo ::ng-deep .escaneo-codigo-fila input {
+  width: 100%;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  font-family: inherit;
+  font-size: 13px;
+  background: var(--paper);
+  color: var(--text-strong);
+}
+.oc-barra-codigo ::ng-deep .escaneo-codigo-fila input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.oc-barra-codigo ::ng-deep .escaneo-codigo-fila button {
+  flex-shrink: 0;
+  height: 36px;
+  box-sizing: border-box;
+}
+.oc-barra-producto {
+  flex: 4 1 260px;
+  min-width: 240px;
+}
+.oc-barra-producto ::ng-deep .selbuscable-input {
+  height: 36px;
+  box-sizing: border-box;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  font-family: inherit;
+  font-size: 13px;
+  background: var(--paper);
+  color: var(--text-strong);
+}
+.oc-barra-producto ::ng-deep .selbuscable-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.oc-barra-cantidad {
+  flex: 1 1 70px;
+  min-width: 64px;
+  max-width: 90px;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  font-family: inherit;
+  font-size: 13px;
+  background: var(--paper);
+  color: var(--text-strong);
+  text-align: center;
+}
+.oc-barra-cantidad:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.oc-barra-agregar {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.oc-barra-agregar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+@media (max-width: 760px) {
+  .oc-barra-codigo,
+  .oc-barra-producto,
+  .oc-barra-cantidad,
+  .oc-barra-agregar {
+    flex-basis: 100%;
+    max-width: none;
+  }
+}
+
+// Mismo input compacto que ordenes-compra.component.scss / lista-precio-detalle.component.scss.
+.precio-lista-input {
+  width: 100px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  background: var(--paper-raised);
+  color: var(--text-strong);
+}
+.precio-lista-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.masivo-fila-foto {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+  display: block;
+}
+
+.masivo-fila-advertencia td {
+  background-color: var(--danger-soft);
+}
+
+.masivo-resumen-bar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper-raised);
+  font-size: 13px;
+  color: var(--text-strong);
+  margin-bottom: 16px;
+}
+.masivo-resumen-advertencia {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.masivo-resumen-revision {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper-raised);
+  margin-bottom: 16px;
+
+  p { margin: 0 0 6px; font-size: 13.5px; }
+  p:last-child { margin-bottom: 0; }
+}
+

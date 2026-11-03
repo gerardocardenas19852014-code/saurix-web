@@ -15,7 +15,12 @@ export class ClienteService {
   private readonly data = inject(DataClientService);
 
   async obtenerOCrearGenerico(): Promise<Cliente> {
-    const clientes = await firstValueFrom(this.data.list<Cliente>('Cliente'));
+    // Filtrado server-side por esGenerico (en vez de traer TODO Cliente
+    // para buscar uno solo en memoria, ver Bloque "eliminar 8 cargas" de
+    // Cobro, 2026-11) — a lo sumo debería existir un único registro con
+    // esta bandera, pero find() se queda con el primero igual si por algún
+    // motivo hubiera más de uno.
+    const clientes = await firstValueFrom(this.data.list<Cliente>('Cliente', { esGenerico: true }));
     const existente = clientes.find((c) => c.esGenerico);
     if (existente) return existente;
 

@@ -12,7 +12,7 @@ export interface Documento {
    */
   contenido: string;
   activo: boolean;
-  /** Estampadas automáticamente por IndexedDbDataClientService en Alta/Modificación. */
+  /** Estampadas automáticamente por SupabaseDataClientService en Alta/Modificación. */
   fechaCreacion?: string;
   fechaModificacion?: string;
 }
@@ -60,7 +60,7 @@ export interface DocumentoVersion {
   titulo: string;
   contenido: string;
   usuario: string;
-  /** Estampada automáticamente por IndexedDbDataClientService en el alta. */
+  /** Estampada automáticamente por SupabaseDataClientService en el alta. */
   fechaCreacion?: string;
 }
 

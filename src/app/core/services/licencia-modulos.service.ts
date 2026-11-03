@@ -1,5 +1,4 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { fuenteDatosActual } from './fuente-datos';
 import { SupabaseService } from './supabase.service';
 
 /** Claves de los módulos "vendibles" (cada empresa puede o no tenerlos
@@ -15,9 +14,7 @@ function esModuloVendible(clave: string): clave is ModuloVendible {
 }
 
 /**
- * Qué módulos tiene contratados la empresa en sesión. Solo aplica en la
- * Nube — en IndexedDB/local no hay concepto de "empresa que compra
- * módulos", así que ahí todo queda habilitado.
+ * Qué módulos tiene contratados la empresa en sesión.
  *
  * Esto es nada más para que la app no OFREZCA ni deje ENTRAR por URL a un
  * módulo no contratado: quien de verdad lo protege es la política RLS
@@ -27,17 +24,13 @@ function esModuloVendible(clave: string): clave is ModuloVendible {
  */
 @Injectable({ providedIn: 'root' })
 export class LicenciaModulosService {
-  private readonly sb = fuenteDatosActual() === 'supabase' ? inject(SupabaseService).cliente : null;
+  private readonly sb = inject(SupabaseService).cliente;
 
   private readonly habilitados = signal<Set<ModuloVendible> | null>(null);
 
   /** Llamar justo después de establecer la sesión (login fresco o sesión
    *  restaurada) — ver AuthService. */
   async cargar(): Promise<void> {
-    if (!this.sb) {
-      this.habilitados.set(new Set(MODULOS_VENDIBLES));
-      return;
-    }
     const { data, error } = await this.sb.schema('seguridad').rpc('mis_modulos');
     if (error) {
       this.habilitados.set(new Set(MODULOS_VENDIBLES));

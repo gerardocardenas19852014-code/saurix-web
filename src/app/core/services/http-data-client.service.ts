@@ -9,7 +9,7 @@ import { DataClientService, ResultadoPagina, OrdenPagina } from './data-client.s
  * (.NET), con la convención /api/{Entidad}/{Accion}. Hoy no está activa
  * (ver `app.config.ts`) — cuando el backend esté listo, basta con cambiar
  * el `provide` de `DataClientService` para que apunte a esta clase en vez
- * de `IndexedDbDataClientService`. Ningún componente cambia.
+ * de `SupabaseDataClientService`. Ningún componente cambia.
  */
 @Injectable({ providedIn: 'root' })
 export class HttpDataClientService extends DataClientService {

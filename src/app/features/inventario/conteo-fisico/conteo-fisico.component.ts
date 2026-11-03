@@ -3,15 +3,11 @@ import { DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { SupabaseService } from '../../../core/services/supabase.service';
-import { fuenteDatosActual } from '../../../core/services/fuente-datos';
 import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { ToastService } from '../../../shared/services/toast.service';
 import { AuthService } from '../../../core/services/auth.service';
-import { Producto } from '../productos/producto.model';
 import { Bodega } from '../bodegas/bodega.model';
-import { ExistenciaBodega } from '../movimientos-bodega/existencia-bodega.model';
 import { MovimientoInventarioService } from '../movimientos-bodega/movimiento-inventario.service';
-import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
 import { ConteoFisico, ConteoFisicoDetalle } from './conteo-fisico.model';
 import { EscaneoCodigoComponent } from '../../../shared/components/escaneo-codigo/escaneo-codigo.component';
 import { exportarCsv } from '../../../shared/utils/csv.util';
@@ -109,10 +105,6 @@ const TOPE_FILAS_PDF = 200;
  * siquiera al entrar a esa pestaña), y usa su propia RPC paginada
  * (fn_conteo_fisico_historial). "Ver detalle" consulta SOLO esa sesión
  * (fn_conteo_fisico_detalle), nunca junto con el listado principal.
- *
- * En modo IndexedDB (navegador sin backend) se mantiene un cálculo en
- * memoria equivalente, cargado una sola vez bajo demanda (cargarBaseLocal())
- * — a esa escala nunca es un problema real de rendimiento.
  */
 @Component({
   selector: 'app-conteo-fisico',
@@ -129,8 +121,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
 
-  private readonly esSupabase = fuenteDatosActual() === 'supabase';
-  private readonly sb = this.esSupabase ? inject(SupabaseService).cliente : null;
+  private readonly sb = inject(SupabaseService).cliente;
 
   ngOnInit(): void {
     document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
@@ -150,7 +141,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     this.tabActiva.set(tab);
   }
 
-  // ── Catálogo de bodegas (chico, siempre completo en ambos modos) ───────
+  // ── Catálogo de bodegas (chico, siempre completo) ───────────────────────
   protected readonly bodegas = signal<Bodega[]>([]);
   protected readonly bodegasActivas = computed(() => this.bodegas().filter((b) => b.activo !== false));
   private nombreBodega(id: number): string {
@@ -249,7 +240,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   private async cargar(): Promise<void> {
     this.cargando.set(true);
     const miSecuencia = ++this.secuencia;
-    const resultado = this.esSupabase ? await this.cargarSupabase() : await this.cargarLocal();
+    const resultado = await this.cargarSupabase();
     if (miSecuencia !== this.secuencia) return; // respuesta vieja, se descarta
     this.filasPagina.set(resultado.filas);
     this.totalFilasFiltradas.set(resultado.total);
@@ -268,7 +259,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   private async cargarSupabase(): Promise<{ filas: FilaConteo[]; total: number }> {
     const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
     const desde = (this.paginaActual() - 1) * tamanio;
-    const { data, error } = await this.sb!.schema('inventario').rpc('fn_conteo_fisico_productos', {
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_conteo_fisico_productos', {
       p_bodega_id: this.bodegaId(),
       p_busqueda_nombre: this.busquedaNombre().trim() || null,
       p_busqueda_codigo: this.busquedaCodigo().trim() || null,
@@ -278,30 +269,6 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     if (error) return { filas: [], total: 0 };
     const filas = (data ?? []) as Record<string, unknown>[];
     return { filas: filas.map((f) => this.mapearFilaConteo(f)), total: Number(filas[0]?.['total'] ?? 0) };
-  }
-
-  private filasLocalFiltradas(): FilaConteo[] {
-    const bodegaId = this.bodegaId();
-    if (!bodegaId) return [];
-    const nombre = this.busquedaNombre().trim().toLowerCase();
-    const codigo = this.busquedaCodigo().trim().toLowerCase();
-    const productosPorId = new Map(this.productosLocal.filter((p) => p.activo && p.existencia !== null).map((p) => [p.id, p]));
-    return this.existenciasBodegaLocal
-      .filter((e) => e.bodegaId === bodegaId && productosPorId.has(e.productoId))
-      .map((e) => {
-        const p = productosPorId.get(e.productoId)!;
-        return { productoId: e.productoId, codigo: p.codigo ?? '', nombre: p.nombre, sistema: e.existencia };
-      })
-      .filter((f) => (!nombre || f.nombre.toLowerCase().includes(nombre)) && (!codigo || f.codigo.toLowerCase().includes(codigo)))
-      .sort((a, b) => a.nombre.localeCompare(b.nombre) || a.productoId - b.productoId);
-  }
-
-  private async cargarLocal(): Promise<{ filas: FilaConteo[]; total: number }> {
-    await this.cargarBaseLocal();
-    const todas = this.filasLocalFiltradas();
-    const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
-    const desde = (this.paginaActual() - 1) * tamanio;
-    return { filas: todas.slice(desde, desde + tamanio), total: todas.length };
   }
 
   /** Atajo para contar escaneando (lector USB/Bluetooth o cámara — ver
@@ -328,7 +295,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     if (!codigo) return;
     this.busquedaCodigo.set(codigo); // también deja el código listo por si luego se da "Buscar" a mano
 
-    const encontrado = this.esSupabase ? await this.buscarPorCodigoExactoSupabase(codigo) : await this.buscarPorCodigoExactoLocal(codigo);
+    const encontrado = await this.buscarPorCodigoExactoSupabase(codigo);
     if (!encontrado) {
       this.toast.advertencia(`No se encontró ningún producto con el código "${codigo}" en esta bodega.`);
       return;
@@ -344,7 +311,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   }
 
   private async buscarPorCodigoExactoSupabase(codigo: string): Promise<FilaConteo | undefined> {
-    const { data, error } = await this.sb!.schema('inventario').rpc('fn_conteo_fisico_productos', {
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_conteo_fisico_productos', {
       p_bodega_id: this.bodegaId(),
       p_busqueda_codigo: codigo,
       p_desde: 0,
@@ -353,23 +320,6 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     if (error) return undefined;
     const filas = ((data ?? []) as Record<string, unknown>[]).map((f) => this.mapearFilaConteo(f));
     return filas.find((f) => f.codigo.trim().toLowerCase() === codigo.toLowerCase());
-  }
-
-  private async buscarPorCodigoExactoLocal(codigo: string): Promise<FilaConteo | undefined> {
-    await this.cargarBaseLocal();
-    const normalizado = codigo.toLowerCase();
-    return this.filasLocalFiltradasSinTexto().find((f) => f.codigo.trim().toLowerCase() === normalizado);
-  }
-
-  private filasLocalFiltradasSinTexto(): FilaConteo[] {
-    const bodegaId = this.bodegaId();
-    const productosPorId = new Map(this.productosLocal.filter((p) => p.activo && p.existencia !== null).map((p) => [p.id, p]));
-    return this.existenciasBodegaLocal
-      .filter((e) => e.bodegaId === bodegaId && productosPorId.has(e.productoId))
-      .map((e) => {
-        const p = productosPorId.get(e.productoId)!;
-        return { productoId: e.productoId, codigo: p.codigo ?? '', nombre: p.nombre, sistema: e.existencia };
-      });
   }
 
   /** Guarda la sesión completa: el encabezado ConteoFisico + una línea de
@@ -508,7 +458,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   private async cargarHistorial(): Promise<void> {
     this.cargandoHistorial.set(true);
     const miSecuencia = ++this.secuenciaHistorial;
-    const resultado = this.esSupabase ? await this.cargarHistorialSupabase() : await this.cargarHistorialLocal();
+    const resultado = await this.cargarHistorialSupabase();
     if (miSecuencia !== this.secuenciaHistorial) return;
     this.historialPagina.set(resultado.filas);
     this.totalHistorialFiltrado.set(resultado.total);
@@ -541,42 +491,10 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   private async cargarHistorialSupabase(): Promise<{ filas: FilaHistorialConteo[]; total: number }> {
     const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
     const desde = (this.paginaActualHistorial() - 1) * tamanio;
-    const { data, error } = await this.sb!.schema('inventario').rpc('fn_conteo_fisico_historial', this.parametrosHistorial(desde, tamanio));
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_conteo_fisico_historial', this.parametrosHistorial(desde, tamanio));
     if (error) return { filas: [], total: 0 };
     const filas = (data ?? []) as Record<string, unknown>[];
     return { filas: filas.map((f) => this.mapearFilaHistorial(f)), total: Number(filas[0]?.['total'] ?? 0) };
-  }
-
-  private historialFilasLocalFiltradas(): FilaHistorialConteo[] {
-    const bodegaId = this.filtroHistorialBodegaId();
-    const desde = this.filtroHistorialDesde();
-    const hasta = this.filtroHistorialHasta();
-    return this.conteosLocal
-      .map((c) => ({
-        id: c.id,
-        fecha: c.fecha,
-        bodegaId: c.bodegaId,
-        bodegaNombre: this.nombreBodega(c.bodegaId),
-        usuarioNombre: this.nombreUsuarioLocal(c.usuarioId),
-        totalProductos: c.totalProductos,
-        totalDiferencias: c.totalDiferencias,
-        notas: c.notas,
-      }))
-      .filter((f) => {
-        if (bodegaId && f.bodegaId !== bodegaId) return false;
-        if (desde && f.fecha.slice(0, 10) < desde) return false;
-        if (hasta && f.fecha.slice(0, 10) > hasta) return false;
-        return true;
-      })
-      .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
-  }
-
-  private async cargarHistorialLocal(): Promise<{ filas: FilaHistorialConteo[]; total: number }> {
-    await this.cargarBaseLocal();
-    const todas = this.historialFilasLocalFiltradas();
-    const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
-    const desde = (this.paginaActualHistorial() - 1) * tamanio;
-    return { filas: todas.slice(desde, desde + tamanio), total: todas.length };
   }
 
   // ── "Ver detalle" — SOLO la sesión elegida, nunca junto al listado ──────
@@ -592,7 +510,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     }
     this.detalleAbiertoId.set(conteoId);
     this.cargandoDetalle.set(true);
-    const filas = this.esSupabase ? await this.cargarDetalleSupabase(conteoId) : await this.cargarDetalleLocal(conteoId);
+    const filas = await this.cargarDetalleSupabase(conteoId);
     this.cargandoDetalle.set(false);
     // Si mientras cargaba se cerró o se abrió otra, no pisar esa decisión.
     if (this.detalleAbiertoId() !== conteoId) return;
@@ -600,7 +518,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   }
 
   private async cargarDetalleSupabase(conteoId: number): Promise<FilaDetalleHistorial[]> {
-    const { data, error } = await this.sb!.schema('inventario').rpc('fn_conteo_fisico_detalle', { p_conteo_fisico_id: conteoId });
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_conteo_fisico_detalle', { p_conteo_fisico_id: conteoId });
     if (error) return [];
     return ((data ?? []) as Record<string, unknown>[]).map((f) => ({
       productoNombre: String(f['producto_nombre'] ?? '—'),
@@ -608,20 +526,6 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
       contado: Number(f['contado']) || 0,
       diferencia: Number(f['diferencia']) || 0,
     }));
-  }
-
-  private async cargarDetalleLocal(conteoId: number): Promise<FilaDetalleHistorial[]> {
-    const detalles = await firstValueFrom(this.data.list<ConteoFisicoDetalle>('ConteoFisicoDetalle', { conteoFisicoId: conteoId }));
-    await this.cargarBaseLocal();
-    const productosPorId = new Map(this.productosLocal.map((p) => [p.id, p]));
-    return detalles
-      .map((d) => ({
-        productoNombre: productosPorId.get(d.productoId)?.nombre ?? '—',
-        sistema: d.sistema,
-        contado: d.contado,
-        diferencia: d.diferencia,
-      }))
-      .sort((a, b) => a.productoNombre.localeCompare(b.productoNombre));
   }
 
   // ── Exportaciones (respetan Bodega/Desde/Hasta — nunca bajan el
@@ -640,18 +544,11 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   async exportarCsvHistorial(): Promise<void> {
     const columnas = this.columnasExportHistorial();
 
-    if (!this.esSupabase) {
-      await this.cargarBaseLocal();
-      const filas = this.historialFilasLocalFiltradas();
-      exportarCsv('conteo_fisico.csv', columnas, filas.map((f) => ({ ...f, notas: f.notas ?? '' })));
-      return;
-    }
-
     const todas: Record<string, unknown>[] = [];
     let desde = 0;
     let total = Infinity;
     while (desde < total) {
-      const { data, error } = await this.sb!.schema('inventario').rpc('fn_conteo_fisico_historial', this.parametrosHistorial(desde, TAMANO_LOTE_EXPORTAR));
+      const { data, error } = await this.sb.schema('inventario').rpc('fn_conteo_fisico_historial', this.parametrosHistorial(desde, TAMANO_LOTE_EXPORTAR));
       if (error) break;
       const filas = (data ?? []) as Record<string, unknown>[];
       if (filas.length === 0) break;
@@ -666,19 +563,10 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   }
 
   async exportarPdfHistorial(): Promise<void> {
-    let filasListado: FilaHistorialConteo[];
-    let totalFiltrado: number;
-    if (this.esSupabase) {
-      const { data, error } = await this.sb!.schema('inventario').rpc('fn_conteo_fisico_historial', this.parametrosHistorial(0, TOPE_FILAS_PDF));
-      const filas = !error ? ((data ?? []) as Record<string, unknown>[]) : [];
-      filasListado = filas.map((f) => this.mapearFilaHistorial(f));
-      totalFiltrado = Number(filas[0]?.['total'] ?? filasListado.length);
-    } else {
-      await this.cargarBaseLocal();
-      const todas = this.historialFilasLocalFiltradas();
-      totalFiltrado = todas.length;
-      filasListado = todas.slice(0, TOPE_FILAS_PDF);
-    }
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_conteo_fisico_historial', this.parametrosHistorial(0, TOPE_FILAS_PDF));
+    const filas = !error ? ((data ?? []) as Record<string, unknown>[]) : [];
+    const filasListado = filas.map((f) => this.mapearFilaHistorial(f));
+    const totalFiltrado = Number(filas[0]?.['total'] ?? filasListado.length);
 
     const notaListado =
       totalFiltrado > filasListado.length
@@ -711,31 +599,4 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ── Catálogos locales (solo IndexedDB) — cargados una sola vez bajo
-  // demanda, nunca al abrir la pantalla. ──────────────────────────────────
-  private baseLocalCargada = false;
-  private productosLocal: Producto[] = [];
-  private existenciasBodegaLocal: ExistenciaBodega[] = [];
-  private usuariosLocal: Usuario[] = [];
-  private conteosLocal: ConteoFisico[] = [];
-
-  private nombreUsuarioLocal(id: number): string {
-    const usuario = this.usuariosLocal.find((u) => u.id === id);
-    return usuario ? nombreCompletoUsuario(usuario) : '—';
-  }
-
-  private async cargarBaseLocal(): Promise<void> {
-    if (this.baseLocalCargada) return;
-    const [productos, existencias, usuarios, conteos] = await Promise.all([
-      firstValueFrom(this.data.list<Producto>('Producto')),
-      firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega')),
-      firstValueFrom(this.data.list<Usuario>('Usuario')),
-      firstValueFrom(this.data.list<ConteoFisico>('ConteoFisico')),
-    ]);
-    this.productosLocal = productos;
-    this.existenciasBodegaLocal = existencias;
-    this.usuariosLocal = usuarios;
-    this.conteosLocal = conteos;
-    this.baseLocalCargada = true;
-  }
 }

@@ -3,16 +3,11 @@ import { DecimalPipe, DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { SupabaseService } from '../../../core/services/supabase.service';
-import { fuenteDatosActual } from '../../../core/services/fuente-datos';
 import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { SelectBuscableComponent, OpcionBuscable } from '../../../shared/components/select-buscable/select-buscable.component';
-import { Producto } from '../productos/producto.model';
-import { formatMoneda, existenciaTotal, alertasStockBajo, haySobreStock } from '../productos/producto.util';
+import { formatMoneda } from '../productos/producto.util';
 import { CategoriaProducto } from '../categorias-producto/categoria-producto.model';
 import { Bodega } from '../bodegas/bodega.model';
-import { ExistenciaBodega } from '../movimientos-bodega/existencia-bodega.model';
-import { NivelMinimoBodega } from '../productos/nivel-minimo-bodega.model';
-import { MovimientoInventario } from '../movimientos-bodega/movimiento-inventario.model';
 import { exportarCsv } from '../../../shared/utils/csv.util';
 import { exportarTablaPdf } from '../../../shared/utils/pdf-tabla.util';
 
@@ -82,24 +77,17 @@ const TOPE_FILAS_PDF = 200;
  * categoría. Solo entran productos FÍSICOS (existencia !== null) y ACTIVOS.
  *
  * Pensado para escalar a 200,000+ productos y millones de movimientos de
- * inventario: en modo Supabase (ver fuenteDatosActual()), TODO el filtrado,
- * orden, paginación y agregación ocurre en Postgres (funciones
- * inventario.fn_valor_stock_* — ver supabase/migrations/48 a 52); Angular
- * nunca recibe más que una tarjeta resumen, un desglose por categoría/
- * bodega (unas pocas filas) o UNA página (25-50 filas) a la vez. Las tres
- * secciones (tarjetas+Resumen, Productos, Rotación) cargan de forma
- * independiente: tarjetas+Resumen al entrar a la pantalla, Productos y
- * Rotación solo la primera vez que se visita esa pestaña (ver
- * seleccionarTab()), cada una con su propio estado de carga — cambiar de
- * pestaña nunca vuelve a pedir lo que ya se cargó, solo cambiar un filtro,
- * de página o de orden dispara una nueva petición (acotada a esa sección).
- *
- * En modo IndexedDB (navegador sin backend, ver fuenteDatosActual()) no hay
- * Postgres al que pedirle agregaciones, así que se mantiene el cálculo en
- * memoria de siempre — a esa escala (datos de un solo usuario en su propio
- * navegador) nunca llega a ser un problema de rendimiento real. Por eso casi
- * todo método clave está duplicado en una variante `...Supabase()` y otra
- * `...Local()`, elegida una sola vez por `esSupabase`.
+ * inventario: TODO el filtrado, orden, paginación y agregación ocurre en
+ * Postgres (funciones inventario.fn_valor_stock_* — ver
+ * supabase/migrations/48 a 52); Angular nunca recibe más que una tarjeta
+ * resumen, un desglose por categoría/bodega (unas pocas filas) o UNA página
+ * (25-50 filas) a la vez. Las tres secciones (tarjetas+Resumen, Productos,
+ * Rotación) cargan de forma independiente: tarjetas+Resumen al entrar a la
+ * pantalla, Productos y Rotación solo la primera vez que se visita esa
+ * pestaña (ver seleccionarTab()), cada una con su propio estado de carga —
+ * cambiar de pestaña nunca vuelve a pedir lo que ya se cargó, solo cambiar
+ * un filtro, de página o de orden dispara una nueva petición (acotada a esa
+ * sección).
  */
 @Component({
   selector: 'app-valor-stock',
@@ -114,12 +102,11 @@ export class ValorStockComponent implements OnInit {
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
   protected readonly formatMoneda = formatMoneda;
 
-  private readonly esSupabase = fuenteDatosActual() === 'supabase';
-  private readonly sb = this.esSupabase ? inject(SupabaseService).cliente : null;
+  private readonly sb = inject(SupabaseService).cliente;
 
-  // ── Catálogos chicos (categorías/bodegas) — siempre completos, en ambos
-  // modos: nunca son el problema de escala (decenas de filas cuando mucho),
-  // así que no tienen su propio RPC, se reutiliza DataClientService.list().
+  // ── Catálogos chicos (categorías/bodegas) — siempre completos: nunca son
+  // el problema de escala (decenas de filas cuando mucho), así que no
+  // tienen su propio RPC, se reutiliza DataClientService.list().
   protected readonly categorias = signal<CategoriaProducto[]>([]);
   protected readonly bodegas = signal<Bodega[]>([]);
   // Sin una opción "Todas las categorías/bodegas" artificial: sin selección
@@ -191,13 +178,6 @@ export class ValorStockComponent implements OnInit {
   );
   private secuenciaRotacion = 0;
 
-  // ── Modo IndexedDB: caché local cargado una sola vez bajo demanda ───────
-  private baseLocalCargada = false;
-  private productosLocal: Producto[] = [];
-  private existenciasBodegaLocal: ExistenciaBodega[] = [];
-  private nivelesMinimoBodegaLocal: NivelMinimoBodega[] = [];
-  private movimientosLocal: MovimientoInventario[] | null = null;
-
   ngOnInit(): void {
     this.cargarCategoriasYBodegas();
     this.cargarResumen();
@@ -225,37 +205,16 @@ export class ValorStockComponent implements OnInit {
     this.bodegas.set(bodegas);
   }
 
-  private async cargarBaseLocal(): Promise<void> {
-    if (this.baseLocalCargada) return;
-    const [productos, existenciasBodega, nivelesMinimoBodega] = await Promise.all([
-      firstValueFrom(this.data.list<Producto>('Producto')),
-      firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega')),
-      firstValueFrom(this.data.list<NivelMinimoBodega>('NivelMinimoBodega')),
-    ]);
-    this.productosLocal = productos;
-    this.existenciasBodegaLocal = existenciasBodega;
-    this.nivelesMinimoBodegaLocal = nivelesMinimoBodega;
-    this.baseLocalCargada = true;
-  }
-
-  private productosValorizablesLocal(): Producto[] {
-    return this.productosLocal.filter((p) => p.activo && p.existencia !== null);
-  }
-
   // ───────────────────────── Tarjetas + Resumen ────────────────────────────
 
   private async cargarResumen(): Promise<void> {
     this.cargandoResumen.set(true);
-    if (this.esSupabase) {
-      await this.cargarResumenSupabase();
-    } else {
-      await this.cargarResumenLocal();
-    }
+    await this.cargarResumenSupabase();
     this.cargandoResumen.set(false);
   }
 
   private async cargarResumenSupabase(): Promise<void> {
-    const sb = this.sb!.schema('inventario');
+    const sb = this.sb.schema('inventario');
     const [resumenRes, porCatRes, porBodRes] = await Promise.all([
       sb.rpc('fn_valor_stock_resumen'),
       sb.rpc('fn_valor_stock_por_categoria'),
@@ -300,71 +259,6 @@ export class ValorStockComponent implements OnInit {
     }
   }
 
-  private async cargarResumenLocal(): Promise<void> {
-    await this.cargarBaseLocal();
-    const valorizables = this.productosValorizablesLocal();
-    const nombreCategoria = (id: number) => this.categorias().find((c) => c.id === id)?.nombre ?? '—';
-    const nombreBodega = (id: number) => this.bodegas().find((b) => b.id === id)?.nombre ?? '—';
-
-    let valorCosto = 0;
-    let valorVenta = 0;
-    let sinExistencia = 0;
-    let stockBajo = 0;
-    let sobreStock = 0;
-    const valorPorCategoria = new Map<number, { nombre: string; valor: number }>();
-
-    for (const p of valorizables) {
-      const existencia = existenciaTotal(p, this.existenciasBodegaLocal);
-      const valor = existencia * p.costo;
-      valorCosto += valor;
-      valorVenta += existencia * p.precioUnitario;
-      if (existencia === 0) sinExistencia++;
-      if (alertasStockBajo(p, this.existenciasBodegaLocal, this.nivelesMinimoBodegaLocal).length > 0) stockBajo++;
-      if (haySobreStock(p, this.existenciasBodegaLocal)) sobreStock++;
-
-      const actual = valorPorCategoria.get(p.categoriaProductoId);
-      if (actual) actual.valor += valor;
-      else valorPorCategoria.set(p.categoriaProductoId, { nombre: nombreCategoria(p.categoriaProductoId), valor });
-    }
-
-    this.valorInventario.set(valorCosto);
-    this.valorVenta.set(valorVenta);
-    this.margenPotencial.set(valorVenta - valorCosto);
-    this.totalProductosValorizables.set(valorizables.length);
-    this.sinExistencia.set(sinExistencia);
-    this.stockBajo.set(stockBajo);
-    this.sobreStock.set(sobreStock);
-
-    this.porCategoria.set(
-      Array.from(valorPorCategoria.entries())
-        .map(([id, v], i) => ({ id, nombre: v.nombre, valor: v.valor, pct: valorCosto > 0 ? (v.valor / valorCosto) * 100 : 0, color: colorPaleta(i) }))
-        .sort((a, b) => b.valor - a.valor),
-    );
-
-    const costoPorProducto = new Map(valorizables.map((p) => [p.id, p.costo]));
-    const valorPorBodega = new Map<number, number>();
-    let asignado = 0;
-    for (const e of this.existenciasBodegaLocal) {
-      const costo = costoPorProducto.get(e.productoId);
-      if (costo === undefined) continue;
-      const valor = e.existencia * costo;
-      valorPorBodega.set(e.bodegaId, (valorPorBodega.get(e.bodegaId) ?? 0) + valor);
-      asignado += valor;
-    }
-    const sinAsignar = Math.max(0, valorCosto - asignado);
-    const filasBodega: ValorBodega[] = Array.from(valorPorBodega.entries()).map(([id, valor], i) => ({
-      id,
-      nombre: nombreBodega(id),
-      valor,
-      pct: valorCosto > 0 ? (valor / valorCosto) * 100 : 0,
-      color: colorPaleta(i),
-    }));
-    if (sinAsignar > 0) {
-      filasBodega.push({ id: null, nombre: 'Sin bodega asignada', valor: sinAsignar, pct: valorCosto > 0 ? (sinAsignar / valorCosto) * 100 : 0, color: 'var(--ink-soft)' });
-    }
-    this.porBodega.set(filasBodega.sort((a, b) => b.valor - a.valor));
-  }
-
   // ───────────────────────── Pestaña Productos ─────────────────────────────
 
   /** Solo actualiza el texto; la búsqueda ya no se dispara sola al teclear
@@ -405,7 +299,7 @@ export class ValorStockComponent implements OnInit {
   private async cargarProductos(): Promise<void> {
     this.cargandoProductos.set(true);
     const miSecuencia = ++this.secuenciaProductos;
-    const filas = this.esSupabase ? await this.cargarProductosSupabase() : await this.cargarProductosLocal();
+    const filas = await this.cargarProductosSupabase();
     if (miSecuencia !== this.secuenciaProductos) return; // llegó una respuesta vieja, se descarta
     this.productosPagina.set(filas.filas);
     this.totalProductosFiltrados.set(filas.total);
@@ -415,7 +309,7 @@ export class ValorStockComponent implements OnInit {
   private async cargarProductosSupabase(): Promise<{ filas: FilaProductoValor[]; total: number }> {
     const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
     const desde = (this.paginaActualProductos() - 1) * tamanio;
-    const { data, error } = await this.sb!.schema('inventario').rpc('fn_valor_stock_productos', {
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_valor_stock_productos', {
       p_busqueda: this.busquedaProductos().trim() || null,
       p_categoria_id: this.categoriaIdFiltro() || null,
       p_bodega_id: this.bodegaIdFiltro() || null,
@@ -448,64 +342,6 @@ export class ValorStockComponent implements OnInit {
     };
   }
 
-  /** Filtra/ordena TODOS los productos valorizables en memoria — sin
-   *  paginar. Única fuente de la lógica de filtrado en modo IndexedDB:
-   *  cargarProductosLocal() le aplica el slice() de la página actual,
-   *  cargarProductosLocalCompleto() (export) la usa tal cual. */
-  private filasProductosLocalFiltradas(): FilaProductoValor[] {
-    const nombreCategoria = (id: number) => this.categorias().find((c) => c.id === id)?.nombre ?? '—';
-    const texto = this.busquedaProductos().trim().toLowerCase();
-    const categoriaId = this.categoriaIdFiltro();
-    const bodegaId = this.bodegaIdFiltro();
-    const estado = this.estadoFiltro();
-
-    let todas: FilaProductoValor[] = this.productosValorizablesLocal().map((p) => {
-      const existencia = existenciaTotal(p, this.existenciasBodegaLocal);
-      return {
-        productoId: p.id,
-        codigo: p.codigo ?? '',
-        nombre: p.nombre,
-        categoriaId: p.categoriaProductoId,
-        categoriaNombre: nombreCategoria(p.categoriaProductoId),
-        existencia,
-        costo: p.costo,
-        valor: existencia * p.costo,
-        stockBajo: alertasStockBajo(p, this.existenciasBodegaLocal, this.nivelesMinimoBodegaLocal).length > 0,
-        sobreStock: haySobreStock(p, this.existenciasBodegaLocal),
-      };
-    });
-
-    if (texto) todas = todas.filter((f) => f.nombre.toLowerCase().includes(texto) || f.codigo.toLowerCase().includes(texto));
-    if (categoriaId) todas = todas.filter((f) => f.categoriaId === categoriaId);
-    if (bodegaId) {
-      const idsEnBodega = new Set(this.existenciasBodegaLocal.filter((e) => e.bodegaId === bodegaId).map((e) => e.productoId));
-      todas = todas.filter((f) => idsEnBodega.has(f.productoId));
-    }
-    if (estado === 'sin_existencia') todas = todas.filter((f) => f.existencia === 0);
-    else if (estado === 'stock_bajo') todas = todas.filter((f) => f.stockBajo);
-    else if (estado === 'sobre_stock') todas = todas.filter((f) => f.sobreStock);
-
-    const orden = this.ordenProductos();
-    const dir = this.direccionProductos() === 'desc' ? -1 : 1;
-    const clave = (f: FilaProductoValor): string | number => (orden === 'nombre' ? f.nombre : orden === 'codigo' ? f.codigo : f[orden]);
-    todas.sort((a, b) => {
-      const va = clave(a);
-      const vb = clave(b);
-      if (va < vb) return -1 * dir;
-      if (va > vb) return 1 * dir;
-      return a.productoId - b.productoId;
-    });
-    return todas;
-  }
-
-  private async cargarProductosLocal(): Promise<{ filas: FilaProductoValor[]; total: number }> {
-    await this.cargarBaseLocal();
-    const todas = this.filasProductosLocalFiltradas();
-    const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
-    const desde = (this.paginaActualProductos() - 1) * tamanio;
-    return { filas: todas.slice(desde, desde + tamanio), total: todas.length };
-  }
-
   // ───────────────────────── Pestaña Rotación ──────────────────────────────
 
   protected cambiarUmbralDias(valor: number): void {
@@ -529,7 +365,7 @@ export class ValorStockComponent implements OnInit {
   private async cargarRotacion(): Promise<void> {
     this.cargandoRotacion.set(true);
     const miSecuencia = ++this.secuenciaRotacion;
-    const resultado = this.esSupabase ? await this.cargarRotacionSupabase() : await this.cargarRotacionLocal();
+    const resultado = await this.cargarRotacionSupabase();
     if (miSecuencia !== this.secuenciaRotacion) return;
     this.rotacionPagina.set(resultado.filas);
     this.totalRotacionFiltrada.set(resultado.total);
@@ -539,7 +375,7 @@ export class ValorStockComponent implements OnInit {
   private async cargarRotacionSupabase(): Promise<{ filas: FilaRotacion[]; total: number }> {
     const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
     const desde = (this.paginaActualRotacion() - 1) * tamanio;
-    const { data, error } = await this.sb!.schema('inventario').rpc('fn_valor_stock_rotacion', {
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_valor_stock_rotacion', {
       p_umbral_dias: this.umbralDias(),
       p_desde: desde,
       p_cantidad: tamanio,
@@ -557,37 +393,6 @@ export class ValorStockComponent implements OnInit {
       })),
       total: Number(filas[0]?.['total'] ?? 0),
     };
-  }
-
-  private async cargarRotacionLocal(): Promise<{ filas: FilaRotacion[]; total: number }> {
-    await this.cargarBaseLocal();
-    if (this.movimientosLocal === null) {
-      const idsValorizables = this.productosValorizablesLocal().map((p) => p.id);
-      this.movimientosLocal = idsValorizables.length
-        ? await firstValueFrom(this.data.list<MovimientoInventario>('MovimientoInventario', { productoId: idsValorizables }))
-        : [];
-    }
-    const ahora = Date.now();
-    const todas: FilaRotacion[] = this.productosValorizablesLocal()
-      .map((p) => {
-        const propios = this.movimientosLocal!.filter((m) => m.productoId === p.id);
-        const ultimoMovimiento = propios.length > 0 ? propios.reduce((max, m) => (m.fecha > max ? m.fecha : max), propios[0].fecha) : null;
-        const diasSinMovimiento = ultimoMovimiento ? Math.floor((ahora - new Date(ultimoMovimiento).getTime()) / 86400000) : null;
-        return {
-          productoId: p.id,
-          codigo: p.codigo ?? '',
-          nombre: p.nombre,
-          existencia: existenciaTotal(p, this.existenciasBodegaLocal),
-          ultimoMovimiento,
-          diasSinMovimiento,
-        };
-      })
-      .filter((f) => f.diasSinMovimiento === null || f.diasSinMovimiento >= this.umbralDias())
-      .sort((a, b) => (b.diasSinMovimiento ?? Infinity) - (a.diasSinMovimiento ?? Infinity));
-
-    const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
-    const desde = (this.paginaActualRotacion() - 1) * tamanio;
-    return { filas: todas.slice(desde, desde + tamanio), total: todas.length };
   }
 
   // ───────────────────────── Exportar ──────────────────────────────────────
@@ -615,18 +420,11 @@ export class ValorStockComponent implements OnInit {
       { clave: 'alerta' as const, etiqueta: 'Alerta' },
     ];
 
-    if (!this.esSupabase) {
-      await this.cargarBaseLocal();
-      const { filas } = await this.cargarProductosLocalCompleto();
-      exportarCsv('valor_stock.csv', columnas, filas.map((f) => ({ ...f, alerta: this.etiquetaAlerta(f) })));
-      return;
-    }
-
     const todas: Record<string, unknown>[] = [];
     let desde = 0;
     let total = Infinity;
     while (desde < total) {
-      const { data, error } = await this.sb!.schema('inventario').rpc('fn_valor_stock_productos', {
+      const { data, error } = await this.sb.schema('inventario').rpc('fn_valor_stock_productos', {
         p_busqueda: this.busquedaProductos().trim() || null,
         p_categoria_id: this.categoriaIdFiltro() || null,
         p_bodega_id: this.bodegaIdFiltro() || null,
@@ -649,15 +447,6 @@ export class ValorStockComponent implements OnInit {
     exportarCsv('valor_stock.csv', columnas, todas);
   }
 
-  /** Igual que filasProductosLocalFiltradas() pero async (carga la base local
-   *  si todavía no está en caché) — usado solo para export en modo
-   *  IndexedDB, donde no hay de otra (ya está todo en memoria, nunca a
-   *  escala real de 200k). */
-  private async cargarProductosLocalCompleto(): Promise<{ filas: FilaProductoValor[] }> {
-    await this.cargarBaseLocal();
-    return { filas: this.filasProductosLocalFiltradas() };
-  }
-
   /** PDF = reporte ejecutivo (requerimiento 11): totales + desglose por
    *  categoría/bodega + filtros aplicados + un listado acotado a
    *  TOPE_FILAS_PDF — nunca un volcado del catálogo completo (eso es lo que
@@ -672,27 +461,19 @@ export class ValorStockComponent implements OnInit {
       `Valor total: ${formatMoneda(this.valorInventario())} · ${this.totalProductosValorizables()} producto(s)` +
       (filtrosTexto.length ? ` · Filtros: ${filtrosTexto.join(', ')}` : '');
 
-    let filasListado: FilaProductoValor[];
-    let totalFiltrado: number;
-    if (this.esSupabase) {
-      const { data, error } = await this.sb!.schema('inventario').rpc('fn_valor_stock_productos', {
-        p_busqueda: this.busquedaProductos().trim() || null,
-        p_categoria_id: this.categoriaIdFiltro() || null,
-        p_bodega_id: this.bodegaIdFiltro() || null,
-        p_estado: this.estadoFiltro() || null,
-        p_orden: this.ordenProductos(),
-        p_direccion: this.direccionProductos(),
-        p_desde: 0,
-        p_cantidad: TOPE_FILAS_PDF,
-      });
-      const filas = !error ? ((data ?? []) as Record<string, unknown>[]) : [];
-      filasListado = filas.map((f) => this.mapearFilaProducto(f));
-      totalFiltrado = Number(filas[0]?.['total'] ?? filasListado.length);
-    } else {
-      const { filas } = await this.cargarProductosLocalCompleto();
-      totalFiltrado = filas.length;
-      filasListado = filas.slice(0, TOPE_FILAS_PDF);
-    }
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_valor_stock_productos', {
+      p_busqueda: this.busquedaProductos().trim() || null,
+      p_categoria_id: this.categoriaIdFiltro() || null,
+      p_bodega_id: this.bodegaIdFiltro() || null,
+      p_estado: this.estadoFiltro() || null,
+      p_orden: this.ordenProductos(),
+      p_direccion: this.direccionProductos(),
+      p_desde: 0,
+      p_cantidad: TOPE_FILAS_PDF,
+    });
+    const filas = !error ? ((data ?? []) as Record<string, unknown>[]) : [];
+    const filasListado = filas.map((f) => this.mapearFilaProducto(f));
+    const totalFiltrado = Number(filas[0]?.['total'] ?? filasListado.length);
 
     const notaListado =
       totalFiltrado > filasListado.length

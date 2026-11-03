@@ -27,7 +27,7 @@ export interface Ticket {
   /** blob_text: no viene en GetList, solo se carga con GetById. */
   solucion?: string | null;
   activo: boolean;
-  /** Auditoría: la agrega IndexedDbDataClientService.alta() automáticamente. Se usa para calcular el SLA (vigencia de la prioridad) desde la creación del ticket. */
+  /** Auditoría: la agrega SupabaseDataClientService.alta() automáticamente. Se usa para calcular el SLA (vigencia de la prioridad) desde la creación del ticket. */
   fechaCreacion?: string;
   fechaModificacion?: string;
   /** Ticket "padre" del que este es subtarea — null/ausente si es un ticket de

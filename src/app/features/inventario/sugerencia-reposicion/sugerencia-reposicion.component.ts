@@ -3,23 +3,17 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { SupabaseService } from '../../../core/services/supabase.service';
-import { fuenteDatosActual } from '../../../core/services/fuente-datos';
 import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { SelectBuscableComponent, OpcionBuscable } from '../../../shared/components/select-buscable/select-buscable.component';
-import { Producto } from '../productos/producto.model';
-import { alertasStockBajo } from '../productos/producto.util';
-import { ExistenciaBodega } from '../movimientos-bodega/existencia-bodega.model';
-import { NivelMinimoBodega } from '../productos/nivel-minimo-bodega.model';
 import { Bodega } from '../bodegas/bodega.model';
 import { Proveedor } from '../proveedores/proveedor.model';
-import { ProductoProveedor } from '../proveedores/producto-proveedor.model';
 import { ToastService } from '../../../shared/services/toast.service';
 import { OrdenCompraBorradorService } from '../compras/orden-compra-borrador.service';
 
 /** Sentinel para el filtro de Proveedor: "Sin proveedor asignado" no es un
  *  id real (sería NULL), así que se representa con -1 en el combo y se
- *  traduce a "proveedor_id IS NULL" tanto en la RPC como en modo local
- *  (ver requerimiento 18 — antes no existía forma de filtrar por esto). */
+ *  traduce a "proveedor_id IS NULL" en la RPC (ver requerimiento 18 — antes
+ *  no existía forma de filtrar por esto). */
 const SIN_PROVEEDOR = -1;
 
 type ColumnaOrden = 'proveedor' | 'codigo' | 'nombre' | 'existencia' | 'minimo' | 'sugerido';
@@ -37,8 +31,8 @@ interface FilaReposicion {
   nivelMinimo: number;
   /** Cuánto comprar para volver a quedar con el doble del mínimo, no solo
    *  justo en el mínimo — así no se vuelve a caer en alerta con el primer
-   *  movimiento de salida. Misma regla de siempre, ahora calculada en SQL
-   *  (ver migración fn_sugerencia_reposicion) o aquí mismo en modo local. */
+   *  movimiento de salida. Misma regla de siempre, calculada en SQL (ver
+   *  migración fn_sugerencia_reposicion). */
   sugerida: number;
   proveedorId: number | null;
   proveedorNombre: string;
@@ -80,8 +74,7 @@ export class SugerenciaReposicionComponent implements OnInit, OnDestroy {
   protected readonly toast = inject(ToastService);
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
 
-  private readonly esSupabase = fuenteDatosActual() === 'supabase';
-  private readonly sb = this.esSupabase ? inject(SupabaseService).cliente : null;
+  private readonly sb = inject(SupabaseService).cliente;
 
   // ── Catálogos chicos para los selects de filtro (Proveedor/Bodega) — se
   // cargan completos porque una empresa normal tiene pocos de cada uno
@@ -125,16 +118,6 @@ export class SugerenciaReposicionComponent implements OnInit, OnDestroy {
     Math.max(1, Math.ceil(this.totalFilas() / Math.max(1, this.preferenciasGrid.tamanoPagina()))),
   );
   private secuencia = 0;
-
-  // ── Modo local (IndexedDB, sin backend) — mismo criterio de siempre: en
-  // ese modo la base es chica (un solo usuario sin servidor), así que se
-  // carga completa una vez y se filtra/ordena/pagina aquí mismo. ─────────
-  private baseLocalCargada = false;
-  private cargaBaseLocalPromesa: Promise<void> | null = null;
-  private productosLocal: Producto[] = [];
-  private existenciasBodegaLocal: ExistenciaBodega[] = [];
-  private nivelesMinimoBodegaLocal: NivelMinimoBodega[] = [];
-  private productoProveedorLocal: ProductoProveedor[] = [];
 
   ngOnInit(): void {
     document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo, ver requerimiento 1
@@ -197,7 +180,7 @@ export class SugerenciaReposicionComponent implements OnInit, OnDestroy {
   private async cargar(): Promise<void> {
     this.cargando.set(true);
     const miSecuencia = ++this.secuencia;
-    const resultado = this.esSupabase ? await this.cargarSupabase() : await this.cargarLocal();
+    const resultado = await this.cargarSupabase();
     if (miSecuencia !== this.secuencia) return; // respuesta vieja, se descarta
     this.filasPagina.set(resultado.filas);
     this.totalFilas.set(resultado.total);
@@ -207,7 +190,7 @@ export class SugerenciaReposicionComponent implements OnInit, OnDestroy {
   private async cargarSupabase(): Promise<{ filas: FilaReposicion[]; total: number }> {
     const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
     const desde = (this.paginaActual() - 1) * tamanio;
-    const { data, error } = await this.sb!.schema('inventario').rpc('fn_sugerencia_reposicion', {
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_sugerencia_reposicion', {
       p_busqueda_nombre: this.busquedaNombre().trim() || null,
       p_busqueda_codigo: this.busquedaCodigo().trim() || null,
       p_proveedor_id: this.filtroProveedorId() || null,
@@ -238,113 +221,6 @@ export class SugerenciaReposicionComponent implements OnInit, OnDestroy {
     };
   }
 
-  // ── Modo local ───────────────────────────────────────────────────────
-  private async cargarBaseLocal(): Promise<void> {
-    if (this.baseLocalCargada) return;
-    if (this.cargaBaseLocalPromesa) return this.cargaBaseLocalPromesa;
-    this.cargaBaseLocalPromesa = Promise.all([
-      firstValueFrom(this.data.list<Producto>('Producto')),
-      firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega')),
-      firstValueFrom(this.data.list<NivelMinimoBodega>('NivelMinimoBodega')),
-      firstValueFrom(this.data.list<ProductoProveedor>('ProductoProveedor')),
-    ]).then(([productos, existenciasBodega, nivelesMinimoBodega, productoProveedor]) => {
-      this.productosLocal = productos;
-      this.existenciasBodegaLocal = existenciasBodega;
-      this.nivelesMinimoBodegaLocal = nivelesMinimoBodega;
-      this.productoProveedorLocal = productoProveedor;
-      this.baseLocalCargada = true;
-    });
-    return this.cargaBaseLocalPromesa;
-  }
-
-  private proveedorPreferidoLocal(producto: Producto): { proveedorId: number | null; precioCompra: number | null } {
-    const preferido = this.productoProveedorLocal.find((pp) => pp.productoId === producto.id && pp.preferido);
-    if (preferido) return { proveedorId: preferido.proveedorId, precioCompra: preferido.precioCompra };
-    return { proveedorId: producto.proveedorId ?? null, precioCompra: null };
-  }
-
-  /** Misma regla exacta que antes (ver alertasStockBajo() en
-   *  producto.util.ts) — todas las alertas sin filtrar, sin ordenar ni
-   *  paginar todavía; eso se aplica después según lo que pida cada
-   *  llamada (tabla visible vs. "Generar orden de compra"). */
-  private todasLasFilasLocal(): FilaReposicion[] {
-    const nombreProveedor = (id: number | null) => {
-      if (!id) return 'Sin proveedor asignado';
-      return this.proveedores().find((p) => p.id === id)?.nombre ?? 'Sin proveedor asignado';
-    };
-    const nombreBodega = (id: number | null) => {
-      if (id === null) return 'Todas (sin mínimo por bodega)';
-      return this.bodegas().find((b) => b.id === id)?.nombre ?? '—';
-    };
-    const filas: FilaReposicion[] = [];
-    for (const producto of this.productosLocal) {
-      if (!producto.activo) continue;
-      const alertas = alertasStockBajo(producto, this.existenciasBodegaLocal, this.nivelesMinimoBodegaLocal);
-      if (alertas.length === 0) continue;
-      const { proveedorId, precioCompra } = this.proveedorPreferidoLocal(producto);
-      for (const alerta of alertas) {
-        const sugerida = Math.max(alerta.nivelMinimo * 2 - alerta.existencia, 1);
-        filas.push({
-          productoId: producto.id,
-          codigo: producto.codigo ?? '',
-          nombre: producto.nombre,
-          bodegaId: alerta.bodegaId,
-          bodegaNombre: nombreBodega(alerta.bodegaId),
-          existencia: alerta.existencia,
-          nivelMinimo: alerta.nivelMinimo,
-          sugerida,
-          proveedorId,
-          proveedorNombre: nombreProveedor(proveedorId),
-          costoUnitario: precioCompra ?? producto.costo,
-        });
-      }
-    }
-    return filas;
-  }
-
-  private ordenarFilasLocal(filas: FilaReposicion[]): FilaReposicion[] {
-    const dir = this.direccion() === 'asc' ? 1 : -1;
-    const copia = [...filas];
-    switch (this.orden()) {
-      case 'codigo':
-        return copia.sort((a, b) => dir * a.codigo.localeCompare(b.codigo));
-      case 'nombre':
-        return copia.sort((a, b) => dir * a.nombre.localeCompare(b.nombre));
-      case 'existencia':
-        return copia.sort((a, b) => dir * (a.existencia - b.existencia));
-      case 'minimo':
-        return copia.sort((a, b) => dir * (a.nivelMinimo - b.nivelMinimo));
-      case 'sugerido':
-        return copia.sort((a, b) => dir * (a.sugerida - b.sugerida));
-      default:
-        // Mismo orden por defecto de siempre: proveedor, luego mínimo descendente.
-        return copia.sort((a, b) => a.proveedorNombre.localeCompare(b.proveedorNombre) || b.nivelMinimo - a.nivelMinimo);
-    }
-  }
-
-  private filasLocalFiltradas(): FilaReposicion[] {
-    const nombre = this.busquedaNombre().trim().toLowerCase();
-    const codigo = this.busquedaCodigo().trim().toLowerCase();
-    const proveedorId = this.filtroProveedorId();
-    const bodegaId = this.filtroBodegaId();
-    return this.todasLasFilasLocal().filter(
-      (f) =>
-        (!nombre || f.nombre.toLowerCase().includes(nombre)) &&
-        (!codigo || f.codigo.toLowerCase().includes(codigo)) &&
-        (!proveedorId ||
-          (proveedorId === SIN_PROVEEDOR ? f.proveedorId === null : f.proveedorId === proveedorId)) &&
-        (!bodegaId || f.bodegaId === bodegaId),
-    );
-  }
-
-  private async cargarLocal(): Promise<{ filas: FilaReposicion[]; total: number }> {
-    await this.cargarBaseLocal();
-    const todas = this.ordenarFilasLocal(this.filasLocalFiltradas());
-    const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
-    const desde = (this.paginaActual() - 1) * tamanio;
-    return { filas: todas.slice(desde, desde + tamanio), total: todas.length };
-  }
-
   /** Genera un borrador de Orden de compra con TODOS los productos
    *  sugeridos de UN proveedor (ignora los demás filtros de pantalla —
    *  nombre/código/bodega — igual que antes: la orden debe llevar todo lo
@@ -352,9 +228,7 @@ export class SugerenciaReposicionComponent implements OnInit, OnDestroy {
    *  en ese momento) y navega a la ficha de Órdenes de compra para que el
    *  usuario la revise — no se guarda nada todavía aquí. */
   async generarOrdenCompra(proveedorId: number): Promise<void> {
-    const filasProveedor = this.esSupabase
-      ? await this.obtenerTodasDelProveedorSupabase(proveedorId)
-      : this.todasLasFilasLocal().filter((f) => f.proveedorId === proveedorId);
+    const filasProveedor = await this.obtenerTodasDelProveedorSupabase(proveedorId);
     if (filasProveedor.length === 0) return;
     const lineas = filasProveedor.map((f) => ({ productoId: f.productoId, cantidad: f.sugerida, costoUnitario: f.costoUnitario }));
     const bodegasDistintas = new Set(filasProveedor.map((f) => f.bodegaId));
@@ -367,7 +241,7 @@ export class SugerenciaReposicionComponent implements OnInit, OnDestroy {
    *  de la propia RPC) — la generación de una orden de compra necesita la
    *  lista completa, no solo la página visible en pantalla. */
   private async obtenerTodasDelProveedorSupabase(proveedorId: number): Promise<FilaReposicion[]> {
-    const { data, error } = await this.sb!.schema('inventario').rpc('fn_sugerencia_reposicion', {
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_sugerencia_reposicion', {
       p_busqueda_nombre: null,
       p_busqueda_codigo: null,
       p_proveedor_id: proveedorId,

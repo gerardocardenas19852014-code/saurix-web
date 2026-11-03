@@ -3,14 +3,10 @@ import { DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { SupabaseService } from '../../../core/services/supabase.service';
-import { fuenteDatosActual } from '../../../core/services/fuente-datos';
 import { SelectBuscableComponent, OpcionBuscable } from '../../../shared/components/select-buscable/select-buscable.component';
 import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { ToastService } from '../../../shared/services/toast.service';
-import { Producto } from '../productos/producto.model';
 import { Bodega } from '../bodegas/bodega.model';
-import { ExistenciaBodega } from '../movimientos-bodega/existencia-bodega.model';
-import { MovimientoInventario } from '../movimientos-bodega/movimiento-inventario.model';
 import { exportarCsv } from '../../../shared/utils/csv.util';
 import { exportarTablaPdf } from '../../../shared/utils/pdf-tabla.util';
 
@@ -84,12 +80,6 @@ const TOPE_FILAS_PDF = 200;
  *    de página.
  *  - Exportar CSV/PDF respeta los filtros activos y nunca depende de lo que
  *    ya esté cargado en Angular — ver exportarCsv()/exportarPdf() más abajo.
- *
- * Modo IndexedDB local (catálogos de prueba, chicos): se mantiene el cálculo
- * en memoria de siempre, cargado una sola vez bajo demanda
- * (cargarBaseLocal()) — a esa escala nunca es un problema real de
- * rendimiento, pero ahora sí respeta los mismos filtros/paginación que el
- * modo Supabase para que el comportamiento visual sea idéntico en ambos.
  */
 @Component({
   selector: 'app-kardex',
@@ -108,11 +98,10 @@ export class KardexComponent implements OnInit, OnDestroy {
   protected readonly toast = inject(ToastService);
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
 
-  private readonly esSupabase = fuenteDatosActual() === 'supabase';
-  private readonly sb = this.esSupabase ? inject(SupabaseService).cliente : null;
+  private readonly sb = inject(SupabaseService).cliente;
 
-  // ── Catálogo de bodegas (chico, siempre completo en ambos modos — igual
-  // que en Movimientos entre bodegas/Órdenes de compra) ───────────────────
+  // ── Catálogo de bodegas (chico, siempre completo — igual que en
+  // Movimientos entre bodegas/Órdenes de compra) ──────────────────────────
   protected readonly bodegas = signal<Bodega[]>([]);
   protected readonly bodegasActivas = computed(() => this.bodegas().filter((b) => b.activo !== false));
   private nombreBodega(id: number | null): string | null {
@@ -163,11 +152,7 @@ export class KardexComponent implements OnInit, OnDestroy {
   }
 
   private cargarBodegas(): void {
-    if (this.esSupabase) {
-      firstValueFrom(this.data.list<Bodega>('Bodega')).then((bodegas) => this.bodegas.set(bodegas));
-    } else {
-      this.cargarBaseLocal().then(() => this.bodegas.set(this.bodegasLocal));
-    }
+    firstValueFrom(this.data.list<Bodega>('Bodega')).then((bodegas) => this.bodegas.set(bodegas));
   }
 
   /** Autocomplete remoto de Producto (ver comentario de clase) — referencia
@@ -177,36 +162,20 @@ export class KardexComponent implements OnInit, OnDestroy {
    *  nombre/código sin otra consulta. */
   protected readonly buscarProductosRemoto = async (texto: string): Promise<OpcionBuscable[]> => {
     const limite = 15;
-    if (this.esSupabase) {
-      const { data, error } = await this.sb!.schema('inventario').rpc('fn_kardex_productos_autocomplete', {
-        p_busqueda: texto || null,
-        p_limite: limite,
-      });
-      if (error) return [];
-      const filas = (data ?? []) as Record<string, unknown>[];
-      for (const f of filas) {
-        this.catalogoAutocomplete.set(Number(f['id']), { codigo: String(f['codigo'] ?? ''), nombre: String(f['nombre']) });
-      }
-      return filas.map((f) => {
-        const codigo = f['codigo'] ? String(f['codigo']) : null;
-        const unidad = f['unidad_nombre'] ? String(f['unidad_nombre']) : null;
-        const etiqueta = [codigo, String(f['nombre']), unidad].filter((p) => !!p).join(' — ');
-        return { valor: Number(f['id']), etiqueta };
-      });
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_kardex_productos_autocomplete', {
+      p_busqueda: texto || null,
+      p_limite: limite,
+    });
+    if (error) return [];
+    const filas = (data ?? []) as Record<string, unknown>[];
+    for (const f of filas) {
+      this.catalogoAutocomplete.set(Number(f['id']), { codigo: String(f['codigo'] ?? ''), nombre: String(f['nombre']) });
     }
-    await this.cargarBaseLocal();
-    const termino = texto.trim().toLowerCase();
-    const candidatos = this.productosLocal.filter((p) => p.activo && p.existencia !== null);
-    const filtrados = termino
-      ? candidatos.filter((p) => p.nombre.toLowerCase().includes(termino) || (p.codigo ?? '').toLowerCase().includes(termino))
-      : candidatos;
-    const unidadNombre = (id: number) => this.unidadesLocal.find((u) => u.id === id)?.nombre ?? null;
-    for (const p of filtrados.slice(0, limite)) {
-      this.catalogoAutocomplete.set(p.id, { codigo: p.codigo ?? '', nombre: p.nombre });
-    }
-    return filtrados.slice(0, limite).map((p) => {
-      const etiqueta = [p.codigo || null, p.nombre, unidadNombre(p.unidadMedidaId)].filter((v) => !!v).join(' — ');
-      return { valor: p.id, etiqueta };
+    return filas.map((f) => {
+      const codigo = f['codigo'] ? String(f['codigo']) : null;
+      const unidad = f['unidad_nombre'] ? String(f['unidad_nombre']) : null;
+      const etiqueta = [codigo, String(f['nombre']), unidad].filter((p) => !!p).join(' — ');
+      return { valor: Number(f['id']), etiqueta };
     });
   };
 
@@ -265,16 +234,14 @@ export class KardexComponent implements OnInit, OnDestroy {
     this.cargandoResumen.set(true);
     const miSecuencia = ++this.secuenciaResumen;
     const bodegaId = this.filtroBodegaId() || null;
-    const existencia = this.esSupabase
-      ? await this.cargarResumenSupabase(productoId, bodegaId)
-      : await this.cargarResumenLocal(productoId, bodegaId);
+    const existencia = await this.cargarResumenSupabase(productoId, bodegaId);
     if (miSecuencia !== this.secuenciaResumen) return; // respuesta vieja — descartar
     this.existenciaActual.set(existencia);
     this.cargandoResumen.set(false);
   }
 
   private async cargarResumenSupabase(productoId: number, bodegaId: number | null): Promise<number> {
-    const { data, error } = await this.sb!.schema('inventario').rpc('fn_kardex_resumen', {
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_kardex_resumen', {
       p_producto_id: productoId,
       p_bodega_id: bodegaId,
     });
@@ -286,16 +253,6 @@ export class KardexComponent implements OnInit, OnDestroy {
     return Number(fila?.['existencia_actual'] ?? 0);
   }
 
-  private async cargarResumenLocal(productoId: number, bodegaId: number | null): Promise<number> {
-    await this.cargarBaseLocal();
-    if (bodegaId) {
-      return this.existenciasBodegaLocal.find((e) => e.productoId === productoId && e.bodegaId === bodegaId)?.existencia ?? 0;
-    }
-    const propias = this.existenciasBodegaLocal.filter((e) => e.productoId === productoId);
-    if (propias.length === 0) return this.productosLocal.find((p) => p.id === productoId)?.existencia ?? 0;
-    return propias.reduce((acc, e) => acc + e.existencia, 0);
-  }
-
   /** Página del Kardex, según paginaActual()/preferenciasGrid.tamanoPagina()
    *  — ver fn_kardex_listar(). */
   private async cargarListado(): Promise<void> {
@@ -303,9 +260,7 @@ export class KardexComponent implements OnInit, OnDestroy {
     if (!productoId) return;
     this.cargandoListado.set(true);
     const miSecuencia = ++this.secuenciaListado;
-    const resultado = this.esSupabase
-      ? await this.cargarListadoSupabase(productoId, null, null)
-      : await this.cargarListadoLocal(productoId);
+    const resultado = await this.cargarListadoSupabase(productoId, null, null);
     if (miSecuencia !== this.secuenciaListado) return; // respuesta vieja — descartar
     // Si la página en la que estábamos quedó vacía (filtro nuevo con menos
     // páginas que la posición actual), retrocede a la última página real —
@@ -331,7 +286,7 @@ export class KardexComponent implements OnInit, OnDestroy {
   ): Promise<{ filas: FilaKardex[]; total: number }> {
     const tamanio = cantidadExplicita ?? this.tamanioPagina();
     const desde = desdeExplicito ?? (this.paginaActual() - 1) * tamanio;
-    const { data, error } = await this.sb!.schema('inventario').rpc('fn_kardex_listar', {
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_kardex_listar', {
       p_producto_id: productoId,
       p_bodega_id: this.filtroBodegaId() || null,
       p_tipo: this.filtroTipo() || null,
@@ -363,65 +318,6 @@ export class KardexComponent implements OnInit, OnDestroy {
       saldo: Number(f['saldo']),
       nota: f['nota'] ? String(f['nota']) : null,
     };
-  }
-
-  /** Mismo cálculo de siempre en modo IndexedDB local (tipo/delta/saldo
-   *  cronológico sobre TODO el historial del producto), filtrado por
-   *  Bodega/Tipo/Desde/Hasta y YA en orden "más reciente primero" — sin
-   *  paginar. Fuente única para la pantalla (cargarListadoLocal() pagina un
-   *  slice) y para exportar (CSV/PDF toman esta misma lista completa). */
-  private calcularFilasLocalFiltradas(productoId: number): FilaKardex[] {
-    const bodegaFiltroId = this.filtroBodegaId();
-    const propios = this.movimientosLocal
-      .filter((m) => m.productoId === productoId)
-      .filter((m) => !bodegaFiltroId || m.bodegaOrigenId === bodegaFiltroId || m.bodegaDestinoId === bodegaFiltroId)
-      .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.id - b.id);
-
-    let saldo = 0;
-    const todas: FilaKardex[] = [];
-    for (const m of propios) {
-      const tipo: TipoMovimiento = m.bodegaOrigenId === null ? 'entrada' : m.bodegaDestinoId === null ? 'salida' : 'traspaso';
-      let delta: number;
-      if (!bodegaFiltroId) {
-        delta = m.bodegaOrigenId === null ? m.cantidad : m.bodegaDestinoId === null ? -m.cantidad : 0;
-      } else {
-        const entra = m.bodegaDestinoId === bodegaFiltroId;
-        const sale = m.bodegaOrigenId === bodegaFiltroId;
-        delta = entra ? m.cantidad : sale ? -m.cantidad : 0;
-      }
-      saldo += delta;
-      todas.push({
-        id: m.id,
-        fecha: m.fecha,
-        tipo,
-        origenNombre: this.nombreBodega(m.bodegaOrigenId),
-        destinoNombre: this.nombreBodega(m.bodegaDestinoId),
-        cantidad: m.cantidad,
-        delta,
-        saldo,
-        nota: m.nota,
-      });
-    }
-
-    const tipoFiltro = this.filtroTipo();
-    const desde = this.filtroDesde();
-    const hasta = this.filtroHasta();
-    return todas
-      .filter((f) => !tipoFiltro || f.tipo === tipoFiltro)
-      .filter((f) => !desde || f.fecha.slice(0, 10) >= desde)
-      .filter((f) => !hasta || f.fecha.slice(0, 10) <= hasta)
-      .reverse(); // más reciente primero, aunque el cálculo fue cronológico
-  }
-
-  /** Modo IndexedDB local — respeta Bodega/Tipo/Desde/Hasta y pagina en
-   *  memoria, para que el comportamiento sea idéntico al modo Supabase. Sin
-   *  problema de escala real a este tamaño de catálogo. */
-  private async cargarListadoLocal(productoId: number): Promise<{ filas: FilaKardex[]; total: number }> {
-    await this.cargarBaseLocal();
-    const filtradas = this.calcularFilasLocalFiltradas(productoId);
-    const tamanio = this.tamanioPagina();
-    const inicioPagina = (this.paginaActual() - 1) * tamanio;
-    return { filas: filtradas.slice(inicioPagina, inicioPagina + tamanio), total: filtradas.length };
   }
 
   private nombreTipo(tipo: TipoMovimiento): string {
@@ -467,13 +363,6 @@ export class KardexComponent implements OnInit, OnDestroy {
     const productoId = this.productoId();
     if (!productoId) return;
 
-    if (!this.esSupabase) {
-      await this.cargarBaseLocal();
-      const todas = this.calcularFilasLocalFiltradas(productoId);
-      exportarCsv(`${this.nombreArchivoBase()}.csv`, this.columnasCsv, todas.map((f) => this.filaParaExportar(f)));
-      return;
-    }
-
     const todas: Record<string, unknown>[] = [];
     let desde = 0;
     let total = Infinity;
@@ -494,18 +383,9 @@ export class KardexComponent implements OnInit, OnDestroy {
     const productoId = this.productoId();
     if (!productoId) return;
 
-    let filasListado: FilaKardex[];
-    let totalFiltrado: number;
-    if (this.esSupabase) {
-      const resultado = await this.cargarListadoSupabase(productoId, 0, TOPE_FILAS_PDF);
-      filasListado = resultado.filas;
-      totalFiltrado = resultado.total;
-    } else {
-      await this.cargarBaseLocal();
-      const todas = this.calcularFilasLocalFiltradas(productoId);
-      totalFiltrado = todas.length;
-      filasListado = todas.slice(0, TOPE_FILAS_PDF);
-    }
+    const resultado = await this.cargarListadoSupabase(productoId, 0, TOPE_FILAS_PDF);
+    const filasListado = resultado.filas;
+    const totalFiltrado = resultado.total;
 
     const bodega = this.bodegas().find((b) => b.id === this.filtroBodegaId());
     const notaListado =
@@ -543,30 +423,4 @@ export class KardexComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ── Catálogos locales (solo IndexedDB) — cargados una sola vez bajo
-  // demanda, nunca al abrir la pantalla (mismo patrón que
-  // MovimientosBodegaComponent.cargarBaseLocal()). ───────────────────────
-  private baseLocalCargada = false;
-  private productosLocal: Producto[] = [];
-  private bodegasLocal: Bodega[] = [];
-  private existenciasBodegaLocal: ExistenciaBodega[] = [];
-  private movimientosLocal: MovimientoInventario[] = [];
-  private unidadesLocal: { id: number; nombre: string }[] = [];
-
-  private async cargarBaseLocal(): Promise<void> {
-    if (this.baseLocalCargada) return;
-    const [productos, bodegas, existencias, movimientos, unidades] = await Promise.all([
-      firstValueFrom(this.data.list<Producto>('Producto')),
-      firstValueFrom(this.data.list<Bodega>('Bodega')),
-      firstValueFrom(this.data.list<ExistenciaBodega>('ExistenciaBodega')),
-      firstValueFrom(this.data.list<MovimientoInventario>('MovimientoInventario')),
-      firstValueFrom(this.data.list<{ id: number; nombre: string }>('UnidadMedida')),
-    ]);
-    this.productosLocal = productos;
-    this.bodegasLocal = bodegas;
-    this.existenciasBodegaLocal = existencias;
-    this.movimientosLocal = movimientos;
-    this.unidadesLocal = unidades;
-    this.baseLocalCargada = true;
-  }
 }

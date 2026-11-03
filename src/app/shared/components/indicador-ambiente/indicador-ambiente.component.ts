@@ -1,5 +1,4 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
-import { fuenteDatosActual } from '../../../core/services/fuente-datos';
 import { CONEXIONES, conexionActual } from '../../../core/services/conexion';
 import { SupabaseService } from '../../../core/services/supabase.service';
 
@@ -13,9 +12,9 @@ interface EmpresaSesion {
 /**
  * Indicador SIEMPRE visible de dónde se están guardando los datos:
  *  - una franja de color en el borde superior de toda la app, y
- *  - una etiqueta fija arriba al centro: NUBE (verde) / LOCAL (naranja) y,
- *    en la nube, la empresa de la sesión. Si el superadmin está trabajando
- *    dentro de otra empresa (modo soporte) se pinta morado y ofrece regresar.
+ *  - una etiqueta fija arriba al centro: NUBE (verde) y la empresa de la
+ *    sesión. Si el superadmin está trabajando dentro de otra empresa (modo
+ *    soporte) se pinta morado y ofrece regresar.
  * Además antepone el ambiente al título de la pestaña del navegador.
  * Se monta una sola vez en App: aparece en login, panel de módulos y en
  * todos los módulos.
@@ -25,9 +24,9 @@ interface EmpresaSesion {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="ambiente-franja" [class.local]="!enNube" [class.soporte]="empresa()?.es_soporte" aria-hidden="true"></div>
-    <div class="ambiente-etiqueta" [class.local]="!enNube" [class.soporte]="empresa()?.es_soporte" role="status" [attr.title]="detalle">
-      {{ enNube ? (empresa()?.es_soporte ? '🛟 SOPORTE' : '☁️ NUBE') : '💻 LOCAL' }}
+    <div class="ambiente-franja" [class.soporte]="empresa()?.es_soporte" aria-hidden="true"></div>
+    <div class="ambiente-etiqueta" [class.soporte]="empresa()?.es_soporte" role="status" [attr.title]="detalle">
+      {{ empresa()?.es_soporte ? '🛟 SOPORTE' : '☁️ NUBE' }}
       <span class="ambiente-sub">{{ subtitulo() }}</span>
       @if (empresa()?.es_soporte) {
         <button type="button" class="ambiente-salir" (click)="salirDeSoporte()">Volver a mi empresa</button>
@@ -50,7 +49,6 @@ interface EmpresaSesion {
       white-space: nowrap; user-select: none;
     }
     .ambiente-sub { font-weight: 500; letter-spacing: 0; opacity: .9; }
-    .local { background: #c2410c; }
     .soporte { background: #7c3aed; }
     .ambiente-salir {
       margin-left: 4px; border: 1px solid rgba(255, 255, 255, .7); border-radius: 999px;
@@ -62,14 +60,12 @@ interface EmpresaSesion {
   `,
 })
 export class IndicadorAmbienteComponent implements OnInit {
-  protected readonly enNube = fuenteDatosActual() === 'supabase';
   private readonly conexion = conexionActual();
-  private readonly sb = this.enNube ? inject(SupabaseService).cliente : null;
+  private readonly sb = inject(SupabaseService).cliente;
 
   protected readonly empresa = signal<EmpresaSesion | null>(null);
 
   protected subtitulo(): string {
-    if (!this.enNube) return 'solo este navegador';
     const partes: string[] = [];
     if (CONEXIONES.length > 1) partes.push(this.conexion.nombre);
     const empresa = this.empresa();
@@ -77,14 +73,11 @@ export class IndicadorAmbienteComponent implements OnInit {
     return partes.length ? partes.join(' · ') : 'Supabase';
   }
 
-  protected readonly detalle = this.enNube
-    ? 'Trabajando en la nube (Supabase). Los datos se comparten entre dispositivos y quedan en la empresa indicada.'
-    : 'Trabajando en local (IndexedDB). Los datos solo existen en este navegador.';
+  protected readonly detalle =
+    'Trabajando en la nube (Supabase). Los datos se comparten entre dispositivos y quedan en la empresa indicada.';
 
   ngOnInit(): void {
-    const prefijo = this.enNube ? '☁️ Nube' : '💻 Local';
-    document.title = `${prefijo} · Saurix`;
-    if (!this.sb) return;
+    document.title = '☁️ Nube · Saurix';
     void this.cargarEmpresa();
     // Al iniciar o cerrar sesión cambia la empresa que se muestra.
     this.sb.auth.onAuthStateChange((evento) => {
@@ -95,7 +88,6 @@ export class IndicadorAmbienteComponent implements OnInit {
   }
 
   private async cargarEmpresa(): Promise<void> {
-    if (!this.sb) return;
     const { data: sesion } = await this.sb.auth.getSession();
     if (!sesion.session) {
       this.empresa.set(null);
@@ -106,7 +98,6 @@ export class IndicadorAmbienteComponent implements OnInit {
   }
 
   async salirDeSoporte(): Promise<void> {
-    if (!this.sb) return;
     await this.sb.schema('seguridad').rpc('cambiar_empresa_activa', { p_empresa: null });
     // '/modulos' a secas se resuelve contra la RAÍZ DEL DOMINIO, no contra
     // el base href de este despliegue (en GitHub Pages la app vive bajo

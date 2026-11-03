@@ -2,7 +2,8 @@
   <h1>Movimientos entre bodegas</h1>
 </div>
 
-<p class="hint" style="margin-top:-6px; max-width:none;">
+@if (!vistaMasiva()) {
+  <p class="hint" style="margin-top:-6px; max-width:none;">
   Registra entradas (mercancía nueva, o la asignación inicial de la existencia que ya tenía un
   producto), traspasos de cantidad entre bodegas, y salidas/ajustes (mermas, daños, correcciones de
   conteo). Cada movimiento queda en el historial de abajo.
@@ -22,7 +23,7 @@
 
 @if (tabActiva() === 'existencia') {
   <div class="grid-toolbar">
-    <button type="button" class="toolbar-btn" (click)="nuevoMovimiento('traspaso')">+ Nuevo movimiento</button>
+    <button type="button" class="toolbar-btn" (click)="abrirMovimientoMasivo()">📦 Movimiento masivo</button>
     <button type="button" class="btn-primary small" (click)="cambiarFiltroExistencia()">🔍 Buscar</button>
 
     <div class="grid-filter">
@@ -124,7 +125,7 @@
   }
 } @else if (tabActiva() === 'historial') {
   <div class="grid-toolbar">
-    <button type="button" class="toolbar-btn" (click)="nuevoMovimiento('traspaso')">+ Nuevo movimiento</button>
+    <button type="button" class="toolbar-btn" (click)="abrirMovimientoMasivo()">📦 Movimiento masivo</button>
     <button type="button" class="btn-primary small" (click)="cambiarFiltroHistorial()">🔍 Buscar</button>
 
     <div class="toolbar-group">
@@ -222,7 +223,7 @@
   }
 } @else {
   <div class="grid-toolbar">
-    <button type="button" class="toolbar-btn" (click)="nuevoMovimiento('traspaso')">+ Nuevo movimiento</button>
+    <button type="button" class="toolbar-btn" (click)="abrirMovimientoMasivo()">📦 Movimiento masivo</button>
     <button type="button" class="btn-primary small" (click)="cambiarFiltroTransito()">🔍 Buscar</button>
 
     <div class="grid-filter">
@@ -299,6 +300,10 @@
       </table>
     </div>
   }
+}
+
+} @else {
+  <app-movimiento-masivo [bodegas]="bodegasActivas()" (cancelar)="cancelarMasiva()" (completado)="alCompletarMasiva()" />
 }
 
 @if (modalAbierto()) {

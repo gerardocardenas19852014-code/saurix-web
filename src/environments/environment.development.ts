@@ -1,8 +1,6 @@
 export const environment = {
   production: false,
   apiUrl: 'http://localhost:5000',
-  // Fuente de datos: 'supabase' (nube) o 'indexeddb' (solo este navegador).
-  fuenteDatos: 'supabase' as 'supabase' | 'indexeddb',
   // Proyectos de Supabase disponibles (ver core/services/conexion.ts).
   // Hoy uno solo: todos los clientes ahí, separados por empresa. Para darle
   // a un cliente su propia base, agrega otra entrada con su proyecto.
