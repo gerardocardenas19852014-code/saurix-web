@@ -17,7 +17,10 @@
 @media (min-width: 1024px) {
   :host {
     display: grid;
-    grid-template-columns: 1fr 380px;
+    /* Columna de Mi Orden: 320-400px según el ancho disponible (22vw),
+     * nunca una proporción enorme de pantalla — el catálogo (1fr) sigue
+     * siendo el protagonista y absorbe TODO el ancho que se libera. */
+    grid-template-columns: 1fr clamp(320px, 22vw, 400px);
     align-items: start;
     gap: 24px;
   }
@@ -114,14 +117,28 @@
 }
 
 .tienda-catalogo {
-  /* Antes 1100px (ver homologación de rendimiento de 2026-10, sección S):
-   * en pantallas grandes dejaba demasiado espacio vacío a los lados. Al
-   * ampliarlo, .tienda-grid (más abajo) ya agrega más columnas solo —
-   * usa auto-fill con minmax(230px, 1fr), así que con más ancho entran
-   * más tarjetas de tamaño razonable en vez de estirarlas. */
-  max-width: 1560px;
-  margin: 0 auto;
+  /* padding sí aplica siempre; max-width/margin (ajuste de ancho, ver
+   * abajo) solo tienen sentido por debajo de 1024px — ahí todavía es una
+   * sola columna centrada en toda la pantalla. */
   padding: 20px 16px 80px;
+  width: 100%;
+}
+
+@media (max-width: 1023px) {
+  .tienda-catalogo {
+    /* Antes 1100px (homologación de rendimiento 2026-10, sección S): en
+     * pantallas grandes SIN panel lateral, dejaba espacio vacío a los
+     * lados. Al ampliarlo, .tienda-grid (más abajo) agrega más columnas
+     * solo — auto-fill con minmax(230px, 1fr) — así que con más ancho
+     * entran más tarjetas en vez de estirarlas. Desde 1024px el catálogo
+     * ya NO es una columna centrada sola: es la columna 1 del grid de 2
+     * columnas del :host (ver arriba), así que este tope ya no aplica —
+     * aplicarlo ahí adentro era justo lo que generaba las franjas vacías
+     * entre el catálogo y Mi Orden en pantallas grandes (ajuste de
+     * aprovechamiento de ancho, noviembre 2026). */
+    max-width: 1560px;
+    margin: 0 auto;
+  }
 }
 
 /* Variables del sistema visual (--store-primary/-dark/-soft/-text) y los
