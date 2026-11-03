@@ -108,8 +108,8 @@ export interface Empresa {
   /** Imagen de portada (hero de la tienda) en base64 (data URL) — mismo
    *  mecanismo que logoPublico (trigger -> edge function tienda-imagenes ->
    *  Storage -> imagen_portada_url). Opcional: si la empresa no la
-   *  configura, el hero muestra un degradado con el color de marca (ver
-   *  heroImagenUrl() en catalogo-tienda.component.ts). */
+   *  configura, el hero sigue usando automáticamente la foto de un
+   *  producto destacado (ver heroImagenUrl() en catalogo-tienda.component.ts). */
   imagenPortadaPublica?: string | null;
   /** Si está en false, /tienda/:clave de esta empresa no muestra nada (y no
    *  aparece en el portal /tienda), aunque la empresa esté activa. */

@@ -98,7 +98,8 @@ export interface EmpresaTienda {
    *  empresa en Empresas — mismo mecanismo que el logo (base64 -> trigger
    *  -> edge function tienda-imagenes -> Storage). null = la empresa no
    *  configuró una; en ese caso heroImagenUrl() en catalogo-tienda.component.ts
-   *  devuelve null y se muestra el degradado con el color de marca. */
+   *  sigue usando la foto de un producto destacado como respaldo, igual
+   *  que antes de este campo existir. */
   imagenPortada: string | null;
   /** Arreglo vacío = sin horario configurado (no se muestra el badge de
    *  abierto/cerrado). */
