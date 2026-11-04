@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { DataClientService, ResultadoPagina, OrdenPagina } from './data-client.service';
+import { DataClientService, ResultadoPagina, OrdenPagina, OpcionesEscritura } from './data-client.service';
 
 /**
  * Implementación FUTURA: llama a los endpoints reales de PlataformaSaurix
@@ -35,7 +35,10 @@ export class HttpDataClientService extends DataClientService {
     return this.http.get<T>(`${this.url(entidad)}/GetById`, { params: { id } });
   }
 
-  override alta<T>(entidad: string, dto: Partial<T>): Observable<T> {
+  override alta<T>(entidad: string, dto: Partial<T>, _opciones?: OpcionesEscritura): Observable<T> {
+    // _opciones (silencioso): sin uso aquí — esta implementación (.NET,
+    // todavía no activa, ver app.config.ts) no muestra toasts de error por
+    // su cuenta, a diferencia de SupabaseDataClientService.
     return this.http.post<T>(`${this.url(entidad)}/Alta`, dto);
   }
 

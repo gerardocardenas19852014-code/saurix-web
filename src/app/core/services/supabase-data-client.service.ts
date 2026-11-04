@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, from, of } from 'rxjs';
 import { FunctionsHttpError, PostgrestError } from '@supabase/supabase-js';
-import { DataClientService, FiltroNulo, FiltroRango, ResultadoPagina, OrdenPagina, FiltroBusqueda, FILTRO_BUSQUEDA } from './data-client.service';
+import { DataClientService, FiltroNulo, FiltroRango, ResultadoPagina, OrdenPagina, FiltroBusqueda, FILTRO_BUSQUEDA, OpcionesEscritura } from './data-client.service';
 
 function esFiltroRango(valor: unknown): valor is FiltroRango {
   return typeof valor === 'object' && valor !== null && !Array.isArray(valor) && ('gte' in valor || 'lte' in valor);
@@ -129,8 +129,8 @@ export class SupabaseDataClientService extends DataClientService {
     return from(this.conToast(() => this.obtener(entidad, id))) as Observable<T>;
   }
 
-  override alta<T>(entidad: string, dto: Partial<T>): Observable<T> {
-    return from(this.conToast(() => this.insertar(entidad, dto as Fila))) as Observable<T>;
+  override alta<T>(entidad: string, dto: Partial<T>, opciones?: OpcionesEscritura): Observable<T> {
+    return from(this.conToast(() => this.insertar(entidad, dto as Fila), opciones?.silencioso)) as Observable<T>;
   }
 
   override modificacion<T>(entidad: string, dto: Partial<T> & { id: number }): Observable<T> {
@@ -463,13 +463,15 @@ export class SupabaseDataClientService extends DataClientService {
   // ── Errores ─────────────────────────────────────────────────────────────
 
   /** Muestra el error en un toast (igual que el interceptor HTTP) y lo
-   *  deja propagarse para que la pantalla también pueda reaccionar. */
-  private async conToast<R>(operacion: () => Promise<R>): Promise<R> {
+   *  deja propagarse para que la pantalla también pueda reaccionar.
+   *  `silencioso`: omite el toast (el error se sigue propagando igual) —
+   *  ver OpcionesEscritura en data-client.service.ts. */
+  private async conToast<R>(operacion: () => Promise<R>, silencioso = false): Promise<R> {
     try {
       return await operacion();
     } catch (error) {
       const mensaje = mensajeError(error);
-      this.toast.error(mensaje);
+      if (!silencioso) this.toast.error(mensaje);
       throw error instanceof Error ? error : new Error(mensaje);
     }
   }

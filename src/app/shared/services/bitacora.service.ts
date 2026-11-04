@@ -84,7 +84,18 @@ export class BitacoraService {
     // `bitacora.registrar(...).subscribe()` sin manejar error (patrón repetido
     // en ~20+ archivos) queda protegido en un solo lugar contra un "Uncaught
     // (in promise)" en consola si falla el guardado de bitácora.
-    return this.data.alta<BitacoraRegistro>('Bitacora', registro).pipe(
+    //
+    // `{ silencioso: true }` (auditoría nov-2026): un fallo al guardar
+    // bitácora es un error de un registro SECUNDARIO (el usuario nunca pidió
+    // "guardar auditoría", lo dispara la app sola al entrar a un módulo o
+    // guardar algo) — mostrarle un toast de error por esto es confuso y
+    // además puede leerse como "no tienes permiso" para la acción real que sí
+    // estaba haciendo, cuando esa acción real sí se guardó bien. Mismo
+    // criterio que ya usa el resto de la app para fallos no críticos (ver
+    // `list()` en SupabaseDataClientService): se reporta por consola, nunca
+    // se le oculta al usuario que "algo pasó", pero tampoco se le interrumpe
+    // por algo que no rompe su trabajo.
+    return this.data.alta<BitacoraRegistro>('Bitacora', registro, { silencioso: true }).pipe(
       catchError((error) => {
         console.warn('No se pudo registrar en la bitácora:', error);
         return EMPTY;

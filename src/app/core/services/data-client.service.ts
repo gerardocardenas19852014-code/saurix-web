@@ -73,6 +73,11 @@ export interface OrdenPagina {
   direccion?: 'asc' | 'desc';
 }
 
+/** Opciones para alta() — ver el comentario de ese método. */
+export interface OpcionesEscritura {
+  silencioso?: boolean;
+}
+
 export abstract class DataClientService {
   /**
    * Lista de registros de una entidad, con filtro opcional.
@@ -86,8 +91,16 @@ export abstract class DataClientService {
   /** Un registro por id. */
   abstract getById<T>(entidad: string, id: number): Observable<T>;
 
-  /** Alta de un registro nuevo. Devuelve el registro creado (con su id asignado). */
-  abstract alta<T>(entidad: string, dto: Partial<T>): Observable<T>;
+  /** Alta de un registro nuevo. Devuelve el registro creado (con su id asignado).
+   *  `opciones.silencioso`: SOLO para escrituras secundarias que la app dispara
+   *  por su cuenta, nunca iniciadas directamente por el usuario (hoy, el
+   *  registro de auditoría en Bitácora — ver BitacoraService.registrar()). Si
+   *  falla, el error se sigue propagando igual (la pantalla puede reaccionar,
+   *  queda en consola) — lo único que cambia es que NO se muestra el toast
+   *  rojo de error, para no interrumpir al usuario por algo que él no pidió.
+   *  Ninguna escritura real del usuario (Guardar producto, etc.) debe pasar
+   *  esto: para esas, un fallo SIEMPRE debe avisarse. */
+  abstract alta<T>(entidad: string, dto: Partial<T>, opciones?: OpcionesEscritura): Observable<T>;
 
   /** Modificación de un registro existente (debe incluir `id`). Devuelve el registro actualizado. */
   abstract modificacion<T>(entidad: string, dto: Partial<T> & { id: number }): Observable<T>;
