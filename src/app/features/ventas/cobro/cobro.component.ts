@@ -10,6 +10,7 @@ import { ToastService } from '../../../shared/services/toast.service';
 import { ProgramaLealtadService } from '../lealtad/lealtad.service';
 import { SelectBuscableComponent, OpcionBuscable } from '../../../shared/components/select-buscable/select-buscable.component';
 import { EscaneoCodigoComponent } from '../../../shared/components/escaneo-codigo/escaneo-codigo.component';
+import { EscaneoGlobalService } from '../../../shared/services/escaneo-global.service';
 import { Producto } from '../../inventario/productos/producto.model';
 import { existenciaTotal, tieneBodegaAsignada } from '../../inventario/productos/producto.util';
 import { CategoriaProducto } from '../../inventario/categorias-producto/categoria-producto.model';
@@ -116,6 +117,7 @@ export class CobroComponent implements OnInit, OnDestroy {
     if (this.debounceBusquedaProductos) clearTimeout(this.debounceBusquedaProductos);
     const pedidoOrigenId = this.pedidoTiendaOrigenId();
     if (pedidoOrigenId !== null) this.pedidoTiendaService.liberar(pedidoOrigenId).catch(() => {});
+    this.detenerEscaneoGlobal?.();
   }
 
   private readonly data = inject(DataClientService);
@@ -134,6 +136,11 @@ export class CobroComponent implements OnInit, OnDestroy {
   private readonly cargaVentaPedidoTienda = inject(CargaVentaPedidoTiendaService);
   private readonly pedidoTiendaService = inject(PedidoTiendaService);
   protected readonly lealtadService = inject(ProgramaLealtadService);
+  private readonly escaneoGlobal = inject(EscaneoGlobalService);
+  /** Función de limpieza que regresa escaneoGlobal.activar() -- ver
+   *  ngOnInit()/ngOnDestroy() más abajo (Cambio 3, prompt maestro
+   *  Ventas→Cobro 2026-11). */
+  private detenerEscaneoGlobal: (() => void) | null = null;
 
   protected readonly formatMoneda = formatMoneda;
   protected readonly metodosPago = METODOS_PAGO;
@@ -155,6 +162,13 @@ export class CobroComponent implements OnInit, OnDestroy {
    *  signal a propósito: solo se lee desde código TS síncrono, nunca desde
    *  el template. */
   private readonly productosConocidos = new Map<number, Producto>();
+  /** codigo normalizado (trim + minúsculas) -> Producto ya resuelto por
+   *  fn_cobro_producto_por_codigo en ESTA sesión -- ver
+   *  seleccionarProductoPorCodigo(). Limitada a 200 entradas (se vacía
+   *  entera si se llega a ese tope -- un turno de caja realista no
+   *  escanea 200 códigos DISTINTOS, así que nunca debería notarse). */
+  private readonly productoPorCodigoConocido = new Map<string, Producto>();
+  private static readonly TOPE_CACHE_CODIGOS = 200;
   /** ids de producto cuya ExistenciaBodega/PrecioLista ya se pidió, para
    *  no volver a pedirla cada vez que el mismo id sigue siendo conocido
    *  (ver cargarExistenciaYPrecioPara()). */
@@ -341,6 +355,22 @@ export class CobroComponent implements OnInit, OnDestroy {
     // tomar() regresa null y no pasa nada.
     const carga = this.cargaVentaPedidoTienda.tomar();
     if (carga) await this.cargarDesdePedidoTienda(carga);
+
+    // Cambio 3 (prompt maestro Ventas→Cobro 2026-11): escaneo con pistola
+    // SIN necesitar seleccionar ningún campo. Se apaga solo (ver
+    // "habilitado" en EscaneoGlobalService) mientras cualquiera de estos
+    // modales esté abierto -- el propio <input> de app-escaneo-codigo
+    // sigue funcionando normal en ese caso, este detector global
+    // sencillamente no interfiere.
+    this.detenerEscaneoGlobal = this.escaneoGlobal.activar({
+      habilitado: () =>
+        !this.cargando() &&
+        !this.modalVentaSimpleAbierto() &&
+        !this.modalClienteAbierto() &&
+        !this.modalPagoAbierto() &&
+        !this.ventaRecienCobrada(),
+      alDetectar: (codigo) => this.seleccionarProductoPorCodigo(codigo),
+    });
   }
 
   // ── Catálogo / búsqueda server-side ─────────────────────────────────────
@@ -479,20 +509,26 @@ export class CobroComponent implements OnInit, OnDestroy {
 
     const codigoNormalizado = codigo.trim();
     if (!codigoNormalizado) return;
+    const claveCache = codigoNormalizado.toLowerCase();
 
-    const { data: fila, error } = await this.sb
-      .schema('inventario')
-      .rpc('fn_cobro_producto_por_codigo', { p_codigo: codigoNormalizado })
-      .maybeSingle();
-    if (error) {
-      this.toast.error('No se pudo buscar el código: ' + error.message);
-      return;
+    let encontrado = this.productoPorCodigoConocido.get(claveCache);
+    if (!encontrado) {
+      const { data: fila, error } = await this.sb
+        .schema('inventario')
+        .rpc('fn_cobro_producto_por_codigo', { p_codigo: codigoNormalizado })
+        .maybeSingle();
+      if (error) {
+        this.toast.error('No se pudo buscar el código: ' + error.message);
+        return;
+      }
+      if (!fila) {
+        this.toast.advertencia(`No se encontró ningún producto activo con el código "${codigo}".`);
+        return;
+      }
+      encontrado = this.filaProductoACamel(fila as Record<string, unknown>);
+      if (this.productoPorCodigoConocido.size >= CobroComponent.TOPE_CACHE_CODIGOS) this.productoPorCodigoConocido.clear();
+      this.productoPorCodigoConocido.set(claveCache, encontrado);
     }
-    if (!fila) {
-      this.toast.advertencia(`No se encontró ningún producto activo con el código "${codigo}".`);
-      return;
-    }
-    const encontrado = this.filaProductoACamel(fila as Record<string, unknown>);
     this.productosConocidos.set(encontrado.id, encontrado);
     await this.cargarExistenciaYPrecioPara([encontrado.id]);
     this.agregarProducto(encontrado);

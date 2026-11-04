@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, ElementRef, EventEmitter, Input, Output, ViewChild, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, EventEmitter, Input, OnDestroy, OnInit, Output, ViewChild, computed, inject, signal } from '@angular/core';
+import { EscaneoGlobalService } from '../../../../shared/services/escaneo-global.service';
 import { firstValueFrom } from 'rxjs';
 import { DataClientService } from '../../../../core/services/data-client.service';
 import { SupabaseService } from '../../../../core/services/supabase.service';
@@ -82,7 +83,7 @@ const TOPE_LINEAS_ADVERTENCIA = 500;
   styleUrl: './movimiento-masivo.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MovimientoMasivoComponent {
+export class MovimientoMasivoComponent implements OnInit, OnDestroy {
   @Input({ required: true }) bodegas: Bodega[] = [];
   /** El usuario cerró la pantalla sin terminar (botón Cancelar en Captura). */
   @Output() readonly cancelar = new EventEmitter<void>();
@@ -93,6 +94,19 @@ export class MovimientoMasivoComponent {
   private readonly data = inject(DataClientService);
   private readonly sb = inject(SupabaseService).cliente;
   protected readonly toast = inject(ToastService);
+  private readonly escaneoGlobal = inject(EscaneoGlobalService);
+  private detenerEscaneoGlobal: (() => void) | null = null;
+
+  ngOnInit(): void {
+    this.detenerEscaneoGlobal = this.escaneoGlobal.activar({
+      habilitado: () => this.paso() === 'captura',
+      alDetectar: (codigo) => this.agregarPorCodigo(codigo),
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.detenerEscaneoGlobal?.();
+  }
 
   @ViewChild('escaneoCodigoBarra') private escaneoCodigoBarra?: EscaneoCodigoComponent;
 
