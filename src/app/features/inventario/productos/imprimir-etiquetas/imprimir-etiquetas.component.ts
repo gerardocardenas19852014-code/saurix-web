@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, computed, effect, inject, signal } from '@angular/core';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { firstValueFrom } from 'rxjs';
 import { DataClientService, FILTRO_BUSQUEDA } from '../../../../core/services/data-client.service';
 import { ToastService } from '../../../../shared/services/toast.service';
@@ -7,6 +8,7 @@ import { Producto } from '../producto.model';
 import { CategoriaProducto } from '../../categorias-producto/categoria-producto.model';
 import { formatMoneda } from '../producto.util';
 import JsBarcode from 'jsbarcode';
+import QRCode from 'qrcode';
 
 /** Solo los campos que esta pantalla necesita mostrar/imprimir — nunca el
  *  Producto completo (evita acarrear campos irrelevantes como descripcion,
@@ -20,6 +22,11 @@ interface FilaEtiqueta {
 }
 
 type ModoSeleccion = 'ninguno' | 'ids' | 'todos-filtrados';
+
+/** Formato de la etiqueta a imprimir. 'barras' es el comportamiento
+ *  histórico (default); 'qr' es la nueva opción -- ver el comentario de
+ *  clase, sección "FORMATO DE ETIQUETA (código de barras / QR)". */
+export type FormatoEtiqueta = 'barras' | 'qr';
 
 /** Filtro de búsqueda congelado en el momento de "Seleccionar todos los
  *  resultados" — ver comentario de clase, sección "SEMÁNTICA DE SELECCIÓN
@@ -90,6 +97,22 @@ const TOPE_COPIAS_POR_PRODUCTO = 200;
  * TOPE_RESOLUCION_SELECCION_GLOBAL) para resolver la lista real — así
  * cualquier producto borrado/dado de baja/cambiado de empresa mientras
  * tanto queda fuera automáticamente (RLS + el propio filtro "activo").
+ *
+ * FORMATO DE ETIQUETA (código de barras / QR, nov-2026): la pantalla
+ * ahora puede imprimir también código QR, elegido con las tarjetas
+ * `formato()` (mismo patrón visual que "Modo de funcionamiento" en
+ * Seguridad → Empresas → Tienda pública). El QR codifica EXACTAMENTE el
+ * mismo identificador que ya usa el código de barras (`producto.codigo`,
+ * p.ej. "SKU-001") -- nada más. Se auditó explícitamente que esto no
+ * puede confundirse con el QR de pedidos de la Tienda pública: Cobro
+ * distingue un pedido por el prefijo `/^SAURIX:ORDER:[0-9a-f]{32}$/i`
+ * (ver `extraerTokenOrdenSaurix` en cobro.component.ts) y Movimientos
+ * entre bodegas no tiene ninguna lógica de pedidos -- un código de
+ * producto plano como "SKU-001" jamás calza con ese patrón, así que
+ * ambos escáneres siguen funcionando sin ningún cambio. Cambiar de
+ * formato NUNCA toca la selección/copias (son señales independientes);
+ * el código de barras conserva su formato de etiqueta intacto -- solo el
+ * QR usa su propio tamaño (ver CSS `.formato-qr` dentro de imprimir()).
  */
 @Component({
   selector: 'app-imprimir-etiquetas',
@@ -105,6 +128,7 @@ export class ImprimirEtiquetasComponent {
 
   private readonly data = inject(DataClientService);
   protected readonly toast = inject(ToastService);
+  private readonly sanitizer = inject(DomSanitizer);
 
   protected readonly categoriasOpciones = computed<OpcionBuscable[]>(() =>
     this.categorias.filter((c) => c.activo !== false).map((c) => ({ valor: c.id, etiqueta: c.nombre })),
@@ -114,6 +138,13 @@ export class ImprimirEtiquetasComponent {
     return this.categorias.find((c) => c.id === id)?.nombre ?? '—';
   }
   protected formatMoneda = formatMoneda;
+
+  // ── Formato de etiqueta (código de barras / QR) ─────────────────────────
+  protected readonly formato = signal<FormatoEtiqueta>('barras');
+
+  seleccionarFormato(formato: FormatoEtiqueta): void {
+    this.formato.set(formato);
+  }
 
   // ── Búsqueda + filtro + paginación server-side ──────────────────────────
   protected readonly busqueda = signal('');
@@ -136,6 +167,30 @@ export class ImprimirEtiquetasComponent {
 
   constructor() {
     this.buscar();
+    // Vista previa (barras o QR, según formato()) del producto preview()
+    // -- se recalcula sola cuando cambia el producto o el formato. El QR
+    // es async (librería `qrcode`); se usa una secuencia de vigencia
+    // (mismo patrón que `secuenciaBusqueda`) para descartar una respuesta
+    // vieja si el usuario cambia de producto/formato antes de que resuelva.
+    effect(() => {
+      const producto = this.productoPreview();
+      const formato = this.formato();
+      const miSecuencia = ++this.secuenciaPreview;
+      if (!producto?.codigo) {
+        this.previewSvgSeguro.set(null);
+        return;
+      }
+      this.generarSvg(producto.codigo, formato)
+        .then((svg) => {
+          if (miSecuencia !== this.secuenciaPreview) return; // vista previa vieja, se descarta
+          this.previewSvgSeguro.set(this.sanitizer.bypassSecurityTrustHtml(svg));
+        })
+        .catch((error) => {
+          if (miSecuencia !== this.secuenciaPreview) return;
+          console.error('No se pudo generar la vista previa:', error);
+          this.previewSvgSeguro.set(null);
+        });
+    });
   }
 
   protected onBuscarInput(texto: string): void {
@@ -335,6 +390,36 @@ export class ImprimirEtiquetasComponent {
     return Math.max(0, this.totalCongelado() - this.idsExcluidos().size) + this.idsIncluidos().size;
   });
 
+  // ── Vista previa (sección 4 del mandato) ────────────────────────────────
+  /** Producto usado para la vista previa compacta: el primero seleccionado
+   *  si hay selección, si no el primero visible con código -- NUNCA se
+   *  genera el código de todo el lote solo para mostrar la vista previa. */
+  protected readonly productoPreview = computed<FilaEtiqueta | null>(() => {
+    const modo = this.modoSeleccion();
+    if (modo === 'ids') {
+      const primerId = Array.from(this.idsIncluidos())[0];
+      const fila = primerId !== undefined ? this.productosVistos.get(primerId) : undefined;
+      if (fila) return fila;
+    } else if (modo === 'todos-filtrados') {
+      const congelado = this.filtroCongelado();
+      const excluidos = this.idsExcluidos();
+      const primero = congelado
+        ? this.filas().find((f) => !excluidos.has(f.id) && this.filaCumpleFiltroCongelado(f, congelado))
+        : undefined;
+      if (primero) return primero;
+      const extraId = Array.from(this.idsIncluidos())[0];
+      const extra = extraId !== undefined ? this.productosVistos.get(extraId) : undefined;
+      if (extra) return extra;
+    }
+    return this.filas().find((f) => !!f.codigo) ?? null;
+  });
+
+  /** SVG (código de barras o QR) de productoPreview(), ya saneado para
+   *  [innerHTML] -- se recalcula en el effect() del constructor. null
+   *  mientras no hay producto con código o mientras se está generando. */
+  protected readonly previewSvgSeguro = signal<SafeHtml | null>(null);
+  private secuenciaPreview = 0;
+
   // ── Copias (global + excepciones por producto) ──────────────────────────
   protected readonly copiasGlobalAplicada = signal(1);
   protected readonly copiasGlobalTexto = signal('1');
@@ -473,7 +558,7 @@ export class ImprimirEtiquetasComponent {
         return;
       }
 
-      this.imprimir(productos);
+      await this.imprimir(productos);
       this.toast.exito(`${totalEtiquetasReal} etiqueta${totalEtiquetasReal === 1 ? '' : 's'} enviada${totalEtiquetasReal === 1 ? '' : 's'} a imprimir.`);
       this.cerrar.emit();
     } finally {
@@ -481,15 +566,16 @@ export class ImprimirEtiquetasComponent {
     }
   }
 
-  // ── Generación del código de barras e impresión ─────────────────────────
-  // Copiado tal cual de ProductosComponent.imprimirEtiquetas()/
-  // dibujarCodigoBarras()/escaparHtml() -- MISMO mecanismo (iframe oculto,
-  // print() síncrono en el mismo gesto de usuario, SVG en vez de canvas
-  // para evitar el bloqueo de Brave), mismo tamaño/formato de etiqueta
-  // (63.5mm × 29.6mm, código + nombre + precio) -- nada de esto se cambió,
-  // per sección "No modificar" del mandato. La ÚNICA diferencia real: el
-  // SVG de un producto con N copias ahora se dibuja UNA vez y se reutiliza
-  // N veces (ver generarSvgBarras()), en vez de dibujarse N veces.
+  // ── Generación del código (barras/QR) e impresión ──────────────────────
+  // dibujarCodigoBarras()/escaparHtml() son el mecanismo histórico, SIN
+  // CAMBIOS (iframe oculto, SVG en vez de canvas para evitar el bloqueo de
+  // Brave, mismo tamaño/formato de etiqueta de código de barras 63.5mm ×
+  // 29.6mm) -- per sección "No modificar" del mandato de nov-2026 que
+  // agregó el QR. Lo nuevo: generarSvgQr()/generarSvg() (dispatch por
+  // formato) e imprimir() ahora async para poder esperar la generación de
+  // QR (la librería `qrcode` es async; JsBarcode sigue siendo síncrono) --
+  // ambos formatos siguen generando un SVG por CÓDIGO único, nunca por
+  // copia.
   private dibujarCodigoBarras(codigo: string): string {
     const dibujar: typeof JsBarcode =
       typeof JsBarcode === 'function' ? JsBarcode : (window as unknown as { JsBarcode?: typeof JsBarcode }).JsBarcode!;
@@ -501,13 +587,29 @@ export class ImprimirEtiquetasComponent {
     return new XMLSerializer().serializeToString(svg);
   }
 
+  /** QR en SVG (texto, igual criterio que el código de barras: se inserta
+   *  tal cual en el HTML a imprimir, sin el peso de un PNG en base64 al
+   *  imprimir muchas etiquetas). `margin: 1` deja el margen de seguridad
+   *  del QR (zona en blanco alrededor) -- NUNCA se recorta por CSS, así
+   *  nunca queda un QR deformado o sin su zona de silencio. Contenido:
+   *  EXACTAMENTE `codigo` (el mismo identificador que ya usa el código de
+   *  barras) -- ver auditoría de escaneo en el comentario de clase. */
+  private async generarSvgQr(codigo: string): Promise<string> {
+    return QRCode.toString(codigo, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
+  }
+
+  private async generarSvg(codigo: string, formato: FormatoEtiqueta): Promise<string> {
+    return formato === 'qr' ? this.generarSvgQr(codigo) : this.dibujarCodigoBarras(codigo);
+  }
+
   private escaparHtml(texto: string): string {
     const div = document.createElement('div');
     div.textContent = texto;
     return div.innerHTML;
   }
 
-  private imprimir(productos: FilaEtiqueta[]): void {
+  private async imprimir(productos: FilaEtiqueta[]): Promise<void> {
+    const formato = this.formato();
     const iframe = document.createElement('iframe');
     iframe.setAttribute('aria-hidden', 'true');
     iframe.style.position = 'fixed';
@@ -526,29 +628,38 @@ export class ImprimirEtiquetasComponent {
       const doc = iframe.contentDocument;
       if (!doc) throw new Error('El navegador no permitió preparar el documento de impresión.');
 
-      // Optimización (sección 9 del mandato): un SVG por producto, nunca
-      // por copia -- antes se recalculaba N veces el mismo código de
-      // barras para un producto con N copias.
-      const cacheBarras = new Map<string, string>();
-      const svgDe = (codigo: string): string => {
-        let svg = cacheBarras.get(codigo);
-        if (!svg) {
-          svg = this.dibujarCodigoBarras(codigo);
-          cacheBarras.set(codigo, svg);
-        }
-        return svg;
-      };
+      // Optimización (sección 6 del mandato): un SVG por CÓDIGO único,
+      // nunca por copia ni por fila -- un producto con N copias nunca
+      // regenera su código N veces, y nunca se genera nada para un
+      // producto que no viene en `productos` (nunca se toca el catálogo
+      // completo). Para QR esto además evita N llamadas async por copia:
+      // se resuelven todos los códigos únicos en paralelo UNA sola vez
+      // antes de armar el HTML.
+      const cache = new Map<string, string>();
+      const codigosUnicos = Array.from(new Set(productos.map((p) => p.codigo ?? '').filter((c) => !!c)));
+      await Promise.all(
+        codigosUnicos.map(async (codigo) => {
+          cache.set(codigo, await this.generarSvg(codigo, formato));
+        }),
+      );
 
+      const esQr = formato === 'qr';
       const htmlEtiquetas = productos
         .flatMap((p) => Array.from({ length: this.copiasDe(p.id) }, () => p))
-        .map(
-          (p) => `
-        <div class="etiqueta">
-          ${svgDe(p.codigo ?? '')}
+        .map((p) => {
+          const svg = cache.get(p.codigo ?? '') ?? '';
+          // El SKU en texto (además del QR) solo aplica al formato QR -- el
+          // código de barras ya es legible como dibujo, no necesita texto
+          // aparte (sección "Conservar... SKU... legibles" del mandato).
+          const sku = esQr ? `<div class="sku">${this.escaparHtml(p.codigo ?? '')}</div>` : '';
+          return `
+        <div class="etiqueta${esQr ? ' formato-qr' : ''}">
+          ${svg}
           <div class="nombre">${this.escaparHtml(p.nombre)}</div>
+          ${sku}
           <div class="precio">${this.escaparHtml(formatMoneda(p.precioUnitario))}</div>
-        </div>`,
-        )
+        </div>`;
+        })
         .join('');
 
       doc.open();
@@ -566,8 +677,14 @@ export class ImprimirEtiquetasComponent {
               display: flex; flex-direction: column; align-items: center; justify-content: center;
               border: 1px dashed #999; text-align: center;
             }
+            /* Código de barras: SIN CAMBIOS -- mismo tamaño/formato de siempre. */
             .etiqueta svg { width: 100%; height: 11mm; }
+            /* QR: proporción cuadrada propia (nunca estirado por el 100%
+               de arriba) -- el margen de seguridad ya lo trae el propio
+               SVG (ver generarSvgQr), aquí solo se controla el tamaño. */
+            .etiqueta.formato-qr svg { width: 13mm; height: 13mm; }
             .etiqueta .nombre { font-size: 9px; font-weight: 700; line-height: 1.2; max-width: 100%; overflow: hidden; margin-top: 1mm; }
+            .etiqueta .sku { font-size: 7px; color: #555; line-height: 1.1; margin-top: 0.3mm; max-width: 100%; overflow: hidden; }
             .etiqueta .precio { font-size: 11px; font-weight: 800; margin-top: 1mm; }
             @media print { .etiqueta { border: none; } }
           </style>

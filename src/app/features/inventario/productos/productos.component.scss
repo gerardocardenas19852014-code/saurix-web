@@ -77,15 +77,58 @@
   margin: -6px 0 2px;
 }
 
-// La vista previa de la importación masiva necesita más espacio que el
-// .modal-box por default (400px, ver styles.scss) porque muestra una tabla
-// de 6 columnas con el detalle de cada renglón — sin esto la tabla queda
-// comprimida y el detalle del error se recorta. Mismo criterio ya usado en
-// Plantillas de WikiDocs (.modal-box.plantilla-modal) cuando el contenido
-// del modal de verdad lo necesita, no como default.
+// La vista previa de la importación masiva necesita bastante más espacio
+// que el .modal-box por default (400px, ver styles.scss): 8 columnas con
+// el detalle de cada renglón (homologación nov-2026, sección B del
+// mandato: ~85-90% del ancho de la ventana) — sin esto la tabla queda
+// comprimida y el detalle del error se recorta.
 .modal-box.importar-modal {
-  max-width: 900px;
-  width: 95%;
+  max-width: 1600px;
+  width: 88%;
+}
+
+// ── Encabezado con zona única de acciones (arriba a la derecha) ──────────
+// Mismo patrón que .etiquetas-header/.etiquetas-header-acciones en
+// imprimir-etiquetas.component.scss y .masivo-header en
+// movimiento-masivo.component.scss (homologación de botones de acción,
+// ronda nov-2026): nunca una barra de acciones duplicada abajo del modal.
+.importar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+
+  h3 { margin-bottom: 0; }
+}
+
+.importar-header-acciones {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 760px) {
+  .importar-header-acciones { width: 100%; }
+  .importar-header-acciones button { flex: 1 1 auto; }
+}
+
+// La tabla de vista previa tiene su propio scroll vertical -- así el
+// encabezado, los contadores Listos/Advertencias/Errores y las acciones
+// (Cancelar/Importar) siempre quedan visibles aunque el archivo traiga
+// cientos o miles de renglones (sección B del mandato).
+.importar-tabla-scroll {
+  max-height: 58vh;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+
+  table.table { margin-bottom: 0; }
+  thead th { position: sticky; top: 0; z-index: 1; background: var(--paper-raised); }
 }
 
 /* Foto del producto en el modal de alta/edición — mismo patrón que

@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
+import { SupabaseService } from '../../../core/services/supabase.service';
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { SelectBuscableComponent, OpcionBuscable } from '../../../shared/components/select-buscable/select-buscable.component';
@@ -18,9 +18,14 @@ import { ExistenciaBodega } from '../movimientos-bodega/existencia-bodega.model'
 import { EscaneoCodigoComponent } from '../../../shared/components/escaneo-codigo/escaneo-codigo.component';
 import { ImprimirEtiquetasComponent } from './imprimir-etiquetas/imprimir-etiquetas.component';
 
-/** Una fila ya parseada del CSV de importación masiva, con su validación
- *  resuelta — ver importarArchivo()/validarFila() más abajo. `payload` solo
- *  viene lleno cuando `error` es null (fila lista para mandar a Alta). */
+/** Una fila ya parseada del CSV de importación masiva. La validación real
+ *  (única implementación -- ya no se duplica en Angular, ver auditoría en
+ *  claude/productos-importacion-masiva-auditoria-2026-11.md) la hace el
+ *  servidor en inventario.fn_importar_productos_masivo — ver
+ *  archivoSeleccionado()/validarEnServidor() más abajo. `error` bloquea la
+ *  importación completa (política "detener todo" -- decisión del usuario,
+ *  4-nov-2026); `advertencia` es informativo y nunca bloquea nada
+ *  (sección B del mandato). */
 interface FilaImportacion {
   numero: number; // número de renglón del archivo (para ubicarlo si hay error) — 1 = encabezado
   nombre: string;
@@ -40,7 +45,19 @@ interface FilaImportacion {
   manejaLotesTexto: string;
   destacadoTexto: string;
   error: string | null;
-  payload: Omit<Producto, 'id'> | null;
+  advertencia: string | null;
+}
+
+/** Forma exacta de lo que regresa inventario.fn_importar_productos_masivo
+ *  (tanto en modo validación como al importar de verdad). */
+interface ResultadoImportacion {
+  operacionId: string;
+  duplicada: boolean;
+  ok: boolean;
+  totalFilas: number;
+  productosCreados: number;
+  errores: { numero: number; mensaje: string }[];
+  advertencias: { numero: number; mensaje: string }[];
 }
 
 // Las primeras 8 columnas son las originales (no se reordenan, para no
@@ -554,12 +571,22 @@ export class ProductosComponent implements OnInit, OnDestroy {
 
   protected readonly modalImportarAbierto = signal(false);
   protected readonly filasImportacion = signal<FilaImportacion[]>([]);
-  protected readonly importando = signal(false);
-  protected readonly progresoImportacion = signal('');
-  protected readonly resumenImportacion = signal<{ importados: number; omitidos: number } | null>(null);
+  protected readonly validando = signal(false); // valida en el servidor justo después de leer el archivo (preview).
+  protected readonly importando = signal(false); // llamada final al confirmar -- una sola, ya no un ciclo por renglón.
+  protected readonly resumenImportacion = signal<{ creados: number } | null>(null);
 
-  protected readonly filasValidas = computed(() => this.filasImportacion().filter((f) => f.error === null));
+  private readonly sb = inject(SupabaseService).cliente;
+  /** Generado una sola vez por archivo elegido (ver archivoSeleccionado) y
+   *  reutilizado en cada reintento de confirmarImportacion -- mismo patrón
+   *  que operacionId en movimiento-masivo.component.ts: nunca se regenera
+   *  en un reintento, así un doble clic, un reintento de red o dos
+   *  pestañas mandando el mismo archivo nunca vuelven a crear productos
+   *  por segunda vez (lo detiene la propia función en el servidor). */
+  private operacionId: string | null = null;
+
   protected readonly filasConError = computed(() => this.filasImportacion().filter((f) => f.error !== null));
+  protected readonly filasConAdvertencia = computed(() => this.filasImportacion().filter((f) => f.error === null && f.advertencia !== null));
+  protected readonly filasListas = computed(() => this.filasImportacion().filter((f) => f.error === null && f.advertencia === null));
 
   /** Plantilla descargable: mismos encabezados que espera importarArchivo(),
    *  con dos renglones de ejemplo (un producto físico y un servicio) usando
@@ -619,35 +646,10 @@ export class ProductosComponent implements OnInit, OnDestroy {
     );
   }
 
-  async archivoSeleccionado(evento: Event): Promise<void> {
-    const input = evento.target as HTMLInputElement;
-    const archivo = input.files?.[0];
-    input.value = ''; // permite volver a elegir el mismo archivo después
-    if (!archivo) return;
-
-    const texto = await archivo.text();
-    const filas = parsearCsv(texto);
-    if (filas.length === 0) {
-      this.toast.advertencia('El archivo está vacío.');
-      return;
-    }
-
-    // La primera fila se asume encabezado — no se valida su contenido, solo se descarta.
-    const renglones = filas.slice(1);
-    if (renglones.length === 0) {
-      this.toast.advertencia('El archivo no trae renglones de datos, solo el encabezado.');
-      return;
-    }
-
-    this.resumenImportacion.set(null);
-    this.filasImportacion.set(renglones.map((campos, indice) => this.validarFila(campos, indice + 2)));
-    this.modalImportarAbierto.set(true);
-  }
-
-  /** `numeroRenglon` es el número de línea real del archivo (contando el
-   *  encabezado como línea 1) — así un error apunta al mismo renglón que el
-   *  usuario vería si abre el CSV en Excel. */
-  private validarFila(campos: string[], numeroRenglon: number): FilaImportacion {
+  /** Convierte un renglón crudo del CSV (puro texto, sin validar nada
+   *  todavía) en una FilaImportacion -- la validación real la hace
+   *  validarEnServidor() llamando a la función en Postgres. */
+  private aFilaImportacion(campos: string[], numeroRenglon: number): FilaImportacion {
     const [
       nombre = '',
       codigo = '',
@@ -667,7 +669,7 @@ export class ProductosComponent implements OnInit, OnDestroy {
       destacadoTexto = '',
     ] = campos;
 
-    const base: Omit<FilaImportacion, 'error' | 'payload'> = {
+    return {
       numero: numeroRenglon,
       nombre: nombre.trim(),
       codigo: codigo.trim(),
@@ -685,184 +687,160 @@ export class ProductosComponent implements OnInit, OnDestroy {
       factorConversionCompraTexto: factorConversionCompraTexto.trim(),
       manejaLotesTexto: manejaLotesTexto.trim(),
       destacadoTexto: destacadoTexto.trim(),
-    };
-
-    if (!base.nombre) {
-      return { ...base, error: 'Falta el nombre.', payload: null };
-    }
-
-    const categoria = this.categorias().find((c) => c.clave.toLowerCase() === base.categoriaTexto.toLowerCase());
-    if (!categoria) {
-      return { ...base, error: `La categoría "${base.categoriaTexto}" no existe (revisa la Clave).`, payload: null };
-    }
-
-    const unidad = this.unidades().find((u) => u.clave.toLowerCase() === base.unidadTexto.toLowerCase());
-    if (!unidad) {
-      return { ...base, error: `La unidad "${base.unidadTexto}" no existe (revisa la Clave).`, payload: null };
-    }
-
-    const costo = base.costoTexto === '' ? 0 : Number(base.costoTexto);
-    if (Number.isNaN(costo) || costo < 0) {
-      return { ...base, error: `Costo inválido: "${base.costoTexto}".`, payload: null };
-    }
-
-    if (base.precioTexto === '') {
-      return { ...base, error: 'Falta el precio.', payload: null };
-    }
-    const precio = Number(base.precioTexto);
-    if (Number.isNaN(precio) || precio < 0) {
-      return { ...base, error: `Precio inválido: "${base.precioTexto}".`, payload: null };
-    }
-
-    let existencia: number | null = null;
-    if (base.existenciaTexto !== '') {
-      existencia = Number(base.existenciaTexto);
-      if (Number.isNaN(existencia) || existencia < 0) {
-        return { ...base, error: `Existencia inválida: "${base.existenciaTexto}".`, payload: null };
-      }
-    }
-
-    const activoTextoNormalizado = base.activoTexto.toLowerCase();
-    const activo = !['no', 'false', '0'].includes(activoTextoNormalizado);
-
-    const descripcion = base.descripcionTexto === '' ? null : base.descripcionTexto;
-
-    // nivelMinimo/nivelMaximo/manejaLotes solo aplican a productos físicos —
-    // mismo criterio que guardar() del alta/edición individual: en un
-    // servicio (existencia === null) se ignoran aunque el CSV traiga algo.
-    const esServicioFila = existencia === null;
-
-    let nivelMinimo: number | null = null;
-    if (!esServicioFila && base.nivelMinimoTexto !== '') {
-      nivelMinimo = Number(base.nivelMinimoTexto);
-      if (Number.isNaN(nivelMinimo) || nivelMinimo < 0) {
-        return { ...base, error: `Nivel mínimo inválido: "${base.nivelMinimoTexto}".`, payload: null };
-      }
-    }
-
-    let nivelMaximo: number | null = null;
-    if (!esServicioFila && base.nivelMaximoTexto !== '') {
-      nivelMaximo = Number(base.nivelMaximoTexto);
-      if (Number.isNaN(nivelMaximo) || nivelMaximo < 0) {
-        return { ...base, error: `Nivel máximo inválido: "${base.nivelMaximoTexto}".`, payload: null };
-      }
-    }
-
-    let proveedorId: number | null = null;
-    if (base.proveedorTexto !== '') {
-      // Proveedor no tiene columna Clave (a diferencia de categoría/unidad)
-      // — el único identificador de texto disponible es el Nombre.
-      const proveedor = this.proveedores().find((p) => p.nombre.toLowerCase() === base.proveedorTexto.toLowerCase());
-      if (!proveedor) {
-        return { ...base, error: `El proveedor "${base.proveedorTexto}" no existe (coincide por Nombre, el proveedor no tiene Clave).`, payload: null };
-      }
-      proveedorId = proveedor.id;
-    }
-
-    let unidadCompraId: number | null = null;
-    let factorConversionCompra: number | null = null;
-    if (base.unidadCompraTexto !== '') {
-      const unidadCompra = this.unidades().find((u) => u.clave.toLowerCase() === base.unidadCompraTexto.toLowerCase());
-      if (!unidadCompra) {
-        return { ...base, error: `La unidad de compra "${base.unidadCompraTexto}" no existe (revisa la Clave).`, payload: null };
-      }
-      if (base.factorConversionCompraTexto === '') {
-        return { ...base, error: 'Falta "factor_conversion_compra" (a cuántas unidades base equivale la unidad de compra).', payload: null };
-      }
-      factorConversionCompra = Number(base.factorConversionCompraTexto);
-      if (Number.isNaN(factorConversionCompra) || factorConversionCompra <= 0) {
-        return { ...base, error: `Factor de conversión inválido: "${base.factorConversionCompraTexto}".`, payload: null };
-      }
-      unidadCompraId = unidadCompra.id;
-    }
-
-    const manejaLotes = !esServicioFila && !['', 'no', 'false', '0'].includes(base.manejaLotesTexto.toLowerCase());
-    const destacado = !['', 'no', 'false', '0'].includes(base.destacadoTexto.toLowerCase());
-
-    return {
-      ...base,
       error: null,
-      payload: {
-        nombre: base.nombre,
-        codigo: base.codigo || null,
-        categoriaProductoId: categoria.id,
-        unidadMedidaId: unidad.id,
-        descripcion,
-        costo,
-        precioUnitario: precio,
-        existencia,
-        nivelMinimo,
-        nivelMaximo,
-        manejaLotes,
-        destacado,
-        proveedorId,
-        unidadCompraId,
-        factorConversionCompra,
-        activo,
-      },
+      advertencia: null,
     };
+  }
+
+  /** Payload en snake_case -- exactamente las llaves que espera
+   *  inventario.fn_importar_productos_masivo (p_filas). */
+  private aPayloadServidor(fila: FilaImportacion): Record<string, unknown> {
+    return {
+      numero: fila.numero,
+      nombre: fila.nombre,
+      codigo: fila.codigo,
+      categoria: fila.categoriaTexto,
+      unidad: fila.unidadTexto,
+      costo: fila.costoTexto,
+      precio: fila.precioTexto,
+      existencia: fila.existenciaTexto,
+      activo: fila.activoTexto,
+      descripcion: fila.descripcionTexto,
+      nivel_minimo: fila.nivelMinimoTexto,
+      nivel_maximo: fila.nivelMaximoTexto,
+      proveedor: fila.proveedorTexto,
+      unidad_compra: fila.unidadCompraTexto,
+      factor_conversion_compra: fila.factorConversionCompraTexto,
+      maneja_lotes: fila.manejaLotesTexto,
+      destacado: fila.destacadoTexto,
+    };
+  }
+
+  private async llamarRpcImportar(soloValidar: boolean): Promise<ResultadoImportacion> {
+    const { data, error } = await this.sb.schema('inventario').rpc('fn_importar_productos_masivo', {
+      p_filas: this.filasImportacion().map((f) => this.aPayloadServidor(f)),
+      p_operacion_id: this.operacionId,
+      p_solo_validar: soloValidar,
+    });
+    if (error) throw error;
+    return data as ResultadoImportacion;
+  }
+
+  /** Aplica sobre las filas ya mostradas los errores/advertencias que
+   *  regresó el servidor, emparejando por número de renglón. */
+  private aplicarResultadoValidacion(resultado: ResultadoImportacion): void {
+    const erroresPorNumero = new Map(resultado.errores.map((e) => [e.numero, e.mensaje]));
+    const advertenciasPorNumero = new Map<number, string[]>();
+    for (const advertencia of resultado.advertencias) {
+      const lista = advertenciasPorNumero.get(advertencia.numero) ?? [];
+      lista.push(advertencia.mensaje);
+      advertenciasPorNumero.set(advertencia.numero, lista);
+    }
+    this.filasImportacion.update((filas) =>
+      filas.map((fila) => ({
+        ...fila,
+        error: erroresPorNumero.get(fila.numero) ?? null,
+        advertencia: advertenciasPorNumero.get(fila.numero)?.join(' ') ?? null,
+      })),
+    );
+  }
+
+  /** Valida TODO el archivo en el servidor (p_solo_validar: true -- nunca
+   *  inserta nada) justo después de leerlo, para la vista previa. Es la
+   *  única validación real: ya no existe una copia en Angular (antes sí,
+   *  100% en el navegador -- ver la auditoría). */
+  private async validarEnServidor(): Promise<void> {
+    this.validando.set(true);
+    try {
+      const resultado = await this.llamarRpcImportar(true);
+      this.aplicarResultadoValidacion(resultado);
+    } catch (error) {
+      this.toast.error((error as Error)?.message ?? 'No se pudo validar el archivo en el servidor.');
+    } finally {
+      this.validando.set(false);
+    }
+  }
+
+  async archivoSeleccionado(evento: Event): Promise<void> {
+    const input = evento.target as HTMLInputElement;
+    const archivo = input.files?.[0];
+    input.value = ''; // permite volver a elegir el mismo archivo después
+    if (!archivo) return;
+
+    const texto = await archivo.text();
+    const filas = parsearCsv(texto);
+    if (filas.length === 0) {
+      this.toast.advertencia('El archivo está vacío.');
+      return;
+    }
+
+    // La primera fila se asume encabezado — no se valida su contenido, solo se descarta.
+    const renglones = filas.slice(1);
+    if (renglones.length === 0) {
+      this.toast.advertencia('El archivo no trae renglones de datos, solo el encabezado.');
+      return;
+    }
+    // Mismo tope que valida inventario.fn_importar_productos_masivo (sección F del mandato).
+    if (renglones.length > 5000) {
+      this.toast.error(`El archivo trae ${renglones.length} renglones -- el máximo por importación es 5,000. Divídelo en partes.`);
+      return;
+    }
+
+    this.resumenImportacion.set(null);
+    this.operacionId = crypto.randomUUID(); // archivo nuevo = operación nueva.
+    this.filasImportacion.set(renglones.map((campos, indice) => this.aFilaImportacion(campos, indice + 2)));
+    this.modalImportarAbierto.set(true);
+    await this.validarEnServidor();
   }
 
   cancelarImportacion(): void {
     this.modalImportarAbierto.set(false);
     this.filasImportacion.set([]);
     this.resumenImportacion.set(null);
+    this.operacionId = null;
   }
 
+  /** Una sola llamada al servidor -- ya no un ciclo de altas una por una
+   *  (sección F del mandato). El mismo operacionId se reutiliza en cada
+   *  reintento (nunca se regenera aquí), así que un reintento tras un
+   *  error de red es idempotente: si la primera llamada sí había llegado
+   *  a completarse en Postgres, esta regresa "duplicada" en vez de crear
+   *  todo por segunda vez (secciones G/H del mandato). "Todo o nada
+   *  SIEMPRE" (decisión del usuario, 4-nov-2026) es automático: la
+   *  función nunca inserta nada si queda algún error de validación. */
   async confirmarImportacion(): Promise<void> {
-    const validas = this.filasValidas();
-    if (validas.length === 0) return;
+    if (this.importando()) return; // doble clic/Enter repetido -- necesario pero no suficiente (ver operacionId).
+    if (this.filasConError().length > 0) return; // defensivo -- el botón ya está deshabilitado en este caso.
+    if (!this.operacionId) return;
 
     this.importando.set(true);
-    let importados = 0;
-    const errores: string[] = [];
-
-    for (let i = 0; i < validas.length; i++) {
-      const fila = validas[i];
-      this.progresoImportacion.set(`Importando ${i + 1}/${validas.length}: ${fila.nombre}…`);
-      try {
-        await firstValueFrom(this.data.alta<Producto>('Producto', fila.payload!));
-        importados++;
-      } catch (error) {
-        errores.push(`Renglón ${fila.numero} (${fila.nombre}): ${(error as Error)?.message ?? 'error desconocido'}.`);
+    try {
+      const resultado = await this.llamarRpcImportar(false);
+      if (resultado.duplicada) {
+        this.resumenImportacion.set({ creados: resultado.productosCreados });
+        this.toast.info(
+          `Esta importación ya se había hecho (${resultado.productosCreados} producto${resultado.productosCreados === 1 ? '' : 's'}) -- no se repitió.`,
+        );
+      } else if (!resultado.ok) {
+        // El servidor encontró algo que el navegador no vio en la vista
+        // previa (p.ej. otro usuario acaba de dar de alta el mismo código
+        // entre la vista previa y este clic) -- se muestra igual que un
+        // error de validación; no se creó nada.
+        this.aplicarResultadoValidacion(resultado);
+        this.toast.error('El archivo todavía tiene errores -- revisa los renglones marcados. No se creó ningún producto.');
+      } else {
+        this.resumenImportacion.set({ creados: resultado.productosCreados });
+        this.toast.exito(`${resultado.productosCreados} producto${resultado.productosCreados === 1 ? '' : 's'} creado${resultado.productosCreados === 1 ? '' : 's'}.`);
+        if (this.busquedaRealizada()) this.cargar();
       }
+    } catch (error) {
+      // Nunca se muestra éxito si Postgres no confirmó -- el operacionId NO
+      // se regenera aquí a propósito: un reintento manda la MISMA
+      // operación, nunca una nueva (ver comentario en operacionId arriba).
+      this.toast.error((error as Error)?.message ?? 'No se pudo completar la importación.');
+    } finally {
+      this.importando.set(false);
     }
-
-    this.importando.set(false);
-    this.progresoImportacion.set('');
-    this.resumenImportacion.set({ importados, omitidos: this.filasConError().length + errores.length });
-
-    if (errores.length > 0) {
-      this.filasImportacion.update((filas) => [
-        ...filas.filter((f) => f.error !== null),
-        ...errores.map((mensaje, indice) => ({
-          numero: -1 - indice,
-          nombre: '',
-          codigo: '',
-          categoriaTexto: '',
-          unidadTexto: '',
-          costoTexto: '',
-          precioTexto: '',
-          existenciaTexto: '',
-          activoTexto: '',
-          descripcionTexto: '',
-          nivelMinimoTexto: '',
-          nivelMaximoTexto: '',
-          proveedorTexto: '',
-          unidadCompraTexto: '',
-          factorConversionCompraTexto: '',
-          manejaLotesTexto: '',
-          destacadoTexto: '',
-          error: mensaje,
-          payload: null,
-        })),
-      ]);
-    } else {
-      this.filasImportacion.set(this.filasImportacion().filter((f) => f.error !== null));
-    }
-
-    this.toast.exito(`Importación terminada: ${importados} creado${importados === 1 ? '' : 's'}.`);
-    if (this.busquedaRealizada()) this.cargar();
   }
 
   // ── Foto del producto ────────────────────────────────────────────────

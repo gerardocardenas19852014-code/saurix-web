@@ -270,69 +270,87 @@
 @if (modalImportarAbierto()) {
   <div class="modal-overlay show" (click)="!importando() && cancelarImportacion()">
     <div class="modal-box importar-modal" (click)="$event.stopPropagation()">
-      <h3>Importar productos</h3>
-
-      @if (resumenImportacion(); as resumen) {
-        <p class="hint" style="margin:0 0 16px;">
-          ✅ {{ resumen.importados }} producto{{ resumen.importados === 1 ? '' : 's' }} creado{{ resumen.importados === 1 ? '' : 's' }}.
-          @if (resumen.omitidos > 0) {
-            ⚠️ {{ resumen.omitidos }} renglón{{ resumen.omitidos === 1 ? '' : 'es' }} omitido{{ resumen.omitidos === 1 ? '' : 's' }} (ver detalle abajo).
-          }
-        </p>
-      } @else {
-        <p class="hint" style="margin:0 0 16px;">
-          {{ filasValidas().length }} renglón{{ filasValidas().length === 1 ? '' : 'es' }} listo{{ filasValidas().length === 1 ? '' : 's' }} para importar.
-          @if (filasConError().length > 0) {
-            {{ filasConError().length }} con error (no se importan).
-          }
-        </p>
-      }
-
-      @if (importando()) {
-        <p class="hint" style="margin:0 0 16px;">⏳ {{ progresoImportacion() }}</p>
-      } @else {
-        <table class="table" style="margin-bottom:18px;">
-          <thead>
-            <tr>
-              <th>Renglón</th>
-              <th>Nombre</th>
-              <th>Categoría</th>
-              <th>Unidad</th>
-              <th>Precio</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (fila of filasImportacion(); track fila.numero) {
-              <tr>
-                <td>{{ fila.numero > 0 ? fila.numero : '—' }}</td>
-                <td>{{ fila.nombre || '—' }}</td>
-                <td>{{ fila.categoriaTexto || '—' }}</td>
-                <td>{{ fila.unidadTexto || '—' }}</td>
-                <td>{{ fila.precioTexto || '—' }}</td>
-                <td>
-                  @if (fila.error) {
-                    <span class="grid-badge grid-badge-danger">{{ fila.error }}</span>
-                  } @else {
-                    <span class="grid-badge grid-badge-success">Lista</span>
-                  }
-                </td>
-              </tr>
+      <div class="importar-header">
+        <div>
+          <h3>Importar productos</h3>
+          <p class="hint" style="margin:2px 0 0;">
+            @if (resumenImportacion(); as resumen) {
+              ✅ {{ resumen.creados }} producto{{ resumen.creados === 1 ? '' : 's' }} creado{{ resumen.creados === 1 ? '' : 's' }}.
+            } @else if (validando()) {
+              Validando el archivo en el servidor…
+            } @else {
+              {{ filasListas().length }} listo{{ filasListas().length === 1 ? '' : 's' }} ·
+              {{ filasConAdvertencia().length }} con advertencia ·
+              {{ filasConError().length }} con error.
+              @if (filasConError().length > 0) {
+                Corrige el archivo y vuelve a elegirlo -- no se importa nada mientras haya algún error.
+              }
             }
-          </tbody>
-        </table>
-      }
-
-      <div class="modal-actions">
-        @if (resumenImportacion()) {
-          <button type="button" class="btn-primary" (click)="cancelarImportacion()">Cerrar</button>
-        } @else {
-          <button type="button" class="btn-secondary" [disabled]="importando()" (click)="cancelarImportacion()">Cancelar</button>
-          <button type="button" class="btn-primary" [disabled]="importando() || filasValidas().length === 0" (click)="confirmarImportacion()">
-            Importar {{ filasValidas().length }} producto{{ filasValidas().length === 1 ? '' : 's' }}
-          </button>
-        }
+          </p>
+        </div>
+        <div class="importar-header-acciones">
+          @if (resumenImportacion()) {
+            <button type="button" class="btn-primary" (click)="cancelarImportacion()">Cerrar</button>
+          } @else {
+            <button type="button" class="btn-secondary" [disabled]="importando()" (click)="cancelarImportacion()">Cancelar</button>
+            <button
+              type="button"
+              class="btn-primary"
+              [disabled]="importando() || validando() || filasImportacion().length === 0 || filasConError().length > 0"
+              (click)="confirmarImportacion()"
+            >
+              @if (importando()) {
+                Importando…
+              } @else {
+                Importar {{ filasListas().length + filasConAdvertencia().length }} producto{{ filasListas().length + filasConAdvertencia().length === 1 ? '' : 's' }}
+              }
+            </button>
+          }
+        </div>
       </div>
+
+      @if (validando()) {
+        <p class="hint" style="margin:0 0 16px;">⏳ Validando {{ filasImportacion().length }} renglón{{ filasImportacion().length === 1 ? '' : 'es' }}…</p>
+      } @else if (!resumenImportacion()) {
+        <div class="importar-tabla-scroll">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Renglón</th>
+                <th>Código</th>
+                <th>Nombre</th>
+                <th>Categoría</th>
+                <th>Unidad</th>
+                <th>Costo</th>
+                <th>Precio</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (fila of filasImportacion(); track fila.numero) {
+                <tr>
+                  <td>{{ fila.numero > 0 ? fila.numero : '—' }}</td>
+                  <td>{{ fila.codigo || '—' }}</td>
+                  <td>{{ fila.nombre || '—' }}</td>
+                  <td>{{ fila.categoriaTexto || '—' }}</td>
+                  <td>{{ fila.unidadTexto || '—' }}</td>
+                  <td>{{ fila.costoTexto || '—' }}</td>
+                  <td>{{ fila.precioTexto || '—' }}</td>
+                  <td>
+                    @if (fila.error) {
+                      <span class="grid-badge grid-badge-danger">{{ fila.error }}</span>
+                    } @else if (fila.advertencia) {
+                      <span class="grid-badge grid-badge-warning">{{ fila.advertencia }}</span>
+                    } @else {
+                      <span class="grid-badge grid-badge-success">Lista</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
     </div>
   </div>
 }
