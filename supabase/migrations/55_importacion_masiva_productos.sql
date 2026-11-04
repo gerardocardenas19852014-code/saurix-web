@@ -87,46 +87,10 @@ as $function$
 declare
   v_existente inventario.importacion_producto;
   v_total int;
-  v_fila jsonb;
-  v_indice int := 0;
-  v_errores jsonb := '[]';
-  v_nombre text;
-  v_codigo text;
-  v_categoria_texto text;
-  v_unidad_texto text;
-  v_costo_texto text;
-  v_precio_texto text;
-  v_existencia_texto text;
-  v_activo_texto text;
-  v_descripcion_texto text;
-  v_nivel_minimo_texto text;
-  v_nivel_maximo_texto text;
-  v_proveedor_texto text;
-  v_unidad_compra_texto text;
-  v_factor_texto text;
-  v_maneja_lotes_texto text;
-  v_destacado_texto text;
-  v_numero int;
-  v_categoria_id bigint;
-  v_unidad_id bigint;
-  v_proveedor_id bigint;
-  v_unidad_compra_id bigint;
-  v_costo numeric;
-  v_precio numeric;
-  v_existencia numeric;
-  v_nivel_minimo numeric;
-  v_nivel_maximo numeric;
-  v_factor numeric;
-  v_es_servicio boolean;
-  v_activo boolean;
-  v_maneja_lotes boolean;
-  v_destacado boolean;
-  v_codigo_lower text;
-  v_vistos jsonb := '{}'; -- mapa codigo_lower -> primer renglón donde apareció, dentro de este mismo archivo.
-  v_payloads jsonb := '[]'; -- renglones ya resueltos y limpios, listos para insertar.
-  v_advertencias jsonb := '[]'; -- avisos que NO bloquean la importación (ver sección B del mandato).
+  v_numero_regla text := '^\d+(\.\d+)?$'; -- entero o decimal no negativo.
+  v_errores jsonb;
+  v_advertencias jsonb;
   v_creados int := 0;
-  v_numero_regla text := '^\d+(\.\d+)?$'; -- entero o decimal no negativo -- mismo criterio que Number() + Number.isNaN()/< 0 en Angular.
 begin
   if p_operacion_id is null then
     raise exception 'Falta el identificador de operación (idempotencia).';
@@ -152,237 +116,183 @@ begin
     raise exception 'El archivo trae % renglones -- el máximo por importación es 5,000. Divídelo en partes.', v_total;
   end if;
 
-  for v_fila in select * from jsonb_array_elements(p_filas)
-  loop
-    v_indice := v_indice + 1;
-    v_numero := coalesce((v_fila->>'numero')::int, v_indice);
-    v_nombre := trim(coalesce(v_fila->>'nombre', ''));
-    v_codigo := trim(coalesce(v_fila->>'codigo', ''));
-    v_categoria_texto := trim(coalesce(v_fila->>'categoria', ''));
-    v_unidad_texto := trim(coalesce(v_fila->>'unidad', ''));
-    v_costo_texto := trim(coalesce(v_fila->>'costo', ''));
-    v_precio_texto := trim(coalesce(v_fila->>'precio', ''));
-    v_existencia_texto := trim(coalesce(v_fila->>'existencia', ''));
-    v_activo_texto := lower(trim(coalesce(v_fila->>'activo', '')));
-    v_descripcion_texto := trim(coalesce(v_fila->>'descripcion', ''));
-    v_nivel_minimo_texto := trim(coalesce(v_fila->>'nivel_minimo', ''));
-    v_nivel_maximo_texto := trim(coalesce(v_fila->>'nivel_maximo', ''));
-    v_proveedor_texto := trim(coalesce(v_fila->>'proveedor', ''));
-    v_unidad_compra_texto := trim(coalesce(v_fila->>'unidad_compra', ''));
-    v_factor_texto := trim(coalesce(v_fila->>'factor_conversion_compra', ''));
-    v_maneja_lotes_texto := lower(trim(coalesce(v_fila->>'maneja_lotes', '')));
-    v_destacado_texto := lower(trim(coalesce(v_fila->>'destacado', '')));
+  -- Validación 100% en SQL de conjuntos (sección F del mandato: nunca un
+  -- ciclo con una consulta/operación por renglón). La primera versión de
+  -- esta función (misma migración, versión inicial) validaba renglón por
+  -- renglón en un ciclo plpgsql acumulando resultados con
+  -- `jsonb || jsonb_build_object(...)` -- esa concatenación NO es O(1),
+  -- cada `||` copia el valor acumulado completo, así que un archivo de N
+  -- renglones costaba O(N²). Medido en pruebas reales (transacción de
+  -- prueba con ROLLBACK, nunca contra datos reales): 27 filas ~149 ms,
+  -- 100 filas ~219 ms, 500 filas ~1,350 ms, 5,000 filas ~49,879 ms
+  -- (≈50 s -- inaceptable). Esta versión usa una sola tabla temporal con
+  -- todos los renglones ya resueltos (categoría/unidad/proveedor por
+  -- JOIN, formatos numéricos por regex, duplicados dentro del archivo por
+  -- una función de ventana) y un solo INSERT ... SELECT masivo al final
+  -- -- mismas reglas de negocio, mismos mensajes, mismo contrato jsonb de
+  -- entrada/salida, mismo todo-o-nada e idempotencia -- solo cambia CÓMO
+  -- se calculan.
+  drop table if exists pg_temp.tmp_importar_filas;
+  create temp table pg_temp.tmp_importar_filas as
+  with base as (
+    select
+      coalesce((f->>'numero')::int, idx::int) as numero,
+      trim(coalesce(f->>'nombre', '')) as nombre,
+      trim(coalesce(f->>'codigo', '')) as codigo,
+      lower(trim(coalesce(f->>'codigo', ''))) as codigo_lower,
+      trim(coalesce(f->>'categoria', '')) as categoria_texto,
+      trim(coalesce(f->>'unidad', '')) as unidad_texto,
+      trim(coalesce(f->>'costo', '')) as costo_texto,
+      trim(coalesce(f->>'precio', '')) as precio_texto,
+      trim(coalesce(f->>'existencia', '')) as existencia_texto,
+      lower(trim(coalesce(f->>'activo', ''))) as activo_texto,
+      trim(coalesce(f->>'descripcion', '')) as descripcion_texto,
+      trim(coalesce(f->>'nivel_minimo', '')) as nivel_minimo_texto,
+      trim(coalesce(f->>'nivel_maximo', '')) as nivel_maximo_texto,
+      trim(coalesce(f->>'proveedor', '')) as proveedor_texto,
+      trim(coalesce(f->>'unidad_compra', '')) as unidad_compra_texto,
+      trim(coalesce(f->>'factor_conversion_compra', '')) as factor_texto,
+      lower(trim(coalesce(f->>'maneja_lotes', ''))) as maneja_lotes_texto,
+      lower(trim(coalesce(f->>'destacado', ''))) as destacado_texto
+    from jsonb_array_elements(p_filas) with ordinality as t(f, idx)
+  ),
+  resuelto as (
+    select
+      b.*,
+      cat.id as categoria_id,
+      uni.id as unidad_id,
+      prov.id as proveedor_id,
+      unic.id as unidad_compra_id,
+      (b.costo_texto = '' or b.costo_texto ~ v_numero_regla) as costo_valido,
+      (b.precio_texto ~ v_numero_regla) as precio_valido,
+      (b.existencia_texto = '' or b.existencia_texto ~ v_numero_regla) as existencia_valido,
+      (b.nivel_minimo_texto = '' or b.nivel_minimo_texto ~ v_numero_regla) as nivel_minimo_valido,
+      (b.nivel_maximo_texto = '' or b.nivel_maximo_texto ~ v_numero_regla) as nivel_maximo_valido,
+      (b.factor_texto ~ v_numero_regla and b.factor_texto::numeric > 0) as factor_valido,
+      case when b.codigo_lower <> '' then count(*) over (partition by b.codigo_lower) else 1 end as veces_codigo_archivo,
+      case when b.codigo_lower <> '' then min(b.numero) over (partition by b.codigo_lower) end as primer_numero_codigo
+    from base b
+    left join inventario.categoria_producto cat on b.categoria_texto <> '' and lower(cat.clave) = lower(b.categoria_texto)
+    left join inventario.unidad_medida uni on b.unidad_texto <> '' and lower(uni.clave) = lower(b.unidad_texto)
+    left join inventario.proveedor prov on b.proveedor_texto <> '' and lower(prov.nombre) = lower(b.proveedor_texto)
+    left join inventario.unidad_medida unic on b.unidad_compra_texto <> '' and lower(unic.clave) = lower(b.unidad_compra_texto)
+  )
+  select
+    r.*,
+    case
+      when r.nombre = '' then 'Falta el nombre.'
+      when r.codigo_lower <> '' and r.veces_codigo_archivo > 1 and r.numero <> r.primer_numero_codigo
+        then format('El código "%s" se repite dentro del mismo archivo (también en el renglón %s).', r.codigo, r.primer_numero_codigo)
+      when r.categoria_id is null then format('La categoría "%s" no existe (revisa la Clave).', r.categoria_texto)
+      when r.unidad_id is null then format('La unidad "%s" no existe (revisa la Clave).', r.unidad_texto)
+      when not r.costo_valido then format('Costo inválido: "%s".', r.costo_texto)
+      when r.precio_texto = '' then 'Falta el precio.'
+      when not r.precio_valido then format('Precio inválido: "%s".', r.precio_texto)
+      when not r.existencia_valido then format('Existencia inválida: "%s".', r.existencia_texto)
+      when r.existencia_texto <> '' and r.nivel_minimo_texto <> '' and not r.nivel_minimo_valido
+        then format('Nivel mínimo inválido: "%s".', r.nivel_minimo_texto)
+      when r.existencia_texto <> '' and r.nivel_maximo_texto <> '' and not r.nivel_maximo_valido
+        then format('Nivel máximo inválido: "%s".', r.nivel_maximo_texto)
+      when r.proveedor_texto <> '' and r.proveedor_id is null
+        then format('El proveedor "%s" no existe (coincide por Nombre, el proveedor no tiene Clave).', r.proveedor_texto)
+      when r.unidad_compra_texto <> '' and r.unidad_compra_id is null
+        then format('La unidad de compra "%s" no existe (revisa la Clave).', r.unidad_compra_texto)
+      when r.unidad_compra_texto <> '' and r.factor_texto = ''
+        then 'Falta "factor_conversion_compra" (a cuántas unidades base equivale la unidad de compra).'
+      when r.unidad_compra_texto <> '' and not r.factor_valido
+        then format('Factor de conversión inválido: "%s".', r.factor_texto)
+      else null
+    end as error_mensaje
+  from resuelto r;
 
-    if v_nombre = '' then
-      v_errores := v_errores || jsonb_build_object('numero', v_numero, 'mensaje', 'Falta el nombre.');
-      continue;
-    end if;
-
-    -- Duplicado DENTRO del mismo archivo (política: detener todo).
-    if v_codigo <> '' then
-      v_codigo_lower := lower(v_codigo);
-      if v_vistos ? v_codigo_lower then
-        v_errores := v_errores || jsonb_build_object(
-          'numero', v_numero,
-          'mensaje', format('El código "%s" se repite dentro del mismo archivo (también en el renglón %s).', v_codigo, v_vistos->>v_codigo_lower)
-        );
-        continue;
-      end if;
-      v_vistos := v_vistos || jsonb_build_object(v_codigo_lower, v_numero);
-    end if;
-
-    -- RLS ya acota categoria_producto/unidad_medida/proveedor a la empresa actual.
-    select id into v_categoria_id from inventario.categoria_producto where lower(clave) = lower(v_categoria_texto);
-    if v_categoria_id is null then
-      v_errores := v_errores || jsonb_build_object('numero', v_numero, 'mensaje', format('La categoría "%s" no existe (revisa la Clave).', v_categoria_texto));
-      continue;
-    end if;
-
-    select id into v_unidad_id from inventario.unidad_medida where lower(clave) = lower(v_unidad_texto);
-    if v_unidad_id is null then
-      v_errores := v_errores || jsonb_build_object('numero', v_numero, 'mensaje', format('La unidad "%s" no existe (revisa la Clave).', v_unidad_texto));
-      continue;
-    end if;
-
-    if v_costo_texto = '' then
-      v_costo := 0;
-    elsif v_costo_texto ~ v_numero_regla then
-      v_costo := v_costo_texto::numeric;
-    else
-      v_errores := v_errores || jsonb_build_object('numero', v_numero, 'mensaje', format('Costo inválido: "%s".', v_costo_texto));
-      continue;
-    end if;
-
-    if v_precio_texto = '' then
-      v_errores := v_errores || jsonb_build_object('numero', v_numero, 'mensaje', 'Falta el precio.');
-      continue;
-    elsif v_precio_texto ~ v_numero_regla then
-      v_precio := v_precio_texto::numeric;
-    else
-      v_errores := v_errores || jsonb_build_object('numero', v_numero, 'mensaje', format('Precio inválido: "%s".', v_precio_texto));
-      continue;
-    end if;
-
-    v_existencia := null;
-    if v_existencia_texto <> '' then
-      if v_existencia_texto ~ v_numero_regla then
-        v_existencia := v_existencia_texto::numeric;
-      else
-        v_errores := v_errores || jsonb_build_object('numero', v_numero, 'mensaje', format('Existencia inválida: "%s".', v_existencia_texto));
-        continue;
-      end if;
-    end if;
-    v_es_servicio := v_existencia is null;
-
-    v_nivel_minimo := null;
-    if not v_es_servicio and v_nivel_minimo_texto <> '' then
-      if v_nivel_minimo_texto ~ v_numero_regla then
-        v_nivel_minimo := v_nivel_minimo_texto::numeric;
-      else
-        v_errores := v_errores || jsonb_build_object('numero', v_numero, 'mensaje', format('Nivel mínimo inválido: "%s".', v_nivel_minimo_texto));
-        continue;
-      end if;
-    end if;
-
-    v_nivel_maximo := null;
-    if not v_es_servicio and v_nivel_maximo_texto <> '' then
-      if v_nivel_maximo_texto ~ v_numero_regla then
-        v_nivel_maximo := v_nivel_maximo_texto::numeric;
-      else
-        v_errores := v_errores || jsonb_build_object('numero', v_numero, 'mensaje', format('Nivel máximo inválido: "%s".', v_nivel_maximo_texto));
-        continue;
-      end if;
-    end if;
-
-    v_proveedor_id := null;
-    if v_proveedor_texto <> '' then
-      select id into v_proveedor_id from inventario.proveedor where lower(nombre) = lower(v_proveedor_texto);
-      if v_proveedor_id is null then
-        v_errores := v_errores || jsonb_build_object('numero', v_numero, 'mensaje', format('El proveedor "%s" no existe (coincide por Nombre, el proveedor no tiene Clave).', v_proveedor_texto));
-        continue;
-      end if;
-    end if;
-
-    v_unidad_compra_id := null;
-    v_factor := null;
-    if v_unidad_compra_texto <> '' then
-      select id into v_unidad_compra_id from inventario.unidad_medida where lower(clave) = lower(v_unidad_compra_texto);
-      if v_unidad_compra_id is null then
-        v_errores := v_errores || jsonb_build_object('numero', v_numero, 'mensaje', format('La unidad de compra "%s" no existe (revisa la Clave).', v_unidad_compra_texto));
-        continue;
-      end if;
-      if v_factor_texto = '' then
-        v_errores := v_errores || jsonb_build_object('numero', v_numero, 'mensaje', 'Falta "factor_conversion_compra" (a cuántas unidades base equivale la unidad de compra).');
-        continue;
-      elsif v_factor_texto ~ v_numero_regla and v_factor_texto::numeric > 0 then
-        v_factor := v_factor_texto::numeric;
-      else
-        v_errores := v_errores || jsonb_build_object('numero', v_numero, 'mensaje', format('Factor de conversión inválido: "%s".', v_factor_texto));
-        continue;
-      end if;
-    end if;
-
-    v_activo := not (v_activo_texto = any (array['no', 'false', '0']));
-    v_maneja_lotes := not v_es_servicio and not (v_maneja_lotes_texto = any (array['', 'no', 'false', '0']));
-    v_destacado := not (v_destacado_texto = any (array['', 'no', 'false', '0']));
-
-    -- Advertencias (sección B del mandato): NO bloquean la importación --
-    -- el renglón sigue adelante y el producto se crea igual.
-    if v_codigo = '' then
-      v_advertencias := v_advertencias || jsonb_build_object('numero', v_numero, 'mensaje', 'Sin código -- no podrá buscarse por código de barras/QR en Cobro ni en Movimientos entre bodegas.');
-    end if;
-    if v_precio < v_costo then
-      v_advertencias := v_advertencias || jsonb_build_object('numero', v_numero, 'mensaje', format('El precio (%s) es menor que el costo (%s).', v_precio, v_costo));
-    end if;
-
-    v_payloads := v_payloads || jsonb_build_object(
-      'numero', v_numero,
-      'nombre', v_nombre,
-      'codigo', case when v_codigo = '' then null else v_codigo end,
-      'categoria_producto_id', v_categoria_id,
-      'unidad_medida_id', v_unidad_id,
-      'descripcion', case when v_descripcion_texto = '' then null else v_descripcion_texto end,
-      'costo', v_costo,
-      'precio_unitario', v_precio,
-      'existencia', v_existencia,
-      'nivel_minimo', v_nivel_minimo,
-      'nivel_maximo', v_nivel_maximo,
-      'proveedor_id', v_proveedor_id,
-      'unidad_compra_id', v_unidad_compra_id,
-      'factor_conversion_compra', v_factor,
-      'maneja_lotes', v_maneja_lotes,
-      'destacado', v_destacado,
-      'activo', v_activo
-    );
-  end loop;
+  select coalesce(jsonb_agg(jsonb_build_object('numero', numero, 'mensaje', error_mensaje) order by numero), '[]'::jsonb)
+  into v_errores
+  from pg_temp.tmp_importar_filas
+  where error_mensaje is not null;
 
   -- Duplicado CONTRA el catálogo ya guardado (política: detener todo) --
-  -- UNA sola consulta por todos los códigos del archivo, nunca una por
-  -- renglón ni el catálogo completo (sección F del mandato).
+  -- una sola consulta (usa producto_codigo_lower_ix), nunca el catálogo
+  -- completo -- solo cuando el archivo ya quedó limpio arriba, igual que
+  -- en la versión anterior.
   if v_errores = '[]'::jsonb then
-    for v_fila in
-      select jsonb_build_object('numero', pl->>'numero', 'codigo', pl->>'codigo', 'id', p.id, 'nombre', p.nombre)
-      from jsonb_array_elements(v_payloads) pl
-      join inventario.producto p on lower(p.codigo) = lower(pl->>'codigo')
-      where pl->>'codigo' is not null
-    loop
-      v_errores := v_errores || jsonb_build_object(
-        'numero', (v_fila->>'numero')::int,
-        'mensaje', format('El código "%s" ya existe en el catálogo (producto #%s: %s).', v_fila->>'codigo', v_fila->>'id', v_fila->>'nombre')
-      );
-    end loop;
+    select coalesce(jsonb_agg(jsonb_build_object(
+      'numero', f.numero,
+      'mensaje', format('El código "%s" ya existe en el catálogo (producto #%s: %s).', f.codigo, p.id, p.nombre)
+    ) order by f.numero), '[]'::jsonb)
+    into v_errores
+    from pg_temp.tmp_importar_filas f
+    join inventario.producto p on lower(p.codigo) = f.codigo_lower
+    where f.codigo_lower <> '';
   end if;
 
-  if jsonb_array_length(v_errores) > 0 then
+  if v_errores <> '[]'::jsonb then
+    drop table if exists pg_temp.tmp_importar_filas;
     return jsonb_build_object(
       'operacionId', p_operacion_id, 'duplicada', false, 'ok', false,
-      'totalFilas', v_total, 'productosCreados', 0, 'errores', v_errores, 'advertencias', v_advertencias
+      'totalFilas', v_total, 'productosCreados', 0, 'errores', v_errores, 'advertencias', '[]'::jsonb
     );
   end if;
 
+  -- Advertencias (sección B): NO bloquean. En este punto TODOS los
+  -- renglones son válidos (si alguno no lo fuera, ya habríamos regresado
+  -- arriba), así que los casteos numéricos aquí son seguros.
+  select coalesce(jsonb_agg(m order by numero), '[]'::jsonb) into v_advertencias
+  from (
+    select numero, 'Sin código -- no podrá buscarse por código de barras/QR en Cobro ni en Movimientos entre bodegas.' as m
+    from pg_temp.tmp_importar_filas where codigo = ''
+    union all
+    select numero, format('El precio (%s) es menor que el costo (%s).',
+      precio_texto::numeric,
+      case when costo_texto = '' then 0 else costo_texto::numeric end
+    ) as m
+    from pg_temp.tmp_importar_filas
+    where precio_texto::numeric < (case when costo_texto = '' then 0 else costo_texto::numeric end)
+  ) a;
+
   if p_solo_validar then
+    drop table if exists pg_temp.tmp_importar_filas;
     return jsonb_build_object(
       'operacionId', p_operacion_id, 'duplicada', false, 'ok', true,
       'totalFilas', v_total, 'productosCreados', 0, 'errores', '[]'::jsonb, 'advertencias', v_advertencias
     );
   end if;
 
-  -- Validación 100% limpia -- ahora sí se inserta. Todo dentro de la misma
-  -- transacción implícita de esta función: si algo truena aquí (debería
-  -- ser imposible, ya se validó todo arriba, pero por ejemplo una
-  -- restricción nueva que no se conocía), Postgres revierte TODO solo.
+  -- Validación 100% limpia -- un solo INSERT masivo (nunca uno por
+  -- renglón), dentro de la misma transacción implícita de esta función
+  -- (sección G: todo o nada). Nunca se modifica ni se borra ningún
+  -- producto existente -- esta función SOLO inserta.
   insert into inventario.importacion_producto (id, total_filas, productos_creados)
   values (p_operacion_id, v_total, 0);
 
-  for v_fila in select * from jsonb_array_elements(v_payloads)
-  loop
-    insert into inventario.producto (
-      nombre, codigo, categoria_producto_id, unidad_medida_id, descripcion, costo, precio_unitario,
-      existencia, nivel_minimo, nivel_maximo, proveedor_id, unidad_compra_id, factor_conversion_compra,
-      maneja_lotes, destacado, activo, importacion_id
-    ) values (
-      v_fila->>'nombre',
-      v_fila->>'codigo',
-      (v_fila->>'categoria_producto_id')::bigint,
-      (v_fila->>'unidad_medida_id')::bigint,
-      v_fila->>'descripcion',
-      (v_fila->>'costo')::numeric,
-      (v_fila->>'precio_unitario')::numeric,
-      (v_fila->>'existencia')::numeric,
-      (v_fila->>'nivel_minimo')::numeric,
-      (v_fila->>'nivel_maximo')::numeric,
-      (v_fila->>'proveedor_id')::bigint,
-      (v_fila->>'unidad_compra_id')::bigint,
-      (v_fila->>'factor_conversion_compra')::numeric,
-      (v_fila->>'maneja_lotes')::boolean,
-      (v_fila->>'destacado')::boolean,
-      (v_fila->>'activo')::boolean,
-      p_operacion_id
-    );
-    v_creados := v_creados + 1;
-  end loop;
+  insert into inventario.producto (
+    nombre, codigo, categoria_producto_id, unidad_medida_id, descripcion, costo, precio_unitario,
+    existencia, nivel_minimo, nivel_maximo, proveedor_id, unidad_compra_id, factor_conversion_compra,
+    maneja_lotes, destacado, activo, importacion_id
+  )
+  select
+    nombre,
+    case when codigo = '' then null else codigo end,
+    categoria_id,
+    unidad_id,
+    case when descripcion_texto = '' then null else descripcion_texto end,
+    case when costo_texto = '' then 0 else costo_texto::numeric end,
+    precio_texto::numeric,
+    case when existencia_texto = '' then null else existencia_texto::numeric end,
+    case when existencia_texto <> '' and nivel_minimo_texto <> '' then nivel_minimo_texto::numeric end,
+    case when existencia_texto <> '' and nivel_maximo_texto <> '' then nivel_maximo_texto::numeric end,
+    proveedor_id,
+    unidad_compra_id,
+    case when unidad_compra_texto <> '' then factor_texto::numeric end,
+    (existencia_texto <> '') and not (maneja_lotes_texto = any (array['', 'no', 'false', '0'])),
+    not (destacado_texto = any (array['', 'no', 'false', '0'])),
+    not (activo_texto = any (array['no', 'false', '0'])),
+    p_operacion_id
+  from pg_temp.tmp_importar_filas;
 
+  get diagnostics v_creados = row_count;
   update inventario.importacion_producto set productos_creados = v_creados where id = p_operacion_id;
+
+  drop table if exists pg_temp.tmp_importar_filas;
 
   return jsonb_build_object(
     'operacionId', p_operacion_id, 'duplicada', false, 'ok', true,
