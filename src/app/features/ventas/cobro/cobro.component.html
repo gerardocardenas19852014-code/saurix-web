@@ -25,9 +25,6 @@
       </div>
 
       <div class="pos-categorias">
-        <button type="button" class="pos-chip" [class.pos-chip-activo]="categoriaFiltro() === null" (click)="alCambiarCategoria(null)">
-          Todas
-        </button>
         @for (cat of categorias(); track cat.id) {
           <button type="button" class="pos-chip" [class.pos-chip-activo]="categoriaFiltro() === cat.id" (click)="alCambiarCategoria(cat.id)">
             {{ cat.nombre }}
@@ -71,8 +68,18 @@
       }
     </div>
 
-    <!-- ── Columna derecha: ticket (Cliente / Canal / Bodega / Líneas / Total / Cancelar-Cobrar, siempre visible salvo las líneas) ── -->
+    <!-- ── Columna derecha: ticket (Cliente / Canal / Bodega / Líneas / Total / Cancelar-Cobrar). En computadora siempre visible aquí; en
+         celular (Cambio 2, prompt maestro Ventas→Cobro 2026-11) este
+         mismo contenido (ng-template ticketContenido) se repite en el
+         cajón móvil de abajo -- misma lógica, dos lugares donde montarla
+         según el ancho de pantalla. ── -->
     <div class="pos-ticket">
+      <ng-container *ngTemplateOutlet="ticketContenido" />
+    </div>
+  </div>
+}
+
+<ng-template #ticketContenido>
       <div class="pos-ticket-config">
         <label>
           Cliente
@@ -91,7 +98,7 @@
         <label>
           <span class="label-con-tip">
             Canal (opcional)
-            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">De dónde vino la venta — texto libre. Déjalo vacío para mostrador normal; escribe algo como "Tienda en línea" si vienes de capturar a mano un pedido recibido por /tienda.</span></button>
+            <button type="button" class="info-tip info-tip--abajo" aria-label="Más información"><span class="info-tip-texto">De dónde vino la venta — texto libre. Déjalo vacío para mostrador normal; escribe algo como "Tienda en línea" si vienes de capturar a mano un pedido recibido por /tienda.</span></button>
           </span>
           <input type="text" class="form-control" list="canales-sugeridos" [value]="canalVenta()" (input)="canalVenta.set($any($event.target).value)" placeholder="Mostrador" />
           <datalist id="canales-sugeridos">
@@ -185,6 +192,31 @@
         <button type="button" class="btn-secondary" (click)="cancelarVentaActual()">Cancelar venta</button>
         <button type="button" class="btn-primary" (click)="abrirPago()">Cobrar</button>
       </div>
+</ng-template>
+
+<!-- Botón fijo "Ver ticket" -- SOLO visible en celular (ver
+     @media (max-width: 860px) en cobro.component.scss). Muestra la
+     cantidad de artículos y el total sin necesidad de abrir el cajón. -->
+@if (turno() && !cargando()) {
+  <button type="button" class="pos-ticket-boton-movil" (click)="ticketMovilAbierto.set(true)">
+    🧾 Ver ticket
+    @if (carrito().length > 0) {
+      <span class="pos-ticket-boton-movil-badge">{{ carrito().length }}</span>
+    }
+    <span class="pos-ticket-boton-movil-total">{{ formatMoneda(totalConPuntos()) }}</span>
+  </button>
+}
+
+<!-- Cajón del ticket en celular -- cerrarlo SOLO oculta el panel, nunca
+     toca carrito/pagos/cliente (ver ticketMovilAbierto en el componente). -->
+@if (ticketMovilAbierto()) {
+  <div class="modal-overlay show pos-ticket-overlay-movil" (click)="ticketMovilAbierto.set(false)">
+    <div class="modal-box pos-ticket-box-movil" (click)="$event.stopPropagation()">
+      <div class="pos-ticket-movil-header">
+        <h3 style="margin:0;">Ticket de venta</h3>
+        <button type="button" class="pos-ticket-item-quitar" title="Cerrar" (click)="ticketMovilAbierto.set(false)">✕</button>
+      </div>
+      <ng-container *ngTemplateOutlet="ticketContenido" />
     </div>
   </div>
 }

@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -62,10 +63,10 @@ interface PagoTicket {
   cambio: number | null;
 }
 
-/** Cuántos productos trae cada página de la cuadrícula de búsqueda — ver
- *  el informe "eliminar 8 cargas" (2026-11): 30 cabe sin scroll pesado en
- *  una pantalla de POS típica, dentro del rango 20-40 pedido. */
-const TAMANO_PAGINA_PRODUCTOS = 30;
+/** Cuántos productos trae cada página de la cuadrícula de búsqueda — 20,
+ *  tal como pide el prompt maestro Ventas→Cobro (2026-11, Cambio 1),
+ *  reemplazando los 30 del informe "eliminar 8 cargas" anterior. */
+const TAMANO_PAGINA_PRODUCTOS = 20;
 /** Tope de ExistenciaBodega/PrecioLista por producto nuevo que se pide de
  *  golpe (ver cargarExistenciaYPrecioPara()) — generoso a propósito (nunca
  *  se ha visto un producto con más de un puñado de bodegas o listas) para
@@ -104,7 +105,7 @@ const TOPE_FILAS_POR_PRODUCTO = 20;
 @Component({
   selector: 'app-cobro',
   standalone: true,
-  imports: [ReactiveFormsModule, SelectBuscableComponent, ClienteFormModalComponent, EscaneoCodigoComponent],
+  imports: [NgTemplateOutlet, ReactiveFormsModule, SelectBuscableComponent, ClienteFormModalComponent, EscaneoCodigoComponent],
   templateUrl: './cobro.component.html',
   styleUrl: './cobro.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -210,6 +211,13 @@ export class CobroComponent implements OnInit, OnDestroy {
   protected readonly modalVentaSimpleAbierto = signal(false);
   protected readonly modalClienteAbierto = signal(false);
   protected readonly modalPagoAbierto = signal(false);
+  /** Cajón/modal del ticket en celular (Cambio 2, prompt maestro
+   *  Ventas→Cobro 2026-11) — en computadora el ticket sigue siempre
+   *  visible en la columna derecha (.pos-ticket, ver scss) y esta señal
+   *  no tiene ningún efecto ahí. En celular el ticket arranca oculto;
+   *  este botón flotante "Ver ticket" lo abre como modal y cerrarlo
+   *  NUNCA toca carrito/pagos/cliente -- solo oculta el panel. */
+  protected readonly ticketMovilAbierto = signal(false);
   protected readonly procesandoVenta = signal(false);
   /** Doble clic / doble Enter en "Agregar" de Venta simple (ver informe,
    *  sección de validaciones): mismo criterio que procesandoVenta arriba. */
@@ -349,9 +357,13 @@ export class CobroComponent implements OnInit, OnDestroy {
     this.debounceBusquedaProductos = setTimeout(() => this.buscarProductos(true), texto.trim() ? 300 : 0);
   }
 
-  protected alCambiarCategoria(categoriaId: number | null): void {
-    if (this.categoriaFiltro() === categoriaId) return;
-    this.categoriaFiltro.set(categoriaId);
+  /** Se quitó el botón "Todas" (Cambio 1, prompt maestro Ventas→Cobro
+   *  2026-11): ahora pulsar la categoría YA seleccionada la desmarca y
+   *  regresa al catálogo general (categoriaFiltro = null), en vez de no
+   *  hacer nada como antes. */
+  protected alCambiarCategoria(categoriaId: number): void {
+    const nuevoValor = this.categoriaFiltro() === categoriaId ? null : categoriaId;
+    this.categoriaFiltro.set(nuevoValor);
     this.buscarProductos(true);
   }
 
@@ -682,6 +694,7 @@ export class CobroComponent implements OnInit, OnDestroy {
     if (this.carrito().length === 0) return;
     this.carrito.set([]);
     this.limpiarOrigenSiCarritoVacio();
+    this.ticketMovilAbierto.set(false); // regresa al catálogo en celular, ver Cambio 2
     this.toast.info('Venta cancelada.');
   }
 
@@ -900,6 +913,7 @@ export class CobroComponent implements OnInit, OnDestroy {
       this.puntosACanjear.set(0);
       this.canalVenta.set('');
       this.modalPagoAbierto.set(false);
+      this.ticketMovilAbierto.set(false); // regresa al catálogo en celular, ver Cambio 2
 
       this.ventaRecienCobrada.set(venta);
       this.clienteRecienCobrado.set(nombreCliente);

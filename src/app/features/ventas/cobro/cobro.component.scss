@@ -158,7 +158,106 @@
 .pos-ticket-total-falta { color: var(--danger); }
 .pos-ticket-total-ok { color: #256b3f; } /* mismo verde que .sx-toast--exito en styles.scss */
 
+// ── Cambio 11 (prompt maestro Ventas→Cobro 2026-11): el tooltip de ayuda
+// de Canal (.info-tip, regla global en styles.scss) abre hacia ARRIBA por
+// defecto -- dentro del cajón móvil del ticket (.modal-box tiene
+// overflow-y: auto, Cambio 2) eso lo puede recortar si el campo queda
+// cerca del borde superior del panel. Este override SOLO aplica al botón
+// con la clase info-tip--abajo (únicamente el de Canal, ver html) -- no
+// toca la regla .info-tip global que usan muchas otras pantallas de
+// Saurix. El campo, su autocompletado (<datalist>) y sus opciones no
+// cambian en nada -- solo la dirección en la que abre su tooltip.
+.info-tip--abajo .info-tip-texto {
+  bottom: auto;
+  top: calc(100% + 8px);
+  transform: translateX(-50%) translateY(-4px);
+}
+.info-tip--abajo .info-tip-texto::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: #0D1B2A;
+}
+.info-tip--abajo:hover .info-tip-texto,
+.info-tip--abajo:focus .info-tip-texto,
+.info-tip--abajo:focus-visible .info-tip-texto {
+  transform: translateX(-50%) translateY(0);
+}
+
+// ── Botón flotante "Ver ticket" + cajón modal en celular (Cambio 2,
+// prompt maestro Ventas→Cobro 2026-11) — oculto en computadora: en
+// computadora el ticket sigue siempre visible en .pos-ticket (columna
+// derecha, sin cambios) y este botón nunca se necesita ahí.
+.pos-ticket-boton-movil {
+  display: none; // solo aparece en el media query de celular, abajo
+}
+
 @media (max-width: 860px) {
   .pos-layout { flex-direction: column; }
-  .pos-ticket { flex: 1 1 auto; width: 100%; position: static; order: -1; }
+
+  // El catálogo se ve primero; el ticket ya NO se apila visible en la
+  // página (antes: order: -1 + siempre presente) — ahora vive solo
+  // dentro del cajón modal (.pos-ticket-overlay-movil, ver @if
+  // ticketMovilAbierto() en el html) para no obligar a hacer scroll por
+  // un panel que no se está usando todavía.
+  .pos-ticket { display: none; }
+
+  // Deja espacio al fondo de la página para que el botón flotante nunca
+  // tape el último producto de la cuadrícula.
+  .pos-productos { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
+
+  .pos-ticket-boton-movil {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: calc(14px + env(safe-area-inset-bottom));
+    z-index: 280; // debajo de .modal-overlay (300): un modal normal (p.ej. Venta simple) lo tapa bien
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 13px 16px;
+    font-size: 14px;
+    font-weight: 700;
+    box-shadow: 0 14px 30px -10px rgba(13, 27, 42, .45);
+    cursor: pointer;
+  }
+  .pos-ticket-boton-movil-badge {
+    background: rgba(255, 255, 255, .25);
+    border-radius: 999px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .pos-ticket-boton-movil-total { margin-left: auto; }
+
+  // El cajón del ticket reutiliza .modal-overlay/.modal-box (mismo
+  // patrón visual que el resto de Saurix, regla general #9) -- solo se
+  // ajusta el ancho/alto para que se sienta como un panel propio, no
+  // como un diálogo chico.
+  .pos-ticket-box-movil {
+    max-width: 480px;
+    width: 92%;
+    max-height: 86vh;
+    padding-bottom: calc(26px + env(safe-area-inset-bottom));
+  }
+  .pos-ticket-movil-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  // Buscador + escaneo + "Venta simple" ya no caben cómodos en una sola
+  // fila en un celular angosto (ver auditoría Cambio 2) -- se reparten en
+  // dos renglones en vez de apretarse.
+  .pos-toolbar { flex-wrap: wrap; }
+  .pos-buscador { flex: 1 1 100%; }
 }
