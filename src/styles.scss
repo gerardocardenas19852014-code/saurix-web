@@ -1866,7 +1866,18 @@ button { font-family: inherit; }
   display: flex;
   align-items: flex-end;
   background-color: var(--store-primary-dark);
-  background-size: cover;
+  /* contain, NO cover (nov-2026): la portada es configurable por cada
+   * empresa (ver Addendum 3, tienda-publica-rediseno-visual-2026-11.md) y
+   * puede llegar con cualquier proporción -- una foto panorámica, pero
+   * también un cartel/gráfico vertical u horizontal con texto/diseño cerca
+   * de los bordes (caso real reportado: el título y las fotos de producto
+   * quedaban cortados por el recorte de "cover" al forzar la imagen dentro
+   * de esta caja ancha y baja). "contain" siempre muestra la imagen
+   * completa, sin recortar nada; el color de marca ya puesto arriba
+   * (background-color) rellena cualquier franja que quede libre en vez de
+   * dejarla vacía. */
+  background-size: contain;
+  background-repeat: no-repeat;
   background-position: center;
   border-radius: 0 0 24px 24px;
   overflow: hidden;
