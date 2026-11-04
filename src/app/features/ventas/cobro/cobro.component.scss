@@ -158,6 +158,75 @@
 .pos-ticket-total-falta { color: var(--danger); }
 .pos-ticket-total-ok { color: #256b3f; } /* mismo verde que .sx-toast--exito en styles.scss */
 
+// ── Cambio 6: modal "Cobrar venta" rediseñado -- total destacado arriba
+// y método de pago como tarjetas clicables (reemplaza el <select> nativo).
+// Reutiliza var(--accent), el mismo color que .pos-chip-activo, para que
+// la tarjeta activa se vea consistente con el resto del POS. ──────────
+.pago-total-destacado {
+  text-align: center;
+  font-size: 30px;
+  font-weight: 700;
+  font-family: 'Montserrat', sans-serif;
+  margin: 2px 0 16px;
+}
+
+.metodo-pago-tarjetas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.metodo-pago-tarjeta {
+  padding: 12px 8px;
+  border-radius: 10px;
+  border: 2px solid var(--line);
+  background: var(--paper-raised);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.metodo-pago-tarjeta-activa {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+// ── Cambio 7: panel único de "venta registrada" -- ícono, título, folio,
+// total destacado y (si aplica) cambio a entregar, en vez del encabezado
+// combinado anterior. Mismo verde que .pos-ticket-total-ok para el
+// ícono/título, consistente con el resto del POS. ──────────────────────
+.venta-confirmada-box {
+  text-align: center;
+}
+
+.venta-confirmada-icono {
+  font-size: 40px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.venta-confirmada-titulo {
+  color: #256b3f; /* mismo verde que .pos-ticket-total-ok y .sx-toast--exito */
+  margin-bottom: 2px;
+}
+
+.venta-confirmada-total {
+  font-size: 28px;
+  font-weight: 700;
+  font-family: 'Montserrat', sans-serif;
+  margin: 10px 0;
+}
+
+.venta-confirmada-cambio {
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+
 // ── Cambio 11 (prompt maestro Ventas→Cobro 2026-11): el tooltip de ayuda
 // de Canal (.info-tip, regla global en styles.scss) abre hacia ARRIBA por
 // defecto -- dentro del cajón móvil del ticket (.modal-box tiene

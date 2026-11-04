@@ -293,6 +293,15 @@ export class CobroComponent implements OnInit, OnDestroy {
    *  "Falta" si todavía falta cubrir el total; si no, "Cambio: $X.XX" si de
    *  verdad hay algo que entregar, o "Pagado ✓" si quedó exacto. */
   protected readonly cambioTotalPagos = computed(() => redondear(this.pagos().reduce((acc, p) => acc + (p.cambio ?? 0), 0)));
+  /** Mismo cálculo que cambioTotalPagos(), pero sobre la copia congelada
+   *  pagosTicket() -- para cuando se muestra el panel "Venta registrada"
+   *  (Cambio 7, prompt maestro Ventas→Cobro 2026-11) this.pagos() ya está
+   *  vacío (se limpia justo después de cobrar, ver confirmarCobro). */
+  protected readonly cambioTicket = computed(() => redondear(this.pagosTicket().reduce((acc, p) => acc + (p.cambio ?? 0), 0)));
+  /** "Agregar pago" para el primero, "+ Agregar otra forma de pago" a
+   *  partir del segundo (Cambio 6) -- misma lógica de siempre, solo
+   *  cambia la etiqueta del botón según cuántos pagos ya se agregaron. */
+  protected readonly etiquetaBotonAgregarPago = computed(() => (this.pagos().length === 0 ? 'Agregar pago' : '+ Agregar otra forma de pago'));
 
   async ngOnInit(): Promise<void> {
     document.documentElement.setAttribute('data-wide', 'grid');
@@ -873,6 +882,12 @@ export class CobroComponent implements OnInit, OnDestroy {
     this.pagoForm.patchValue({ monto: Math.max(0, this.faltantePorPagar()) });
   }
 
+  /** Tarjeta de método de pago (Cambio 6, prompt maestro Ventas→Cobro
+   *  2026-11) -- reemplaza el <select> de antes, mismo FormControl. */
+  elegirMetodoPago(metodo: MetodoPago): void {
+    this.pagoForm.controls.metodoPago.setValue(metodo);
+  }
+
   get montoRecibidoVisible(): boolean {
     return this.pagoForm.controls.metodoPago.value === 'Efectivo';
   }
@@ -929,7 +944,10 @@ export class CobroComponent implements OnInit, OnDestroy {
         puntosACanjear: this.puntosACanjear(),
       });
 
-      this.toast.exito(`Venta ${venta.folio} registrada.`);
+      // Confirmación única (Cambio 7, prompt maestro Ventas→Cobro 2026-11):
+      // antes aquí se mostraba un toast Y el panel ventaRecienCobrada de
+      // abajo, los dos a la vez. El panel por sí solo ya cubre folio,
+      // total, cambio y estado -- el toast quedó eliminado.
 
       // Vincula el pedido/orden de origen ("Cargar a venta" desde Pedidos
       // web) con la Venta que acaba de quedar registrada — SOLO hasta

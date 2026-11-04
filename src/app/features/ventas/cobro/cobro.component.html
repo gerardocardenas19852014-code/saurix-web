@@ -255,9 +255,16 @@
 
 @if (ventaRecienCobrada(); as venta) {
   <div class="modal-overlay show" (click)="cerrarPanelVentaRegistrada()">
-    <div class="modal-box" style="max-width: 380px;" (click)="$event.stopPropagation()">
-      <h3>✅ Venta {{ venta.folio }} registrada</h3>
-      <p class="hint" style="margin-top:-6px;">Total: {{ formatMoneda(venta.total) }}</p>
+    <div class="modal-box venta-confirmada-box" style="max-width: 380px;" (click)="$event.stopPropagation()">
+      <div class="venta-confirmada-icono">✅</div>
+      <h3 class="venta-confirmada-titulo">¡Venta registrada!</h3>
+      <p class="hint" style="margin-top:-6px;">Folio {{ venta.folio }} · {{ venta.estado }}</p>
+
+      <div class="venta-confirmada-total">{{ formatMoneda(venta.total) }}</div>
+
+      @if (cambioTicket() > 0) {
+        <p class="venta-confirmada-cambio">Cambio a entregar: <strong>{{ formatMoneda(cambioTicket()) }}</strong></p>
+      }
 
       <div class="modal-actions">
         <button type="button" class="btn-secondary" (click)="cerrarPanelVentaRegistrada()">Nueva venta</button>
@@ -269,21 +276,22 @@
 
 @if (modalPagoAbierto()) {
   <div class="modal-overlay show" (click)="modalPagoAbierto.set(false)">
-    <div class="modal-box" style="max-width: 460px;" (click)="$event.stopPropagation()">
-      <h3>Cobrar</h3>
+    <div class="modal-box pago-modal-box" style="max-width: 460px;" (click)="$event.stopPropagation()">
+      <h3>Cobrar venta</h3>
 
-      <div class="pos-ticket-totales" style="margin-bottom: 14px;">
-        <div class="pos-ticket-total-linea"><span>Total de la venta</span><span>{{ formatMoneda(totalConPuntos()) }}</span></div>
-        <div class="pos-ticket-total-linea"><span>Pagado</span><span>{{ formatMoneda(totalPagado()) }}</span></div>
-        <div class="pos-ticket-total-linea pos-ticket-total-grande" [class.pos-ticket-total-falta]="faltantePorPagar() > 0.01" [class.pos-ticket-total-ok]="faltantePorPagar() <= 0.01">
-          @if (faltantePorPagar() > 0.01) {
-            <span>Falta</span><span>{{ formatMoneda(faltantePorPagar()) }}</span>
-          } @else if (cambioTotalPagos() > 0) {
-            <span>Cambio</span><span>{{ formatMoneda(cambioTotalPagos()) }}</span>
-          } @else {
-            <span>Pagado ✓</span><span>{{ formatMoneda(0) }}</span>
-          }
-        </div>
+      <div class="pago-total-destacado">{{ formatMoneda(totalConPuntos()) }}</div>
+
+      <div class="metodo-pago-tarjetas">
+        @for (metodo of metodosPago; track metodo) {
+          <button
+            type="button"
+            class="metodo-pago-tarjeta"
+            [class.metodo-pago-tarjeta-activa]="pagoForm.controls.metodoPago.value === metodo"
+            (click)="elegirMetodoPago(metodo)"
+          >
+            {{ metodo }}
+          </button>
+        }
       </div>
 
       @if (pagos().length > 0) {
@@ -306,15 +314,7 @@
       @if (faltantePorPagar() > 0.01) {
         <form class="edit-form" [formGroup]="pagoForm" (ngSubmit)="agregarPago()" style="margin-bottom: 14px;">
           <label>
-            Método de pago
-            <select formControlName="metodoPago">
-              @for (metodo of metodosPago; track metodo) {
-                <option [value]="metodo">{{ metodo }}</option>
-              }
-            </select>
-          </label>
-          <label>
-            Monto a aplicar con este método
+            Monto a aplicar con {{ pagoForm.controls.metodoPago.value }}
             <input type="number" step="0.01" min="0.01" formControlName="monto" />
           </label>
           @if (montoRecibidoVisible) {
@@ -327,10 +327,23 @@
             }
           }
           <div class="modal-actions" style="justify-content: flex-start;">
-            <button type="submit" class="btn-secondary">+ Agregar pago</button>
+            <button type="submit" class="btn-secondary">{{ etiquetaBotonAgregarPago() }}</button>
           </div>
         </form>
       }
+
+      <div class="pos-ticket-totales" style="margin-bottom: 14px;">
+        <div class="pos-ticket-total-linea"><span>Aplicado</span><span>{{ formatMoneda(totalPagado()) }}</span></div>
+        <div class="pos-ticket-total-linea pos-ticket-total-grande" [class.pos-ticket-total-falta]="faltantePorPagar() > 0.01" [class.pos-ticket-total-ok]="faltantePorPagar() <= 0.01">
+          @if (faltantePorPagar() > 0.01) {
+            <span>Restante</span><span>{{ formatMoneda(faltantePorPagar()) }}</span>
+          } @else if (cambioTotalPagos() > 0) {
+            <span>Cambio</span><span>{{ formatMoneda(cambioTotalPagos()) }}</span>
+          } @else {
+            <span>Pagado ✓</span><span>{{ formatMoneda(0) }}</span>
+          }
+        </div>
+      </div>
 
       <div class="modal-actions">
         <button type="button" class="btn-secondary" (click)="modalPagoAbierto.set(false)">Seguir editando</button>
