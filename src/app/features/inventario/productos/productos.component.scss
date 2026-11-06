@@ -131,6 +131,49 @@
   thead th { position: sticky; top: 0; z-index: 1; background: var(--paper-raised); }
 }
 
+// ── Modal "Nuevo producto"/"Editar producto" en 4 pestañas (rediseño
+// UI/UX, nov-2026) ───────────────────────────────────────────────────────
+// Mismo truco que .modal-box.importar-modal arriba (ver .importar-tabla-scroll):
+// el modal completo YA tenía overflow-y:auto + max-height:90vh (ver
+// .modal-box en styles.scss) -- aquí se vuelve flex en columna y se le
+// quita el scroll a la caja completa, para dárselo SOLO al contenido
+// (.producto-modal-contenido). Así el encabezado (título/Cerrar/Guardar) y
+// la barra de pestañas (.tab-bar, ya responsiva -- ver @media en
+// styles.scss) se quedan siempre visibles, y solo el contenido de la
+// pestaña activa hace scroll cuando no cabe completo.
+.modal-box.producto-modal {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.producto-modal-header,
+.producto-modal-tabs {
+  flex: 0 0 auto;
+}
+
+.producto-modal-tabs {
+  margin-bottom: 14px;
+}
+
+.producto-modal-contenido {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding-right: 2px; // separa el contenido del scrollbar, sin reservarle una columna
+}
+
+// Corrección (nov-2026, reporte de espacio vacío): .edit-form/.form-grid-2col
+// traen un max-width global (760px/760px, ver styles.scss) pensado para
+// pantallas con un solo formulario angosto -- dentro de este modal (hasta
+// 1180px, ver el estilo inline del .modal-box en el .html) eso dejaba un
+// hueco vacío a la derecha en las 4 pestañas, en vez de aprovechar el ancho
+// real del modal. Se quita SOLO aquí, scoped a .producto-modal-contenido
+// (selector con mayor especificidad que el global): no toca la regla de
+// styles.scss, así que ningún otro formulario/modal del sistema cambia.
+.producto-modal-contenido .edit-form {
+  max-width: none;
+}
+
 /* Foto del producto en el modal de alta/edición — mismo patrón que
  * .foto-miembro-* en miembros.component.scss (FileReader → canvas → base64),
  * pero cuadrada/redondeada en vez de circular (es un producto, no una

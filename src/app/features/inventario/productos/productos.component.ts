@@ -13,7 +13,7 @@ import { Producto } from './producto.model';
 import { CategoriaProducto } from '../categorias-producto/categoria-producto.model';
 import { UnidadMedida } from '../unidades-medida/unidad-medida.model';
 import { Proveedor } from '../proveedores/proveedor.model';
-import { formatMoneda, existenciaTotal, tieneBodegaAsignada } from './producto.util';
+import { formatMoneda, existenciaTotal } from './producto.util';
 import { ExistenciaBodega } from '../movimientos-bodega/existencia-bodega.model';
 import { EscaneoCodigoComponent } from '../../../shared/components/escaneo-codigo/escaneo-codigo.component';
 import { ImprimirEtiquetasComponent } from './imprimir-etiquetas/imprimir-etiquetas.component';
@@ -66,6 +66,11 @@ const ENCABEZADOS_CSV = [
   'nombre', 'codigo', 'categoria', 'unidad', 'costo', 'precio', 'existencia', 'activo',
   'descripcion', 'nivel_minimo', 'nivel_maximo', 'proveedor', 'unidad_compra', 'factor_conversion_compra', 'maneja_lotes', 'destacado',
 ] as const;
+
+/** Las 4 pestañas del modal "Nuevo producto"/"Editar producto" (rediseño
+ *  UI/UX, nov-2026) -- un único FormGroup para las 4, nunca se pierde
+ *  información al cambiar de pestaña (ver pestanaActiva más abajo). */
+type PestanaProducto = 'general' | 'inventario' | 'precios' | 'tienda';
 
 @Component({
   selector: 'app-productos',
@@ -179,15 +184,19 @@ export class ProductosComponent implements OnInit, OnDestroy {
     return this.proveedores().find((p) => p.id === id)?.nombre ?? '—';
   }
 
+  /** Existencia actual del producto en edición, solo para MOSTRARLA en el
+   *  modal (PENDIENTE 2.1, 2026-11) -- el formulario ya no tiene ningún
+   *  control para capturarla o cambiarla; 0 para un producto nuevo (todavía
+   *  no existe productoEnEdicion()). Misma función existenciaTotal() que ya
+   *  usa la columna "Existencia" del listado, para que nunca se desincronicen. */
+  protected existenciaActualEnEdicion(): number {
+    const producto = this.productoEnEdicion();
+    return producto ? existenciaTotal(producto, this.existenciasBodega()) : 0;
+  }
+
   protected readonly modalAbierto = signal(false);
   protected readonly productoEnEdicion = signal<Producto | null>(null);
   protected readonly productoAEliminar = signal<Producto | null>(null);
-  /** true cuando el producto en edición ya tiene al menos una bodega
-   *  asignada (ver tieneBodegaAsignada() en producto.util.ts) — a partir de
-   *  ahí "Existencia inicial" se vuelve de solo lectura: cambiarla de verdad
-   *  se hace desde Movimientos entre bodegas, para no tener dos números que
-   *  puedan desincronizarse. */
-  protected readonly existenciaBloqueada = signal(false);
   /** Foto del producto en edición (base64, ya redimensionada) — aparte del
    *  formulario reactivo por lo mismo que fotoActual en miembros.component.ts:
    *  más simple de resetear/precargar que meterla como FormControl. */
@@ -196,6 +205,54 @@ export class ProductosComponent implements OnInit, OnDestroy {
    *  guardar()/quitarFoto() no la tocan; solo se cierra al abrir/cerrar el
    *  modal o con el botón ✕ del visor). */
   protected readonly fotoAmpliada = signal(false);
+
+  /** Pestaña visible del modal de alta/edición -- arranca siempre en
+   *  "general" (ver nuevo()/editar()). Cambiar de pestaña solo oculta/
+   *  muestra secciones del MISMO form (ver .html); nunca crea, destruye ni
+   *  resetea ningún FormControl, así que no se pierde nada al navegar. */
+  protected readonly pestanaActiva = signal<PestanaProducto>('general');
+
+  /** A qué pestaña pertenece cada control -- en el mismo orden en que se
+   *  muestran las pestañas (general, inventario, precios, tienda), para
+   *  que, si guardar() falla por validación, se cambie a la primera
+   *  pestaña con un campo inválido (ver irAPestanaConError()). */
+  private readonly ORDEN_CONTROLES_POR_PESTANA: { control: string; pestana: PestanaProducto }[] = [
+    { control: 'nombre', pestana: 'general' },
+    { control: 'codigo', pestana: 'general' },
+    { control: 'categoriaProductoId', pestana: 'general' },
+    { control: 'unidadMedidaId', pestana: 'general' },
+    { control: 'proveedorId', pestana: 'general' },
+    { control: 'descripcion', pestana: 'general' },
+    { control: 'esServicio', pestana: 'inventario' },
+    { control: 'nivelMinimo', pestana: 'inventario' },
+    { control: 'nivelMaximo', pestana: 'inventario' },
+    { control: 'manejaLotes', pestana: 'inventario' },
+    { control: 'costo', pestana: 'precios' },
+    { control: 'precioUnitario', pestana: 'precios' },
+    { control: 'unidadCompraId', pestana: 'precios' },
+    { control: 'factorConversionCompra', pestana: 'precios' },
+    { control: 'destacado', pestana: 'tienda' },
+    { control: 'activo', pestana: 'tienda' },
+  ];
+
+  private readonly ETIQUETA_PESTANA: Record<PestanaProducto, string> = {
+    general: 'General',
+    inventario: 'Inventario',
+    precios: 'Precios',
+    tienda: 'Tienda',
+  };
+
+  /** Cambia a la primera pestaña (en el orden de arriba) que tenga un
+   *  control inválido y avisa cuál es -- se llama justo después de
+   *  form.markAllAsTouched() en guardar(), así que el campo ya se ve
+   *  resaltado en rojo (.edit-form input.ng-invalid.ng-touched, ver
+   *  styles.scss) en cuanto esa pestaña se muestra. */
+  private irAPestanaConError(): void {
+    const primero = this.ORDEN_CONTROLES_POR_PESTANA.find(({ control }) => this.form.get(control)?.invalid);
+    if (!primero) return;
+    this.pestanaActiva.set(primero.pestana);
+    this.toast.advertencia(`Falta un campo obligatorio en la pestaña "${this.ETIQUETA_PESTANA[primero.pestana]}".`);
+  }
 
   protected readonly columnas: ColumnaTabla<Producto>[] = [
     { campo: 'codigo', etiqueta: 'Código', formatear: (fila) => fila.codigo ?? '—' },
@@ -238,7 +295,6 @@ export class ProductosComponent implements OnInit, OnDestroy {
      *  null (servicio) o como el número del control `existencia` de abajo
      *  (ver guardar()). */
     esServicio: [false],
-    existencia: [0, [Validators.min(0)]],
     /** Opcional — null = sin mínimo definido (ver producto.model.ts). Igual
      *  que `existencia`, se oculta y se fuerza a null cuando es servicio
      *  (ver guardar()). */
@@ -373,10 +429,9 @@ export class ProductosComponent implements OnInit, OnDestroy {
       return;
     }
     this.productoEnEdicion.set(null);
-    this.existenciaBloqueada.set(false);
     this.fotoActual.set('');
     this.fotoAmpliada.set(false);
-    this.form.controls.existencia.enable();
+    this.pestanaActiva.set('general');
     this.form.reset({
       id: 0,
       nombre: '',
@@ -387,7 +442,6 @@ export class ProductosComponent implements OnInit, OnDestroy {
       costo: 0,
       precioUnitario: 0,
       esServicio: false,
-      existencia: 0,
       nivelMinimo: null,
       nivelMaximo: null,
       manejaLotes: false,
@@ -402,20 +456,9 @@ export class ProductosComponent implements OnInit, OnDestroy {
 
   editar(producto: Producto): void {
     this.productoEnEdicion.set(producto);
-    const bloqueada = tieneBodegaAsignada(producto.id, this.existenciasBodega());
-    this.existenciaBloqueada.set(bloqueada);
     this.fotoActual.set(producto.foto ?? '');
     this.fotoAmpliada.set(false);
-    /** Deshabilitar de verdad el FormControl (no solo el atributo HTML) es
-     *  necesario: ReactiveFormsModule reescribe la propiedad `disabled` del
-     *  <input> en cada ciclo de detección de cambios según el estado del
-     *  control, así que un `[attr.disabled]` puesto solo en la plantilla
-     *  pierde esa pelea y el campo queda editable de todas formas. */
-    if (bloqueada) {
-      this.form.controls.existencia.disable();
-    } else {
-      this.form.controls.existencia.enable();
-    }
+    this.pestanaActiva.set('general');
     this.form.reset({
       id: producto.id,
       nombre: producto.nombre,
@@ -426,7 +469,6 @@ export class ProductosComponent implements OnInit, OnDestroy {
       costo: producto.costo,
       precioUnitario: producto.precioUnitario,
       esServicio: producto.existencia === null,
-      existencia: existenciaTotal(producto, this.existenciasBodega()),
       nivelMinimo: producto.nivelMinimo ?? null,
       nivelMaximo: producto.nivelMaximo ?? null,
       manejaLotes: producto.manejaLotes ?? false,
@@ -478,22 +520,29 @@ export class ProductosComponent implements OnInit, OnDestroy {
   guardar(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      this.irAPestanaConError();
       return;
     }
     // unidadCompraId != 0 ("Sin unidad de compra alterna") exige un factor
     // > 0 — no se valida con Validators porque depende de otro control.
     if (this.form.controls.unidadCompraId.value !== 0 && !this.form.controls.factorConversionCompra.value) {
+      this.pestanaActiva.set('precios');
       this.toast.advertencia('Captura a cuántas unidades base equivale la unidad de compra (factor de conversión).');
       return;
     }
 
     const valor = this.form.getRawValue();
-    const { esServicio, existencia, nivelMinimo, nivelMaximo, manejaLotes, ...resto } = valor;
+    const { esServicio, nivelMinimo, nivelMaximo, manejaLotes, ...resto } = valor;
+    // PENDIENTE 2.1 ("Correcciones y mejoras pendientes", 2026-11): la
+    // existencia ya no se captura en este formulario, en NINGÚN caso --
+    // un producto nuevo siempre inicia en 0, uno existente conserva
+    // exactamente la que ya tenía (nunca se lee de un control del form).
+    const existenciaActual = this.productoEnEdicion()?.existencia ?? 0;
     const payload = {
       ...resto,
       codigo: resto.codigo || null,
       descripcion: resto.descripcion || null,
-      existencia: esServicio ? null : existencia,
+      existencia: esServicio ? null : existenciaActual,
       nivelMinimo: esServicio ? null : nivelMinimo,
       nivelMaximo: esServicio ? null : nivelMaximo,
       manejaLotes: esServicio ? false : manejaLotes,

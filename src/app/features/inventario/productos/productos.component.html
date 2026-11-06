@@ -92,8 +92,8 @@
 
 @if (modalAbierto()) {
   <div class="modal-overlay show" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
-    <form class="modal-box" style="max-width: 1180px; width: 95%;" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
-      <div class="page-header" style="margin-bottom: 12px;">
+    <form class="modal-box producto-modal" style="max-width: 1180px; width: 95%;" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+      <div class="page-header producto-modal-header" style="margin-bottom: 12px;">
         <h3>{{ productoEnEdicion() ? 'Editar producto' : 'Nuevo producto' }}</h3>
         <div class="page-actions">
           <button type="button" class="btn-secondary small" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">Cerrar</button>
@@ -101,147 +101,180 @@
         </div>
       </div>
 
-      <div class="edit-form form-grid-3col" style="margin-bottom: 18px; max-width: 1180px; gap: 18px 32px;">
-        <div class="full-span foto-producto-campo">
-          <span class="foto-producto-etiqueta">Foto del producto</span>
-          <div class="foto-producto-fila">
-            @if (fotoActual()) {
-              <button type="button" class="foto-producto-preview-boton" title="Ver en tamaño completo" (click)="fotoAmpliada.set(true)">
-                <img class="foto-producto-preview" [src]="fotoActual()" alt="Foto del producto" />
-              </button>
-            } @else {
-              <div class="foto-producto-preview foto-producto-preview-vacia">📦</div>
-            }
-            <div class="foto-producto-acciones">
-              <label class="btn-secondary small foto-producto-boton">
-                {{ fotoActual() ? 'Cambiar foto' : 'Subir foto' }}
-                <input #fotoInput type="file" accept="image/*" hidden (change)="onFotoSeleccionada($event)" />
-              </label>
-              @if (fotoActual()) {
-                <button type="button" class="btn-secondary small" (click)="fotoAmpliada.set(true)">Ver tamaño completo</button>
-                <button type="button" class="btn-secondary small" (click)="quitarFoto(fotoInput)">Quitar foto</button>
-              }
+      <!-- Rediseño en 4 pestañas (UI/UX, nov-2026) -- un único form, cambiar
+           de pestaña solo oculta/muestra secciones, nunca pierde datos (ver
+           pestanaActiva en el .ts). Mismo .tab-bar/.tab-btn que ya usa
+           Movimientos entre bodegas -- en celular ya se envuelve solo (ver
+           @media(max-width:680px) en styles.scss), sin CSS nuevo. -->
+      <div class="tab-bar producto-modal-tabs">
+        <button type="button" class="tab-btn" [class.is-active]="pestanaActiva() === 'general'" (click)="pestanaActiva.set('general')">General</button>
+        <button type="button" class="tab-btn" [class.is-active]="pestanaActiva() === 'inventario'" (click)="pestanaActiva.set('inventario')">Inventario</button>
+        <button type="button" class="tab-btn" [class.is-active]="pestanaActiva() === 'precios'" (click)="pestanaActiva.set('precios')">Precios</button>
+        <button type="button" class="tab-btn" [class.is-active]="pestanaActiva() === 'tienda'" (click)="pestanaActiva.set('tienda')">Tienda</button>
+      </div>
+
+      <div class="producto-modal-contenido">
+        @if (pestanaActiva() === 'general') {
+          <div class="edit-form form-grid-2col" style="margin-bottom: 4px;">
+            <div class="full-span foto-producto-campo">
+              <span class="foto-producto-etiqueta">Foto del producto</span>
+              <div class="foto-producto-fila">
+                @if (fotoActual()) {
+                  <button type="button" class="foto-producto-preview-boton" title="Ver en tamaño completo" (click)="fotoAmpliada.set(true)">
+                    <img class="foto-producto-preview" [src]="fotoActual()" alt="Foto del producto" />
+                  </button>
+                } @else {
+                  <div class="foto-producto-preview foto-producto-preview-vacia">📦</div>
+                }
+                <div class="foto-producto-acciones">
+                  <label class="btn-secondary small foto-producto-boton">
+                    {{ fotoActual() ? 'Cambiar foto' : 'Subir foto' }}
+                    <input #fotoInput type="file" accept="image/*" hidden (change)="onFotoSeleccionada($event)" />
+                  </label>
+                  @if (fotoActual()) {
+                    <button type="button" class="btn-secondary small" (click)="fotoAmpliada.set(true)">Ver tamaño completo</button>
+                    <button type="button" class="btn-secondary small" (click)="quitarFoto(fotoInput)">Quitar foto</button>
+                  }
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <label>
-          Nombre
-          <input type="text" formControlName="nombre" />
-        </label>
-
-        <label>
-          Código / SKU (opcional)
-          <div class="campo-codigo-con-escaner">
-            <input type="text" formControlName="codigo" />
-            <app-escaneo-codigo [soloBoton]="true" (codigoEscaneado)="asignarCodigoEscaneado($event)" />
-          </div>
-        </label>
-
-        <label>
-          Categoría
-          <app-select-buscable [opciones]="opcionesCategoria()" formControlName="categoriaProductoId" placeholder="Buscar categoría…" />
-        </label>
-
-        <label>
-          Unidad de medida
-          <app-select-buscable [opciones]="opcionesUnidad()" formControlName="unidadMedidaId" placeholder="Buscar unidad…" />
-        </label>
-
-        <label>
-          Proveedor (opcional)
-          <app-select-buscable [opciones]="opcionesProveedor()" formControlName="proveedorId" placeholder="Buscar proveedor…" />
-        </label>
-
-        <label class="full-span">
-          Descripción (opcional)
-          <textarea formControlName="descripcion" rows="2"></textarea>
-        </label>
-
-        <div class="tipo-producto-toggle full-span" role="group" aria-label="¿Es producto físico o servicio?">
-          <label class="checkbox-inline">
-            <input type="radio" formControlName="esServicio" [value]="false" />
-            Producto físico (con existencia)
-          </label>
-          <label class="checkbox-inline">
-            <input type="radio" formControlName="esServicio" [value]="true" />
-            Servicio (sin inventario)
-          </label>
-        </div>
-
-        @if (!form.controls.esServicio.value) {
-          <label>
-            <span class="label-con-tip">
-              Existencia inicial
-              @if (existenciaBloqueada()) {
-                <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Ya tiene bodega asignada — cámbiala desde Inventario → Movimientos entre bodegas.</span></button>
-              }
-            </span>
-            <input type="number" step="1" min="0" formControlName="existencia" />
-          </label>
-
-          <label>
-            <span class="label-con-tip">
-              Nivel mínimo (opcional)
-              <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Si la existencia cae por debajo, se avisa en Valor de stock.</span></button>
-            </span>
-            <input type="number" step="1" min="0" formControlName="nivelMinimo" placeholder="Sin mínimo definido" />
-          </label>
-
-          <label>
-            <span class="label-con-tip">
-              Nivel máximo (opcional)
-              <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Si la existencia lo supera, se avisa sobre-stock en Valor de stock.</span></button>
-            </span>
-            <input type="number" step="1" min="0" formControlName="nivelMaximo" placeholder="Sin máximo definido" />
-          </label>
-
-          <label>
-            <span class="label-con-tip">
-              Unidad de compra (opcional)
-              <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Si se compra en una unidad distinta a la base (p. ej. Caja en vez de Pieza).</span></button>
-            </span>
-            <app-select-buscable [opciones]="opcionesUnidadCompra()" formControlName="unidadCompraId" placeholder="Buscar unidad…" />
-          </label>
-
-          @if (form.controls.unidadCompraId.value) {
-            <label>
-              <span class="label-con-tip">
-                Equivale a (factor de conversión)
-                <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Cuántas unidades base trae cada unidad de compra.</span></button>
-              </span>
-              <input type="number" step="0.0001" min="0.0001" formControlName="factorConversionCompra" placeholder="Ej. 12" />
+            <label class="full-span">
+              Nombre
+              <input type="text" formControlName="nombre" />
             </label>
-          }
 
-          <label class="checkbox-inline">
-            <input type="checkbox" formControlName="manejaLotes" />
-            Maneja lotes y caducidad
-          </label>
+            <label>
+              Código / SKU (opcional)
+              <div class="campo-codigo-con-escaner">
+                <input type="text" formControlName="codigo" />
+                <app-escaneo-codigo [soloBoton]="true" (codigoEscaneado)="asignarCodigoEscaneado($event)" />
+              </div>
+            </label>
+
+            <label>
+              Categoría
+              <app-select-buscable [opciones]="opcionesCategoria()" formControlName="categoriaProductoId" placeholder="Buscar categoría…" />
+            </label>
+
+            <label>
+              Unidad de medida
+              <app-select-buscable [opciones]="opcionesUnidad()" formControlName="unidadMedidaId" placeholder="Buscar unidad…" />
+            </label>
+
+            <label>
+              Proveedor (opcional)
+              <app-select-buscable [opciones]="opcionesProveedor()" formControlName="proveedorId" placeholder="Buscar proveedor…" />
+            </label>
+
+            <label class="full-span">
+              Descripción (opcional)
+              <textarea formControlName="descripcion" rows="2"></textarea>
+            </label>
+          </div>
         }
 
-        <label class="checkbox-inline">
-          <input type="checkbox" formControlName="destacado" />
-          <span class="label-con-tip">
-            Destacado en la tienda pública
-            <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Aparece en la sección "⭐ Destacados" arriba del catálogo de /tienda/:clave.</span></button>
-          </span>
-        </label>
+        @if (pestanaActiva() === 'inventario') {
+          <div class="edit-form form-grid-2col" style="margin-bottom: 4px;">
+            <div class="tipo-producto-toggle full-span" role="group" aria-label="¿Es producto físico o servicio?">
+              <label class="checkbox-inline">
+                <input type="radio" formControlName="esServicio" [value]="false" />
+                Producto físico (con existencia)
+              </label>
+              <label class="checkbox-inline">
+                <input type="radio" formControlName="esServicio" [value]="true" />
+                Servicio (sin inventario)
+              </label>
+            </div>
 
-        <label>
-          Costo
-          <input type="number" step="0.01" min="0" formControlName="costo" />
-        </label>
+            @if (!form.controls.esServicio.value) {
+              <!-- PENDIENTE 2.1 ("Correcciones y mejoras pendientes", 2026-11):
+                   se quitó el campo editable "Existencia inicial" -- un producto
+                   nuevo siempre inicia en 0, y uno existente conserva la que ya
+                   tenía; cambiarla de verdad se hace exclusivamente desde
+                   Inventario → Movimientos entre bodegas → Movimiento masivo. -->
+              <p class="hint full-span" style="margin: -4px 0 4px;">
+                @if (productoEnEdicion()) {
+                  Existencia actual: <strong>{{ existenciaActualEnEdicion() }}</strong> — para cambiarla, ve a Inventario → Movimientos entre bodegas → Movimiento masivo.
+                } @else {
+                  Los productos nuevos inician con existencia 0 — regístrala desde Inventario → Movimientos entre bodegas → Movimiento masivo en cuanto la tengas.
+                }
+              </p>
 
-        <label>
-          Precio de venta
-          <input type="number" step="0.01" min="0" formControlName="precioUnitario" />
-        </label>
+              <label>
+                <span class="label-con-tip">
+                  Nivel mínimo (opcional)
+                  <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Si la existencia cae por debajo, se avisa en Valor de stock.</span></button>
+                </span>
+                <input type="number" step="1" min="0" formControlName="nivelMinimo" placeholder="Sin mínimo definido" />
+              </label>
 
-        <label class="checkbox-inline">
-          <input type="checkbox" formControlName="activo" />
-          Activo
-        </label>
+              <label>
+                <span class="label-con-tip">
+                  Nivel máximo (opcional)
+                  <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Si la existencia lo supera, se avisa sobre-stock en Valor de stock.</span></button>
+                </span>
+                <input type="number" step="1" min="0" formControlName="nivelMaximo" placeholder="Sin máximo definido" />
+              </label>
+
+              <label class="checkbox-inline full-span">
+                <input type="checkbox" formControlName="manejaLotes" />
+                Maneja lotes y caducidad
+              </label>
+            }
+          </div>
+        }
+
+        @if (pestanaActiva() === 'precios') {
+          <div class="edit-form form-grid-2col" style="margin-bottom: 4px;">
+            <label>
+              Costo
+              <input type="number" step="0.01" min="0" formControlName="costo" />
+            </label>
+
+            <label>
+              Precio de venta
+              <input type="number" step="0.01" min="0" formControlName="precioUnitario" />
+            </label>
+
+            @if (!form.controls.esServicio.value) {
+              <label>
+                <span class="label-con-tip">
+                  Unidad de compra (opcional)
+                  <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Si se compra en una unidad distinta a la base (p. ej. Caja en vez de Pieza).</span></button>
+                </span>
+                <app-select-buscable [opciones]="opcionesUnidadCompra()" formControlName="unidadCompraId" placeholder="Buscar unidad…" />
+              </label>
+
+              @if (form.controls.unidadCompraId.value) {
+                <label>
+                  <span class="label-con-tip">
+                    Equivale a (factor de conversión)
+                    <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Cuántas unidades base trae cada unidad de compra.</span></button>
+                  </span>
+                  <input type="number" step="0.0001" min="0.0001" formControlName="factorConversionCompra" placeholder="Ej. 12" />
+                </label>
+              }
+            }
+          </div>
+        }
+
+        @if (pestanaActiva() === 'tienda') {
+          <div class="edit-form" style="margin-bottom: 4px;">
+            <label class="checkbox-inline">
+              <input type="checkbox" formControlName="destacado" />
+              <span class="label-con-tip">
+                Destacado en la tienda pública
+                <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Aparece en la sección "⭐ Destacados" arriba del catálogo de /tienda/:clave.</span></button>
+              </span>
+            </label>
+
+            <label class="checkbox-inline">
+              <input type="checkbox" formControlName="activo" />
+              Activo
+            </label>
+          </div>
+        }
       </div>
     </form>
   </div>

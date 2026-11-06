@@ -3,4 +3,8 @@
  * .tipo-producto-toggle + .checkbox-inline, .modal-actions — ver
  * src/styles.scss), igual que cualquier otro modal de alta/edición del
  * sistema. No se agrega CSS a medida para no desalinearse del resto de
- * las pantallas del proyecto. */
+ * las pantallas del proyecto.
+ *
+ * Cambio 9: el botón que abre/cierra "Datos fiscales y domicilio" es un
+ * <button class="btn-secondary small full-span"> normal -- mismo estilo
+ * que cualquier botón secundario chico del sistema, sin clase nueva. */

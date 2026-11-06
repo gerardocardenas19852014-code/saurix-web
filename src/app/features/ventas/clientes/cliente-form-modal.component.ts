@@ -14,9 +14,18 @@ import { RegimenFiscal } from '../regimenes-fiscales/regimen-fiscal.model';
  * Mismo estilo que cualquier otro modal de "ventana administradora" del
  * proyecto (ver movimientos-bodega.component.html/productos.component.html):
  * un solo `.edit-form.form-grid-3col` con el domicilio distribuido en
- * renglones de 3 columnas (en vez de un campo por renglón), sin acordeones
- * ni encabezados propios — nada de esto se reinventa, es la misma
- * plantilla que ya usa el resto del sistema.
+ * renglones de 3 columnas (en vez de un campo por renglón) — nada de esto
+ * se reinventa, es la misma plantilla que ya usa el resto del sistema.
+ *
+ * Cambio 9 (prompt maestro Ventas→Cobro, 2026-11): captura progresiva --
+ * para dar de alta un cliente rápido desde Cobro sin obligar al cajero a
+ * llenar domicilio/régimen fiscal, el formulario se divide en "general"
+ * (siempre visible: nombre, RFC -- sigue siendo obligatorio, no se tocó
+ * ese validador -- correo, teléfono y lista de precio) y "Datos fiscales
+ * y domicilio" (colapsable vía `mostrarFiscal`, ver más abajo). Al editar
+ * un cliente que YA tiene algún dato fiscal/domicilio capturado, la
+ * sección se abre sola (ver el `effect()` del constructor) para que nadie
+ * pierda de vista información que ya existía.
  *
  * El contacto genérico "Público en General" (Cliente.esGenerico, ver
  * cliente.service.ts) se puede editar aquí mismo (domicilio, correo,
@@ -48,6 +57,13 @@ export class ClienteFormModalComponent {
    *  opcional — ver catálogo editable en Ventas / Administración / Regímenes
    *  fiscales (RegimenesFiscalesComponent), ya no es un arreglo fijo en código. */
   protected readonly opcionesRegimenFiscal = signal<OpcionBuscable[]>([{ valor: '', etiqueta: 'Sin régimen capturado' }]);
+
+  /** Cambio 9: la sección "Datos fiscales y domicilio" arranca colapsada
+   *  para un cliente nuevo (captura rápida desde Cobro) y se abre sola al
+   *  editar un cliente que ya tenía algo capturado ahí -- ver el effect()
+   *  del constructor. Es solo UI: no afecta qué campos son obligatorios
+   *  ni cómo se guarda el formulario. */
+  protected readonly mostrarFiscal = signal(false);
 
   private readonly data = inject(DataClientService);
   private readonly toast = inject(ToastService);
@@ -173,6 +189,24 @@ export class ClienteFormModalComponent {
       }
 
       if (!this.form.controls.esExtranjero.value) this.form.controls.pais.disable();
+
+      // Cambio 9: si el cliente que se está editando ya tiene algún dato
+      // fiscal/domicilio capturado, se abre la sección sola -- nunca se
+      // esconde información que ya existía. Para un cliente nuevo arranca
+      // cerrada (captura rápida).
+      this.mostrarFiscal.set(
+        !!cliente &&
+          (cliente.esExtranjero ||
+            !!cliente.regimenFiscalClave ||
+            !!cliente.codigoPostal ||
+            !!cliente.colonia ||
+            !!cliente.calle ||
+            !!cliente.numeroExterior ||
+            !!cliente.numeroInterior ||
+            !!cliente.estado ||
+            !!cliente.municipio ||
+            !!cliente.localidad),
+      );
 
       if (cliente?.esGenerico) {
         this.form.controls.rfc.disable();

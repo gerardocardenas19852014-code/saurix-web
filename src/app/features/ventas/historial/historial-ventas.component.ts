@@ -16,7 +16,7 @@ import { Devolucion, DevolucionItem } from '../devolucion/devolucion.model';
 import { CuentaPorCobrar } from '../cuenta-por-cobrar/cuenta-por-cobrar.model';
 import { CuentaPorCobrarService } from '../cuenta-por-cobrar/cuenta-por-cobrar.service';
 import { cantidadDisponibleParaDevolver, DevolucionService, LineaDevolucionEntrada } from '../devolucion/devolucion.service';
-import { construirTicketHtml, ESTILO_TICKET, formatMoneda, redondear } from '../ventas.util';
+import { construirTicketHtml, estiloTicket, formatMoneda, redondear } from '../ventas.util';
 import { exportarCsv } from '../../../shared/utils/csv.util';
 import { exportarTablaPdf } from '../../../shared/utils/pdf-tabla.util';
 
@@ -377,7 +377,7 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
       cajeroNombre: this.nombreVendedor(venta.vendedorUsuarioId),
     });
     try {
-      imprimirHtml(`Ticket ${venta.folio}`, cuerpo, ESTILO_TICKET);
+      imprimirHtml(`Ticket ${venta.folio}`, cuerpo, estiloTicket('80mm'));
     } catch {
       this.toast.error('No se pudo preparar la impresión del ticket.');
     }

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -18,7 +18,17 @@ import { Bodega } from '../../inventario/bodegas/bodega.model';
 import { ExistenciaBodega } from '../../inventario/movimientos-bodega/existencia-bodega.model';
 import { TipoListaPrecio } from '../../inventario/tipos-lista-precio/tipo-lista-precio.model';
 import { PrecioLista } from '../../inventario/listas-precio/precio-lista.model';
-import { construirTicketHtml, ESTILO_TICKET, formatMoneda, redondear } from '../ventas.util';
+import {
+  construirTicketHtml,
+  estiloTicket,
+  anchoPxTicket,
+  mensajeTicketTexto,
+  generarTicketPdfBlob,
+  DatosTicket,
+  FormatoTicket,
+  formatMoneda,
+  redondear,
+} from '../ventas.util';
 import { imprimirHtml } from '../../../shared/utils/imprimir.util';
 import { nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
 import { Cliente } from '../clientes/cliente.model';
@@ -232,6 +242,16 @@ export class CobroComponent implements OnInit, OnDestroy {
    *  este botón flotante "Ver ticket" lo abre como modal y cerrarlo
    *  NUNCA toca carrito/pagos/cliente -- solo oculta el panel. */
   protected readonly ticketMovilAbierto = signal(false);
+
+  /** PENDIENTE 1 (teclado Android, prompt "Correcciones y mejoras
+   *  pendientes", 2026-11): referencia al buscador de productos -- mismo
+   *  patrón que select-buscable.component.ts/comando-paleta.component.ts
+   *  (@ViewChild + ElementRef<HTMLInputElement>). Se usa SOLO para
+   *  enfocar/desenfocar el campo a propósito desde código (ver
+   *  reenfocarBuscadorSiAplica()/cerrarTecladoBuscador() más abajo),
+   *  nunca para leer ni escribir su valor (eso sigue siendo
+   *  busquedaProducto()/alEscribirBusqueda(), sin cambios). */
+  @ViewChild('buscadorInput') private buscadorInputRef?: ElementRef<HTMLInputElement>;
   protected readonly procesandoVenta = signal(false);
   /** Doble clic / doble Enter en "Agregar" de Venta simple (ver informe,
    *  sección de validaciones): mismo criterio que procesandoVenta arriba. */
@@ -242,8 +262,31 @@ export class CobroComponent implements OnInit, OnDestroy {
    *  folio + botón de Imprimir ticket — ver confirmarCobro(). */
   protected readonly ventaRecienCobrada = signal<Venta | null>(null);
   protected readonly clienteRecienCobrado = signal('');
+  /** Teléfono/correo congelados del cliente de ESA venta -- igual que
+   *  clienteRecienCobrado pero con los datos de contacto, para "Enviar
+   *  por WhatsApp"/"Enviar por correo" (Cambio 10). Puede venir vacío
+   *  (cliente genérico, o uno sin esos datos capturados). */
+  protected readonly contactoClienteRecienCobrado = signal<{ telefono: string; correo: string }>({ telefono: '', correo: '' });
   protected readonly itemsTicket = signal<ItemTicket[]>([]);
   protected readonly pagosTicket = signal<PagoTicket[]>([]);
+  /** Formato de papel del ticket (Cambio 8) -- se recuerda en localStorage
+   *  entre ventas, por navegador/caja, para no tener que volver a
+   *  elegirlo en cada venta. Si localStorage no está disponible (modo
+   *  privado, etc.) simplemente no persiste -- no es crítico. */
+  protected readonly formatoTicket = signal<FormatoTicket>(CobroComponent.leerFormatoTicketGuardado());
+  /** Para el @for de las tarjetas de formato en el panel de confirmación. */
+  protected readonly formatosTicket: readonly FormatoTicket[] = ['58mm', '80mm', 'carta'];
+  private static readonly CLAVE_FORMATO_TICKET = 'saurix-formato-ticket';
+
+  private static leerFormatoTicketGuardado(): FormatoTicket {
+    try {
+      const guardado = localStorage.getItem(CobroComponent.CLAVE_FORMATO_TICKET);
+      if (guardado === '58mm' || guardado === '80mm' || guardado === 'carta') return guardado;
+    } catch {
+      // sin soporte/permiso de localStorage -- se usa el default de abajo.
+    }
+    return '80mm';
+  }
 
   protected readonly ventaSimpleForm = this.fb.nonNullable.group({
     descripcion: ['', Validators.required],
@@ -401,9 +444,44 @@ export class CobroComponent implements OnInit, OnDestroy {
    *  regresa al catálogo general (categoriaFiltro = null), en vez de no
    *  hacer nada como antes. */
   protected alCambiarCategoria(categoriaId: number): void {
+    this.cerrarTecladoBuscador(); // PENDIENTE 1 (teclado Android, 2026-11)
     const nuevoValor = this.categoriaFiltro() === categoriaId ? null : categoriaId;
     this.categoriaFiltro.set(nuevoValor);
     this.buscarProductos(true);
+  }
+
+  /** PENDIENTE 1 (teclado Android, "Correcciones y mejoras pendientes"
+   *  2026-11): cierra a propósito el teclado virtual cuando el cajero
+   *  toca algo que NO es el campo de búsqueda (categoría, "+Venta
+   *  simple", "Ver ticket") -- en vez de confiar en que el navegador lo
+   *  cierre solo al mover el foco, que en Android no siempre pasa a
+   *  tiempo. blur() en un input que ya no tenía el foco no hace nada, así
+   *  que es seguro llamarlo siempre, sin preguntar primero si lo tenía. */
+  private cerrarTecladoBuscador(): void {
+    this.buscadorInputRef?.nativeElement.blur();
+  }
+
+  /** PENDIENTE 1: re-enfocar el buscador después de agregar un producto
+   *  es una comodidad para teclado físico (el cajero sigue tecleando sin
+   *  volver a tocar el campo, ver "Mantener compatibilidad con teclado
+   *  físico" del encargo) -- pero en un touchscreen eso es exactamente lo
+   *  que hace aparecer el teclado virtual sin que el cajero lo haya
+   *  pedido ("al tocar un producto, no abrir el teclado"). matchMedia
+   *  '(pointer: coarse)' es la señal estándar de "puntero de toque" (dedo)
+   *  vs "puntero fino" (mouse/trackpad) -- no depende de ancho de
+   *  pantalla ni de user-agent, así que una tablet con mouse Bluetooth
+   *  sigue beneficiándose del re-enfoque. */
+  protected reenfocarBuscadorSiAplica(): void {
+    if (!window.matchMedia?.('(pointer: coarse)').matches) {
+      this.buscadorInputRef?.nativeElement.focus();
+    }
+  }
+
+  /** PENDIENTE 1: abre el cajón del ticket en celular cerrando antes el
+   *  teclado -- mismo criterio que alCambiarCategoria(). */
+  protected abrirTicketMovil(): void {
+    this.cerrarTecladoBuscador();
+    this.ticketMovilAbierto.set(true);
   }
 
   /** Única función que de verdad consulta Producto — con filtro de texto
@@ -745,6 +823,7 @@ export class CobroComponent implements OnInit, OnDestroy {
 
   // ── Venta simple ───────────────────────────────────────────────────────
   abrirVentaSimple(): void {
+    this.cerrarTecladoBuscador(); // PENDIENTE 1 (teclado Android, 2026-11)
     this.ventaSimpleForm.reset({ descripcion: '', monto: 0 });
     this.modalVentaSimpleAbierto.set(true);
   }
@@ -922,6 +1001,9 @@ export class CobroComponent implements OnInit, OnDestroy {
     }));
     const pagosParaTicket: PagoTicket[] = this.pagos().map((p) => ({ metodoPago: p.metodoPago, monto: p.monto, cambio: p.cambio }));
     const nombreCliente = this.clienteSeleccionado()?.nombre ?? '';
+    // Cambio 10: teléfono/correo congelados para "Enviar por WhatsApp"/
+    // "Enviar por correo" del ticket -- mismo criterio que nombreCliente.
+    const contactoCliente = { telefono: this.clienteSeleccionado()?.telefono ?? '', correo: this.clienteSeleccionado()?.correo ?? '' };
     const idsVendidos = [...new Set(this.carrito().map((i) => i.productoId).filter((id): id is number => id !== null))];
 
     this.procesandoVenta.set(true);
@@ -971,6 +1053,7 @@ export class CobroComponent implements OnInit, OnDestroy {
 
       this.ventaRecienCobrada.set(venta);
       this.clienteRecienCobrado.set(nombreCliente);
+      this.contactoClienteRecienCobrado.set(contactoCliente);
       this.itemsTicket.set(itemsParaTicket);
       this.pagosTicket.set(pagosParaTicket);
 
@@ -1001,22 +1084,140 @@ export class CobroComponent implements OnInit, OnDestroy {
     return usuario ? nombreCompletoUsuario(usuario) : '';
   }
 
-  imprimirTicketRecien(): void {
+  /** Datos congelados del ticket de ESTA venta, en el formato que comparten
+   *  construirTicketHtml()/mensajeTicketTexto()/generarTicketPdfBlob() --
+   *  un solo lugar donde se arma, lo usan imprimirTicketRecien(),
+   *  compartirTicketWhatsapp(), descargarTicketPdf() y enviarTicketCorreo()
+   *  (Cambios 8 y 10) para no repetir este objeto 4 veces. */
+  private datosTicket(): DatosTicket | null {
     const venta = this.ventaRecienCobrada();
-    if (!venta) return;
-
-    const cuerpo = construirTicketHtml({
+    if (!venta) return null;
+    return {
       venta,
       items: this.itemsTicket(),
       pagos: this.pagosTicket(),
       clienteNombre: this.clienteRecienCobrado(),
       cajeroNombre: this.nombreCajeroActual(),
-    });
+    };
+  }
+
+  /** Cambio 8: elegir 58mm/80mm/carta -- se recuerda en localStorage para
+   *  la próxima venta (ver CobroComponent.leerFormatoTicketGuardado()). */
+  elegirFormatoTicket(formato: FormatoTicket): void {
+    this.formatoTicket.set(formato);
     try {
-      imprimirHtml(`Ticket ${venta.folio}`, cuerpo, ESTILO_TICKET);
+      localStorage.setItem(CobroComponent.CLAVE_FORMATO_TICKET, formato);
+    } catch {
+      // no crítico -- ver comentario del signal formatoTicket.
+    }
+  }
+
+  imprimirTicketRecien(): void {
+    const datos = this.datosTicket();
+    if (!datos) return;
+
+    const formato = this.formatoTicket();
+    const cuerpo = construirTicketHtml(datos);
+    try {
+      imprimirHtml(`Ticket ${datos.venta.folio}`, cuerpo, estiloTicket(formato), anchoPxTicket(formato));
     } catch {
       this.toast.error('No se pudo preparar la impresión del ticket.');
     }
+  }
+
+  /** Cambio 10: comparte el ticket por WhatsApp. Usa primero la Web Share
+   *  API nativa (navigator.share) -- en celular eso deja al cajero elegir
+   *  WhatsApp (o cualquier otra app) y, cuando el navegador lo soporta,
+   *  manda también el PDF como archivo adjunto, no solo el texto. Si el
+   *  navegador no tiene Web Share API (la mayoría de escritorio) cae al
+   *  enlace wa.me de siempre -- mismo mecanismo ya usado en
+   *  catalogo-tienda.component.ts para mandar el pedido de la tienda
+   *  pública, aquí en sentido inverso (negocio -> cliente). Si el cliente
+   *  de esta venta tiene teléfono capturado se usa directo; si no, se abre
+   *  wa.me sin número para que el cajero elija el contacto a mano. */
+  async compartirTicketWhatsapp(): Promise<void> {
+    const datos = this.datosTicket();
+    if (!datos) return;
+
+    const mensaje = mensajeTicketTexto(datos);
+    const telefono = this.contactoClienteRecienCobrado().telefono.replace(/[^\d+]/g, '');
+
+    if (typeof navigator.share === 'function') {
+      try {
+        const archivos = this.archivoTicketPdf(datos);
+        const detalleCompartir: ShareData = { title: `Ticket ${datos.venta.folio}`, text: mensaje };
+        if (archivos && typeof navigator.canShare === 'function' && navigator.canShare({ files: archivos })) {
+          detalleCompartir.files = archivos;
+        }
+        await navigator.share(detalleCompartir);
+        return;
+      } catch (error) {
+        // AbortError = el cajero cerró el panel de compartir -- no es una
+        // falla, no se cae al wa.me de abajo (ya decidió no compartir).
+        if (error instanceof Error && error.name === 'AbortError') return;
+        // Cualquier otro error (poco común) sí cae al enlace wa.me de abajo.
+      }
+    }
+
+    const destino = telefono ? `https://wa.me/${telefono}` : 'https://wa.me/';
+    window.open(`${destino}?text=${encodeURIComponent(mensaje)}`, '_blank');
+  }
+
+  /** PDF del ticket como File, listo para navigator.share({files}) -- null
+   *  si jsPDF truena por lo que sea (no debería, pero nunca debe tumbar el
+   *  flujo de compartir: en ese caso se manda solo el texto). */
+  private archivoTicketPdf(datos: DatosTicket): File[] | null {
+    try {
+      const blob = generarTicketPdfBlob(datos, this.formatoTicket());
+      return [new File([blob], `ticket-${datos.venta.folio}.pdf`, { type: 'application/pdf' })];
+    } catch {
+      return null;
+    }
+  }
+
+  /** Cambio 8/10: descarga el ticket como PDF (mismo formato 58mm/80mm/
+   *  carta elegido arriba) -- para adjuntarlo a mano donde el cajero
+   *  quiera (un correo, un chat, guardarlo). */
+  descargarTicketPdf(): void {
+    const datos = this.datosTicket();
+    if (!datos) return;
+    try {
+      const blob = generarTicketPdfBlob(datos, this.formatoTicket());
+      const url = URL.createObjectURL(blob);
+      const enlace = document.createElement('a');
+      enlace.href = url;
+      enlace.download = `ticket-${datos.venta.folio}.pdf`;
+      enlace.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      this.toast.error('No se pudo generar el PDF del ticket.');
+    }
+  }
+
+  /** Cambio 10 -- "enviar por correo": Saurix NO tiene (todavía) ningún
+   *  servicio de correo transaccional configurado (se auditó el proyecto
+   *  completo: sin Resend/SendGrid/SMTP ni función de servidor para esto
+   *  -- ver el reporte de esta fase). Mandar un correo de verdad, ya
+   *  entregado, requeriría dar de alta ese servicio -- no es algo que se
+   *  pueda simular aquí sin que parezca que "ya se envió" cuando no es
+   *  cierto. Lo que SÍ se puede hacer honestamente con solo el navegador
+   *  es abrir el cliente de correo del propio cajero (mailto:) con el
+   *  asunto/cuerpo ya listos -- igual de "manual" que el enlace wa.me de
+   *  arriba, el cajero sigue siendo quien aprieta Enviar. mailto: no puede
+   *  adjuntar archivos por código: si se quiere mandar el PDF, hay que
+   *  adjuntarlo a mano (ver descargarTicketPdf()) -- el toast de abajo lo
+   *  deja claro, nunca se afirma que el correo ya salió. */
+  enviarTicketCorreo(): void {
+    const datos = this.datosTicket();
+    if (!datos) return;
+
+    const correoCliente = this.contactoClienteRecienCobrado().correo;
+    const asunto = encodeURIComponent(`Ticket ${datos.venta.folio} — Saurix`);
+    const cuerpo = encodeURIComponent(mensajeTicketTexto(datos));
+    const destinatario = correoCliente ? encodeURIComponent(correoCliente) : '';
+
+    window.open(`mailto:${destinatario}?subject=${asunto}&body=${cuerpo}`, '_blank');
+    this.toast.info('Se abrió tu programa de correo con el ticket listo para enviar. Si quieres adjuntar el PDF, descárgalo primero y agrégalo a mano.');
   }
 
   cerrarPanelVentaRegistrada(): void {

@@ -226,6 +226,43 @@
   margin-bottom: 10px;
 }
 
+// ── Cambio 8: chips de formato de papel del ticket (58mm/80mm/Carta) --
+// mismo patrón visual que .metodo-pago-tarjeta de arriba, pero más chicas
+// (son 3 opciones cortas, no necesitan tanto espacio). ──────────────────
+.formato-ticket-chips {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.formato-ticket-chip {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: var(--paper-raised);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.formato-ticket-chip-activo {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+// ── Cambio 10: fila de acciones para compartir el ticket (WhatsApp/PDF/
+// correo) -- debajo del total/cambio y encima de "Nueva venta"/"Imprimir". ─
+.venta-confirmada-acciones {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
 
 // ── Cambio 11 (prompt maestro Ventas→Cobro 2026-11): el tooltip de ayuda
 // de Canal (.info-tip, regla global en styles.scss) abre hacia ARRIBA por

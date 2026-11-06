@@ -19,13 +19,6 @@ import { exportarTablaPdf } from '../../../shared/utils/pdf-tabla.util';
 type TipoMovimiento = 'entrada' | 'traspaso' | 'salida';
 type TabMovimientosBodega = 'existencia' | 'historial' | 'transito';
 
-interface FilaSinAsignar {
-  productoId: number;
-  codigo: string;
-  nombre: string;
-  cantidad: number;
-}
-
 interface FilaExistencia {
   existenciaId: number;
   productoId: number;
@@ -79,7 +72,7 @@ const TOPE_FILAS_PDF = 200;
 /**
  * "Opera fácilmente con distintas bodegas": entradas (mercancía nueva, o la
  * asignación inicial de la existencia que un producto ya traía antes de
- * este módulo — ver asignarABodega()), traspasos de cantidad entre
+ * este módulo), traspasos de cantidad entre
  * bodegas, y salidas/ajustes (mermas, daños, correcciones de conteo), con
  * su historial completo — filtrable por producto, bodega y fecha.
  *
@@ -92,7 +85,7 @@ const TOPE_FILAS_PDF = 200;
  * pestañas usan RPC paginadas (inventario.fn_movimientos_* — ver migración
  * movimientos_bodega_rpc_*), nunca cargan el catálogo de productos ni el
  * historial completo. Al abrir la pantalla solo se carga "Existencia por
- * bodega" (más el bloque de productos sin asignar); Historial y En tránsito
+ * bodega"; Historial y En tránsito
  * cargan hasta que se visita esa pestaña por primera vez (igual que
  * Rotación en valor-stock.component.ts). El selector de Producto (filtro
  * de Historial y el campo del modal "Nuevo movimiento") es un autocomplete
@@ -198,12 +191,6 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
   );
   private secuenciaExistencia = 0;
 
-  /** Bloque informativo de productos con existencia heredada sin asignar a
-   *  ninguna bodega (ver fn_movimientos_productos_sin_asignar) — acotado a
-   *  100 filas (caso transicional, se espera que sea chico o vacío). */
-  protected readonly productosSinAsignar = signal<FilaSinAsignar[]>([]);
-  protected readonly totalSinAsignar = signal(0);
-
   protected onBusquedaExistenciaInput(texto: string): void {
     this.busquedaExistencia.set(texto);
   }
@@ -261,30 +248,6 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
       bodegaNombre: String(f['bodega_nombre'] ?? ''),
       existencia: Number(f['existencia']) || 0,
       ubicacion: (f['ubicacion'] as string | null) ?? null,
-    };
-  }
-
-  private async cargarProductosSinAsignar(): Promise<void> {
-    const resultado = await this.cargarSinAsignarSupabase();
-    this.productosSinAsignar.set(resultado.filas);
-    this.totalSinAsignar.set(resultado.total);
-  }
-
-  private async cargarSinAsignarSupabase(): Promise<{ filas: FilaSinAsignar[]; total: number }> {
-    const { data, error } = await this.sb.schema('inventario').rpc('fn_movimientos_productos_sin_asignar', {
-      p_desde: 0,
-      p_cantidad: 100,
-    });
-    if (error) return { filas: [], total: 0 };
-    const filas = (data ?? []) as Record<string, unknown>[];
-    return {
-      filas: filas.map((f) => ({
-        productoId: Number(f['id']),
-        codigo: String(f['codigo'] ?? ''),
-        nombre: String(f['nombre'] ?? ''),
-        cantidad: Number(f['existencia']) || 0,
-      })),
-      total: Number(filas[0]?.['total'] ?? 0),
     };
   }
 
@@ -574,7 +537,7 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
   protected readonly modalAbierto = signal(false);
   protected readonly guardando = signal(false);
   /** Etiqueta a mostrar en el campo remoto de Producto cuando se precarga
-   *  un valor programáticamente (asignarABodega(), seleccionarPorCodigo())
+   *  un valor programáticamente (seleccionarPorCodigo())
    *  — en modo remoto, SelectBuscableComponent no tiene el catálogo
    *  completo para resolver la etiqueta de un id por sí solo. */
   protected readonly productoPreseleccionadoEtiqueta = signal<string | null>(null);
@@ -613,10 +576,7 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
     this.cargarBodegas();
     // Ninguna pestaña carga datos sola al abrir — igual que Productos y
     // servicios, la tabla arranca vacía hasta el primer click en "Buscar"
-    // (ver busquedaRealizadaExistencia/busquedaRealizadaHistorial). El
-    // bloque de "sin asignar" es informativo, no un resultado de búsqueda,
-    // así que sí se carga de una vez.
-    this.cargarProductosSinAsignar();
+    // (ver busquedaRealizadaExistencia/busquedaRealizadaHistorial).
   }
 
   ngOnDestroy(): void {
@@ -639,9 +599,8 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
 
   /** Busca el producto cuyo código coincida (exacto, sin distinguir
    *  mayúsculas) con lo escaneado/capturado en app-escaneo-codigo y lo
-   *  selecciona en el formulario — mismo criterio de "atajo" que
-   *  asignarABodega(): el usuario sigue siendo quien revisa el resto del
-   *  formulario antes de guardar. Solo busca entre productos físicos
+   *  selecciona en el formulario — el usuario sigue siendo quien revisa el
+   *  resto del formulario antes de guardar. Solo busca entre productos físicos
    *  activos. Consulta puntual por código (índice existente), nunca el
    *  catálogo completo. */
   async seleccionarPorCodigo(codigo: string): Promise<void> {
@@ -669,28 +628,6 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
     }
     this.form.reset({ tipo, productoId: 0, bodegaOrigenId: 0, bodegaDestinoId: 0, cantidad: 1, nota: '', enTransito: false });
     this.productoPreseleccionadoEtiqueta.set(null);
-    this.disponibleOrigen.set(null);
-    this.modalAbierto.set(true);
-  }
-
-  /** Atajo desde la tabla "sin asignar": precarga Entrada con el producto y
-   *  la cantidad heredada ya puestos — el usuario solo elige la bodega
-   *  destino. */
-  asignarABodega(fila: FilaSinAsignar): void {
-    if (this.bodegasActivas().length === 0) {
-      this.toast.advertencia('Antes crea al menos una Bodega activa (Inventario → Bodegas).');
-      return;
-    }
-    this.form.reset({
-      tipo: 'entrada',
-      productoId: fila.productoId,
-      bodegaOrigenId: 0,
-      bodegaDestinoId: 0,
-      cantidad: fila.cantidad,
-      nota: 'Asignación inicial',
-      enTransito: false,
-    });
-    this.productoPreseleccionadoEtiqueta.set(fila.codigo ? `${fila.codigo} — ${fila.nombre}` : fila.nombre);
     this.disponibleOrigen.set(null);
     this.modalAbierto.set(true);
   }
@@ -755,10 +692,8 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
   }
 
   /** Tras crear un movimiento: refresca solo la pestaña que se está viendo
-   *  (nunca las otras dos, que ni siquiera tienen por qué estar cargadas) y
-   *  el bloque de "sin asignar" (una Entrada puede vaciarlo). */
+   *  (nunca las otras dos, que ni siquiera tienen por qué estar cargadas). */
   private refrescarTrasGuardar(): void {
-    this.cargarProductosSinAsignar();
     if (this.tabActiva() === 'existencia') this.cargarExistencia();
     else if (this.tabActiva() === 'historial') this.cargarHistorial();
     else this.cargarTransito();

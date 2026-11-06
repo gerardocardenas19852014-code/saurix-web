@@ -4,8 +4,7 @@
  * tipos, distinguidos por si traen bodega de origen y/o destino:
  * - Entrada (bodegaOrigenId = null, bodegaDestinoId con valor): mercancía
  *   nueva, o la asignación inicial de la existencia "heredada" de un
- *   producto que aún no tenía ninguna bodega (ver
- *   movimientos-bodega.component.ts → asignarABodega()).
+ *   producto que aún no tenía ninguna bodega.
  * - Traspaso (ambas con valor): mueve cantidad de una bodega a otra — resta
  *   de origen, suma a destino.
  * - Salida/Ajuste (bodegaOrigenId con valor, bodegaDestinoId = null): resta

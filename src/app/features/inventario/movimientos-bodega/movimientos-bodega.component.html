@@ -50,32 +50,6 @@
     </div>
   </div>
 
-  @if (productosSinAsignar().length > 0) {
-    <div class="empty-state-block" style="text-align:left; margin-bottom:28px;">
-      <p>
-        <strong>{{ totalSinAsignar() }}</strong>
-        producto{{ totalSinAsignar() === 1 ? '' : 's' }} con existencia heredada que todavía no se
-        asignó a ninguna bodega — se sigue viendo normal en Productos y Valor de stock, pero no se
-        puede traspasar ni dar de salida hasta asignarlo.
-      </p>
-      <div class="grid-table-scroll">
-        <table class="grid-table">
-          <thead><tr><th>Código</th><th>Producto</th><th>Existencia</th><th></th></tr></thead>
-          <tbody>
-            @for (fila of productosSinAsignar(); track fila.productoId) {
-              <tr>
-                <td data-label="Código">{{ fila.codigo || '—' }}</td>
-                <td data-label="Producto">{{ fila.nombre }}</td>
-                <td data-label="Existencia">{{ fila.cantidad }}</td>
-                <td><button type="button" class="btn-secondary small" (click)="asignarABodega(fila)">Asignar a bodega</button></td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    </div>
-  }
-
   @if (busquedaRealizadaExistencia()) {
     <div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-bottom:10px;">
       <span class="hint" style="margin:0;">

@@ -41,7 +41,7 @@
 
       <div class="pos-grid">
         @for (producto of productos(); track producto.id) {
-          <button type="button" class="pos-tile" (click)="agregarProducto(producto); buscadorInput.focus()">
+          <button type="button" class="pos-tile" (click)="agregarProducto(producto); reenfocarBuscadorSiAplica()">
             <span class="pos-tile-nombre">{{ producto.nombre }}</span>
             <span class="pos-tile-precio">{{ formatMoneda(precioProducto(producto)) }}</span>
             @if (existenciaDisponible(producto) !== null) {
@@ -198,7 +198,7 @@
      @media (max-width: 860px) en cobro.component.scss). Muestra la
      cantidad de artículos y el total sin necesidad de abrir el cajón. -->
 @if (turno() && !cargando()) {
-  <button type="button" class="pos-ticket-boton-movil" (click)="ticketMovilAbierto.set(true)">
+  <button type="button" class="pos-ticket-boton-movil" (click)="abrirTicketMovil()">
     🧾 Ver ticket
     @if (carrito().length > 0) {
       <span class="pos-ticket-boton-movil-badge">{{ carrito().length }}</span>
@@ -265,6 +265,31 @@
       @if (cambioTicket() > 0) {
         <p class="venta-confirmada-cambio">Cambio a entregar: <strong>{{ formatMoneda(cambioTicket()) }}</strong></p>
       }
+
+      <!-- Cambio 8: formato de papel del ticket -- se recuerda para la próxima venta. -->
+      <div class="formato-ticket-chips">
+        @for (formato of formatosTicket; track formato) {
+          <button
+            type="button"
+            class="formato-ticket-chip"
+            [class.formato-ticket-chip-activo]="formatoTicket() === formato"
+            (click)="elegirFormatoTicket(formato)"
+          >
+            {{ formato === 'carta' ? 'Carta' : formato }}
+          </button>
+        }
+      </div>
+
+      <!-- Cambio 10: compartir el ticket. WhatsApp/Correo son "manuales" --
+           abren la app o el cliente de correo del cajero con el ticket ya
+           listo, él sigue siendo quien aprieta Enviar (Saurix no tiene un
+           servicio de correo transaccional propio -- ver el comentario de
+           enviarTicketCorreo() en el componente). -->
+      <div class="venta-confirmada-acciones">
+        <button type="button" class="btn-secondary small" (click)="compartirTicketWhatsapp()">📲 WhatsApp</button>
+        <button type="button" class="btn-secondary small" (click)="descargarTicketPdf()">📄 PDF</button>
+        <button type="button" class="btn-secondary small" (click)="enviarTicketCorreo()">✉️ Correo</button>
+      </div>
 
       <div class="modal-actions">
         <button type="button" class="btn-secondary" (click)="cerrarPanelVentaRegistrada()">Nueva venta</button>
