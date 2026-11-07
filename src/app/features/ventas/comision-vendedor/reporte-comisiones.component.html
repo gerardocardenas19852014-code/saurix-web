@@ -6,12 +6,24 @@
   <div class="grid-filter">
     <label class="grid-filter-fecha-label">
       Desde
-      <input type="date" [value]="fechaDesde()" (change)="cambiarFechaDesde($any($event.target).value)" />
+      <input type="date" [value]="fechaDesde()" (change)="fechaDesde.set($any($event.target).value)" />
     </label>
     <label class="grid-filter-fecha-label">
       Hasta
-      <input type="date" [value]="fechaHasta()" (change)="cambiarFechaHasta($any($event.target).value)" />
+      <input type="date" [value]="fechaHasta()" (change)="fechaHasta.set($any($event.target).value)" />
     </label>
+    <select
+      class="toolbar-select"
+      aria-label="Filtrar por vendedor"
+      [value]="filtroVendedorId()"
+      (change)="filtroVendedorId.set(+$any($event.target).value)"
+    >
+      <option [value]="0">Todos los vendedores</option>
+      @for (usuario of usuariosActivos(); track usuario.id) {
+        <option [value]="usuario.id">{{ usuario.nombre }}</option>
+      }
+    </select>
+    <button type="button" class="btn-primary small" (click)="cambiarFiltro()">🔍 Buscar</button>
   </div>
 </div>
 
@@ -23,6 +35,20 @@
       <div class="num">{{ formatMoneda(totalComisiones()) }}</div>
       <div class="label">Total a pagar en comisiones</div>
     </div>
+  </div>
+
+  <!-- Paginación REAL contra el servidor (ver cargarListado()/irAPaginaSiguiente()/
+       irAPaginaAnterior() en reporte-comisiones.component.ts). -->
+  <div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-bottom:10px;">
+    <span class="hint" style="margin:0;">
+      Página {{ paginaActual() }} de {{ totalPaginas() }} — {{ totalVendedoresFiltrados() }} vendedor(es)
+    </span>
+    <button type="button" class="btn-secondary small" [disabled]="paginaActual() <= 1" (click)="irAPaginaAnterior()">
+      ← Anterior
+    </button>
+    <button type="button" class="btn-secondary small" [disabled]="paginaActual() >= totalPaginas()" (click)="irAPaginaSiguiente()">
+      Siguiente →
+    </button>
   </div>
 
   <div class="catalog-group">
@@ -41,16 +67,16 @@
           </tr>
         </thead>
         <tbody>
-          @for (fila of filas(); track fila.usuario.id) {
+          @for (fila of filas(); track fila.usuarioId) {
             <tr>
-              <td>{{ fila.usuario.nombre }}</td>
+              <td>{{ fila.vendedorNombre }}</td>
               <td>{{ fila.numeroVentas }}</td>
               <td>{{ formatMoneda(fila.totalVentas) }}</td>
               <td>{{ formatMoneda(fila.totalDevuelto) }}</td>
               <td>{{ formatMoneda(fila.ventasNetas) }}</td>
               <td>
-                @if (fila.comision) {
-                  {{ fila.comision.tipo === 'Porcentaje' ? fila.comision.valor + '%' : formatMoneda(fila.comision.valor) + ' por venta' }}
+                @if (fila.comisionTipo) {
+                  {{ fila.comisionTipo === 'Porcentaje' ? fila.comisionValor + '%' : formatMoneda(fila.comisionValor ?? 0) + ' por venta' }}
                 } @else {
                   Sin comisión
                 }

@@ -27,7 +27,9 @@
       placeholder="Buscar por folio o cliente…"
       [value]="busqueda()"
       (input)="busqueda.set($any($event.target).value)"
+      (keyup.enter)="cambiarFiltro()"
     />
+    <button type="button" class="btn-primary small" (click)="cambiarFiltro()">🔍 Buscar</button>
   </div>
 
   <div class="grid-filter">
@@ -36,10 +38,25 @@
   </div>
 </div>
 
+<!-- Paginación REAL contra el servidor (ver cargarListado()/irAPaginaSiguiente()/
+     irAPaginaAnterior() en historial-ventas.component.ts) — mismo criterio que
+     Clientes/Productos/Órdenes de compra. -->
+<div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-bottom:10px;">
+  <span class="hint" style="margin:0;">
+    Página {{ paginaActual() }} de {{ totalPaginas() }} — {{ totalVentasFiltradas() }} venta(s)
+  </span>
+  <button type="button" class="btn-secondary small" [disabled]="paginaActual() <= 1 || cargando()" (click)="irAPaginaAnterior()">
+    ← Anterior
+  </button>
+  <button type="button" class="btn-secondary small" [disabled]="paginaActual() >= totalPaginas() || cargando()" (click)="irAPaginaSiguiente()">
+    Siguiente →
+  </button>
+</div>
+
 <app-data-table
   [tamanoPagina]="preferenciasGrid.tamanoPagina()"
   [columnas]="columnas"
-  [filas]="ventasFiltradas()"
+  [filas]="ventasPagina()"
   [cargando]="cargando()"
   [ocultarEditarEliminar]="true"
   accionExtraEtiqueta="Ver detalle"
@@ -58,7 +75,7 @@
       </div>
 
       <p class="hint" style="margin-top:-6px;">
-        {{ nombreCliente(venta.clienteId) }} · Atendió {{ nombreVendedor(venta.vendedorUsuarioId) }}
+        {{ clienteNombreDetalle() }} · Atendió {{ vendedorNombreDetalle() }}
       </p>
 
       @if (cargandoDetalle()) {

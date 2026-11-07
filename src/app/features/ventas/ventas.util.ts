@@ -172,6 +172,49 @@ export function mensajeTicketTexto(datos: DatosTicket): string {
   return lineas.join('\n');
 }
 
+/** Validación simple de correo (Fase 6, 2026-11 -- optimización de
+ *  Tickets): mismo criterio general que Validators.email de Angular,
+ *  usado al capturar el correo del cliente (ver
+ *  cliente-form-modal.component.ts) -- aquí se revalida en el punto de
+ *  uso, para no precompletar "Enviar por correo" con un destinatario
+ *  claramente inválido (dato viejo, importado, o capturado antes de que
+ *  existiera esa validación). Si no pasa, se trata igual que "sin
+ *  correo" -- se abre el cliente de correo sin destinatario, nunca se
+ *  bloquea la acción completa por esto. */
+export function correoEsValido(correo: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo.trim());
+}
+
+/** Validación simple de teléfono (Fase 6, 2026-11): exige entre 10 y 15
+ *  dígitos (10 = formato nacional mexicano típico, hasta 15 = E.164
+ *  internacional completo) -- para no armar un enlace wa.me con un
+ *  número claramente incompleto o basura. Recibe el teléfono YA
+ *  limpiado a solo dígitos (ver compartirTicketWhatsapp() en
+ *  cobro.component.ts, que quita todo lo demás incluido el signo '+' --
+ *  wa.me espera el número SIN '+'). */
+export function telefonoEsValido(telefonoSoloDigitos: string): boolean {
+  return /^\d{10,15}$/.test(telefonoSoloDigitos);
+}
+
+/** Mensaje BREVE para el enlace directo de WhatsApp (wa.me) -- Fase 6,
+ *  2026-11: a propósito mucho más corto que mensajeTicketTexto() (el
+ *  detalle completo línea por línea, que sigue usándose como cuerpo del
+ *  correo) -- un ticket completo como mensaje de chat es largo e
+ *  incómodo de leer. Folio y total son los únicos datos que de verdad
+ *  hacen falta ahí; el ticket/PDF completo se comparte por una acción
+ *  SEPARADA (ver "Compartir PDF" -- independiente de este mensaje,
+ *  nunca prometido como adjunto automático de WhatsApp). */
+export function mensajeWhatsappBreve(datos: DatosTicket): string {
+  return [
+    'Hola, te compartimos el comprobante de tu compra.',
+    '',
+    `Folio: ${datos.venta.folio}`,
+    `Total: ${formatMoneda(datos.venta.total)}`,
+    '',
+    'Gracias por tu preferencia.',
+  ].join('\n');
+}
+
 /** Ancho de página (mm) y margen por formato — usados solo por
  *  generarTicketPdfBlob(). 'carta' es una hoja carta letter completa (para
  *  una impresora de oficina normal); 58mm/80mm son el ancho real del

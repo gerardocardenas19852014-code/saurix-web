@@ -1,19 +1,22 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { DataClientService, FiltroRango } from '../../../core/services/data-client.service';
-import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
-import { Devolucion, DevolucionItem } from '../devolucion/devolucion.model';
-import { Venta } from '../venta/venta.model';
-import { formatMoneda, redondear } from '../ventas.util';
-import { ComisionVendedor } from './comision-vendedor.model';
+import { DataClientService } from '../../../core/services/data-client.service';
+import { SupabaseService } from '../../../core/services/supabase.service';
+import { ToastService } from '../../../shared/services/toast.service';
+import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
+import { Usuario } from '../../seguridad/usuarios/usuario.model';
+import { formatMoneda } from '../ventas.util';
+import { TipoComisionVendedor } from './comision-vendedor.model';
 
 interface FilaReporteComision {
-  usuario: Usuario;
+  usuarioId: number;
+  vendedorNombre: string;
   numeroVentas: number;
   totalVentas: number;
   totalDevuelto: number;
   ventasNetas: number;
-  comision: ComisionVendedor | null;
+  comisionTipo: TipoComisionVendedor | null;
+  comisionValor: number | null;
   montoComision: number;
 }
 
@@ -24,8 +27,22 @@ interface FilaReporteComision {
  * periodo, para no pagar comisión sobre algo que el cliente regresó. La
  * comisión se calcula sobre lo VENDIDO, no sobre lo ya cobrado — una venta
  * a Crédito sin abonar todavía también genera comisión (decisión de
- * alcance, documentada aquí; se puede revisar si el negocio prefiere
- * pagar comisión solo al cobrar).
+ * alcance ya documentada antes de esta homologación).
+ *
+ * HOMOLOGACIÓN DE RENDIMIENTO (Fase 1, "Prompt maestro" nov-2026): el
+ * cálculo por vendedor (ventas netas, comisión) se hacía 100% en Angular
+ * vía un computed que iteraba TODOS los vendedores activos, sin
+ * paginación ni filtro por vendedor — con muchos vendedores/mucho
+ * historial eso significa procesar cada vez el periodo completo en el
+ * navegador. Ahora una sola función de PostgreSQL
+ * (`ventas.fn_reporte_comisiones_listar`) hace TODO el cálculo (ventas
+ * netas = vendido - devuelto, comisión según tipo configurado) con los
+ * MISMOS criterios de negocio de siempre, filtra por fecha y vendedor,
+ * pagina 20 vendedores por página (ordenados por comisión a pagar DESC) y
+ * regresa también la suma de comisión de TODOS los vendedores que cumplen
+ * el filtro (no solo los de la página visible) para la tarjeta "Total a
+ * pagar". Un botón "🔍 Buscar" es el único disparador de una consulta
+ * nueva — cambiar fecha o vendedor nunca consulta por sí solo.
  */
 @Component({
   selector: 'app-reporte-comisiones',
@@ -41,56 +58,41 @@ export class ReporteComisionesComponent implements OnInit, OnDestroy {
   }
 
   private readonly data = inject(DataClientService);
+  private readonly sb = inject(SupabaseService).cliente;
+  protected readonly toast = inject(ToastService);
+  protected readonly preferenciasGrid = inject(PreferenciasGridService);
   protected readonly formatMoneda = formatMoneda;
 
   protected readonly cargando = signal(true);
+
+  /** Catálogo chico (vendedores activos) — se carga UNA sola vez, solo
+   *  para llenar el combo "Vendedor"; nunca para calcular nada (eso lo
+   *  hace fn_reporte_comisiones_listar en el servidor). */
+  protected readonly usuarios = signal<Usuario[]>([]);
+  protected readonly usuariosActivos = computed(() => this.usuarios().filter((u) => u.activo !== false));
+
+  /** Filtros EN EDICIÓN — nunca disparan una consulta por sí solos. Solo
+   *  cambiarFiltro() (botón "🔍 Buscar") los aplica de verdad. */
   protected readonly fechaDesde = signal(this.primerDiaMesISO());
   protected readonly fechaHasta = signal(this.hoyISO());
+  protected readonly filtroVendedorId = signal(0); // 0 = todos los vendedores
 
-  private readonly usuarios = signal<Usuario[]>([]);
-  private readonly ventas = signal<Venta[]>([]);
-  private readonly devolucionItemsPorVenta = signal<Map<number, number>>(new Map());
-  private readonly comisiones = signal<ComisionVendedor[]>([]);
+  protected readonly paginaActual = signal(1);
+  protected readonly totalVendedoresFiltrados = signal(0);
+  protected readonly totalPaginas = computed(() =>
+    Math.max(1, Math.ceil(this.totalVendedoresFiltrados() / Math.max(1, this.preferenciasGrid.tamanoPagina()))),
+  );
+  /** Suma de comisión de TODOS los vendedores que cumplen el filtro (no
+   *  solo los de la página visible) — la da el propio servidor
+   *  (suma_comision_total vía sum(...) over()), nunca se calcula sumando
+   *  solo las filas ya traídas. */
+  protected readonly totalComisiones = signal(0);
+  protected readonly filas = signal<FilaReporteComision[]>([]);
 
-  protected readonly filas = computed<FilaReporteComision[]>(() => {
-    // this.ventas() ya viene acotada por fechaDesde/fechaHasta desde el
-    // servidor (ver cargar()) — aquí solo falta descartar las que no están
-    // Completadas.
-    const devueltoPorVenta = this.devolucionItemsPorVenta();
-    const ventasPeriodo = this.ventas().filter((v) => v.estado === 'Completada');
-
-    return this.usuarios()
-      .filter((u) => u.activo !== false)
-      .map((usuario) => {
-        const ventasVendedor = ventasPeriodo.filter((v) => v.vendedorUsuarioId === usuario.id);
-        const totalVentas = redondear(ventasVendedor.reduce((acc, v) => acc + v.total, 0));
-        const totalDevuelto = redondear(
-          ventasVendedor.reduce((acc, v) => acc + (devueltoPorVenta.get(v.id) ?? 0), 0),
-        );
-        const ventasNetas = redondear(totalVentas - totalDevuelto);
-        const comision = this.comisiones().find((c) => c.usuarioId === usuario.id) ?? null;
-        const montoComision = redondear(
-          !comision
-            ? 0
-            : comision.tipo === 'Porcentaje'
-              ? ventasNetas * (comision.valor / 100)
-              : ventasVendedor.length * comision.valor,
-        );
-        return {
-          usuario,
-          numeroVentas: ventasVendedor.length,
-          totalVentas,
-          totalDevuelto,
-          ventasNetas,
-          comision,
-          montoComision,
-        };
-      })
-      .filter((f) => f.numeroVentas > 0)
-      .sort((a, b) => b.montoComision - a.montoComision);
-  });
-
-  protected readonly totalComisiones = computed(() => redondear(this.filas().reduce((acc, f) => acc + f.montoComision, 0)));
+  /** Evita que una respuesta vieja (petición lenta) pise el resultado de
+   *  una búsqueda/página más reciente — mismo patrón que
+   *  OrdenesCompraComponent.secuenciaListado. */
+  private secuenciaListado = 0;
 
   private hoyISO(): string {
     return new Date().toISOString().slice(0, 10);
@@ -103,75 +105,80 @@ export class ReporteComisionesComponent implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     document.documentElement.setAttribute('data-wide', 'grid');
-    const [usuarios, comisiones] = await Promise.all([
-      firstValueFrom(this.data.list<Usuario>('Usuario')),
-      firstValueFrom(this.data.list<ComisionVendedor>('ComisionVendedor')),
-    ]);
+    const usuarios = await firstValueFrom(this.data.list<Usuario>('Usuario'));
     this.usuarios.set(usuarios);
-    this.comisiones.set(comisiones);
-    await this.cargar();
+    await this.cargarListado();
   }
 
-  /** Vuelve a pedir Venta/Devolucion/DevolucionItem al servidor, acotadas al
-   *  periodo Desde–Hasta vigente — Venta y sus devoluciones son tablas que
-   *  crecen sin límite con el tiempo, así que NUNCA se traen completas:
-   *  mismo riesgo de 504 Gateway Timeout que ya se corrigió en el dashboard
-   *  de ventas. También reemplaza el N+1 anterior (una consulta de
-   *  DevolucionItem POR CADA devolución que haya existido alguna vez) por
-   *  un solo .in() sobre los ids de devolución de SOLO las ventas del
-   *  periodo. */
-  protected async cargar(): Promise<void> {
+  /** Trae SOLO la página actual de vendedores que cumplen el filtro
+   *  aplicado — nunca el catálogo completo de vendedores ni el histórico
+   *  de ventas. Mismo patrón que OrdenesCompraComponent.cargarListado(). */
+  async cargarListado(): Promise<void> {
     this.cargando.set(true);
-    const desde = this.fechaDesde();
-    const hasta = this.fechaHasta();
-    const rangoFecha: FiltroRango = {};
-    if (desde) rangoFecha.gte = `${desde}T00:00:00`;
-    if (hasta) rangoFecha.lte = `${hasta}T23:59:59`;
-    const filtroFecha = rangoFecha.gte !== undefined || rangoFecha.lte !== undefined ? { fecha: rangoFecha } : {};
-
-    const ventas = await firstValueFrom(this.data.list<Venta>('Venta', filtroFecha));
-    this.ventas.set(ventas);
-
-    // Una devolución cuenta para "ventas netas" del periodo de la VENTA, sin
-    // importar cuándo se procesó el regreso — así que se acota por los ids
-    // de venta del periodo, no por la fecha de la propia devolución (eso
-    // cambiaría el resultado: una devolución tardía dejaría de descontarse).
-    const idsVentas = ventas.map((v) => v.id);
-    if (idsVentas.length === 0) {
-      this.devolucionItemsPorVenta.set(new Map());
+    const miSecuencia = ++this.secuenciaListado;
+    const resultado = await this.cargarListadoSupabase();
+    if (miSecuencia !== this.secuenciaListado) return; // ya respondió una búsqueda/página más nueva — descartar esta
+    const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
+    if (resultado.filas.length === 0 && this.paginaActual() > 1 && resultado.total > 0) {
+      this.paginaActual.set(Math.max(1, Math.ceil(resultado.total / tamanio)));
       this.cargando.set(false);
+      await this.cargarListado();
       return;
     }
-    const devoluciones = await firstValueFrom(this.data.list<Devolucion>('Devolucion', { ventaId: idsVentas }));
-    const idsDevoluciones = devoluciones.map((d) => d.id);
-    const items =
-      idsDevoluciones.length > 0
-        ? await firstValueFrom(this.data.list<DevolucionItem>('DevolucionItem', { devolucionId: idsDevoluciones }))
-        : [];
-
-    const itemsPorDevolucion = new Map<number, DevolucionItem[]>();
-    for (const item of items) {
-      const arr = itemsPorDevolucion.get(item.devolucionId) ?? [];
-      arr.push(item);
-      itemsPorDevolucion.set(item.devolucionId, arr);
-    }
-    const mapa = new Map<number, number>();
-    for (const devolucion of devoluciones) {
-      const totalItems = (itemsPorDevolucion.get(devolucion.id) ?? []).reduce((acc, item) => acc + item.subtotal, 0);
-      mapa.set(devolucion.ventaId, (mapa.get(devolucion.ventaId) ?? 0) + totalItems);
-    }
-    this.devolucionItemsPorVenta.set(mapa);
-
+    this.filas.set(resultado.filas);
+    this.totalVendedoresFiltrados.set(resultado.total);
+    this.totalComisiones.set(resultado.sumaComisionTotal);
     this.cargando.set(false);
   }
 
-  protected cambiarFechaDesde(valor: string): void {
-    this.fechaDesde.set(valor);
-    void this.cargar();
+  private async cargarListadoSupabase(): Promise<{ filas: FilaReporteComision[]; total: number; sumaComisionTotal: number }> {
+    const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
+    const desde = (this.paginaActual() - 1) * tamanio;
+    const { data, error } = await this.sb.schema('ventas').rpc('fn_reporte_comisiones_listar', {
+      p_desde_fecha: this.fechaDesde() || null,
+      p_hasta_fecha: this.fechaHasta() || null,
+      p_vendedor_id: this.filtroVendedorId() || null,
+      p_desde: desde,
+      p_cantidad: tamanio,
+    });
+    if (error) {
+      this.toast.error('No se pudo cargar el reporte de comisiones: ' + error.message);
+      return { filas: [], total: 0, sumaComisionTotal: 0 };
+    }
+    const filas = (data ?? []) as Record<string, unknown>[];
+    return {
+      filas: filas.map((f) => ({
+        usuarioId: Number(f['usuario_id']),
+        vendedorNombre: String(f['vendedor_nombre']),
+        numeroVentas: Number(f['numero_ventas']) || 0,
+        totalVentas: Number(f['total_ventas']) || 0,
+        totalDevuelto: Number(f['total_devuelto']) || 0,
+        ventasNetas: Number(f['ventas_netas']) || 0,
+        comisionTipo: (f['comision_tipo'] as TipoComisionVendedor | null) ?? null,
+        comisionValor: f['comision_valor'] !== null ? Number(f['comision_valor']) : null,
+        montoComision: Number(f['monto_comision']) || 0,
+      })),
+      total: Number(filas[0]?.['total_filas'] ?? 0),
+      sumaComisionTotal: Number(filas[0]?.['suma_comision_total'] ?? 0),
+    };
   }
 
-  protected cambiarFechaHasta(valor: string): void {
-    this.fechaHasta.set(valor);
-    void this.cargar();
+  /** Único disparador de una consulta nueva (botón "🔍 Buscar") — cambiar
+   *  fecha o vendedor nunca consulta por sí solo. Vuelve a la página 1. */
+  protected cambiarFiltro(): void {
+    this.paginaActual.set(1);
+    void this.cargarListado();
+  }
+
+  protected irAPaginaAnterior(): void {
+    if (this.paginaActual() <= 1) return;
+    this.paginaActual.update((p) => p - 1);
+    void this.cargarListado();
+  }
+
+  protected irAPaginaSiguiente(): void {
+    if (this.paginaActual() >= this.totalPaginas()) return;
+    this.paginaActual.update((p) => p + 1);
+    void this.cargarListado();
   }
 }

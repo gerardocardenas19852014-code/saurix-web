@@ -107,13 +107,13 @@
            Movimientos entre bodegas -- en celular ya se envuelve solo (ver
            @media(max-width:680px) en styles.scss), sin CSS nuevo. -->
       <div class="tab-bar producto-modal-tabs">
-        <button type="button" class="tab-btn" [class.is-active]="pestanaActiva() === 'general'" (click)="pestanaActiva.set('general')">General</button>
-        <button type="button" class="tab-btn" [class.is-active]="pestanaActiva() === 'inventario'" (click)="pestanaActiva.set('inventario')">Inventario</button>
-        <button type="button" class="tab-btn" [class.is-active]="pestanaActiva() === 'precios'" (click)="pestanaActiva.set('precios')">Precios</button>
-        <button type="button" class="tab-btn" [class.is-active]="pestanaActiva() === 'tienda'" (click)="pestanaActiva.set('tienda')">Tienda</button>
+        <button type="button" class="tab-btn" [class.is-active]="pestanaActiva() === 'general'" (click)="cambiarPestana('general')">General</button>
+        <button type="button" class="tab-btn" [class.is-active]="pestanaActiva() === 'inventario'" (click)="cambiarPestana('inventario')">Inventario</button>
+        <button type="button" class="tab-btn" [class.is-active]="pestanaActiva() === 'precios'" (click)="cambiarPestana('precios')">Precios</button>
+        <button type="button" class="tab-btn" [class.is-active]="pestanaActiva() === 'tienda'" (click)="cambiarPestana('tienda')">Tienda</button>
       </div>
 
-      <div class="producto-modal-contenido">
+      <div class="producto-modal-contenido" #contenidoModalProducto>
         @if (pestanaActiva() === 'general') {
           <div class="edit-form form-grid-2col" style="margin-bottom: 4px;">
             <div class="full-span foto-producto-campo">

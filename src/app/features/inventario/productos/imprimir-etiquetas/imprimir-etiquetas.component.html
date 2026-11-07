@@ -1,11 +1,18 @@
 <div class="modal-overlay show" (click)="cerrar.emit()">
   <div class="modal-box etiquetas-modal" style="max-width: 1180px; width: 95%;" (click)="$event.stopPropagation()">
+    @if (pasoConfiguracion() && productosParaConfigurar()) {
+      <app-configuracion-impresion-etiquetas
+        [productos]="productosParaConfigurar()!"
+        (volver)="volverASeleccion()"
+        (cerrar)="impresionCompletada()"
+      />
+    } @else {
     <div class="etiquetas-header">
       <div>
-        <h3>Imprimir etiquetas {{ formato() === 'qr' ? 'con código QR' : 'con código de barras' }}</h3>
+        <h3>Imprimir etiquetas</h3>
         <p class="hint" style="margin:2px 0 0;">
           Elige los productos (solo los que tienen código/SKU) y cuántas copias de cada etiqueta necesitas.
-          Cada etiqueta trae el {{ formato() === 'qr' ? 'código QR' : 'código de barras' }}, el nombre y el precio.
+          El papel, el tamaño, el tipo de código (barras o QR) y qué información mostrar se eligen en el siguiente paso.
         </p>
       </div>
       <div class="etiquetas-header-acciones">
@@ -14,42 +21,10 @@
           @if (imprimiendo()) {
             Preparando…
           } @else {
-            Imprimir {{ totalEtiquetas() }} etiqueta{{ totalEtiquetas() === 1 ? '' : 's' }}
+            Configurar impresión ({{ totalEtiquetas() }})
           }
         </button>
       </div>
-    </div>
-
-    <div class="etiquetas-formato-y-preview">
-      <div class="etiquetas-formato">
-        <p class="hint" style="margin:0 0 8px;"><strong>Formato de etiqueta</strong></p>
-        <div class="etiquetas-formato-tarjetas" role="group" aria-label="Formato de etiqueta">
-          <label class="etiquetas-formato-tarjeta" [class.is-selected]="formato() === 'barras'">
-            <input type="radio" name="formatoEtiqueta" [checked]="formato() === 'barras'" (change)="seleccionarFormato('barras')" />
-            <span class="etiquetas-formato-tarjeta-titulo">▌▍▌ Código de barras</span>
-            <span class="etiquetas-formato-tarjeta-desc">El formato de siempre -- código, nombre y precio.</span>
-          </label>
-          <label class="etiquetas-formato-tarjeta" [class.is-selected]="formato() === 'qr'">
-            <input type="radio" name="formatoEtiqueta" [checked]="formato() === 'qr'" (change)="seleccionarFormato('qr')" />
-            <span class="etiquetas-formato-tarjeta-titulo">⬛ Código QR</span>
-            <span class="etiquetas-formato-tarjeta-desc">Mismo código, en QR -- para escanear desde el celular.</span>
-          </label>
-        </div>
-      </div>
-
-      @if (productoPreview(); as preview) {
-        <div class="etiquetas-vista-previa" aria-label="Vista previa de la etiqueta">
-          <p class="hint" style="margin:0 0 6px;"><strong>Vista previa</strong></p>
-          <div class="etiquetas-vista-previa-caja">
-            <div class="etiquetas-vista-previa-codigo" [class.es-qr]="formato() === 'qr'" [innerHTML]="previewSvgSeguro()"></div>
-            <div class="etiquetas-vista-previa-datos">
-              <div class="etiquetas-vista-previa-nombre">{{ preview.nombre }}</div>
-              <div class="etiquetas-vista-previa-sku">SKU: {{ preview.codigo }}</div>
-              <div class="etiquetas-vista-previa-precio">{{ formatMoneda(preview.precioUnitario) }}</div>
-            </div>
-          </div>
-        </div>
-      }
     </div>
 
     <div class="grid-filter" style="margin-bottom:12px;">
@@ -183,5 +158,6 @@
         · {{ totalEtiquetas() }} etiqueta{{ totalEtiquetas() === 1 ? '' : 's' }} en total
       </span>
     </div>
+    }
   </div>
 </div>

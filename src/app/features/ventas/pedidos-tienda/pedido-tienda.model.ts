@@ -40,11 +40,11 @@ export interface ItemPedidoTienda {
  * una Venta/MovimientoInventario por sí solo.
  *
  * NO afecta inventario ni caja hasta que se Confirma — igual que
- * Cotizacion (ver cotizacion.model.ts) — momento en el que
- * PedidoTiendaService.confirmarComoVenta() registra una Venta real con el
- * mismo VentaService que usa Cobro. (Para 'menu_qr' esto se evoluciona en
- * el Bloque E — "Cargar a venta" hacia Cobro con revalidación de
- * precio/stock — por ahora 'menu_qr' solo se puede ver y descartar aquí.)
+ * Cotizacion (ver cotizacion.model.ts) — momento en el que CobroComponent
+ * (vía "Cargar a venta", único camino desde Fase 5 2026-11 para los 2
+ * orígenes) registra una Venta real con VentaService y
+ * PedidoTiendaService.marcarConfirmadoDesdeVenta() vincula este pedido
+ * con ella.
  */
 export interface PedidoTienda {
   id: number;

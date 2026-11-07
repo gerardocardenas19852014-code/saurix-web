@@ -1,0 +1,219 @@
+// Estilos propios de ConfiguracionImpresionEtiquetasComponent -- los
+// estilos de Angular están encapsulados por componente, así que
+// .etiquetas-header/.etiquetas-header-acciones se repiten aquí con la
+// misma regla que ya usa imprimir-etiquetas.component.scss (mismo criterio
+// documentado ahí: "los estilos de un componente no alcanzan a otro").
+// El resto (.config-etiquetas-*) es nuevo de esta ronda (nov-2026,
+// "Optimización de impresión de etiquetas").
+
+.etiquetas-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+
+  h3 { margin-bottom: 0; }
+}
+
+.etiquetas-header-acciones {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 760px) {
+  .etiquetas-header-acciones { width: 100%; }
+  .etiquetas-header-acciones button { flex: 1 1 auto; }
+}
+
+.config-etiquetas-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 4px;
+  color: var(--accent);
+  font-size: inherit;
+  font-family: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+
+  &:hover { color: var(--accent-strong, var(--accent)); }
+}
+
+// ── Layout de dos columnas (config | vista previa) -- una sola columna en
+// pantallas angostas (sección 8 del mandato: "una sola columna apilada en
+// mobile"). ───────────────────────────────────────────────────────────────
+.config-etiquetas-cuerpo {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.config-etiquetas-opciones {
+  flex: 1 1 320px;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.config-etiquetas-preview {
+  flex: 1 1 360px;
+  min-width: 280px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+}
+
+@media (max-width: 760px) {
+  .config-etiquetas-cuerpo { flex-direction: column; }
+  .config-etiquetas-opciones,
+  .config-etiquetas-preview { flex: 1 1 auto; min-width: 0; width: 100%; }
+}
+
+.config-etiquetas-seccion {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+
+  &:last-child { border-bottom: none; padding-bottom: 0; }
+}
+
+.config-etiquetas-radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+// Mismo patrón visual/de interacción que .etiquetas-formato-tarjeta
+// (imprimir-etiquetas.component.scss), ya usado también en
+// .modo-tienda-tarjeta/.masivo-tipo-tarjeta -- borde + fondo suave en la
+// seleccionada, radio funcional pero visualmente discreto.
+.config-etiquetas-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+  background: var(--paper-raised);
+  font-size: 13px;
+  color: var(--text-strong);
+  transition: border-color .12s ease, background .12s ease;
+
+  input[type='radio'] { width: auto; margin: 0; }
+
+  &:hover { border-color: var(--accent); }
+
+  &.is-selected {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    font-weight: 600;
+  }
+}
+
+.config-etiquetas-medidas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+}
+
+.config-etiquetas-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-strong);
+  margin-bottom: 6px;
+
+  input[type='checkbox'] { width: auto; margin: 0; }
+}
+
+.config-etiquetas-advertencia {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--warn-soft, #fff4e5);
+  color: var(--warn-strong, #8a5a00);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.config-etiquetas-resumen {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+  margin-bottom: 10px;
+}
+
+// Muestra de etiquetas reales -- mismo criterio de proporción que
+// .etiquetas-vista-previa-codigo (código de barras tiene tamaño
+// intrínseco propio y no es cuadrado; el QR sí lo es).
+.config-etiquetas-muestra {
+  display: grid;
+  gap: 8px;
+}
+
+.config-etiquetas-muestra-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: var(--paper-raised);
+  text-align: center;
+  overflow: hidden;
+}
+
+.config-etiquetas-muestra-codigo {
+  width: 100%;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  svg { max-width: 100%; max-height: 100%; }
+  &.es-qr svg { width: 34px; height: 34px; }
+}
+
+.config-etiquetas-muestra-nombre {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.config-etiquetas-muestra-sku {
+  font-size: 9px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.config-etiquetas-muestra-precio {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--text-strong);
+}

@@ -4,13 +4,15 @@
 
 <div class="grid-toolbar">
   <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo</button>
+  <button type="button" class="btn-primary small" (click)="cambiarFiltro()">🔍 Buscar</button>
 
   <div class="grid-filter">
     <input
       type="search"
-      placeholder="Buscar por nombre o RFC…"
+      placeholder="Buscar por nombre, RFC, correo o teléfono…"
       [value]="busqueda()"
       (input)="busqueda.set($any($event.target).value)"
+      (keyup.enter)="cambiarFiltro()"
     />
     <label class="board-filter-field board-filter-checkbox" style="margin:0;">
       <input type="checkbox" [checked]="mostrarInactivos()" (change)="mostrarInactivos.set($any($event.target).checked)" />
@@ -19,10 +21,26 @@
   </div>
 </div>
 
+<!-- Paginación REAL contra el servidor (ver cargar()/irAPaginaSiguiente()/
+     irAPaginaAnterior() en clientes.component.ts) — mismo criterio que
+     Productos/Kardex/Órdenes de compra. VA ANTES de la tabla para que no
+     brinque de posición cuando la tabla pasa de vacía a poblada. -->
+<div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-bottom:10px;">
+  <span class="hint" style="margin:0;">
+    Página {{ paginaActual() }} de {{ totalPaginas() }} — {{ totalFiltrado() }} cliente(s)
+  </span>
+  <button type="button" class="btn-secondary small" [disabled]="paginaActual() <= 1 || cargando()" (click)="irAPaginaAnterior()">
+    ← Anterior
+  </button>
+  <button type="button" class="btn-secondary small" [disabled]="paginaActual() >= totalPaginas() || cargando()" (click)="irAPaginaSiguiente()">
+    Siguiente →
+  </button>
+</div>
+
 <app-data-table
   [tamanoPagina]="preferenciasGrid.tamanoPagina()"
   [columnas]="columnas"
-  [filas]="clientesFiltrados()"
+  [filas]="clientesPagina()"
   [cargando]="cargando()"
   (editar)="editar($event)"
   (eliminar)="pedirEliminar($event)"

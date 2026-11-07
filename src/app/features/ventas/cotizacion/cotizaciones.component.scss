@@ -1,3 +1,23 @@
 /* Sin estilos propios: reutiliza las clases globales del grid de
  * catálogos, del formulario (.edit-form.form-grid-*col) y de la lista
  * tipo "ticket" (.pos-ticket-*, ver src/styles.scss). */
+
+
+/* Fase 4 (2026-11): "Nueva cotización" puede crecer mucho (varias líneas
+ * agregadas) dentro de un solo .modal-box con scroll interno
+ * (overflow-y:auto, ver .modal-box en src/styles.scss) -- sin esto, en
+ * pantallas chicas o con el teclado virtual abierto, Cancelar/Generar
+ * podían quedar fuera de la vista hasta hacer scroll hasta el final. Al
+ * estar encapsulado por Angular, SOLO afecta el modal de ESTE componente,
+ * no los demás .modal-box de la app. */
+.modal-box-cotizacion-nueva {
+  display: flex;
+  flex-direction: column;
+}
+.modal-box-cotizacion-nueva .modal-actions {
+  position: sticky;
+  bottom: 0;
+  background: var(--paper-raised);
+  padding-top: 14px;
+  margin-top: auto;
+}

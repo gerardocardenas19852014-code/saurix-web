@@ -3,118 +3,197 @@
 </div>
 
 <p class="hint" style="margin-top:-6px;">
-  Cómo van las ventas de hoy, sin tener que entrar al Historial a contarlas a mano.
+  Cómo van las ventas, organizadas en pestañas — cada una se consulta solo cuando se abre.
 </p>
 
-@if (cargando()) {
-  <p class="empty">Cargando…</p>
-} @else {
-  <div class="dashboard-stats" style="margin-bottom:24px;">
-    <div class="dashboard-stat-card">
-      <div class="num">{{ formatMoneda(totalHoy()) }}</div>
-      <div class="label">
-        Ventas de hoy
-        @if (cambioPctVsAyer(); as cambio) {
-          <span [style.color]="cambio >= 0 ? 'var(--client)' : 'var(--danger)'">
-            ({{ cambio >= 0 ? '+' : '' }}{{ cambio | number: '1.0-0' }}% vs. ayer)
-          </span>
-        }
+<div class="tab-bar" style="margin-top:12px;">
+  <button type="button" class="tab-btn" [class.is-active]="pestana() === 'resumen'" (click)="cambiarPestana('resumen')">Resumen</button>
+  <button type="button" class="tab-btn" [class.is-active]="pestana() === 'metodos'" (click)="cambiarPestana('metodos')">Métodos de pago</button>
+  <button type="button" class="tab-btn" [class.is-active]="pestana() === 'canales'" (click)="cambiarPestana('canales')">Canales</button>
+  <button type="button" class="tab-btn" [class.is-active]="pestana() === 'top'" (click)="cambiarPestana('top')">Más vendidos</button>
+</div>
+
+<!-- ======================= RESUMEN ======================= -->
+@if (pestana() === 'resumen') {
+  @if (cargandoResumen()) {
+    <p class="empty">Cargando…</p>
+  } @else if (resumen(); as r) {
+    <div class="dashboard-stats" style="margin-bottom:16px;">
+      <div class="dashboard-stat-card">
+        <div class="num">{{ formatMoneda(r.ventasHoy) }}</div>
+        <div class="label">
+          Ventas de hoy
+          @if (cambioPctVsAyer(); as cambio) {
+            <span [style.color]="cambio >= 0 ? 'var(--client)' : 'var(--danger)'">
+              ({{ cambio >= 0 ? '+' : '' }}{{ cambio | number: '1.0-0' }}% vs. ayer)
+            </span>
+          }
+        </div>
+      </div>
+      <div class="dashboard-stat-card">
+        <div class="num">{{ r.numeroVentasHoy }}</div>
+        <div class="label">Número de ventas hoy</div>
+      </div>
+      <div class="dashboard-stat-card">
+        <div class="num">{{ formatMoneda(r.ticketPromedioHoy) }}</div>
+        <div class="label">Ticket promedio de hoy</div>
+      </div>
+      <div class="dashboard-stat-card">
+        <div class="num">{{ formatMoneda(r.ventasAyer) }}</div>
+        <div class="label">Ventas de ayer</div>
+      </div>
+      <div class="dashboard-stat-card">
+        <div class="num">{{ formatMoneda(r.costoVendidoHoy) }}</div>
+        <div class="label">Costo de lo vendido hoy</div>
+      </div>
+      <div class="dashboard-stat-card" [class.dashboard-stat-danger]="r.margenBrutoHoy < 0">
+        <div class="num">{{ formatMoneda(r.margenBrutoHoy) }}</div>
+        <div class="label">Margen bruto de hoy ({{ margenPctHoy() | number: '1.0-0' }}%)</div>
       </div>
     </div>
-    <div class="dashboard-stat-card">
-      <div class="num">{{ numeroVentasHoy() }}</div>
-      <div class="label">Número de ventas hoy</div>
-    </div>
-    <div class="dashboard-stat-card">
-      <div class="num">{{ formatMoneda(ticketPromedioHoy()) }}</div>
-      <div class="label">Ticket promedio de hoy</div>
-    </div>
-    <div class="dashboard-stat-card">
-      <div class="num">{{ formatMoneda(totalAyer()) }}</div>
-      <div class="label">Ventas de ayer</div>
-    </div>
-    <div class="dashboard-stat-card">
-      <div class="num">{{ formatMoneda(costoVendidoHoy()) }}</div>
-      <div class="label">Costo de lo vendido hoy</div>
-    </div>
-    <div class="dashboard-stat-card" [class.dashboard-stat-danger]="margenHoy() < 0">
-      <div class="num">{{ formatMoneda(margenHoy()) }}</div>
-      <div class="label">Margen bruto de hoy ({{ margenPctHoy() | number: '1.0-0' }}%)</div>
+    <p class="hint" style="margin-top:0;">
+      El costo/margen solo considera renglones con producto del catálogo (usa el costo actual del
+      producto) — una "Venta simple" sin producto no tiene costo conocido y no se incluye. Estas
+      cifras son brutas: no restan devoluciones posteriores, igual que antes.
+    </p>
+  }
+}
+
+<!-- ======================= MÉTODOS DE PAGO ======================= -->
+@if (pestana() === 'metodos') {
+  <div class="grid-toolbar">
+    <div class="grid-filter">
+      <label class="grid-filter-fecha-label">
+        Desde
+        <input type="date" [value]="metodosDesde()" (change)="metodosDesde.set($any($event.target).value)" />
+      </label>
+      <label class="grid-filter-fecha-label">
+        Hasta
+        <input type="date" [value]="metodosHasta()" (change)="metodosHasta.set($any($event.target).value)" />
+      </label>
+      <button type="button" class="btn-primary small" (click)="buscarMetodos()">🔍 Buscar</button>
     </div>
   </div>
-  <p class="hint" style="margin-top:-18px; margin-bottom:24px;">
-    El costo/margen solo considera renglones con producto del catálogo (usa Producto.costo) — una
-    "Venta simple" sin producto no tiene costo conocido y no se incluye.
-  </p>
-
-  <div class="catalog-group" style="margin-bottom:24px;">
-    <h2 class="catalog-group-title">Ventas de hoy por método de pago</h2>
+  @if (cargandoMetodos()) {
+    <p class="empty">Cargando…</p>
+  } @else {
     <div class="grid-table-scroll">
       <table class="grid-table">
         <thead><tr><th>Método</th><th>Total</th></tr></thead>
         <tbody>
-          @for (fila of totalPorMetodoHoy(); track fila.metodoPago) {
+          @for (fila of metodosFilas(); track fila.metodoPago) {
             <tr>
               <td data-label="Método">{{ fila.metodoPago }}</td>
               <td data-label="Total">{{ formatMoneda(fila.total) }}</td>
             </tr>
+          } @empty {
+            <tr><td colspan="2" class="empty">Sin ventas en el rango seleccionado.</td></tr>
           }
         </tbody>
       </table>
     </div>
-  </div>
-
-  <div class="catalog-group" style="margin-bottom:24px;">
-    <h2 class="catalog-group-title">Ventas de hoy por canal</h2>
-    <p class="hint" style="margin:0 0 10px;">
-      "Mostrador" agrupa lo que se vendió sin capturar ningún canal — incluye lo que llegó por
-      /tienda una vez que se validó y se capturó aquí a mano (ver el campo Canal en Cobro).
+    <p class="hint">
+      Incluye el efecto de devoluciones ya registradas sobre estas ventas (se atribuyen a la
+      fecha de la venta original, igual que en Corte de caja).
     </p>
+  }
+}
+
+<!-- ======================= CANALES ======================= -->
+@if (pestana() === 'canales') {
+  <div class="grid-toolbar">
+    <div class="grid-filter">
+      <label class="grid-filter-fecha-label">
+        Desde
+        <input type="date" [value]="canalesDesde()" (change)="canalesDesde.set($any($event.target).value)" />
+      </label>
+      <label class="grid-filter-fecha-label">
+        Hasta
+        <input type="date" [value]="canalesHasta()" (change)="canalesHasta.set($any($event.target).value)" />
+      </label>
+      <button type="button" class="btn-primary small" (click)="buscarCanales()">🔍 Buscar</button>
+    </div>
+  </div>
+  @if (cargandoCanales()) {
+    <p class="empty">Cargando…</p>
+  } @else {
     <div class="grid-table-scroll">
       <table class="grid-table">
         <thead><tr><th>Canal</th><th>Ventas</th><th>Total</th></tr></thead>
         <tbody>
-          @for (fila of totalPorCanalHoy(); track fila.canal) {
+          @for (fila of canalesFilas(); track fila.canal) {
             <tr>
               <td data-label="Canal">{{ fila.canal }}</td>
               <td data-label="Ventas">{{ fila.cantidad }}</td>
               <td data-label="Total">{{ formatMoneda(fila.total) }}</td>
             </tr>
           } @empty {
-            <tr><td colspan="3" class="empty">Sin ventas hoy.</td></tr>
+            <tr><td colspan="3" class="empty">Sin ventas en el rango seleccionado.</td></tr>
           }
         </tbody>
       </table>
     </div>
+    <p class="hint">
+      "Mostrador" agrupa lo que se vendió sin capturar ningún canal.
+    </p>
+  }
+}
+
+<!-- ======================= MÁS VENDIDOS ======================= -->
+@if (pestana() === 'top') {
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+    <p class="hint" style="margin:0;">
+      Top 50 de los últimos {{ diasTopProductos }} días, por cantidad neta (vendida − devuelta).
+    </p>
+    <div class="grid-filter">
+      <button type="button" class="btn-secondary small" (click)="exportarTopCsv()">⬇ Exportar CSV</button>
+      <button type="button" class="btn-secondary small" (click)="exportarTopPdf()">⬇ Exportar PDF</button>
+    </div>
   </div>
 
-  <div class="catalog-group">
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
-      <h2 class="catalog-group-title" style="margin:0; border-bottom:none; padding-bottom:0;">Productos más vendidos (últimos 30 días)</h2>
-      <div class="grid-filter">
-        <button type="button" class="btn-secondary small" (click)="exportarCsv()">⬇ Exportar CSV</button>
-        <button type="button" class="btn-secondary small" (click)="exportarPdf()">⬇ Exportar PDF</button>
-      </div>
+  @if (cargandoTop()) {
+    <p class="empty">Cargando…</p>
+  } @else {
+    <div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin:10px 0;">
+      <span class="hint" style="margin:0;">
+        Página {{ topPaginaActual() }} de {{ topTotalPaginas() }} — {{ topTotalFilas() }} producto(s)
+      </span>
+      <button type="button" class="btn-secondary small" [disabled]="topPaginaActual() <= 1" (click)="irATopPaginaAnterior()">
+        ← Anterior
+      </button>
+      <button type="button" class="btn-secondary small" [disabled]="topPaginaActual() >= topTotalPaginas()" (click)="irATopPaginaSiguiente()">
+        Siguiente →
+      </button>
     </div>
-    @if (productosMasVendidos().length > 0) {
-      <div class="grid-table-scroll">
-        <table class="grid-table">
-          <thead><tr><th>Producto</th><th>Cantidad</th><th>Total vendido</th></tr></thead>
-          <tbody>
-            @for (fila of productosMasVendidos(); track fila.nombre) {
-              <tr>
-                <td data-label="Producto">{{ fila.nombre }}</td>
-                <td data-label="Cantidad">{{ fila.cantidad }}</td>
-                <td data-label="Total vendido">{{ formatMoneda(fila.total) }}</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    } @else {
-      <div class="empty-state-block">
-        <p>Todavía no hay ventas en los últimos 30 días.</p>
-      </div>
-    }
-  </div>
+    <div class="grid-table-scroll">
+      <table class="grid-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Producto</th>
+            <th>Código</th>
+            <th>Vendida</th>
+            <th>Devuelta</th>
+            <th>Neta</th>
+            <th>Importe neto</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (fila of topFilas(); track fila.productoId) {
+            <tr>
+              <td data-label="#">{{ fila.posicion }}</td>
+              <td data-label="Producto">{{ fila.nombre }}</td>
+              <td data-label="Código">{{ fila.codigo || '—' }}</td>
+              <td data-label="Vendida">{{ fila.cantidadVendida }}</td>
+              <td data-label="Devuelta">{{ fila.cantidadDevuelta }}</td>
+              <td data-label="Neta">{{ fila.cantidadNeta }}</td>
+              <td data-label="Importe neto">{{ formatMoneda(fila.importeNeto) }}</td>
+            </tr>
+          } @empty {
+            <tr><td colspan="7" class="empty">Todavía no hay ventas en los últimos {{ diasTopProductos }} días.</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
 }

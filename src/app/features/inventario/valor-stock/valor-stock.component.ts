@@ -12,7 +12,7 @@ import { exportarCsv } from '../../../shared/utils/csv.util';
 import { exportarTablaPdf } from '../../../shared/utils/pdf-tabla.util';
 
 type TabValorStock = 'resumen' | 'productos' | 'rotacion';
-type EstadoFiltro = '' | 'sin_existencia' | 'stock_bajo' | 'sobre_stock';
+type EstadoFiltro = '' | 'con_existencia' | 'sin_existencia' | 'stock_bajo' | 'sobre_stock';
 type OrdenProductos = 'nombre' | 'codigo' | 'existencia' | 'costo' | 'valor';
 type Direccion = 'asc' | 'desc';
 

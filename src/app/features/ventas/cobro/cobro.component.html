@@ -111,7 +111,7 @@
         @if (bodegas().length > 0) {
           <label>
             Bodega de venta
-            <select [value]="bodegaVentaId()" (change)="bodegaVentaId.set(+$any($event.target).value)">
+            <select [value]="bodegaVentaId()" (change)="cambiarBodegaVenta(+$any($event.target).value)">
               @for (bodega of bodegas(); track bodega.id) {
                 <option [value]="bodega.id">{{ bodega.nombre }}</option>
               }
@@ -280,14 +280,18 @@
         }
       </div>
 
-      <!-- Cambio 10: compartir el ticket. WhatsApp/Correo son "manuales" --
-           abren la app o el cliente de correo del cajero con el ticket ya
-           listo, él sigue siendo quien aprieta Enviar (Saurix no tiene un
-           servicio de correo transaccional propio -- ver el comentario de
-           enviarTicketCorreo() en el componente). -->
+      <!-- Fase 6 (2026-11): WhatsApp/Correo son "manuales" -- abren la app
+           o el cliente de correo del cajero con el ticket ya listo, él
+           sigue siendo quien aprieta Enviar (Saurix no tiene un servicio
+           de correo transaccional propio -- ver el comentario de
+           enviarTicketCorreo() en el componente). WhatsApp SIEMPRE usa el
+           enlace oficial wa.me (nunca el selector de apps del sistema);
+           "PDF" comparte el archivo con las capacidades nativas del
+           dispositivo cuando están disponibles y, si no, lo descarga --
+           ver accionPdfTicket() en el componente. -->
       <div class="venta-confirmada-acciones">
         <button type="button" class="btn-secondary small" (click)="compartirTicketWhatsapp()">📲 WhatsApp</button>
-        <button type="button" class="btn-secondary small" (click)="descargarTicketPdf()">📄 PDF</button>
+        <button type="button" class="btn-secondary small" (click)="accionPdfTicket()">📄 PDF</button>
         <button type="button" class="btn-secondary small" (click)="enviarTicketCorreo()">✉️ Correo</button>
       </div>
 

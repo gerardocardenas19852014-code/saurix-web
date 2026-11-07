@@ -1,0 +1,174 @@
+<div class="config-etiquetas">
+  <div class="etiquetas-header">
+    <div>
+      <h3>Imprimir etiquetas de productos</h3>
+      <p class="hint" style="margin:2px 0 0;">
+        {{ productos.length }} producto{{ productos.length === 1 ? '' : 's' }} · {{ totalEtiquetas() }} etiqueta{{ totalEtiquetas() === 1 ? '' : 's' }} en total.
+        <button type="button" class="config-etiquetas-link" (click)="volver.emit()">Ajustar cantidades</button>
+      </p>
+    </div>
+    <div class="etiquetas-header-acciones">
+      <button type="button" class="btn-secondary" [disabled]="imprimiendo()" (click)="volver.emit()">← Volver</button>
+      <button type="button" class="btn-primary" [disabled]="imprimiendo() || distribucion().columnas === 0" (click)="imprimirAhora()">
+        @if (imprimiendo()) {
+          Imprimiendo…
+        } @else {
+          Imprimir
+        }
+      </button>
+    </div>
+  </div>
+
+  <div class="config-etiquetas-cuerpo">
+    <div class="config-etiquetas-opciones">
+      <!-- A. Papel -->
+      <div class="config-etiquetas-seccion">
+        <p class="hint" style="margin:0 0 8px;"><strong>Papel</strong></p>
+        <div class="config-etiquetas-radios" role="group" aria-label="Papel">
+          <label class="config-etiquetas-radio" [class.is-selected]="papel() === 'carta'">
+            <input type="radio" name="papel" [checked]="papel() === 'carta'" (change)="papel.set('carta')" /> Carta
+          </label>
+          <label class="config-etiquetas-radio" [class.is-selected]="papel() === 'a4'">
+            <input type="radio" name="papel" [checked]="papel() === 'a4'" (change)="papel.set('a4')" /> A4
+          </label>
+          <label class="config-etiquetas-radio" [class.is-selected]="papel() === 'termico80'">
+            <input type="radio" name="papel" [checked]="papel() === 'termico80'" (change)="papel.set('termico80')" /> Rollo térmico 80mm
+          </label>
+          <label class="config-etiquetas-radio" [class.is-selected]="papel() === 'termico58'">
+            <input type="radio" name="papel" [checked]="papel() === 'termico58'" (change)="papel.set('termico58')" /> Rollo térmico 58mm
+          </label>
+          <label class="config-etiquetas-radio" [class.is-selected]="papel() === 'personalizado'">
+            <input type="radio" name="papel" [checked]="papel() === 'personalizado'" (change)="papel.set('personalizado')" /> Personalizado
+          </label>
+        </div>
+        @if (papel() === 'personalizado') {
+          <div class="config-etiquetas-medidas">
+            <label>Ancho (mm)
+              <input type="number" min="10" step="1" class="precio-lista-input" [value]="papelAnchoPersonalizado()" (input)="papelAnchoPersonalizado.set($any($event.target).value)" />
+            </label>
+            <label>Alto (mm)
+              <input type="number" min="10" step="1" class="precio-lista-input" [value]="papelAltoPersonalizado()" (input)="papelAltoPersonalizado.set($any($event.target).value)" />
+            </label>
+          </div>
+        }
+        @if (papel() === 'termico80' || papel() === 'termico58') {
+          <p class="hint" style="margin:8px 0 0;">Rollo continuo: el largo se calcula según la cantidad de etiquetas -- no se desperdicia rollo.</p>
+        }
+      </div>
+
+      <!-- B. Tamaño de etiqueta -->
+      <div class="config-etiquetas-seccion">
+        <p class="hint" style="margin:0 0 8px;"><strong>Tamaño de etiqueta</strong></p>
+        <div class="config-etiquetas-radios" role="group" aria-label="Tamaño de etiqueta">
+          <label class="config-etiquetas-radio" [class.is-selected]="tamanoEtiqueta() === 'pequena'">
+            <input type="radio" name="tamano" [checked]="tamanoEtiqueta() === 'pequena'" (change)="tamanoEtiqueta.set('pequena')" /> Pequeña (38×25mm)
+          </label>
+          <label class="config-etiquetas-radio" [class.is-selected]="tamanoEtiqueta() === 'mediana'">
+            <input type="radio" name="tamano" [checked]="tamanoEtiqueta() === 'mediana'" (change)="tamanoEtiqueta.set('mediana')" /> Mediana (50×35mm)
+          </label>
+          <label class="config-etiquetas-radio" [class.is-selected]="tamanoEtiqueta() === 'grande'">
+            <input type="radio" name="tamano" [checked]="tamanoEtiqueta() === 'grande'" (change)="tamanoEtiqueta.set('grande')" /> Grande (70×45mm)
+          </label>
+          <label class="config-etiquetas-radio" [class.is-selected]="tamanoEtiqueta() === 'personalizada'">
+            <input type="radio" name="tamano" [checked]="tamanoEtiqueta() === 'personalizada'" (change)="tamanoEtiqueta.set('personalizada')" /> Personalizada
+          </label>
+        </div>
+        @if (tamanoEtiqueta() === 'personalizada') {
+          <div class="config-etiquetas-medidas">
+            <label>Ancho (mm)
+              <input type="number" min="10" step="1" class="precio-lista-input" [value]="etiquetaAnchoPersonalizado()" (input)="etiquetaAnchoPersonalizado.set($any($event.target).value)" />
+            </label>
+            <label>Alto (mm)
+              <input type="number" min="10" step="1" class="precio-lista-input" [value]="etiquetaAltoPersonalizado()" (input)="etiquetaAltoPersonalizado.set($any($event.target).value)" />
+            </label>
+          </div>
+        }
+      </div>
+
+      <!-- C. Tipo de código -->
+      <div class="config-etiquetas-seccion">
+        <p class="hint" style="margin:0 0 8px;"><strong>Tipo de código</strong></p>
+        <div class="config-etiquetas-radios" role="group" aria-label="Tipo de código">
+          <label class="config-etiquetas-radio" [class.is-selected]="formato() === 'barras'">
+            <input type="radio" name="formato" [checked]="formato() === 'barras'" (change)="formato.set('barras')" /> Código de barras
+          </label>
+          <label class="config-etiquetas-radio" [class.is-selected]="formato() === 'qr'">
+            <input type="radio" name="formato" [checked]="formato() === 'qr'" (change)="formato.set('qr')" /> Código QR
+          </label>
+        </div>
+        @if (codigosInvalidosParaBarras().length > 0) {
+          <p class="config-etiquetas-advertencia">
+            {{ codigosInvalidosParaBarras().length }} código(s) tienen caracteres no compatibles con código de barras.
+            <button type="button" class="config-etiquetas-link" (click)="usarQrParaTodos()">Usar código QR para todos</button>
+          </p>
+        }
+      </div>
+
+      <!-- D. Distribución -->
+      <div class="config-etiquetas-seccion">
+        <p class="hint" style="margin:0 0 8px;"><strong>Columnas por hoja</strong></p>
+        <div class="config-etiquetas-radios" role="group" aria-label="Columnas por hoja">
+          <label class="config-etiquetas-radio" [class.is-selected]="columnasModo() === 'auto'">
+            <input type="radio" name="columnas" [checked]="columnasModo() === 'auto'" (change)="columnasModo.set('auto')" /> Automáticas
+          </label>
+          @for (n of opcionesColumnas; track n) {
+            <label class="config-etiquetas-radio" [class.is-selected]="columnasModo() === n">
+              <input type="radio" name="columnas" [checked]="columnasModo() === n" (change)="columnasModo.set(n)" /> {{ n }}
+            </label>
+          }
+        </div>
+      </div>
+
+      <!-- Información en la etiqueta -->
+      <div class="config-etiquetas-seccion">
+        <p class="hint" style="margin:0 0 8px;"><strong>Información en la etiqueta</strong></p>
+        <label class="config-etiquetas-check">
+          <input type="checkbox" [checked]="mostrarNombre()" (change)="mostrarNombre.set($any($event.target).checked)" /> Nombre del producto
+        </label>
+        <label class="config-etiquetas-check">
+          <input type="checkbox" [checked]="mostrarSku()" (change)="mostrarSku.set($any($event.target).checked)" /> SKU / código en texto
+        </label>
+        <label class="config-etiquetas-check">
+          <input type="checkbox" [checked]="mostrarPrecio()" (change)="mostrarPrecio.set($any($event.target).checked)" /> Precio
+        </label>
+        <p class="hint" style="margin:6px 0 0;">El código ({{ formato() === 'qr' ? 'QR' : 'de barras' }}) siempre se incluye.</p>
+      </div>
+    </div>
+
+    <div class="config-etiquetas-preview">
+      <p class="hint" style="margin:0 0 8px;"><strong>Vista previa</strong></p>
+
+      @if (distribucion().advertencia) {
+        <p class="config-etiquetas-advertencia">{{ distribucion().advertencia }}</p>
+      }
+
+      <div class="config-etiquetas-resumen">
+        {{ distribucion().columnas }} columna{{ distribucion().columnas === 1 ? '' : 's' }} ×
+        {{ distribucion().filasPorPagina }} fila{{ distribucion().filasPorPagina === 1 ? '' : 's' }} por hoja ·
+        {{ totalEtiquetas() }} etiqueta{{ totalEtiquetas() === 1 ? '' : 's' }} ·
+        {{ distribucion().paginas }} hoja{{ distribucion().paginas === 1 ? '' : 's' }} estimada{{ distribucion().paginas === 1 ? '' : 's' }}
+      </div>
+
+      <div class="config-etiquetas-muestra" [style.grid-template-columns]="'repeat(' + columnasGrid() + ', 1fr)'">
+        @for (p of muestraPreview(); track p.id) {
+          <div class="config-etiquetas-muestra-item">
+            <div class="config-etiquetas-muestra-codigo" [class.es-qr]="formato() === 'qr'" [innerHTML]="svgPorCodigo().get(p.codigo) ?? null"></div>
+            @if (mostrarNombre()) {
+              <div class="config-etiquetas-muestra-nombre">{{ p.nombre }}</div>
+            }
+            @if (mostrarSku()) {
+              <div class="config-etiquetas-muestra-sku">{{ p.codigo }}</div>
+            }
+            @if (mostrarPrecio()) {
+              <div class="config-etiquetas-muestra-precio">{{ formatMoneda(p.precioUnitario) }}</div>
+            }
+          </div>
+        }
+      </div>
+
+      @if (totalEtiquetas() > muestraPreview().length) {
+        <p class="hint" style="margin-top:8px;">… y {{ totalEtiquetas() - muestraPreview().length }} etiqueta(s) más (muestra limitada a {{ muestraPreview().length }}).</p>
+      }
+    </div>
+  </div>
+</div>

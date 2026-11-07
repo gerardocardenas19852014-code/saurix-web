@@ -2,14 +2,13 @@ import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
+import { SupabaseService } from '../../../core/services/supabase.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../../shared/services/toast.service';
 import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
 import { imprimirHtml } from '../../../shared/utils/imprimir.util';
-import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
-import { Cliente } from '../clientes/cliente.model';
 import { MetodoPago, METODOS_PAGO, Venta, VentaItem, VentaPago } from '../venta/venta.model';
 import { VentaService } from '../venta/venta.service';
 import { Devolucion, DevolucionItem } from '../devolucion/devolucion.model';
@@ -19,6 +18,31 @@ import { cantidadDisponibleParaDevolver, DevolucionService, LineaDevolucionEntra
 import { construirTicketHtml, estiloTicket, formatMoneda, redondear } from '../ventas.util';
 import { exportarCsv } from '../../../shared/utils/csv.util';
 import { exportarTablaPdf } from '../../../shared/utils/pdf-tabla.util';
+
+/** Cada renglón del listado — ya resuelto por el servidor (cliente/vendedor
+ *  por nombre, total, etc. vía ventas.fn_historial_ventas_listar()), nunca
+ *  por un lookup en memoria contra tablas completas de Cliente/Usuario. */
+interface FilaHistorialVenta {
+  id: number;
+  folio: string;
+  fecha: string;
+  clienteId: number;
+  clienteNombre: string;
+  vendedorUsuarioId: number;
+  vendedorNombre: string;
+  total: number;
+  estado: string;
+  canal: string | null;
+}
+
+/** CSV exporta TODO lo que cumple el filtro actual (no solo la página
+ *  visible), en lotes — nunca en una sola petición gigante. Mismo criterio
+ *  que UsuariosListComponent.exportarUsuariosCsv() / MovimientosBodega
+ *  Component.exportarCsvHistorial(). */
+const TAMANO_LOTE_EXPORTAR = 1000;
+/** PDF es un reporte acotado, no un volcado completo — mismo criterio que
+ *  MovimientosBodegaComponent.exportarPdfHistorial() / ValorStockComponent. */
+const TOPE_FILAS_PDF = 200;
 
 /**
  * Historial de ventas — todas las ventas registradas (de cualquier turno),
@@ -32,6 +56,22 @@ import { exportarTablaPdf } from '../../../shared/utils/pdf-tabla.util';
  * otros históricos del proyecto (ver ColumnaTabla.subfila/ocultarEditarEliminar
  * en data-table.component.ts): la fila no se edita ni se borra directo
  * desde el grid, todo pasa por el modal de detalle.
+ *
+ * HOMOLOGACIÓN DE RENDIMIENTO (Fase 1, "Prompt maestro" nov-2026): esta
+ * pantalla descargaba `list('Venta')` + `list('Cliente')` + `list('Usuario')`
+ * COMPLETOS (sin filtro ni paginación server-side) y filtraba/ordenaba/
+ * resolvía nombres todo en memoria vía `ventasFiltradas()` — con mucho
+ * historial eso significaba traer TRES tablas enteras para mostrar 20
+ * filas. Ahora sigue el mismo patrón ya homologado en Órdenes de compra
+ * (ver OrdenesCompraComponent.cargarListado()/cargarListadoSupabase()):
+ * una función de PostgreSQL (`ventas.fn_historial_ventas_listar`) hace el
+ * join con Cliente/Usuario, filtra (folio/cliente por texto, estado, rango
+ * de fecha), ordena, pagina con OFFSET/LIMIT y regresa el total real
+ * (`count(*) over()`) en una sola consulta. Un botón "🔍 Buscar" + Enter es
+ * el único disparador de una consulta nueva — ningún filtro (fecha, estado,
+ * texto) dispara nada por sí solo — y la paginación es real contra el
+ * servidor (Anterior/Siguiente), protegida contra respuestas fuera de orden
+ * con `secuenciaListado` (mismo patrón que MovimientosBodegaComponent).
  */
 @Component({
   selector: 'app-historial-ventas',
@@ -47,6 +87,7 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
   }
 
   private readonly data = inject(DataClientService);
+  private readonly sb = inject(SupabaseService).cliente;
   private readonly ventaService = inject(VentaService);
   private readonly devolucionService = inject(DevolucionService);
   private readonly cuentaPorCobrarService = inject(CuentaPorCobrarService);
@@ -57,40 +98,37 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
   protected readonly formatMoneda = formatMoneda;
   protected readonly metodosPago = METODOS_PAGO;
 
+  /** Solo la página actual, ya filtrada/ordenada/recortada y con nombres
+   *  resueltos por el servidor — ver cargarListado(). */
+  protected readonly ventasPagina = signal<FilaHistorialVenta[]>([]);
   protected readonly cargando = signal(true);
-  protected readonly ventas = signal<Venta[]>([]);
-  protected readonly clientes = signal<Cliente[]>([]);
-  protected readonly usuarios = signal<Usuario[]>([]);
 
+  /** Filtros EN EDICIÓN — nunca disparan una consulta por sí solos. Solo
+   *  cambiarFiltro() (botón "🔍 Buscar" o Enter) los aplica de verdad. */
   protected readonly busqueda = signal('');
   protected readonly fechaDesde = signal(this.hoyISO());
   protected readonly fechaHasta = signal(this.hoyISO());
   protected readonly filtroEstado = signal<'Todas' | 'Completada' | 'Cancelada'>('Todas');
 
-  protected readonly ventasFiltradas = computed(() => {
-    const texto = this.busqueda().trim().toLowerCase();
-    const desde = this.fechaDesde();
-    const hasta = this.fechaHasta();
-    const estado = this.filtroEstado();
+  protected readonly paginaActual = signal(1);
+  /** Total real de ventas que cumplen el filtro actual (antes de recortar
+   *  a la página) — lo da el propio servidor (fn_historial_ventas_listar,
+   *  columna total_filas vía count(*) over()); nunca se calcula contando
+   *  filas ya traídas. */
+  protected readonly totalVentasFiltradas = signal(0);
+  protected readonly totalPaginas = computed(() =>
+    Math.max(1, Math.ceil(this.totalVentasFiltradas() / Math.max(1, this.preferenciasGrid.tamanoPagina()))),
+  );
+  /** Evita que una respuesta vieja (petición lenta) pise el resultado de
+   *  una búsqueda/página más reciente — mismo patrón que
+   *  OrdenesCompraComponent.secuenciaListado. */
+  private secuenciaListado = 0;
 
-    return this.ventas()
-      .filter((v) => {
-        const fechaVenta = v.fecha.slice(0, 10);
-        if (desde && fechaVenta < desde) return false;
-        if (hasta && fechaVenta > hasta) return false;
-        if (estado !== 'Todas' && v.estado !== estado) return false;
-        if (!texto) return true;
-        const cliente = this.nombreCliente(v.clienteId).toLowerCase();
-        return v.folio.toLowerCase().includes(texto) || cliente.includes(texto);
-      })
-      .sort((a, b) => b.fecha.localeCompare(a.fecha));
-  });
-
-  protected readonly columnas: ColumnaTabla<Venta>[] = [
+  protected readonly columnas: ColumnaTabla<FilaHistorialVenta>[] = [
     { campo: 'folio', etiqueta: 'Folio' },
     { campo: 'fecha', etiqueta: 'Fecha', formatear: (v) => this.formatearFecha(v.fecha) },
-    { campo: 'clienteId', etiqueta: 'Cliente', formatear: (v) => this.nombreCliente(v.clienteId) },
-    { campo: 'vendedorUsuarioId', etiqueta: 'Vendedor', formatear: (v) => this.nombreVendedor(v.vendedorUsuarioId) },
+    { campo: 'clienteNombre', etiqueta: 'Cliente' },
+    { campo: 'vendedorNombre', etiqueta: 'Vendedor' },
     { campo: 'total', etiqueta: 'Total', formatear: (v) => formatMoneda(v.total) },
     {
       campo: 'estado',
@@ -101,6 +139,11 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
   ];
 
   protected readonly ventaDetalle = signal<Venta | null>(null);
+  /** Nombre de cliente/vendedor del renglón que abrió el detalle — ya
+   *  venían resueltos por el servidor en el listado, así que el modal no
+   *  necesita volver a consultar Cliente/Usuario por separado. */
+  protected readonly clienteNombreDetalle = signal('—');
+  protected readonly vendedorNombreDetalle = signal('—');
   protected readonly itemsDetalle = signal<VentaItem[]>([]);
   protected readonly pagosDetalle = signal<VentaPago[]>([]);
   protected readonly devolucionItemsDetalle = signal<DevolucionItem[]>([]);
@@ -162,36 +205,101 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
     return new Date(fecha).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' });
   }
 
-  protected nombreCliente(clienteId: number): string {
-    return this.clientes().find((c) => c.id === clienteId)?.nombre ?? '—';
-  }
-
-  protected nombreVendedor(usuarioId: number): string {
-    const usuario = this.usuarios().find((u) => u.id === usuarioId);
-    return usuario ? nombreCompletoUsuario(usuario) : '—';
-  }
-
   async ngOnInit(): Promise<void> {
     document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
-    await this.cargar();
+    await this.cargarListado();
   }
 
-  private async cargar(): Promise<void> {
+  /** Trae SOLO la página actual del historial que cumple el filtro
+   *  aplicado — nunca el histórico completo. Mismo patrón que
+   *  OrdenesCompraComponent.cargarListado(). */
+  async cargarListado(): Promise<void> {
     this.cargando.set(true);
-    const [ventas, clientes, usuarios] = await Promise.all([
-      firstValueFrom(this.data.list<Venta>('Venta')),
-      firstValueFrom(this.data.list<Cliente>('Cliente')),
-      firstValueFrom(this.data.list<Usuario>('Usuario')),
-    ]);
-    this.ventas.set(ventas);
-    this.clientes.set(clientes);
-    this.usuarios.set(usuarios);
+    const miSecuencia = ++this.secuenciaListado;
+    const resultado = await this.cargarListadoSupabase();
+    if (miSecuencia !== this.secuenciaListado) return; // ya respondió una búsqueda/página más nueva — descartar esta
+    const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
+    // Si la página en la que estábamos quedó vacía (p.ej. un filtro nuevo
+    // tiene menos páginas que la posición actual), retrocede a la última
+    // página real en vez de dejar la tabla en blanco.
+    if (resultado.filas.length === 0 && this.paginaActual() > 1 && resultado.total > 0) {
+      this.paginaActual.set(Math.max(1, Math.ceil(resultado.total / tamanio)));
+      this.cargando.set(false);
+      await this.cargarListado();
+      return;
+    }
+    this.ventasPagina.set(resultado.filas);
+    this.totalVentasFiltradas.set(resultado.total);
     this.cargando.set(false);
   }
 
-  async verDetalle(venta: Venta): Promise<void> {
-    this.ventaDetalle.set(venta);
+  /** ventas.fn_historial_ventas_listar() hace TODO el trabajo en
+   *  PostgreSQL: filtra (folio/cliente por texto, estado, rango de fecha),
+   *  resuelve nombre de cliente y vendedor (join), ordena fecha DESC/id
+   *  DESC, pagina con OFFSET/LIMIT y calcula el conteo real de filas
+   *  (count(*) over(), columna total_filas) en una sola consulta. */
+  private async cargarListadoSupabase(): Promise<{ filas: FilaHistorialVenta[]; total: number }> {
+    const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
+    const desde = (this.paginaActual() - 1) * tamanio;
+    const estado = this.filtroEstado();
+    const { data, error } = await this.sb.schema('ventas').rpc('fn_historial_ventas_listar', {
+      p_busqueda: this.busqueda().trim() || null,
+      p_estado: estado === 'Todas' ? null : estado,
+      p_desde_fecha: this.fechaDesde() || null,
+      p_hasta_fecha: this.fechaHasta() || null,
+      p_desde: desde,
+      p_cantidad: tamanio,
+    });
+    if (error) {
+      this.toast.error('No se pudo cargar el historial de ventas: ' + error.message);
+      return { filas: [], total: 0 };
+    }
+    const filas = (data ?? []) as Record<string, unknown>[];
+    return { filas: filas.map((f) => this.mapearFila(f)), total: Number(filas[0]?.['total_filas'] ?? 0) };
+  }
+
+  private mapearFila(f: Record<string, unknown>): FilaHistorialVenta {
+    return {
+      id: Number(f['id']),
+      folio: String(f['folio']),
+      fecha: String(f['fecha']),
+      clienteId: Number(f['cliente_id']),
+      clienteNombre: (f['cliente_nombre'] as string | null) || '—',
+      vendedorUsuarioId: Number(f['vendedor_usuario_id']),
+      vendedorNombre: (f['vendedor_nombre'] as string | null) || '—',
+      total: Number(f['total']) || 0,
+      estado: String(f['estado']),
+      canal: (f['canal'] as string | null) ?? null,
+    };
+  }
+
+  /** Único disparador de una consulta nueva (botón "🔍 Buscar" o Enter en
+   *  la caja de búsqueda) — cambiar fecha/estado/texto nunca consulta por
+   *  sí solo. Vuelve a la página 1: quedarse en una página de un filtro
+   *  nuevo casi siempre cae fuera de rango. */
+  protected cambiarFiltro(): void {
+    this.paginaActual.set(1);
+    this.cargarListado();
+  }
+
+  protected irAPaginaAnterior(): void {
+    if (this.paginaActual() <= 1) return;
+    this.paginaActual.update((p) => p - 1);
+    this.cargarListado();
+  }
+
+  protected irAPaginaSiguiente(): void {
+    if (this.paginaActual() >= this.totalPaginas()) return;
+    this.paginaActual.update((p) => p + 1);
+    this.cargarListado();
+  }
+
+  async verDetalle(fila: FilaHistorialVenta): Promise<void> {
+    this.clienteNombreDetalle.set(fila.clienteNombre);
+    this.vendedorNombreDetalle.set(fila.vendedorNombre);
     this.cargandoDetalle.set(true);
+    const venta = await firstValueFrom(this.data.getById<Venta>('Venta', fila.id));
+    this.ventaDetalle.set(venta);
     await this.cargarDetalle(venta);
     this.cargandoDetalle.set(false);
   }
@@ -222,6 +330,8 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
 
   cerrarDetalle(): void {
     this.ventaDetalle.set(null);
+    this.clienteNombreDetalle.set('—');
+    this.vendedorNombreDetalle.set('—');
     this.itemsDetalle.set([]);
     this.pagosDetalle.set([]);
     this.devolucionItemsDetalle.set([]);
@@ -296,7 +406,7 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
       this.toast.exito(`Devolución ${devolucion.folio} registrada — existencia repuesta.`);
       this.modalDevolucionAbierto.set(false);
       await this.cargarDetalle(venta);
-      await this.cargar();
+      await this.cargarListado();
     } finally {
       this.guardandoDevolucion.set(false);
     }
@@ -315,14 +425,44 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
       this.toast.exito(`Venta ${venta.folio} cancelada — existencia repuesta.`);
       this.ventaACancelar.set(null);
       this.ventaDetalle.set(ventaCancelada);
-      await this.cargar();
+      await this.cargarListado();
     } catch (error) {
       this.ventaACancelar.set(null);
       this.toast.error(error instanceof Error ? error.message : 'No se pudo cancelar la venta.');
     }
   }
 
-  exportarCsv(): void {
+  /** Exporta TODAS las ventas que cumplen el filtro actual (no solo la
+   *  página visible), pidiéndolas en lotes de TAMANO_LOTE_EXPORTAR — nunca
+   *  en una sola petición gigante ni descargando de más. Mismo patrón que
+   *  UsuariosListComponent.exportarUsuariosCsv(). */
+  async exportarCsv(): Promise<void> {
+    const estado = this.filtroEstado();
+    const parametros = {
+      p_busqueda: this.busqueda().trim() || null,
+      p_estado: estado === 'Todas' ? null : estado,
+      p_desde_fecha: this.fechaDesde() || null,
+      p_hasta_fecha: this.fechaHasta() || null,
+    };
+
+    const todas: FilaHistorialVenta[] = [];
+    let desde = 0;
+    let total = Infinity;
+    while (desde < total) {
+      const { data, error } = await this.sb
+        .schema('ventas')
+        .rpc('fn_historial_ventas_listar', { ...parametros, p_desde: desde, p_cantidad: TAMANO_LOTE_EXPORTAR });
+      if (error) {
+        this.toast.error('No se pudo exportar el historial: ' + error.message);
+        return;
+      }
+      const filas = (data ?? []) as Record<string, unknown>[];
+      if (filas.length === 0) break;
+      todas.push(...filas.map((f) => this.mapearFila(f)));
+      total = Number(filas[0]?.['total_filas'] ?? 0);
+      desde += TAMANO_LOTE_EXPORTAR;
+    }
+
     exportarCsv(
       'historial_ventas.csv',
       [
@@ -333,22 +473,47 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
         { clave: 'total', etiqueta: 'Total' },
         { clave: 'estado', etiqueta: 'Estado' },
       ],
-      this.ventasFiltradas().map((v) => ({
+      todas.map((v) => ({
         folio: v.folio,
         fecha: this.formatearFecha(v.fecha),
-        cliente: this.nombreCliente(v.clienteId),
-        vendedor: this.nombreVendedor(v.vendedorUsuarioId),
+        cliente: v.clienteNombre,
+        vendedor: v.vendedorNombre,
         total: v.total,
         estado: v.estado,
       })),
     );
   }
 
-  exportarPdf(): void {
+  /** PDF es un reporte acotado a TOPE_FILAS_PDF (no un volcado completo) —
+   *  mismo criterio que MovimientosBodegaComponent.exportarPdfHistorial().
+   *  Si hay más filas que las mostradas, lo dice explícitamente (exporta
+   *  CSV para el detalle completo). */
+  async exportarPdf(): Promise<void> {
+    const estado = this.filtroEstado();
+    const { data, error } = await this.sb.schema('ventas').rpc('fn_historial_ventas_listar', {
+      p_busqueda: this.busqueda().trim() || null,
+      p_estado: estado === 'Todas' ? null : estado,
+      p_desde_fecha: this.fechaDesde() || null,
+      p_hasta_fecha: this.fechaHasta() || null,
+      p_desde: 0,
+      p_cantidad: TOPE_FILAS_PDF,
+    });
+    if (error) {
+      this.toast.error('No se pudo exportar el historial: ' + error.message);
+      return;
+    }
+    const filas = (data ?? []) as Record<string, unknown>[];
+    const filasListado = filas.map((f) => this.mapearFila(f));
+    const totalFiltrado = Number(filas[0]?.['total_filas'] ?? filasListado.length);
+    const notaListado =
+      totalFiltrado > filasListado.length
+        ? `Mostrando las primeras ${filasListado.length} de ${totalFiltrado} ventas filtradas (exporta CSV para el detalle completo).`
+        : undefined;
+
     exportarTablaPdf({
       nombreArchivo: 'historial_ventas.pdf',
       titulo: 'Historial de ventas',
-      subtitulo: `Del ${this.fechaDesde()} al ${this.fechaHasta()}`,
+      subtitulo: notaListado ?? `Del ${this.fechaDesde()} al ${this.fechaHasta()}`,
       columnas: [
         { etiqueta: 'Folio', ancho: 26 },
         { etiqueta: 'Fecha', ancho: 32 },
@@ -357,11 +522,11 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
         { etiqueta: 'Total', ancho: 24 },
         { etiqueta: 'Estado' },
       ],
-      filas: this.ventasFiltradas().map((v) => [
+      filas: filasListado.map((v) => [
         v.folio,
         this.formatearFecha(v.fecha),
-        this.nombreCliente(v.clienteId),
-        this.nombreVendedor(v.vendedorUsuarioId),
+        v.clienteNombre,
+        v.vendedorNombre,
         formatMoneda(v.total),
         v.estado,
       ]),
@@ -373,8 +538,8 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
       venta,
       items,
       pagos,
-      clienteNombre: this.nombreCliente(venta.clienteId),
-      cajeroNombre: this.nombreVendedor(venta.vendedorUsuarioId),
+      clienteNombre: this.clienteNombreDetalle(),
+      cajeroNombre: this.vendedorNombreDetalle(),
     });
     try {
       imprimirHtml(`Ticket ${venta.folio}`, cuerpo, estiloTicket('80mm'));

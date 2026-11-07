@@ -366,4 +366,17 @@
   // dos renglones en vez de apretarse.
   .pos-toolbar { flex-wrap: wrap; }
   .pos-buscador { flex: 1 1 100%; }
+
+  // Fase 6 (2026-11, auditoría de Tickets): los 3 botones de compartir
+  // (WhatsApp/PDF/Correo) usan .btn-secondary.small, que en TODA la app
+  // mide ~22-24px de alto (padding 5px 12px + font 12px) -- cómodo con
+  // mouse, apretado para el dedo en celular. Se agranda el área táctil
+  // SOLO aquí (no se toca .btn-secondary.small global, que usan otras
+  // pantallas sin relación con Tickets) en vez de un target de toque
+  // más chico de lo recomendado.
+  .venta-confirmada-acciones button.small {
+    padding: 10px 16px;
+    font-size: 13px;
+    min-height: 40px;
+  }
 }

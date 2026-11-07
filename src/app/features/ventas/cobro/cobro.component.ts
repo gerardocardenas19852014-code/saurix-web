@@ -23,6 +23,9 @@ import {
   estiloTicket,
   anchoPxTicket,
   mensajeTicketTexto,
+  mensajeWhatsappBreve,
+  correoEsValido,
+  telefonoEsValido,
   generarTicketPdfBlob,
   DatosTicket,
   FormatoTicket,
@@ -485,31 +488,55 @@ export class CobroComponent implements OnInit, OnDestroy {
   }
 
   /** Única función que de verdad consulta Producto — con filtro de texto
-   *  (nombre/código, OR) y categoría aplicados del lado del servidor
-   *  (listarPagina + FILTRO_BUSQUEDA, ver DataClientService), nunca
-   *  descargando el catálogo completo para filtrarlo en Angular.
-   *  reset=true: nueva búsqueda (reemplaza la página); reset=false:
-   *  "cargar más" (desde = lo que ya se tiene). */
+   *  (nombre/código, OR), categoría y EXISTENCIA aplicados del lado del
+   *  servidor, nunca descargando el catálogo completo para filtrarlo en
+   *  Angular. reset=true: nueva búsqueda (reemplaza la página);
+   *  reset=false: "cargar más" (desde = lo que ya se tiene).
+   *
+   *  FASE 3 (2026-11, cierre — "ocultar productos agotados"): antes
+   *  consultaba Producto directo (listarPagina + FILTRO_BUSQUEDA) y solo
+   *  BLOQUEABA agregar un producto agotado (ver agregarProducto()), pero
+   *  igual lo mostraba en la cuadrícula con "0 disp.". Ahora usa
+   *  inventario.fn_cobro_productos_listar() -- una función nueva que
+   *  cruza Producto con ExistenciaBodega/existencia_producto_resumen y
+   *  filtra ANTES de paginar: solo trae servicios (existencia null) y
+   *  productos físicos con disponibilidad > 0, respetando la bodega de
+   *  venta elegida (bodegaVentaId()) con el mismo criterio que
+   *  existenciaDisponible() (producto.util.ts). Si la llamada falla
+   *  (red/servidor), se avisa por toast y se conserva la página ya
+   *  mostrada -- nunca se vacía el catálogo por un error de red.
+   *  cargarExistenciaYPrecioPara() de abajo no cambió: sigue siendo
+   *  necesaria para el badge "disp." (por bodega) y el precio por lista,
+   *  que son datos por-bodega/por-lista que esta función no resuelve. */
   private async buscarProductos(reset: boolean): Promise<void> {
     const miSecuencia = ++this.secuenciaBusquedaProductos;
     const desde = reset ? 0 : this.productos().length;
     this.cargandoProductos.set(true);
     try {
       const texto = this.busquedaProducto().trim();
-      const filtro: Record<string, unknown> = { activo: true };
       const categoria = this.categoriaFiltro();
-      if (categoria !== null) filtro['categoriaProductoId'] = categoria;
-      if (texto) filtro[FILTRO_BUSQUEDA] = { columnas: ['nombre', 'codigo'], texto };
 
-      const resultado = await firstValueFrom(
-        this.data.listarPagina<Producto>('Producto', filtro, desde, TAMANO_PAGINA_PRODUCTOS, { columna: 'nombre' }),
-      );
+      const { data, error } = await this.sb.schema('inventario').rpc('fn_cobro_productos_listar', {
+        p_busqueda: texto || null,
+        p_categoria_id: categoria,
+        p_bodega_id: this.bodegaVentaId(),
+        p_desde: desde,
+        p_cantidad: TAMANO_PAGINA_PRODUCTOS,
+      });
       if (miSecuencia !== this.secuenciaBusquedaProductos) return; // ya hay una búsqueda más nueva en curso
+      if (error) {
+        this.toast.error('No se pudo cargar el catálogo de productos: ' + error.message);
+        return; // el catálogo ya mostrado (si había) se deja tal cual -- nunca se vacía por un error.
+      }
 
-      this.productos.set(reset ? resultado.filas : [...this.productos(), ...resultado.filas]);
-      this.totalProductos.set(resultado.total);
-      for (const p of resultado.filas) this.productosConocidos.set(p.id, p);
-      await this.cargarExistenciaYPrecioPara(resultado.filas.map((p) => p.id));
+      const filasCrudas = (data ?? []) as Record<string, unknown>[];
+      const filas = filasCrudas.map((f) => this.filaProductoACamel(f));
+      const total = Number(filasCrudas[0]?.['total'] ?? 0);
+
+      this.productos.set(reset ? filas : [...this.productos(), ...filas]);
+      this.totalProductos.set(total);
+      for (const p of filas) this.productosConocidos.set(p.id, p);
+      await this.cargarExistenciaYPrecioPara(filas.map((p) => p.id));
     } finally {
       if (miSecuencia === this.secuenciaBusquedaProductos) this.cargandoProductos.set(false);
     }
@@ -518,6 +545,18 @@ export class CobroComponent implements OnInit, OnDestroy {
   protected cargarMasProductos(): void {
     if (this.cargandoProductos() || !this.hayMasProductos()) return;
     this.buscarProductos(false);
+  }
+
+  /** Fase 3 (2026-11, cierre): cambiar la bodega de venta ahora vuelve a
+   *  consultar el catálogo (reset=true) porque fn_cobro_productos_listar()
+   *  filtra por existencia DISPONIBLE EN ESA BODEGA -- un producto que
+   *  aparecía con la bodega anterior puede estar agotado en la nueva (o
+   *  viceversa). Antes no hacía falta volver a consultar nada porque el
+   *  filtro de existencia solo se recalculaba en pantalla (badge "disp."),
+   *  nunca cambiaba qué productos estaban en la página ya traída. */
+  protected cambiarBodegaVenta(id: number): void {
+    this.bodegaVentaId.set(id);
+    this.buscarProductos(true);
   }
 
   /** Pide ExistenciaBodega/PrecioLista SOLO para los ids de producto que
@@ -855,14 +894,18 @@ export class CobroComponent implements OnInit, OnDestroy {
    *  clase, "MODO REMOTO" — ya usado en Movimientos entre bodegas →
    *  Historial → Producto, no es infraestructura nueva). Busca por
    *  nombre/RFC/teléfono (FILTRO_BUSQUEDA, OR) entre clientes activos,
-   *  máximo 20 a la vez — reemplaza la descarga completa de Cliente.
-   *  Arrow function (no método normal) porque el componente hijo invoca
-   *  esta referencia directamente, sin "this": debe venir ya enlazada. */
+   *  máximo 10 a la vez (Fase 3, prompt maestro Cobro 2026-11 — antes 20)
+   *  — reemplaza la descarga completa de Cliente. "Razón social" no es un
+   *  campo separado en Cliente (ver cliente.model.ts: una sola `nombre`
+   *  sirve para persona física o moral), así que buscar por `nombre` ya
+   *  cubre ese caso. Arrow function (no método normal) porque el
+   *  componente hijo invoca esta referencia directamente, sin "this":
+   *  debe venir ya enlazada. */
   protected readonly buscarClientesRemoto = async (texto: string): Promise<OpcionBuscable[]> => {
     const filtro: Record<string, unknown> = { activo: true };
     const limpio = texto.trim();
     if (limpio) filtro[FILTRO_BUSQUEDA] = { columnas: ['nombre', 'rfc', 'telefono'], texto: limpio };
-    const resultado = await firstValueFrom(this.data.listarPagina<Cliente>('Cliente', filtro, 0, 20, { columna: 'nombre' }));
+    const resultado = await firstValueFrom(this.data.listarPagina<Cliente>('Cliente', filtro, 0, 10, { columna: 'nombre' }));
     for (const c of resultado.filas) this.clientesConocidos.set(c.id, c);
     return resultado.filas.map((c) => ({ valor: c.id, etiqueta: this.etiquetaCliente(c) }));
   };
@@ -1008,39 +1051,57 @@ export class CobroComponent implements OnInit, OnDestroy {
 
     this.procesandoVenta.set(true);
     try {
-      const venta = await this.ventaService.registrar({
-        turnoCajaId: turno.id,
-        clienteId,
-        vendedorUsuarioId: usuario.id,
-        notas: null,
-        canal: this.canalVenta(),
-        lineas: this.carrito().map((i) => ({
-          productoId: i.productoId,
-          descripcion: i.descripcion,
-          cantidad: i.cantidad,
-          precioUnitario: i.precioUnitario,
-          descuentoPct: i.descuentoPct,
-          bodegaId: i.bodegaId,
-        })),
-        pagos: this.pagos().map((p) => ({ metodoPago: p.metodoPago, monto: p.monto, montoRecibido: p.montoRecibido, cambio: p.cambio })),
-        puntosACanjear: this.puntosACanjear(),
-      });
-
-      // Confirmación única (Cambio 7, prompt maestro Ventas→Cobro 2026-11):
-      // antes aquí se mostraba un toast Y el panel ventaRecienCobrada de
-      // abajo, los dos a la vez. El panel por sí solo ya cubre folio,
-      // total, cambio y estado -- el toast quedó eliminado.
-
-      // Vincula el pedido/orden de origen ("Cargar a venta" desde Pedidos
-      // web) con la Venta que acaba de quedar registrada — SOLO hasta
-      // ahora, nunca antes (ver pedidoTiendaOrigenId arriba). Si falla, la
-      // venta ya registrada NO se deshace: solo se avisa, el pedido se
-      // queda "Pendiente" y el staff lo puede resolver a mano.
+      // Cargar a venta desde Pedidos web/Menú QR (ver pedidoTiendaOrigenId
+      // arriba) usa ahora ventas.fn_pedido_tienda_cargar_a_venta (Fase 5,
+      // 2026-11) en vez del patrón anterior de 2 pasos sueltos
+      // (registrar() + PedidoTiendaService.marcarConfirmadoDesdeVenta()):
+      // candado + registro de la venta + actualización del pedido quedan
+      // TODO en una sola transacción atómica del lado del servidor -- ver
+      // VentaService.registrarDesdePedidoTienda(). Una venta SIN pedido de
+      // origen (Cobro normal de mostrador) sigue exactamente igual que
+      // antes, con registrar().
       const pedidoOrigenId = this.pedidoTiendaOrigenId();
+      const lineasVenta = this.carrito().map((i) => ({
+        productoId: i.productoId,
+        descripcion: i.descripcion,
+        cantidad: i.cantidad,
+        precioUnitario: i.precioUnitario,
+        descuentoPct: i.descuentoPct,
+        bodegaId: i.bodegaId,
+      }));
+      const pagosVenta = this.pagos().map((p) => ({ metodoPago: p.metodoPago, monto: p.monto, montoRecibido: p.montoRecibido, cambio: p.cambio }));
+
+      let venta: Venta;
+      let creadaEnEstaSolicitud = true;
+
       if (pedidoOrigenId !== null) {
+        const resultado = await this.ventaService.registrarDesdePedidoTienda(pedidoOrigenId, {
+          turnoCajaId: turno.id,
+          clienteId,
+          vendedorUsuarioId: usuario.id,
+          notas: null,
+          canal: this.canalVenta(),
+          lineas: lineasVenta,
+          pagos: pagosVenta,
+          puntosACanjear: this.puntosACanjear(),
+        });
+        venta = resultado.venta;
+        creadaEnEstaSolicitud = resultado.creadaEnEstaSolicitud;
+        // Solo se limpia tras una respuesta exitosa del servidor (igual
+        // que antes) -- si la llamada lanza (pedido ya Descartado/
+        // Expirado, turno inválido, etc.), el carrito/pedido de origen se
+        // quedan intactos para que el cajero pueda ver el error y decidir.
         this.pedidoTiendaOrigenId.set(null);
-        this.pedidoTiendaService.marcarConfirmadoDesdeVenta(pedidoOrigenId, venta.id).catch(() => {
-          this.toast.advertencia('La venta se registró, pero no se pudo actualizar el pedido de origen en Pedidos web.');
+      } else {
+        venta = await this.ventaService.registrar({
+          turnoCajaId: turno.id,
+          clienteId,
+          vendedorUsuarioId: usuario.id,
+          notas: null,
+          canal: this.canalVenta(),
+          lineas: lineasVenta,
+          pagos: pagosVenta,
+          puntosACanjear: this.puntosACanjear(),
         });
       }
 
@@ -1050,6 +1111,27 @@ export class CobroComponent implements OnInit, OnDestroy {
       this.canalVenta.set('');
       this.modalPagoAbierto.set(false);
       this.ticketMovilAbierto.set(false); // regresa al catálogo en celular, ver Cambio 2
+
+      if (!creadaEnEstaSolicitud) {
+        // Idempotencia (ver registrarDesdePedidoTienda()): este pedido ya
+        // había quedado Confirmado ANTES de que esta solicitud llegara al
+        // servidor -- otro cajero ya lo cobró primero, o esta misma
+        // solicitud se reintentó por un timeout de red. NO es una venta
+        // nueva de este cobro -- nunca mostrar el panel "Venta
+        // registrada"/ticket como si este cajero la hubiera hecho (sería
+        // un falso éxito propio, ver mandato Fase 5 "Identificación de
+        // reintentos"). Solo se avisa con el folio real, para
+        // trazabilidad, y se corta aquí.
+        this.toast.advertencia(
+          `Este pedido ya había sido confirmado antes de esta solicitud (folio ${venta.folio}) — probablemente por otro cajero. No se registró una venta nueva.`,
+        );
+        return;
+      }
+
+      // Confirmación única (Cambio 7, prompt maestro Ventas→Cobro 2026-11):
+      // antes aquí se mostraba un toast Y el panel ventaRecienCobrada de
+      // abajo, los dos a la vez. El panel por sí solo ya cubre folio,
+      // total, cambio y estado -- el toast quedó eliminado.
 
       this.ventaRecienCobrada.set(venta);
       this.clienteRecienCobrado.set(nombreCliente);
@@ -1087,7 +1169,7 @@ export class CobroComponent implements OnInit, OnDestroy {
   /** Datos congelados del ticket de ESTA venta, en el formato que comparten
    *  construirTicketHtml()/mensajeTicketTexto()/generarTicketPdfBlob() --
    *  un solo lugar donde se arma, lo usan imprimirTicketRecien(),
-   *  compartirTicketWhatsapp(), descargarTicketPdf() y enviarTicketCorreo()
+   *  compartirTicketWhatsapp(), accionPdfTicket() y enviarTicketCorreo()
    *  (Cambios 8 y 10) para no repetir este objeto 4 veces. */
   private datosTicket(): DatosTicket | null {
     const venta = this.ventaRecienCobrada();
@@ -1125,72 +1207,98 @@ export class CobroComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** Cambio 10: comparte el ticket por WhatsApp. Usa primero la Web Share
-   *  API nativa (navigator.share) -- en celular eso deja al cajero elegir
-   *  WhatsApp (o cualquier otra app) y, cuando el navegador lo soporta,
-   *  manda también el PDF como archivo adjunto, no solo el texto. Si el
-   *  navegador no tiene Web Share API (la mayoría de escritorio) cae al
-   *  enlace wa.me de siempre -- mismo mecanismo ya usado en
-   *  catalogo-tienda.component.ts para mandar el pedido de la tienda
-   *  pública, aquí en sentido inverso (negocio -> cliente). Si el cliente
-   *  de esta venta tiene teléfono capturado se usa directo; si no, se abre
-   *  wa.me sin número para que el cajero elija el contacto a mano. */
-  async compartirTicketWhatsapp(): Promise<void> {
+  /** Fase 6 (2026-11, "optimización de Tickets: WhatsApp, correo e
+   *  impresión"): este botón ahora SIEMPRE usa el enlace oficial
+   *  wa.me/api.whatsapp.com -- nunca la Web Share API nativa. Antes se
+   *  intentaba primero navigator.share(), que en escritorio (Windows en
+   *  particular, confirmado en la auditoría de esta fase) abre el
+   *  selector de aplicaciones del sistema en vez de WhatsApp directo --
+   *  justo el problema que se pidió corregir. Compartir el PDF como
+   *  archivo es ahora una acción SEPARADA e independiente (ver
+   *  accionPdfTicket() más abajo) -- este botón nunca intenta adjuntar
+   *  nada, para no prometer un adjunto que WhatsApp no garantiza recibir
+   *  por este medio. Mensaje breve (no el ticket completo línea por
+   *  línea -- eso sigue siendo el cuerpo del correo, ver
+   *  enviarTicketCorreo()). Si el cliente de esta venta tiene un
+   *  teléfono capturado con pinta de válido (10-15 dígitos, sin el signo
+   *  '+' que wa.me no acepta) se usa directo; si no, se abre wa.me sin
+   *  número para que el cajero elija el contacto a mano. */
+  compartirTicketWhatsapp(): void {
     const datos = this.datosTicket();
     if (!datos) return;
 
-    const mensaje = mensajeTicketTexto(datos);
-    const telefono = this.contactoClienteRecienCobrado().telefono.replace(/[^\d+]/g, '');
+    const mensaje = mensajeWhatsappBreve(datos);
+    const soloDigitos = this.contactoClienteRecienCobrado().telefono.replace(/\D/g, '');
+    const telefono = telefonoEsValido(soloDigitos) ? soloDigitos : '';
 
-    if (typeof navigator.share === 'function') {
+    const destino = telefono ? `https://wa.me/${telefono}` : 'https://wa.me/';
+    const ventana = window.open(`${destino}?text=${encodeURIComponent(mensaje)}`, '_blank');
+    if (!ventana) {
+      this.toast.advertencia('El navegador bloqueó la ventana de WhatsApp. Permite ventanas emergentes para este sitio e intenta de nuevo.');
+      return;
+    }
+    this.toast.info('Se abrió WhatsApp con el ticket listo para enviar.');
+  }
+
+  /** Fase 6 (2026-11): "📄 PDF" -- acción INDEPENDIENTE del botón de
+   *  WhatsApp de arriba (que ya nunca depende de esto para funcionar).
+   *  Intenta primero compartir el ARCHIVO con las capacidades nativas
+   *  del dispositivo (Web Share API con archivos -- normalmente solo
+   *  celular/Android, "conservar esa capacidad como opción
+   *  independiente" según el mandato de esta fase); si el navegador no
+   *  lo soporta (la mayoría de escritorio) o el cajero cancela el panel
+   *  del sistema, cae a la descarga directa de siempre. Si SÍ se
+   *  comparte, puede terminar en WhatsApp, Drive, Bluetooth, lo que el
+   *  cajero elija -- nunca se afirma automáticamente que "se envió",
+   *  solo que se compartió/descargó. */
+  async accionPdfTicket(): Promise<void> {
+    const datos = this.datosTicket();
+    if (!datos) return;
+
+    let blob: Blob;
+    try {
+      blob = generarTicketPdfBlob(datos, this.formatoTicket());
+    } catch {
+      this.toast.error('No se pudo generar el PDF del ticket.');
+      return;
+    }
+
+    const archivo = new File([blob], `ticket-${datos.venta.folio}.pdf`, { type: 'application/pdf' });
+    if (typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [archivo] })) {
       try {
-        const archivos = this.archivoTicketPdf(datos);
-        const detalleCompartir: ShareData = { title: `Ticket ${datos.venta.folio}`, text: mensaje };
-        if (archivos && typeof navigator.canShare === 'function' && navigator.canShare({ files: archivos })) {
-          detalleCompartir.files = archivos;
-        }
-        await navigator.share(detalleCompartir);
+        await navigator.share({ files: [archivo], title: `Ticket ${datos.venta.folio}` });
+        this.toast.exito('PDF compartido.');
         return;
       } catch (error) {
-        // AbortError = el cajero cerró el panel de compartir -- no es una
-        // falla, no se cae al wa.me de abajo (ya decidió no compartir).
-        if (error instanceof Error && error.name === 'AbortError') return;
-        // Cualquier otro error (poco común) sí cae al enlace wa.me de abajo.
+        // AbortError = el cajero cerró el panel de compartir -- avisar y
+        // NO caer a la descarga (decidió no compartir, no "descargar en
+        // su lugar" sin que lo pidiera).
+        if (error instanceof Error && error.name === 'AbortError') {
+          this.toast.info('Se canceló compartir el PDF.');
+          return;
+        }
+        // Cualquier otro error (poco común) sí cae a la descarga de abajo.
       }
     }
 
-    const destino = telefono ? `https://wa.me/${telefono}` : 'https://wa.me/';
-    window.open(`${destino}?text=${encodeURIComponent(mensaje)}`, '_blank');
+    this.descargarBlobTicketPdf(blob, datos.venta.folio);
   }
 
-  /** PDF del ticket como File, listo para navigator.share({files}) -- null
-   *  si jsPDF truena por lo que sea (no debería, pero nunca debe tumbar el
-   *  flujo de compartir: en ese caso se manda solo el texto). */
-  private archivoTicketPdf(datos: DatosTicket): File[] | null {
+  /** Descarga directa del blob ya generado -- usado como único camino en
+   *  escritorio (sin Web Share de archivos) y como respaldo si
+   *  accionPdfTicket() no pudo compartir por un error distinto de que el
+   *  cajero cancelara. */
+  private descargarBlobTicketPdf(blob: Blob, folio: string): void {
     try {
-      const blob = generarTicketPdfBlob(datos, this.formatoTicket());
-      return [new File([blob], `ticket-${datos.venta.folio}.pdf`, { type: 'application/pdf' })];
-    } catch {
-      return null;
-    }
-  }
-
-  /** Cambio 8/10: descarga el ticket como PDF (mismo formato 58mm/80mm/
-   *  carta elegido arriba) -- para adjuntarlo a mano donde el cajero
-   *  quiera (un correo, un chat, guardarlo). */
-  descargarTicketPdf(): void {
-    const datos = this.datosTicket();
-    if (!datos) return;
-    try {
-      const blob = generarTicketPdfBlob(datos, this.formatoTicket());
       const url = URL.createObjectURL(blob);
       const enlace = document.createElement('a');
       enlace.href = url;
-      enlace.download = `ticket-${datos.venta.folio}.pdf`;
+      enlace.download = `ticket-${folio}.pdf`;
       enlace.click();
       URL.revokeObjectURL(url);
+      this.toast.exito('PDF descargado.');
     } catch {
-      this.toast.error('No se pudo generar el PDF del ticket.');
+      this.toast.error('No se pudo descargar el PDF del ticket.');
     }
   }
 
@@ -1205,16 +1313,21 @@ export class CobroComponent implements OnInit, OnDestroy {
    *  asunto/cuerpo ya listos -- igual de "manual" que el enlace wa.me de
    *  arriba, el cajero sigue siendo quien aprieta Enviar. mailto: no puede
    *  adjuntar archivos por código: si se quiere mandar el PDF, hay que
-   *  adjuntarlo a mano (ver descargarTicketPdf()) -- el toast de abajo lo
-   *  deja claro, nunca se afirma que el correo ya salió. */
+   *  adjuntarlo a mano (ver accionPdfTicket()) -- el toast de abajo lo
+   *  deja claro, nunca se afirma que el correo ya salió.
+   *
+   *  Fase 6 (2026-11): el correo del cliente se revalida aquí
+   *  (correoEsValido()) antes de precompletarlo como destinatario -- un
+   *  valor claramente inválido (dato viejo, importado) se trata igual
+   *  que "sin correo": se abre el cliente de correo sin destinatario. */
   enviarTicketCorreo(): void {
     const datos = this.datosTicket();
     if (!datos) return;
 
-    const correoCliente = this.contactoClienteRecienCobrado().correo;
+    const correoCliente = this.contactoClienteRecienCobrado().correo.trim();
+    const destinatario = correoEsValido(correoCliente) ? encodeURIComponent(correoCliente) : '';
     const asunto = encodeURIComponent(`Ticket ${datos.venta.folio} — Saurix`);
     const cuerpo = encodeURIComponent(mensajeTicketTexto(datos));
-    const destinatario = correoCliente ? encodeURIComponent(correoCliente) : '';
 
     window.open(`mailto:${destinatario}?subject=${asunto}&body=${cuerpo}`, '_blank');
     this.toast.info('Se abrió tu programa de correo con el ticket listo para enviar. Si quieres adjuntar el PDF, descárgalo primero y agrégalo a mano.');

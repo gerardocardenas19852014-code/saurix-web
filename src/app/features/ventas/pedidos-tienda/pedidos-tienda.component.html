@@ -180,50 +180,12 @@
         <button type="button" class="btn-secondary" (click)="cerrarDetalle()">Cerrar</button>
         @if (pedido.estado === 'Pendiente') {
           <button type="button" class="btn-secondary" style="background: var(--danger-soft); color: var(--danger);" (click)="pedirDescartar(pedido)">Descartar</button>
-          <button type="button" class="btn-secondary" (click)="cargarAVenta(pedido)" title="Revisa/edita todo en Cobro antes de cobrar — revalida precio y disponibilidad">
+          <button type="button" class="btn-primary" (click)="cargarAVenta(pedido)" title="Revisa/edita todo en Cobro antes de cobrar — revalida precio y disponibilidad">
             Cargar a venta →
           </button>
-          @if (pedido.origen === 'pedido_web') {
-            <button type="button" class="btn-primary" (click)="abrirConfirmar()">Confirmar venta</button>
-          }
         }
       </div>
     </div>
-  </div>
-}
-
-@if (modalConfirmarAbierto()) {
-  <div class="modal-overlay show" (click)="cerrarConfirmar()">
-    <form class="modal-box" style="max-width: 420px;" [formGroup]="confirmarForm" (click)="$event.stopPropagation()" (ngSubmit)="confirmarConfirmar()">
-      <h3>Confirmar venta</h3>
-      <p class="hint" style="margin-top:-6px;">Se descontará existencia y se registrará el cobro por el total del pedido.</p>
-
-      <div class="edit-form" style="margin-bottom: 14px;">
-        <label>
-          Bodega de venta
-          <select [value]="bodegaConversionId()" (change)="bodegaConversionId.set(+$any($event.target).value)">
-            @for (bodega of bodegas(); track bodega.id) {
-              <option [value]="bodega.id">{{ bodega.nombre }}</option>
-            }
-          </select>
-        </label>
-        <label>
-          Método de pago
-          <select formControlName="metodoPago">
-            @for (metodo of metodosPago; track metodo) {
-              <option [value]="metodo">{{ metodo }}</option>
-            }
-          </select>
-        </label>
-      </div>
-
-      <p class="hint" style="margin-bottom:14px;">Total a cobrar: <strong>{{ formatMoneda(pedidoDetalle()?.total ?? 0) }}</strong></p>
-
-      <div class="modal-actions">
-        <button type="button" class="btn-secondary" (click)="cerrarConfirmar()">Cancelar</button>
-        <button type="submit" class="btn-primary" [disabled]="confirmando()">{{ confirmando() ? 'Confirmando…' : 'Confirmar' }}</button>
-      </div>
-    </form>
   </div>
 }
 

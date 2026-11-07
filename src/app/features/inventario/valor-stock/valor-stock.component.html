@@ -126,6 +126,7 @@
         </div>
         <select class="toolbar-select" [value]="estadoFiltro()" (change)="estadoFiltro.set($any($event.target).value)">
           <option value="">Todos los estados</option>
+          <option value="con_existencia">Con existencia</option>
           <option value="sin_existencia">Sin existencia</option>
           <option value="stock_bajo">Stock bajo</option>
           <option value="sobre_stock">Sobre-stock</option>

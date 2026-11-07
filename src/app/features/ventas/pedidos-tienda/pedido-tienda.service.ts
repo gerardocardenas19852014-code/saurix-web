@@ -2,8 +2,6 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { SupabaseService } from '../../../core/services/supabase.service';
-import { VentaService, PagoEntrada } from '../venta/venta.service';
-import { Venta } from '../venta/venta.model';
 import { EstadoPedidoTienda, FilaPedidoTienda, OrigenPedidoTienda, PedidoTienda } from './pedido-tienda.model';
 import { LineaCargaVentaPedidoTienda } from '../carga-venta-pedido-tienda.service';
 
@@ -19,17 +17,18 @@ export interface FiltrosPedidosTienda {
 }
 
 /**
- * Confirmar/descartar pedidos web — confirmarComoVenta() SÍ toca
- * inventario y caja, reutilizando el MISMO VentaService.registrar() que
- * usa Cobro (igual patrón que CotizacionService.convertirAVenta()), así
- * que una venta nacida de un pedido web es indistinguible de una venta
- * normal en el Historial/Dashboard (misma tabla Venta, mismo folio
- * VTA-####, canal "Tienda en línea").
+ * Reclamar/revalidar/descartar pedidos web — registrar la venta en sí ya
+ * no ocurre aquí (ver Fase 5, 2026-11): el único camino a venta es
+ * "Cargar a venta" hacia Cobro (CobroComponent.confirmarCobro(), que desde
+ * Fase 5 Parte B usa VentaService.registrarDesdePedidoTienda() →
+ * ventas.fn_pedido_tienda_cargar_a_venta(), candado + venta + actualización
+ * del pedido en una sola transacción atómica). marcarConfirmadoDesdeVenta()
+ * abajo ya NO tiene ningún llamador real — queda documentado como código
+ * muerto, sin retirar por no haber sido pedido explícitamente.
  */
 @Injectable({ providedIn: 'root' })
 export class PedidoTiendaService {
   private readonly data = inject(DataClientService);
-  private readonly ventaService = inject(VentaService);
   private readonly sb = inject(SupabaseService).cliente;
 
   /** Bandeja paginada/filtrada del lado del servidor (ver
@@ -164,57 +163,21 @@ export class PedidoTiendaService {
    *  hasta que la venta ya quedó registrada (nunca antes: "cargar a
    *  venta" ≠ "venta cobrada", sección 19 del plan). Si esto falla, la
    *  venta ya registrada NO se deshace — el pedido simplemente se queda
-   *  "Pendiente" en la bandeja y el staff lo puede resolver a mano. */
+   *  "Pendiente" en la bandeja y el staff lo puede resolver a mano.
+   *
+   *  Fase 5 (2026-11): este método quedó SIN llamadores reales al activarse
+   *  ventas.fn_pedido_tienda_cargar_a_venta() (ver
+   *  claude/fase5-propuesta-atomicidad-pedido-venta-2026-11.md del
+   *  proyecto) — la grieta de protección contra ventas duplicadas que
+   *  tenía este patrón de 2 pasos (un pedido cuyo paso 2 fallaba aquí se
+   *  quedaba reclamable de nuevo, sin registro de que ya existía una
+   *  venta) ya no existe en el único camino que queda ("Cargar a venta").
+   *  Se deja el método intacto (código muerto) en vez de borrarlo, por no
+   *  haberse pedido explícitamente su retiro. */
   async marcarConfirmadoDesdeVenta(pedidoId: number, ventaId: number): Promise<void> {
     await firstValueFrom(
       this.data.modificacion<PedidoTienda>('PedidoTienda', { id: pedidoId, estado: 'Confirmado', ventaId }),
     );
-  }
-
-  /** Texto para Venta.notas — se conserva ahí el nombre/teléfono/nota/
-   *  ubicación del cliente, porque la venta queda a nombre del cliente
-   *  genérico (el pedido web no crea un Cliente con datos fiscales).
-   *  Exclusivo de 'pedido_web' (ver confirmarComoVenta()) — 'menu_qr' no
-   *  pasa por aquí todavía (Bloque E). */
-  private notasVenta(pedido: PedidoTienda): string {
-    const partes = [`Pedido web — Cliente: ${pedido.nombreCliente ?? ''}, Tel: ${pedido.telefonoCliente ?? ''}`];
-    if (pedido.notasCliente) partes.push(`Nota: ${pedido.notasCliente}`);
-    if (pedido.ubicacionLat !== null && pedido.ubicacionLng !== null) {
-      partes.push(`Ubicación: https://www.google.com/maps?q=${pedido.ubicacionLat},${pedido.ubicacionLng}`);
-    }
-    return partes.join(' — ');
-  }
-
-  async confirmarComoVenta(
-    pedido: PedidoTienda,
-    params: { turnoCajaId: number; clienteId: number; vendedorUsuarioId: number; bodegaId: number | null; pago: PagoEntrada },
-  ): Promise<Venta> {
-    const venta = await this.ventaService.registrar({
-      turnoCajaId: params.turnoCajaId,
-      clienteId: params.clienteId,
-      vendedorUsuarioId: params.vendedorUsuarioId,
-      notas: this.notasVenta(pedido),
-      canal: 'Tienda en línea',
-      lineas: pedido.items.map((item) => ({
-        productoId: item.productoId,
-        descripcion:
-          item.nombreProducto +
-          (item.opcionesElegidas.length > 0
-            ? ` (${item.opcionesElegidas.map((o) => `${o.grupoNombre}: ${o.valorNombre}`).join(', ')})`
-            : ''),
-        cantidad: item.cantidad,
-        precioUnitario: item.precioBase + item.opcionesElegidas.reduce((acc, o) => acc + o.precioAdicional, 0),
-        descuentoPct: 0,
-        bodegaId: params.bodegaId,
-      })),
-      pagos: [params.pago],
-    });
-
-    await firstValueFrom(
-      this.data.modificacion<PedidoTienda>('PedidoTienda', { ...pedido, estado: 'Confirmado', ventaId: venta.id }),
-    );
-
-    return venta;
   }
 
   async descartar(pedido: PedidoTienda): Promise<PedidoTienda> {

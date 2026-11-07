@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { DataClientService } from '../../../core/services/data-client.service';
@@ -212,6 +212,25 @@ export class ProductosComponent implements OnInit, OnDestroy {
    *  resetea ningún FormControl, así que no se pierde nada al navegar. */
   protected readonly pestanaActiva = signal<PestanaProducto>('general');
 
+  /** El contenido de las 4 pestañas comparte UN SOLO contenedor con scroll
+   *  (.producto-modal-contenido, ver productos.component.scss) -- sin esta
+   *  referencia, cambiar de pestaña después de haber bajado el scroll en
+   *  la anterior dejaba la nueva pestaña abierta en esa misma posición,
+   *  mostrando sus primeros campos recortados arriba del todo (bug
+   *  confirmado en la auditoría Fase 2, "Prompt maestro" nov-2026). Ver
+   *  cambiarPestana()/irAPestanaConError() más abajo. */
+  @ViewChild('contenidoModalProducto') private contenidoModalRef?: ElementRef<HTMLElement>;
+
+  /** Único punto que cambia de pestaña en el modal -- además de mover el
+   *  signal, regresa el contenedor de contenido a su posición superior
+   *  (ver el comentario de contenidoModalRef arriba). Nunca crea, destruye
+   *  ni resetea ningún FormControl: el form sigue siendo uno solo para las
+   *  4 pestañas, así que no se pierde ningún valor capturado. */
+  protected cambiarPestana(pestana: PestanaProducto): void {
+    this.pestanaActiva.set(pestana);
+    this.contenidoModalRef?.nativeElement.scrollTo({ top: 0 });
+  }
+
   /** A qué pestaña pertenece cada control -- en el mismo orden en que se
    *  muestran las pestañas (general, inventario, precios, tienda), para
    *  que, si guardar() falla por validación, se cambie a la primera
@@ -250,7 +269,7 @@ export class ProductosComponent implements OnInit, OnDestroy {
   private irAPestanaConError(): void {
     const primero = this.ORDEN_CONTROLES_POR_PESTANA.find(({ control }) => this.form.get(control)?.invalid);
     if (!primero) return;
-    this.pestanaActiva.set(primero.pestana);
+    this.cambiarPestana(primero.pestana);
     this.toast.advertencia(`Falta un campo obligatorio en la pestaña "${this.ETIQUETA_PESTANA[primero.pestana]}".`);
   }
 
@@ -526,7 +545,7 @@ export class ProductosComponent implements OnInit, OnDestroy {
     // unidadCompraId != 0 ("Sin unidad de compra alterna") exige un factor
     // > 0 — no se valida con Validators porque depende de otro control.
     if (this.form.controls.unidadCompraId.value !== 0 && !this.form.controls.factorConversionCompra.value) {
-      this.pestanaActiva.set('precios');
+      this.cambiarPestana('precios');
       this.toast.advertencia('Captura a cuántas unidades base equivale la unidad de compra (factor de conversión).');
       return;
     }

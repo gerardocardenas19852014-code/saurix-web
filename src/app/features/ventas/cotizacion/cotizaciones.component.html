@@ -11,6 +11,23 @@
   <button type="button" class="toolbar-btn" (click)="abrirNueva()">+ Nueva</button>
 </div>
 
+<!-- Paginación servidor (Fase 4, 2026-11): antes se descargaba la tabla
+     Cotizacion completa; ahora siempre se trae solo UNA página -- mismo
+     patrón que OrdenesCompraComponent/MovimientosBodegaComponent (el
+     paginador interno de <app-data-table> no se nota porque siempre se le
+     pasa exactamente una página de servidor). -->
+<div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-bottom:10px;">
+  <span class="hint" style="margin:0;">
+    Página {{ paginaActual() }} de {{ totalPaginas() }} — {{ totalCotizaciones() }} cotización(es)
+  </span>
+  <button type="button" class="btn-secondary small" [disabled]="paginaActual() <= 1 || cargando()" (click)="irAPaginaAnterior()">
+    ← Anterior
+  </button>
+  <button type="button" class="btn-secondary small" [disabled]="paginaActual() >= totalPaginas() || cargando()" (click)="irAPaginaSiguiente()">
+    Siguiente →
+  </button>
+</div>
+
 <app-data-table
   [tamanoPagina]="preferenciasGrid.tamanoPagina()"
   [columnas]="columnas"
@@ -24,13 +41,19 @@
 
 @if (modalNuevaAbierto()) {
   <div class="modal-overlay show" (click)="cerrarNueva()">
-    <form class="modal-box" style="max-width: 680px; width: 94%;" [formGroup]="cotizacionForm" (click)="$event.stopPropagation()" (ngSubmit)="guardarNueva()">
+    <form class="modal-box modal-box-cotizacion-nueva" style="max-width: 680px; width: 94%;" [formGroup]="cotizacionForm" (click)="$event.stopPropagation()" (ngSubmit)="guardarNueva()">
       <h3>Nueva cotización</h3>
 
       <div class="edit-form form-grid-2col" style="margin-bottom: 14px;">
         <label>
           Cliente
-          <app-select-buscable [opciones]="opcionesClientes()" [value]="clienteNuevaId()" placeholder="Buscar cliente…" (valueChange)="clienteNuevaId.set($event ? +$event : null)" />
+          <app-select-buscable
+            [busquedaRemota]="buscarClientesRemoto"
+            [value]="clienteNuevaId()"
+            [etiquetaValorExterno]="etiquetaClienteNuevaSeleccionado()"
+            placeholder="Buscar cliente por nombre, RFC o teléfono…"
+            (valueChange)="clienteNuevaId.set($event ? +$event : null)"
+          />
         </label>
         <label>
           Vigente hasta (opcional)
@@ -46,23 +69,28 @@
       <div class="edit-form form-grid-5col" style="margin-bottom: 14px;" [formGroup]="lineaForm">
         <label class="full-span">
           Producto (opcional — déjalo en "Texto libre" para un renglón sin producto del catálogo)
-          <app-select-buscable [opciones]="opcionesProductos()" [value]="lineaForm.controls.productoId.value" placeholder="Buscar producto…" (valueChange)="elegirProductoLinea($event)" />
+          <app-select-buscable
+            [busquedaRemota]="buscarProductosRemoto"
+            [value]="lineaForm.controls.productoId.value"
+            placeholder="Buscar producto por nombre o código…"
+            (valueChange)="elegirProductoLinea($event)"
+          />
         </label>
         <label class="full-span">
           Descripción
-          <input type="text" formControlName="descripcion" />
+          <input id="cotLineaDescripcion" type="text" formControlName="descripcion" (keydown.enter)="onEnterLinea($event)" />
         </label>
         <label>
           Cantidad
-          <input type="number" min="1" step="1" formControlName="cantidad" />
+          <input id="cotLineaCantidad" type="number" min="1" step="1" formControlName="cantidad" (keydown.enter)="onEnterLinea($event)" />
         </label>
         <label>
           Precio unitario
-          <input type="number" min="0" step="0.01" formControlName="precioUnitario" />
+          <input id="cotLineaPrecioUnitario" type="number" min="0" step="0.01" formControlName="precioUnitario" (keydown.enter)="onEnterLinea($event)" />
         </label>
         <label>
           Descuento %
-          <input type="number" min="0" max="100" step="1" formControlName="descuentoPct" />
+          <input id="cotLineaDescuentoPct" type="number" min="0" max="100" step="1" formControlName="descuentoPct" (keydown.enter)="onEnterLinea($event)" />
         </label>
         <label class="full-span" style="justify-content: flex-end;">
           <button type="button" class="btn-secondary" (click)="agregarLinea()">+ Agregar línea</button>

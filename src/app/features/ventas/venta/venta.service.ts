@@ -117,6 +117,78 @@ export class VentaService {
     return venta;
   }
 
+  /**
+   * Único camino para convertir un Pedido web/Menú QR en una Venta --
+   * ventas.fn_pedido_tienda_cargar_a_venta (Fase 5, 2026-11): candado
+   * `SELECT...FOR UPDATE` + ventas.fn_venta_registrar() + actualización del
+   * pedido (estado='Confirmado', venta_id), TODO en una sola transacción
+   * atómica -- si cualquier paso falla (incluyendo la actualización del
+   * pedido DESPUÉS de ya haber registrado la venta), Postgres revierte
+   * también lo que fn_venta_registrar ya había hecho (venta + pagos +
+   * descuento de inventario). Ver
+   * claude/fase5-propuesta-atomicidad-pedido-venta-2026-11.md y
+   * claude/fase5-verificacion-final-parteB-2026-11.md para el diseño y las
+   * pruebas. fn_venta_registrar() en sí NUNCA se modificó -- esta función
+   * es un wrapper nuevo alrededor, no un reemplazo.
+   *
+   * Reemplaza el patrón anterior de 2 pasos sueltos (registrar() +
+   * PedidoTiendaService.marcarConfirmadoDesdeVenta() por separado, sin
+   * protección transaccional conjunta) para el único camino que queda en
+   * Pedidos web ("Cargar a venta" → Cobro, ver CobroComponent.confirmarCobro()).
+   *
+   * Idempotente a propósito: si el pedido ya estaba 'Confirmado' cuando
+   * llega esta solicitud (otro cajero ya lo cobró primero, o esta misma
+   * solicitud se reintentó por un timeout de red), la función de Postgres
+   * NO crea una segunda venta -- devuelve la que ya existe, marcando
+   * `creadaEnEstaSolicitud: false` para que el llamador pueda distinguir
+   * "esta llamada acaba de cobrar" de "alguien ya lo había cobrado antes"
+   * SIN depender de la fecha de la venta (instrucción explícita del
+   * mandato: la fecha nunca es un identificador confiable de reintento).
+   */
+  async registrarDesdePedidoTienda(
+    pedidoTiendaId: number,
+    params: {
+      turnoCajaId: number;
+      clienteId: number;
+      vendedorUsuarioId: number;
+      notas: string | null;
+      canal: string | null;
+      lineas: LineaVentaEntrada[];
+      pagos: PagoEntrada[];
+      puntosACanjear?: number;
+    },
+  ): Promise<{ venta: Venta; creadaEnEstaSolicitud: boolean }> {
+    const { data, error } = await this.sb.schema('ventas').rpc('fn_pedido_tienda_cargar_a_venta', {
+      p_pedido_id: pedidoTiendaId,
+      p_turno_caja_id: params.turnoCajaId,
+      p_cliente_id: params.clienteId,
+      p_vendedor_usuario_id: params.vendedorUsuarioId,
+      p_notas: params.notas,
+      p_canal: params.canal,
+      p_lineas: params.lineas.map((l) => ({
+        producto_id: l.productoId,
+        descripcion: l.descripcion,
+        cantidad: l.cantidad,
+        precio_unitario: l.precioUnitario,
+        descuento_pct: l.descuentoPct,
+        bodega_id: l.bodegaId,
+      })),
+      p_pagos: params.pagos.map((p) => ({
+        metodo_pago: p.metodoPago,
+        monto: p.monto,
+        monto_recibido: p.montoRecibido,
+        cambio: p.cambio,
+      })),
+      p_puntos_a_canjear: params.puntosACanjear ?? 0,
+    });
+    if (error) throw new Error(error.message);
+
+    const resultado = data as { ventaId: number; creadaEnEstaSolicitud: boolean };
+    const venta = await firstValueFrom(this.data.getById<Venta>('Venta', resultado.ventaId));
+    if (!venta) throw new Error('La venta se registró pero no se pudo recuperar.');
+    return { venta, creadaEnEstaSolicitud: resultado.creadaEnEstaSolicitud };
+  }
+
   /** Cancela una venta ya cobrada: repone la existencia de cada renglón con
    *  producto real (Entrada, lo opuesto exacto de la Salida que hizo
    *  registrar()), revierte el programa de lealtad y marca la venta como

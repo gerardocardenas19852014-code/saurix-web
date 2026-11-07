@@ -1,17 +1,11 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { DataClientService } from '../../../core/services/data-client.service';
-import { AuthService } from '../../../core/services/auth.service';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../../shared/services/toast.service';
 import { PreferenciasGridService } from '../../../shared/services/preferencias-grid.service';
-import { Bodega } from '../../inventario/bodegas/bodega.model';
-import { ClienteService } from '../clientes/cliente.service';
-import { MetodoPago, METODOS_PAGO } from '../venta/venta.model';
-import { TurnoCajaService } from '../turno/turno-caja.service';
 import { formatMoneda } from '../ventas.util';
 import { CargaVentaPedidoTiendaService } from '../carga-venta-pedido-tienda.service';
 import { EstadoPedidoTienda, FilaPedidoTienda, OrigenPedidoTienda, PedidoTienda } from './pedido-tienda.model';
@@ -19,18 +13,36 @@ import { PedidoTiendaService } from './pedido-tienda.service';
 
 /**
  * "Pedidos web" — bandeja de los pedidos que llegan de la tienda pública
- * (/tienda/:clave, ver catalogo-tienda.component.ts). Desde el plan "Menú +
- * Mi orden" (2026-10/11) muestra DOS orígenes en la misma bandeja (ver
- * ventas.pedido_tienda.origen — nunca se infiere, lo pone el servidor):
- *   - 'pedido_web': el flujo de siempre — el pedido real se manda por
- *     WhatsApp, esto solo queda de registro ligero para no volver a
- *     teclearlo. "Confirmar venta" arma la Venta real con
- *     PedidoTiendaService (mismo VentaService que usa Cobro).
+ * (/tienda/:clave, ver catalogo-tienda.component.ts). Muestra DOS orígenes
+ * en la misma bandeja (ver ventas.pedido_tienda.origen — nunca se infiere,
+ * lo pone el servidor):
+ *   - 'pedido_web': el pedido real se manda por WhatsApp, esto solo queda
+ *     de registro ligero para no volver a teclearlo.
  *   - 'menu_qr': "Mostrar en caja" del modo Menú + Mi orden — NO es un
  *     pedido en línea, es solo una intención que el cliente muestra en
- *     caja con folio/QR. Todavía no tiene un camino a venta (eso es el
- *     Bloque E — "Cargar a venta" hacia Cobro con revalidación de
- *     precio/stock): por ahora solo se puede ver y descartar aquí.
+ *     caja con folio/QR.
+ *
+ * Fase 5 (2026-11, "unificación de Pedidos web con Cobro"): ANTES había
+ * DOS caminos a venta para 'pedido_web' ("Cargar a venta" hacia Cobro, y
+ * un botón/modal independiente "Confirmar venta" que llamaba
+ * PedidoTiendaService.confirmarComoVenta() directo, SIN revalidar precio/
+ * stock del servidor). Ese segundo camino se retiró aquí — "Cargar a
+ * venta" (cargarAVenta() abajo) es ahora el ÚNICO camino a venta para los
+ * 2 orígenes, consistente con lo que ya hacía 'menu_qr'.
+ *
+ * Dependencia ya RESUELTA (ver claude/fase5-propuesta-atomicidad-pedido-venta-2026-11.md
+ * y claude/fase5-entrega-final-parteB-2026-11.md del proyecto): "Cargar a
+ * venta" registraba antes la Venta y vinculaba el pedido en DOS pasos
+ * separados (CobroComponent.confirmarCobro(): VentaService.registrar() +
+ * PedidoTiendaService.marcarConfirmadoDesdeVenta() aparte) — no atómico,
+ * con riesgo real de venta duplicada si el segundo paso fallaba. Desde
+ * Fase 5 Parte B (2026-11), confirmarCobro() usa
+ * VentaService.registrarDesdePedidoTienda() →
+ * ventas.fn_pedido_tienda_cargar_a_venta(), que hace candado + registro de
+ * la venta + actualización del pedido en UNA sola transacción atómica e
+ * idempotente. marcarConfirmadoDesdeVenta() ya no tiene ningún llamador
+ * real (queda en PedidoTiendaService como código muerto, sin retirar
+ * todavía por no haber sido pedido explícitamente).
  *
  * Bandeja paginada/filtrada del lado del servidor (ver
  * ventas.fn_pedidos_tienda_listar() y PedidoTiendaService.listar()) — mismo
@@ -44,7 +56,7 @@ import { PedidoTiendaService } from './pedido-tienda.service';
 @Component({
   selector: 'app-pedidos-tienda',
   standalone: true,
-  imports: [ReactiveFormsModule, ConfirmDialogComponent, DatePipe],
+  imports: [ConfirmDialogComponent, DatePipe],
   templateUrl: './pedidos-tienda.component.html',
   styleUrl: './pedidos-tienda.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -55,23 +67,17 @@ export class PedidosTiendaComponent implements OnInit, OnDestroy {
   }
 
   private readonly data = inject(DataClientService);
-  private readonly auth = inject(AuthService);
-  private readonly fb = inject(FormBuilder);
-  private readonly clienteService = inject(ClienteService);
-  private readonly turnoCajaService = inject(TurnoCajaService);
   private readonly pedidoTiendaService = inject(PedidoTiendaService);
   private readonly cargaVentaPedidoTienda = inject(CargaVentaPedidoTiendaService);
   private readonly router = inject(Router);
   protected readonly toast = inject(ToastService);
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
   protected readonly formatMoneda = formatMoneda;
-  protected readonly metodosPago = METODOS_PAGO;
 
   protected readonly cargando = signal(true);
   protected readonly cargandoDetalle = signal(false);
   protected readonly filas = signal<FilaPedidoTienda[]>([]);
   protected readonly totalFilas = signal(0);
-  protected readonly bodegas = signal<Bodega[]>([]);
 
   // ── Filtros — server-side: ningún cambio dispara una consulta por sí
   //    solo, solo el botón "🔍 Buscar" (o Enter en el buscador), ver
@@ -86,9 +92,17 @@ export class PedidosTiendaComponent implements OnInit, OnDestroy {
   protected readonly paginaActual = signal(1);
   protected readonly totalPaginas = computed(() => Math.max(1, Math.ceil(this.totalFilas() / this.tamanioPagina())));
 
+  /** Evita que una respuesta vieja (petición lenta) pise el resultado de
+   *  una búsqueda/página/confirmación/descarte más reciente — mismo
+   *  patrón que KardexComponent.secuenciaListado /
+   *  MovimientosBodegaComponent.secuenciaHistorial (homologación Fase 1,
+   *  "Prompt maestro" nov-2026: esta pantalla ya decía seguir ese mismo
+   *  criterio pero le faltaba esta guarda). */
+  private secuenciaPedidos = 0;
+
   async ngOnInit(): Promise<void> {
     document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
-    await Promise.all([this.cargarBodegas(), this.cargarPedidos()]);
+    await this.cargarPedidos();
   }
 
   private hoyISO(): string {
@@ -99,14 +113,9 @@ export class PedidosTiendaComponent implements OnInit, OnDestroy {
     return Math.max(1, this.preferenciasGrid.tamanoPagina());
   }
 
-  private async cargarBodegas(): Promise<void> {
-    const bodegas = await firstValueFrom(this.data.list<Bodega>('Bodega'));
-    this.bodegas.set(bodegas.filter((b) => b.activo !== false));
-    this.bodegaConversionId.set(this.bodegas()[0]?.id ?? null);
-  }
-
   private async cargarPedidos(): Promise<void> {
     this.cargando.set(true);
+    const miSecuencia = ++this.secuenciaPedidos;
     const tamanio = this.tamanioPagina();
     const desde = (this.paginaActual() - 1) * tamanio;
     const estado = this.filtroEstado();
@@ -123,6 +132,7 @@ export class PedidosTiendaComponent implements OnInit, OnDestroy {
         desde,
         tamanio,
       );
+      if (miSecuencia !== this.secuenciaPedidos) return; // ya respondió una búsqueda/página/acción más nueva — descartar esta
       // Si la página actual quedó vacía (p.ej. se eliminó la última fila de
       // la última página), regresa a la última página real con datos —
       // mismo criterio que Kardex.
@@ -133,9 +143,10 @@ export class PedidosTiendaComponent implements OnInit, OnDestroy {
       this.filas.set(resultado.filas);
       this.totalFilas.set(resultado.total);
     } catch (e) {
+      if (miSecuencia !== this.secuenciaPedidos) return; // ya hay una más nueva en curso — no pisarla con este error
       this.toast.error('No se pudo cargar la bandeja de pedidos: ' + (e instanceof Error ? e.message : 'error desconocido'));
     } finally {
-      this.cargando.set(false);
+      if (miSecuencia === this.secuenciaPedidos) this.cargando.set(false);
     }
   }
 
@@ -161,14 +172,6 @@ export class PedidosTiendaComponent implements OnInit, OnDestroy {
   protected readonly pedidoDetalle = signal<PedidoTienda | null>(null);
   protected readonly pedidoADescartar = signal<PedidoTienda | null>(null);
   protected readonly pedidoAEliminar = signal<FilaPedidoTienda | null>(null);
-
-  protected readonly modalConfirmarAbierto = signal(false);
-  protected readonly bodegaConversionId = signal<number | null>(null);
-  protected readonly confirmando = signal(false);
-
-  protected readonly confirmarForm = this.fb.nonNullable.group({
-    metodoPago: ['Efectivo' as MetodoPago, Validators.required],
-  });
 
   /** A demanda — nunca se trae junto con el listado (ver el comentario
    *  grande arriba). */
@@ -218,15 +221,14 @@ export class PedidosTiendaComponent implements OnInit, OnDestroy {
     await this.cargarPedidos();
   }
 
-  /** "Cargar a venta" (Bloque E) — revalida precio/disponibilidad del lado
-   *  del servidor (nunca confía en el total/precio guardado en el
-   *  pedido/orden, sección 30 del plan), precarga el carrito de Cobro vía
-   *  CargaVentaPedidoTiendaService y navega ahí. El cajero sigue pudiendo
-   *  editar TODO antes de cobrar — esto no registra ninguna venta por sí
-   *  solo ("cargar a venta" ≠ "venta cobrada"). Disponible para los 2
-   *  orígenes: para 'pedido_web' coexiste con "Confirmar venta" (el
-   *  flujo directo de siempre, que sigue intacto); para 'menu_qr' es el
-   *  único camino a venta por ahora. */
+  /** "Cargar a venta" — único camino a venta para los 2 orígenes desde
+   *  Fase 5 (ver el comentario grande de la clase). Revalida precio/
+   *  disponibilidad del lado del servidor (nunca confía en el total/
+   *  precio guardado en el pedido/orden, sección 30 del plan), precarga
+   *  el carrito de Cobro vía CargaVentaPedidoTiendaService y navega ahí.
+   *  El cajero sigue pudiendo editar TODO antes de cobrar — esto no
+   *  registra ninguna venta por sí solo ("cargar a venta" ≠ "venta
+   *  cobrada"). */
   protected async cargarAVenta(pedido: PedidoTienda): Promise<void> {
     // Reclamo atómico (Bloque G) ANTES de revalidar/navegar — ver el
     // comentario grande de PedidoTiendaService.reclamar(): nunca se decide
@@ -263,89 +265,4 @@ export class PedidosTiendaComponent implements OnInit, OnDestroy {
     }
   }
 
-  async abrirConfirmar(): Promise<void> {
-    const usuario = this.auth.usuarioActual();
-    const pedido = this.pedidoDetalle();
-    if (!usuario || !pedido) return;
-    // "Confirmar venta" (finaliza directo, sin pasar por Cobro) sigue
-    // siendo exclusivo de 'pedido_web' — para 'menu_qr' falta "Cargar a
-    // venta" con revalidación de precio/stock (Bloque E); el botón ya no
-    // se muestra para 'menu_qr' en el HTML, esto es la misma defensa que
-    // ya se aplicó en abrirEnvio() de la tienda pública.
-    if (pedido.origen !== 'pedido_web') return;
-
-    // turnoAbiertoOCrear(): si "Apertura de caja" está desactivada, abre uno
-    // en silencio en vez de bloquear — ver su comentario en TurnoCajaService.
-    const turno = await this.turnoCajaService.turnoAbiertoOCrear(usuario.id);
-    if (!turno) {
-      this.toast.advertencia('Abre un turno de caja antes de confirmar un pedido como venta.');
-      return;
-    }
-
-    // Reclamo atómico (Bloque G) — ver cargarAVenta() arriba, mismo
-    // mecanismo: confirmar directo también puede chocar con otro cajero
-    // haciendo lo mismo (o con "Cargar a venta" hacia Cobro) al mismo
-    // tiempo, nunca se confía solo en el estado ya cargado en Angular.
-    const reclamado = await this.pedidoTiendaService.reclamar(pedido.id);
-    if (!reclamado) {
-      this.toast.advertencia('Este pedido ya está siendo atendido en otra caja (o ya cambió de estado).');
-      await this.cargarPedidos();
-      return;
-    }
-
-    this.confirmarForm.reset({ metodoPago: 'Efectivo' });
-    this.modalConfirmarAbierto.set(true);
-  }
-
-  /** Suelta el reclamo tomado en abrirConfirmar() — ver
-   *  PedidoTiendaService.liberar() (best-effort, no bloquea el cierre del
-   *  modal). Al confirmar de verdad (confirmarConfirmar()) no hace falta
-   *  liberar: el pedido pasa a 'Confirmado' y ya no se puede volver a
-   *  reclamar sin importar estos campos. */
-  cerrarConfirmar(): void {
-    const pedido = this.pedidoDetalle();
-    if (pedido) this.pedidoTiendaService.liberar(pedido.id).catch(() => {});
-    this.modalConfirmarAbierto.set(false);
-  }
-
-  async confirmarConfirmar(): Promise<void> {
-    const pedido = this.pedidoDetalle();
-    const usuario = this.auth.usuarioActual();
-    if (!pedido || !usuario) return;
-
-    if (this.bodegaConversionId() === null) {
-      this.toast.advertencia('Elige la bodega de la que se descuenta existencia.');
-      return;
-    }
-    if (this.confirmarForm.invalid) {
-      this.confirmarForm.markAllAsTouched();
-      return;
-    }
-
-    this.confirmando.set(true);
-    try {
-      const turno = await this.turnoCajaService.turnoAbiertoOCrear(usuario.id);
-      if (!turno) {
-        this.toast.advertencia('Ya no tienes un turno de caja abierto.');
-        return;
-      }
-      const generico = await this.clienteService.obtenerOCrearGenerico();
-
-      const valor = this.confirmarForm.getRawValue();
-      const venta = await this.pedidoTiendaService.confirmarComoVenta(pedido, {
-        turnoCajaId: turno.id,
-        clienteId: generico.id,
-        vendedorUsuarioId: usuario.id,
-        bodegaId: this.bodegaConversionId(),
-        pago: { metodoPago: valor.metodoPago, monto: pedido.total, montoRecibido: null, cambio: null },
-      });
-
-      this.toast.exito(`Pedido confirmado como venta ${venta.folio}.`);
-      this.modalConfirmarAbierto.set(false);
-      this.pedidoDetalle.set({ ...pedido, estado: 'Confirmado', ventaId: venta.id });
-      await this.cargarPedidos();
-    } finally {
-      this.confirmando.set(false);
-    }
-  }
 }
