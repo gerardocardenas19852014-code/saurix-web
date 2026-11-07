@@ -155,3 +155,39 @@ export function calcularDistribucion(params: {
     advertencia,
   };
 }
+
+/**
+ * Tipografía/medidas internas de UNA etiqueta -- función pura, SIN DOM,
+ * que tanto la vista previa en pantalla (ConfiguracionImpresionEtiquetasComponent,
+ * bindings de la muestra) como la impresión real (mismo componente,
+ * imprimir()) deben llamar IGUAL, por la misma razón que calcularDistribucion():
+ * nunca dos cálculos independientes que puedan dar resultados distintos
+ * (sección 4 / sección 5 del mandato de corrección, nov-2026).
+ *
+ * ALTO_BASE_MM (35mm) es la altura de la etiqueta "Mediana", que es el
+ * tamaño sobre el que ya estaban calibrados los tamaños de fuente
+ * históricos (9px nombre / 7px sku / 11px precio) -- se preserva ese
+ * calibre para Mediana (escala 1) y se escala proporcionalmente para
+ * Pequeña/Grande/Personalizada, con piso y techo para no volverse
+ * ilegible ni desproporcionado.
+ */
+const ALTO_BASE_TIPOGRAFIA_MM = 35;
+
+export interface TipografiaEtiqueta {
+  nombrePx: number;
+  skuPx: number;
+  precioPx: number;
+  /** % del alto de la etiqueta que ocupa el área del código (QR o barras) --
+   *  mismo criterio para vista previa e impresión real. */
+  codigoAltoPct: number;
+}
+
+export function calcularTipografia(etiquetaAltoMm: number): TipografiaEtiqueta {
+  const escala = etiquetaAltoMm > 0 ? Math.min(1.5, Math.max(0.65, etiquetaAltoMm / ALTO_BASE_TIPOGRAFIA_MM)) : 1;
+  return {
+    nombrePx: Math.max(7, Math.round(9 * escala)),
+    skuPx: Math.max(6, Math.round(7 * escala)),
+    precioPx: Math.max(8, Math.round(11 * escala)),
+    codigoAltoPct: 55,
+  };
+}

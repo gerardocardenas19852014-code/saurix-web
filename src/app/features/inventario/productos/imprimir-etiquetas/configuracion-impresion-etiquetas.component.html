@@ -137,6 +137,9 @@
 
     <div class="config-etiquetas-preview">
       <p class="hint" style="margin:0 0 8px;"><strong>Vista previa</strong></p>
+      <p class="hint" style="margin:0 0 8px;">
+        A escala (no es el tamaño físico real -- use la prueba de calibración para verificar milímetros con una regla).
+      </p>
 
       @if (distribucion().advertencia) {
         <p class="config-etiquetas-advertencia">{{ distribucion().advertencia }}</p>
@@ -149,18 +152,28 @@
         {{ distribucion().paginas }} hoja{{ distribucion().paginas === 1 ? '' : 's' }} estimada{{ distribucion().paginas === 1 ? '' : 's' }}
       </div>
 
-      <div class="config-etiquetas-muestra" [style.grid-template-columns]="'repeat(' + columnasGrid() + ', 1fr)'">
+      <div class="config-etiquetas-muestra" [style.grid-template-columns]="'repeat(' + columnasGrid() + ', ' + previewMedidas().itemAnchoPx + 'px)'">
         @for (p of muestraPreview(); track p.id) {
-          <div class="config-etiquetas-muestra-item">
-            <div class="config-etiquetas-muestra-codigo" [class.es-qr]="formato() === 'qr'" [innerHTML]="svgPorCodigo().get(p.codigo) ?? null"></div>
+          <div
+            class="config-etiquetas-muestra-item"
+            [style.width.px]="previewMedidas().itemAnchoPx"
+            [style.height.px]="previewMedidas().itemAltoPx"
+          >
+            <div
+              class="config-etiquetas-muestra-codigo"
+              [class.es-qr]="formato() === 'qr'"
+              [style.width.px]="previewMedidas().codigoAnchoPx"
+              [style.height.px]="previewMedidas().codigoAltoPxFinal"
+              [innerHTML]="svgPorCodigo().get(p.codigo) ?? null"
+            ></div>
             @if (mostrarNombre()) {
-              <div class="config-etiquetas-muestra-nombre">{{ p.nombre }}</div>
+              <div class="config-etiquetas-muestra-nombre" [style.font-size.px]="tipografia().nombrePx">{{ p.nombre }}</div>
             }
             @if (mostrarSku()) {
-              <div class="config-etiquetas-muestra-sku">{{ p.codigo }}</div>
+              <div class="config-etiquetas-muestra-sku" [style.font-size.px]="tipografia().skuPx">{{ p.codigo }}</div>
             }
             @if (mostrarPrecio()) {
-              <div class="config-etiquetas-muestra-precio">{{ formatMoneda(p.precioUnitario) }}</div>
+              <div class="config-etiquetas-muestra-precio" [style.font-size.px]="tipografia().precioPx">{{ formatMoneda(p.precioUnitario) }}</div>
             }
           </div>
         }
@@ -169,6 +182,20 @@
       @if (totalEtiquetas() > muestraPreview().length) {
         <p class="hint" style="margin-top:8px;">… y {{ totalEtiquetas() - muestraPreview().length }} etiqueta(s) más (muestra limitada a {{ muestraPreview().length }}).</p>
       }
+
+      <div class="config-etiquetas-calibracion">
+        <button type="button" class="btn-secondary small" [disabled]="imprimiendoCalibracion()" (click)="imprimirPruebaCalibracion()">
+          @if (imprimiendoCalibracion()) {
+            Generando…
+          } @else {
+            🖨 Imprimir prueba de calibración (regla de 100×100mm)
+          }
+        </button>
+        <p class="hint" style="margin:6px 0 0;">
+          Imprímala a tamaño real/100% (nunca "Ajustar a la página") y mídala con una regla física
+          antes de confiar en que el tamaño de etiqueta elegido saldrá correcto en su impresora.
+        </p>
+      </div>
     </div>
   </div>
 </div>

@@ -29,40 +29,50 @@
       (input)="busqueda.set($any($event.target).value)"
       (keyup.enter)="cambiarFiltro()"
     />
-    <button type="button" class="btn-primary small" (click)="cambiarFiltro()">🔍 Buscar</button>
+    <button type="button" class="btn-primary small" [disabled]="cargando()" (click)="cambiarFiltro()">🔍 Buscar</button>
   </div>
 
   <div class="grid-filter">
-    <button type="button" class="btn-secondary small" (click)="exportarCsv()">⬇ Exportar CSV</button>
-    <button type="button" class="btn-secondary small" (click)="exportarPdf()">⬇ Exportar PDF</button>
+    <button type="button" class="btn-secondary small" [disabled]="!haBuscado()" (click)="exportarCsv()">⬇ Exportar CSV</button>
+    <button type="button" class="btn-secondary small" [disabled]="!haBuscado()" (click)="exportarPdf()">⬇ Exportar PDF</button>
   </div>
 </div>
 
-<!-- Paginación REAL contra el servidor (ver cargarListado()/irAPaginaSiguiente()/
-     irAPaginaAnterior() en historial-ventas.component.ts) — mismo criterio que
-     Clientes/Productos/Órdenes de compra. -->
-<div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-bottom:10px;">
-  <span class="hint" style="margin:0;">
-    Página {{ paginaActual() }} de {{ totalPaginas() }} — {{ totalVentasFiltradas() }} venta(s)
-  </span>
-  <button type="button" class="btn-secondary small" [disabled]="paginaActual() <= 1 || cargando()" (click)="irAPaginaAnterior()">
-    ← Anterior
-  </button>
-  <button type="button" class="btn-secondary small" [disabled]="paginaActual() >= totalPaginas() || cargando()" (click)="irAPaginaSiguiente()">
-    Siguiente →
-  </button>
-</div>
+<!-- Búsqueda manual: al abrir la pantalla no se consulta nada (ver
+     ngOnInit() en historial-ventas.component.ts) -- solo se muestran los
+     filtros, con una invitación a presionar "Buscar", hasta que el usuario
+     ejecute la primera búsqueda. -->
+@if (!haBuscado()) {
+  <p class="empty" style="margin-top:20px;">Ajusta los filtros y presiona "🔍 Buscar" para ver resultados.</p>
+} @else {
+  <!-- Paginación REAL contra el servidor (ver cargarListado()/irAPaginaSiguiente()/
+       irAPaginaAnterior() en historial-ventas.component.ts) — mismo criterio que
+       Clientes/Productos/Órdenes de compra. La paginación usa SIEMPRE los
+       filtros de la última búsqueda ejecutada (filtrosAplicados), nunca lo
+       que se esté editando en ese momento. -->
+  <div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-bottom:10px;">
+    <span class="hint" style="margin:0;">
+      Página {{ paginaActual() }} de {{ totalPaginas() }} — {{ totalVentasFiltradas() }} venta(s)
+    </span>
+    <button type="button" class="btn-secondary small" [disabled]="paginaActual() <= 1 || cargando()" (click)="irAPaginaAnterior()">
+      ← Anterior
+    </button>
+    <button type="button" class="btn-secondary small" [disabled]="paginaActual() >= totalPaginas() || cargando()" (click)="irAPaginaSiguiente()">
+      Siguiente →
+    </button>
+  </div>
 
-<app-data-table
-  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
-  [columnas]="columnas"
-  [filas]="ventasPagina()"
-  [cargando]="cargando()"
-  [ocultarEditarEliminar]="true"
-  accionExtraEtiqueta="Ver detalle"
-  accionExtraTitulo="Ver renglones, pagos y acciones de esta venta"
-  (accionExtra)="verDetalle($event)"
-/>
+  <app-data-table
+    [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+    [columnas]="columnas"
+    [filas]="ventasPagina()"
+    [cargando]="cargando()"
+    [ocultarEditarEliminar]="true"
+    accionExtraEtiqueta="Ver detalle"
+    accionExtraTitulo="Ver renglones, pagos y acciones de esta venta"
+    (accionExtra)="verDetalle($event)"
+  />
+}
 
 @if (ventaDetalle(); as venta) {
   <div class="modal-overlay show" (click)="cerrarDetalle()">

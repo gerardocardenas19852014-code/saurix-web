@@ -101,7 +101,15 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
   /** Solo la página actual, ya filtrada/ordenada/recortada y con nombres
    *  resueltos por el servidor — ver cargarListado(). */
   protected readonly ventasPagina = signal<FilaHistorialVenta[]>([]);
-  protected readonly cargando = signal(true);
+  /** false hasta que termine una búsqueda -- nunca arranca en true: ya no se
+   *  consulta nada al abrir la pantalla (ver ngOnInit() y sección "Búsqueda
+   *  manual" del mandato de corrección, nov-2026: "mostrar los filtros sin
+   *  consultar ni cargar resultados" al abrir). */
+  protected readonly cargando = signal(false);
+  /** true en cuanto el usuario presiona "Buscar" por primera vez -- antes de
+   *  eso la tabla no debe mostrar "sin resultados" (sería confuso, todavía
+   *  no se buscó nada) sino una invitación a buscar. */
+  protected readonly haBuscado = signal(false);
 
   /** Filtros EN EDICIÓN — nunca disparan una consulta por sí solos. Solo
    *  cambiarFiltro() (botón "🔍 Buscar" o Enter) los aplica de verdad. */
@@ -109,6 +117,24 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
   protected readonly fechaDesde = signal(this.hoyISO());
   protected readonly fechaHasta = signal(this.hoyISO());
   protected readonly filtroEstado = signal<'Todas' | 'Completada' | 'Cancelada'>('Todas');
+
+  /** Filtros APLICADOS -- la foto de los filtros tal como estaban cuando se
+   *  presionó "Buscar" por última vez. cargarListadoSupabase()/exportarCsv()/
+   *  exportarPdf() y la paginación (irAPaginaAnterior()/irAPaginaSiguiente())
+   *  leen SIEMPRE de aquí, nunca de los signals "en edición" de arriba --
+   *  así, si el usuario cambia un filtro después de buscar pero no presiona
+   *  Buscar otra vez, paginar/exportar sigue usando la búsqueda anterior,
+   *  no el filtro a medio editar (requisito explícito del mandato de
+   *  corrección, nov-2026: "La paginación debe utilizar los filtros de la
+   *  última búsqueda ejecutada, no los filtros que todavía se están
+   *  editando" / "Las exportaciones CSV/PDF deben corresponder a la última
+   *  búsqueda ejecutada"). null = todavía no se ejecutó ninguna búsqueda. */
+  private filtrosAplicados: {
+    busqueda: string;
+    estado: 'Todas' | 'Completada' | 'Cancelada';
+    desde: string;
+    hasta: string;
+  } | null = null;
 
   protected readonly paginaActual = signal(1);
   /** Total real de ventas que cumplen el filtro actual (antes de recortar
@@ -205,9 +231,11 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
     return new Date(fecha).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' });
   }
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void {
     document.documentElement.setAttribute('data-wide', 'grid'); // ancho completo
-    await this.cargarListado();
+    // NO se consulta nada al abrir -- solo se muestran los filtros, en
+    // espera de que el usuario presione "Buscar" (ver cambiarFiltro() y
+    // haBuscado()/filtrosAplicados más arriba).
   }
 
   /** Trae SOLO la página actual del historial que cumple el filtro
@@ -239,14 +267,15 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
    *  DESC, pagina con OFFSET/LIMIT y calcula el conteo real de filas
    *  (count(*) over(), columna total_filas) en una sola consulta. */
   private async cargarListadoSupabase(): Promise<{ filas: FilaHistorialVenta[]; total: number }> {
+    const f = this.filtrosAplicados;
+    if (!f) return { filas: [], total: 0 }; // defensivo: no debería llamarse sin una búsqueda ya ejecutada.
     const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
     const desde = (this.paginaActual() - 1) * tamanio;
-    const estado = this.filtroEstado();
     const { data, error } = await this.sb.schema('ventas').rpc('fn_historial_ventas_listar', {
-      p_busqueda: this.busqueda().trim() || null,
-      p_estado: estado === 'Todas' ? null : estado,
-      p_desde_fecha: this.fechaDesde() || null,
-      p_hasta_fecha: this.fechaHasta() || null,
+      p_busqueda: f.busqueda.trim() || null,
+      p_estado: f.estado === 'Todas' ? null : f.estado,
+      p_desde_fecha: f.desde || null,
+      p_hasta_fecha: f.hasta || null,
       p_desde: desde,
       p_cantidad: tamanio,
     });
@@ -278,6 +307,13 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
    *  sí solo. Vuelve a la página 1: quedarse en una página de un filtro
    *  nuevo casi siempre cae fuera de rango. */
   protected cambiarFiltro(): void {
+    this.filtrosAplicados = {
+      busqueda: this.busqueda(),
+      estado: this.filtroEstado(),
+      desde: this.fechaDesde(),
+      hasta: this.fechaHasta(),
+    };
+    this.haBuscado.set(true);
     this.paginaActual.set(1);
     this.cargarListado();
   }
@@ -437,12 +473,16 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
    *  en una sola petición gigante ni descargando de más. Mismo patrón que
    *  UsuariosListComponent.exportarUsuariosCsv(). */
   async exportarCsv(): Promise<void> {
-    const estado = this.filtroEstado();
+    const f = this.filtrosAplicados;
+    if (!f) {
+      this.toast.advertencia('Presiona "Buscar" antes de exportar.');
+      return;
+    }
     const parametros = {
-      p_busqueda: this.busqueda().trim() || null,
-      p_estado: estado === 'Todas' ? null : estado,
-      p_desde_fecha: this.fechaDesde() || null,
-      p_hasta_fecha: this.fechaHasta() || null,
+      p_busqueda: f.busqueda.trim() || null,
+      p_estado: f.estado === 'Todas' ? null : f.estado,
+      p_desde_fecha: f.desde || null,
+      p_hasta_fecha: f.hasta || null,
     };
 
     const todas: FilaHistorialVenta[] = [];
@@ -489,12 +529,16 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
    *  Si hay más filas que las mostradas, lo dice explícitamente (exporta
    *  CSV para el detalle completo). */
   async exportarPdf(): Promise<void> {
-    const estado = this.filtroEstado();
+    const f = this.filtrosAplicados;
+    if (!f) {
+      this.toast.advertencia('Presiona "Buscar" antes de exportar.');
+      return;
+    }
     const { data, error } = await this.sb.schema('ventas').rpc('fn_historial_ventas_listar', {
-      p_busqueda: this.busqueda().trim() || null,
-      p_estado: estado === 'Todas' ? null : estado,
-      p_desde_fecha: this.fechaDesde() || null,
-      p_hasta_fecha: this.fechaHasta() || null,
+      p_busqueda: f.busqueda.trim() || null,
+      p_estado: f.estado === 'Todas' ? null : f.estado,
+      p_desde_fecha: f.desde || null,
+      p_hasta_fecha: f.hasta || null,
       p_desde: 0,
       p_cantidad: TOPE_FILAS_PDF,
     });
@@ -513,7 +557,7 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
     exportarTablaPdf({
       nombreArchivo: 'historial_ventas.pdf',
       titulo: 'Historial de ventas',
-      subtitulo: notaListado ?? `Del ${this.fechaDesde()} al ${this.fechaHasta()}`,
+      subtitulo: notaListado ?? `Del ${f.desde} al ${f.hasta}`,
       columnas: [
         { etiqueta: 'Folio', ancho: 26 },
         { etiqueta: 'Fecha', ancho: 32 },

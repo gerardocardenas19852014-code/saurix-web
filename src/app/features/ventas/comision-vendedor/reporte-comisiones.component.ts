@@ -63,7 +63,11 @@ export class ReporteComisionesComponent implements OnInit, OnDestroy {
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
   protected readonly formatMoneda = formatMoneda;
 
-  protected readonly cargando = signal(true);
+  /** false hasta terminar una búsqueda -- ya no se consulta nada al abrir
+   *  la pantalla (ver ngOnInit()). */
+  protected readonly cargando = signal(false);
+  /** true en cuanto el usuario presiona "Buscar" por primera vez. */
+  protected readonly haBuscado = signal(false);
 
   /** Catálogo chico (vendedores activos) — se carga UNA sola vez, solo
    *  para llenar el combo "Vendedor"; nunca para calcular nada (eso lo
@@ -76,6 +80,14 @@ export class ReporteComisionesComponent implements OnInit, OnDestroy {
   protected readonly fechaDesde = signal(this.primerDiaMesISO());
   protected readonly fechaHasta = signal(this.hoyISO());
   protected readonly filtroVendedorId = signal(0); // 0 = todos los vendedores
+
+  /** Filtros APLICADOS -- foto de los filtros tal como estaban cuando se
+   *  presionó "Buscar" por última vez. cargarListadoSupabase() y la
+   *  paginación leen SIEMPRE de aquí, nunca de los signals "en edición" de
+   *  arriba (mismo criterio que HistorialVentasComponent -- ver mandato de
+   *  corrección "Búsqueda manual en reportes de ventas", nov-2026). null =
+   *  todavía no se ejecutó ninguna búsqueda. */
+  private filtrosAplicados: { desde: string; hasta: string; vendedorId: number } | null = null;
 
   protected readonly paginaActual = signal(1);
   protected readonly totalVendedoresFiltrados = signal(0);
@@ -105,9 +117,11 @@ export class ReporteComisionesComponent implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     document.documentElement.setAttribute('data-wide', 'grid');
+    // El catálogo de vendedores SÍ se carga al abrir (solo llena el combo de
+    // filtro, nunca calcula nada) -- lo que ya NO se hace al abrir es
+    // consultar el reporte: eso espera a que se presione "Buscar".
     const usuarios = await firstValueFrom(this.data.list<Usuario>('Usuario'));
     this.usuarios.set(usuarios);
-    await this.cargarListado();
   }
 
   /** Trae SOLO la página actual de vendedores que cumplen el filtro
@@ -132,12 +146,14 @@ export class ReporteComisionesComponent implements OnInit, OnDestroy {
   }
 
   private async cargarListadoSupabase(): Promise<{ filas: FilaReporteComision[]; total: number; sumaComisionTotal: number }> {
+    const f = this.filtrosAplicados;
+    if (!f) return { filas: [], total: 0, sumaComisionTotal: 0 }; // defensivo: no debería llamarse sin una búsqueda ya ejecutada.
     const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
     const desde = (this.paginaActual() - 1) * tamanio;
     const { data, error } = await this.sb.schema('ventas').rpc('fn_reporte_comisiones_listar', {
-      p_desde_fecha: this.fechaDesde() || null,
-      p_hasta_fecha: this.fechaHasta() || null,
-      p_vendedor_id: this.filtroVendedorId() || null,
+      p_desde_fecha: f.desde || null,
+      p_hasta_fecha: f.hasta || null,
+      p_vendedor_id: f.vendedorId || null,
       p_desde: desde,
       p_cantidad: tamanio,
     });
@@ -166,6 +182,12 @@ export class ReporteComisionesComponent implements OnInit, OnDestroy {
   /** Único disparador de una consulta nueva (botón "🔍 Buscar") — cambiar
    *  fecha o vendedor nunca consulta por sí solo. Vuelve a la página 1. */
   protected cambiarFiltro(): void {
+    this.filtrosAplicados = {
+      desde: this.fechaDesde(),
+      hasta: this.fechaHasta(),
+      vendedorId: this.filtroVendedorId(),
+    };
+    this.haBuscado.set(true);
     this.paginaActual.set(1);
     void this.cargarListado();
   }

@@ -23,11 +23,13 @@
         <option [value]="usuario.id">{{ usuario.nombre }}</option>
       }
     </select>
-    <button type="button" class="btn-primary small" (click)="cambiarFiltro()">🔍 Buscar</button>
+    <button type="button" class="btn-primary small" [disabled]="cargando()" (click)="cambiarFiltro()">🔍 Buscar</button>
   </div>
 </div>
 
-@if (cargando()) {
+@if (!haBuscado()) {
+  <p class="empty" style="margin-top:20px;">Ajusta los filtros y presiona "🔍 Buscar" para ver el reporte.</p>
+} @else if (cargando()) {
   <p class="empty">Cargando…</p>
 } @else {
   <div class="dashboard-stats" style="margin-bottom: 24px;">
@@ -43,10 +45,10 @@
     <span class="hint" style="margin:0;">
       Página {{ paginaActual() }} de {{ totalPaginas() }} — {{ totalVendedoresFiltrados() }} vendedor(es)
     </span>
-    <button type="button" class="btn-secondary small" [disabled]="paginaActual() <= 1" (click)="irAPaginaAnterior()">
+    <button type="button" class="btn-secondary small" [disabled]="paginaActual() <= 1 || cargando()" (click)="irAPaginaAnterior()">
       ← Anterior
     </button>
-    <button type="button" class="btn-secondary small" [disabled]="paginaActual() >= totalPaginas()" (click)="irAPaginaSiguiente()">
+    <button type="button" class="btn-secondary small" [disabled]="paginaActual() >= totalPaginas() || cargando()" (click)="irAPaginaSiguiente()">
       Siguiente →
     </button>
   </div>
