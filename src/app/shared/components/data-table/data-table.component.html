@@ -1,9 +1,9 @@
 <div class="grid-table-scroll">
-  <table class="grid-table" [attr.data-cargando]="cargando()">
+  <table class="grid-table" [class.grid-table-compacta]="compacto()" [attr.data-cargando]="cargando()">
     <thead>
       <tr>
         @for (columna of columnasFila(); track columna.claveColumna ?? columna.campo) {
-          <th>
+          <th [style.width.px]="columna.anchoColumna ?? null">
             <button
               type="button"
               class="grid-sort-button"
@@ -23,9 +23,26 @@
       @for (fila of filasPagina(); track fila.id) {
         <tr [class.grid-fila-con-subfila]="columnaSubfila()">
           @for (columna of columnasFila(); track columna.claveColumna ?? columna.campo) {
-            <td [attr.data-label]="columna.etiqueta">
-              @if (columna.claseValor) {
-                <span class="grid-badge {{ columna.claseValor(fila) }}" [title]="columna.titulo ? columna.titulo(fila) : ''">{{ valorCelda(fila, columna) }}</span>
+            <td [attr.data-label]="columna.etiqueta" [style.width.px]="columna.anchoColumna ?? null">
+              @if (columna.subEtiqueta) {
+                <div class="grid-cell-contenido">
+                  @if (columna.claseValor) {
+                    <span class="grid-badge {{ columna.claseValor(fila) }}" [class.grid-badge-recortada]="columna.anchoMaximo" [style.max-width.px]="columna.anchoMaximo ?? null" [title]="columna.titulo ? columna.titulo(fila) : ''">{{ valorCelda(fila, columna) }}</span>
+                  } @else if (columna.titulo) {
+                    <span
+                      class="grid-cell-truncada"
+                      [class.grid-cell-truncada-multilinea]="columna.multilinea"
+                      [style.max-width.px]="columna.anchoMaximo ?? null"
+                      [title]="columna.titulo(fila)"
+                      >{{ valorCelda(fila, columna) }}</span
+                    >
+                  } @else {
+                    {{ valorCelda(fila, columna) }}
+                  }
+                  <div class="grid-cell-sub" [style.max-width.px]="columna.anchoMaximo ?? null" [title]="columna.subEtiqueta(fila)">{{ columna.subEtiqueta(fila) }}</div>
+                </div>
+              } @else if (columna.claseValor) {
+                <span class="grid-badge {{ columna.claseValor(fila) }}" [class.grid-badge-recortada]="columna.anchoMaximo" [style.max-width.px]="columna.anchoMaximo ?? null" [title]="columna.titulo ? columna.titulo(fila) : ''">{{ valorCelda(fila, columna) }}</span>
               } @else if (columna.titulo) {
                 <span
                   class="grid-cell-truncada"

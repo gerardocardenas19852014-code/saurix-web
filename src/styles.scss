@@ -218,7 +218,19 @@ h1, h2 { font-family: 'Montserrat', sans-serif; font-weight: 700; color: var(--h
   .main-topbar { position: static; flex-wrap: wrap; padding: 12px 16px; }
 }
 
-.content { max-width: 980px; margin: 0 auto; padding: 40px 32px 80px; }
+/* min-width:0 -- autorizado explícitamente por el usuario (mandato "Ajuste
+   visual de Lista de tickets", nov-2026) aunque .content es compartido por
+   toda la app: .content es un elemento flex (hijo de .app-shell) y, sin
+   esto, el default de CSS (min-width:auto en flex items) le impide encogerse
+   por debajo del ancho mínimo de su contenido -- cuando una pantalla tiene
+   contenido ancho (p.ej. la tabla de Lista de tickets en una laptop de
+   ~1366-1440px), en vez de que el scroll quede contenido donde ya estaba
+   pensado (.grid-table-scroll, que ya trae overflow-x:auto para esto), TODA
+   la página se ensancha más que la ventana -- scroll horizontal de página,
+   justo lo que ninguna pantalla de Saurix debe tener. Con min-width:0, el
+   contenido ancho vuelve a quedar contenido en su propio scroll interno. Sin
+   efecto visual en ninguna pantalla que hoy no desborde (la inmensa mayoría). */
+.content { max-width: 980px; margin: 0 auto; padding: 40px 32px 80px; min-width: 0; }
 .content.content-wide { max-width: none; }
 .hero { margin-bottom: 40px; max-width: 640px; }
 .hero h1 { font-family: 'Montserrat', sans-serif; font-weight: 700; color: var(--heading-navy); font-size: 36px; line-height: 1.2; margin: 0 0 10px; }
@@ -354,6 +366,17 @@ html[data-wide='grid'] .content { max-width: 1600px; }
 // Ocupa su propio renglón dentro de .board-filters (en vez de compartir fila
 // con los demás combos), sin estirarse a todo el ancho del contenedor.
 .board-filter-field-full { flex: 0 1 auto; }
+
+/* Lista de tickets (Gestión de proyectos → Tickets, modoVista='lista'): con
+   el contenedor a ancho completo (html[data-wide='grid']) el flex:1 1 140px
+   genérico de .board-filter-field estiraba cada combo corto (Tipo, Módulo,
+   Prioridad...) de forma pareja e innecesaria -- aquí se fija un ancho
+   cómodo y fijo para los combos y se deja que "Buscar" (el campo que más
+   aprovecha el espacio extra) absorba lo que sobra. Clase extra
+   ".tickets-filtros" en el propio <div class="board-filters"> de Tickets --
+   el resto de pantallas que usan .board-filters no se ven afectadas. */
+.board-filters.tickets-filtros .board-filter-field { flex: 0 1 170px; }
+.board-filters.tickets-filtros .board-filter-field-buscar { flex: 2 1 260px; }
 
 // Filtro de Estado con selección múltiple (tickets › Lista de tickets): un
 // botón con la misma pinta que los <select> vecinos que abre un desplegable
@@ -1211,6 +1234,13 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
 .grid-sort-button span { font-size: 12px; line-height: 1; opacity: .7; }
 .grid-table td { padding: 11px 16px; border-bottom: 1px solid var(--line); vertical-align: middle; color: var(--text-strong); }
 .grid-table tbody tr:last-child td { border-bottom: none; }
+/* Variante compacta (ColumnaTabla/DataTableComponent.compacto) -- menos
+   padding vertical para mostrar más registros por pantalla sin tocar la
+   variante normal (.grid-table sin esta clase sigue igual en todas las
+   demás pantallas) -- ver mandato "Ajuste visual de Lista de tickets",
+   nov-2026. */
+.grid-table.grid-table-compacta th { padding: 7px 14px; }
+.grid-table.grid-table-compacta td { padding: 7px 14px; }
 .grid-table tbody tr { transition: background-color .1s ease; }
 .grid-table tbody tr:hover td { background-color: var(--accent-soft); }
 .grid-actions-col { text-align: right; }
@@ -1227,6 +1257,23 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
  * ticket, que de otra forma estiran el renglón entero y empujan/tapan los
  * botones de Acciones cuando el texto es largo. */
 .grid-cell-truncada { display: inline-block; max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+
+/* Píldora (.grid-badge) con ColumnaTabla.anchoMaximo -- recorta el texto de
+   la píldora en vez de dejarla crecer con el contenido (p.ej. un nombre de
+   Prioridad/Estado inusualmente largo) -- ver ColumnaTabla.anchoMaximo. */
+.grid-badge-recortada { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+
+/* Segunda línea compacta DENTRO de la misma celda (ColumnaTabla.subEtiqueta)
+   -- a diferencia de .grid-subfila-* (renglón de ancho completo aparte),
+   esta vive pegada al valor principal sin aumentar la altura del renglón
+   más que una línea extra pequeña. Pensada para el Título de un ticket
+   debajo de su Folio -- ver mandato "Ajuste visual de Lista de tickets",
+   nov-2026. */
+.grid-cell-contenido { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.grid-cell-sub {
+  font-size: 12px; color: var(--ink-soft); max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* Variante de .grid-cell-truncada que envuelve hasta 2 renglones en vez de
    recortar a una sola línea — ver ColumnaTabla.multilinea. */
@@ -1297,7 +1344,13 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
   .grid-table-scroll { overflow-x: visible; }
   .grid-table { min-width: 0; }
   .grid-table thead { display: none; }
-  .grid-table, .grid-table tbody, .grid-table tr, .grid-table td { display: block; width: 100%; }
+  /* !important: neutraliza la pista de ancho inline que ColumnaTabla.anchoColumna
+     pone en th/td (ver data-table.component.html) -- en la vista de tarjeta
+     de móvil cada celda ya es de ancho completo por diseño, y sin esto el
+     ancho fijo de escritorio (p.ej. 110px para "Prioridad") se filtraría
+     aquí y rompería la tarjeta apilada. Nadie más usa anchoColumna todavía,
+     así que esto no cambia ninguna pantalla existente. */
+  .grid-table, .grid-table tbody, .grid-table tr, .grid-table td { display: block; width: 100% !important; }
   .grid-table tr { padding: 12px 16px; border-bottom: 1px solid var(--line); }
   .grid-table tr:last-child { border-bottom: none; }
   .grid-table tbody tr:hover td { background-color: transparent; }
@@ -1318,6 +1371,18 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
      display:block arriba) — solo falta alinear a la izquierda, igual que
      el resto de contenido con colspan en móvil. */
   .grid-subfila-celda { text-align: left; }
+  /* Mismo criterio que .grid-cell-truncada arriba: en la tarjeta apilada no
+     hay renglón que estirar, así que la sub-línea (ColumnaTabla.subEtiqueta,
+     p.ej. el Título debajo del Folio) se ve completa en vez de recortada,
+     y el apilado vertical se alinea a la derecha como el resto del valor. */
+  .grid-cell-contenido { align-items: flex-end; }
+  .grid-cell-sub { max-width: none; white-space: normal; text-align: right; }
+  /* Mismo criterio: una píldora recortada (ColumnaTabla.anchoMaximo sobre
+     claseValor, p.ej. Prioridad/Estado/Vigencia de un ticket) tampoco tiene
+     renglón que estirar en la tarjeta apilada -- se ve completa. El
+     !important neutraliza el max-width inline que pone anchoMaximo
+     (misma razón que el width !important de arriba). */
+  .grid-badge-recortada { max-width: none !important; overflow: visible; }
 }
 
 .grid-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-top: 16px; padding: 12px 16px; background: var(--paper-raised); border: 1px solid var(--line); border-radius: 10px; }

@@ -59,6 +59,31 @@ export interface ColumnaTabla<T> {
    * columnas/pantallas que usan DataTableComponent no cambia.
    */
   anchoMaximo?: number;
+  /**
+   * Opcional: ancho (px) que se le pide a la COLUMNA completa (encabezado y
+   * todas sus celdas), como pista para el layout automático de la tabla
+   * (`table-layout` sigue en `auto` -- esto no lo fuerza, solo lo sugiere,
+   * y el espacio que una columna angosta deja libre lo absorben las demás
+   * columnas que no tienen `anchoColumna`). Pensado para columnas de valor
+   * corto (p.ej. Prioridad/Estado/Planeado/Vigencia de un ticket) que no
+   * necesitan competir por espacio con columnas de texto libre (Folio,
+   * Módulo, Asignado a) -- ver columnasLista en kanban.component.ts
+   * (mandato "Ajuste visual de Lista de tickets", nov-2026). En móvil
+   * (`@media max-width:640px`, vista de tarjeta) esta pista se ignora
+   * (ver `.grid-table td { width: 100% !important }` en styles.scss), así
+   * que no afecta esa vista. Sin este campo, ninguna columna/pantalla
+   * existente cambia.
+   */
+  anchoColumna?: number;
+  /**
+   * Opcional: una segunda línea, compacta, DENTRO de la misma celda (no un
+   * renglón de ancho completo como `subfila`) -- pensado para mostrar un
+   * dato secundario pegado al principal sin inflar la altura del renglón
+   * (p.ej. el Título de un ticket debajo de su Folio). Se recorta a una
+   * línea con elipsis; el valor completo queda disponible al pasar el
+   * mouse. Ver `.grid-cell-sub`/`.grid-cell-contenido` en styles.scss.
+   */
+  subEtiqueta?: (fila: T) => string;
 }
 
 /**
@@ -79,6 +104,12 @@ export class DataTableComponent<T extends { id: number }> {
   readonly filas = input.required<T[]>();
   readonly tamanoPagina = input<number>(10);
   readonly cargando = input<boolean>(false);
+  /** true = renglones más compactos (menos padding vertical en encabezado y
+   *  celdas) vía la clase `grid-table-compacta` -- pensado para tablas con
+   *  muchas columnas/registros por pantalla (p.ej. Lista de tickets, ver
+   *  mandato "Ajuste visual de Lista de tickets", nov-2026). Sin este input
+   *  (`false` por defecto) ninguna pantalla existente cambia de aspecto. */
+  readonly compacto = input<boolean>(false);
   /** true = solo lectura: oculta por completo la columna "Acciones" (Editar/Eliminar).
    *  Pensado para bitácoras/históricos donde no tiene sentido editar o borrar un registro
    *  ya generado (p.ej. el historial de cambios de estado de un ticket). */

@@ -498,45 +498,60 @@ export class KanbanComponent implements OnInit, OnDestroy {
   /** Columnas de la vista de Lista (tabla) — alternativa al tablero Kanban, mismo estándar del resto del sistema. */
   protected readonly columnasLista: ColumnaTabla<Ticket>[] = [
     {
+      // Folio + Título fusionados en una sola celda -- ver mandato "Ajuste
+      // visual de Lista de tickets", nov-2026: el Título ya no vive en su
+      // propio renglón de ancho completo (subfila), que era justo lo que
+      // más aumentaba la altura de cada registro. Ahora es una segunda
+      // línea COMPACTA dentro de la misma celda del Folio
+      // (ColumnaTabla.subEtiqueta, ver grid-cell-contenido/grid-cell-sub en
+      // styles.scss) -- una sola línea recortada con el texto completo
+      // disponible al pasar el mouse, sin estirar el renglón. Junto con
+      // Módulo y Asignado a, es de las columnas con MÁS espacio (pedido
+      // explícito del mandato) -- el que dejan libre Prioridad/Estado/
+      // Planeado/Vigencia al acotarse abajo -- pero sigue con un tope
+      // (ver anchoMaximo/anchoColumna abajo): sin uno, un título atípico
+      // podía antes estirar la tabla entera sin límite.
       campo: 'numeroTicket',
       etiqueta: 'Folio',
-      // Folios largos (p.ej. "SLA-PROD-TEST-1") estiraban el renglón entero --
-      // mismo tratamiento que Sprint/Asignado: se recorta con elipsis a un
-      // ancho de código corto y el valor completo queda disponible al pasar
-      // el mouse (auditoría "Mejoras de experiencia en lista de tickets",
-      // nov-2026).
       titulo: (fila) => fila.numeroTicket,
-      anchoMaximo: 150,
+      subEtiqueta: (fila) => fila.titulo,
+      // Sin tope, un folio o un título largo hacía crecer la celda (y la
+      // tabla entera, en layout automático) sin límite -- anchoMaximo acota
+      // CADA línea (folio y título) y anchoColumna acota la columna misma;
+      // 280/300px es generoso (varias veces más que Folio interno,
+      // Prioridad o Estado) sin dejar que una sola fila atípica rompa el
+      // ancho de toda la tabla. El valor completo de ambas líneas sigue
+      // disponible al pasar el mouse.
+      anchoMaximo: 220,
+      anchoColumna: 240,
     },
     {
       campo: 'folioInterno',
       etiqueta: 'Folio interno',
       formatear: (fila) => fila.folioInterno || '—',
       titulo: (fila) => fila.folioInterno || '',
-      anchoMaximo: 150,
-    },
-    {
-      campo: 'titulo',
-      etiqueta: 'Título',
-      // El título competía por ancho con el resto de columnas (Proyecto,
-      // Módulo, Sprint, Asignado a, etc.) — por angosto que quedara ese
-      // espacio, siempre se sentía apretado. Ahora se muestra en su propio
-      // renglón de ANCHO COMPLETO debajo de la fila (ColumnaTabla.subfila),
-      // sin competir por espacio horizontal — con un tope de 3 renglones por
-      // si acaso (grid-subfila-valor en styles.scss) y el texto completo
-      // disponible al pasar el mouse.
-      subfila: true,
-      titulo: (fila) => fila.titulo,
+      // anchoColumna (ancho de LA COLUMNA, no solo del texto): columna
+      // secundaria -- debe seguir visible (mandato) pero no competir por
+      // espacio con Folio/Título, Módulo o Asignado a.
+      anchoMaximo: 90,
+      anchoColumna: 95,
     },
     {
       campo: 'ticketTipoId',
       etiqueta: 'Tipo',
       formatear: (fila) => `${this.iconoTipo(fila.ticketTipoId)} ${this.nombreTipo(fila.ticketTipoId)}`.trim(),
+      anchoColumna: 90,
     },
     {
       campo: 'ticketModuloId',
       etiqueta: 'Módulo',
+      // Más espacio que Tipo/Prioridad/Estado (pedido explícito del
+      // mandato) pero con un tope -- sin él, un nombre de módulo largo
+      // podía crecer sin límite igual que pasaba con Folio/Título.
       formatear: (fila) => (fila.ticketModuloId ? `${this.iconoModulo(fila.ticketModuloId)} ${this.nombreModulo(fila.ticketModuloId)}`.trim() : 'Sin módulo'),
+      titulo: (fila) => (fila.ticketModuloId ? this.nombreModulo(fila.ticketModuloId) : 'Sin módulo'),
+      anchoMaximo: 150,
+      anchoColumna: 170,
     },
     {
       campo: 'sprintId',
@@ -547,6 +562,8 @@ export class KanbanComponent implements OnInit, OnDestroy {
       formatear: (fila) => nombreSprintCorto(this.nombreSprint(fila)),
       titulo: (fila) => this.nombreSprint(fila),
       claseValor: (fila) => (fila.sprintId ? 'grid-badge-success' : 'grid-badge-neutral'),
+      anchoMaximo: 75,
+      anchoColumna: 85,
     },
     {
       campo: 'ticketPrioridadId',
@@ -557,34 +574,50 @@ export class KanbanComponent implements OnInit, OnDestroy {
       // entre sí (mismo criterio visual, sin tocar ninguna regla de
       // negocio: es la misma píldora genérica que ya usaba Estado).
       claseValor: () => 'grid-badge-neutral',
+      titulo: (fila) => this.nombrePrioridad(fila.ticketPrioridadId),
+      // Campo corto -- el mandato pide reducir su ancho para liberar
+      // espacio a Folio/Título, Módulo y Asignado a.
+      anchoMaximo: 75,
+      anchoColumna: 85,
     },
     {
       campo: 'tableroColumnaId',
       etiqueta: 'Estado',
       formatear: (fila) => this.nombreColumna(fila.tableroColumnaId),
       claseValor: () => 'grid-badge-neutral',
+      titulo: (fila) => this.nombreColumna(fila.tableroColumnaId),
+      anchoMaximo: 90,
+      anchoColumna: 100,
     },
     {
       campo: 'asignadoUsuarioId',
       etiqueta: 'Asignado a',
-      // Mismo criterio que Título/Sprint en esta tabla: un nombre largo no
-      // debe estirar el renglón ni cortarse a la mitad — se recorta con
-      // elipsis (grid-cell-truncada) y el nombre completo queda disponible
-      // al pasar el mouse (columna.titulo, ver data-table.component.html).
+      // Mismo criterio que Folio/Título/Módulo en esta tabla: un nombre
+      // largo no debe estirar el renglón ni cortarse a la mitad — se
+      // recorta con elipsis y el nombre completo queda disponible al pasar
+      // el mouse. Más espacio que Tipo/Prioridad/Estado/Planeado/Vigencia
+      // (pedido explícito del mandato) pero con tope, mismo motivo que
+      // Folio/Módulo arriba.
       formatear: (fila) => this.nombreUsuario(fila.asignadoUsuarioId),
       titulo: (fila) => this.nombreUsuario(fila.asignadoUsuarioId),
+      anchoMaximo: 130,
+      anchoColumna: 150,
     },
     {
       campo: 'planeado',
       etiqueta: 'Planeado',
       formatear: (fila) => (fila.planeado !== false ? 'Sí' : 'No'),
       claseValor: (fila) => (fila.planeado !== false ? 'grid-badge-success' : 'grid-badge-muted'),
+      anchoColumna: 70,
     },
     {
       campo: 'fechaCreacion',
       etiqueta: 'Vigencia',
       formatear: (fila) => this.textoSla(fila) || '—',
       claseValor: (fila) => this.claseBadgeSla(fila),
+      titulo: (fila) => this.textoSla(fila) || '',
+      anchoMaximo: 80,
+      anchoColumna: 90,
     },
   ];
 

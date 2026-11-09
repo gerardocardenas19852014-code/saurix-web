@@ -24,7 +24,7 @@
   </div>
 </div>
 
-<div class="board-filters">
+<div class="board-filters tickets-filtros">
   <label class="board-filter-field">
     Proyecto
     <select [value]="proyectoSeleccionadoId()" (change)="cambiarProyecto($any($event.target).value)">
@@ -185,6 +185,7 @@
     [columnas]="columnasLista"
     [filas]="ticketsFiltrados()"
     [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+    [compacto]="true"
     (editar)="abrirDetalle($event)"
     (eliminar)="pedirEliminarTicket($event)"
   />
