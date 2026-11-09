@@ -30,6 +30,7 @@
                 <span
                   class="grid-cell-truncada"
                   [class.grid-cell-truncada-multilinea]="columna.multilinea"
+                  [style.max-width.px]="columna.anchoMaximo ?? null"
                   [title]="columna.titulo(fila)"
                   >{{ valorCelda(fila, columna) }}</span
                 >

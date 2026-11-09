@@ -1430,6 +1430,22 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
 .modal-box { background: var(--paper-raised); border-radius: 14px; padding: 26px 28px; max-width: 400px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 48px -16px rgba(0, 0, 0, .4); }
 .modal-box h3 { font-family: 'Montserrat', sans-serif; font-weight: 700; color: var(--heading-navy); font-size: 20px; margin: 0 0 10px; }
 .modal-box p { color: var(--ink-soft); font-size: 14px; line-height: 1.5; margin: 0 0 22px; }
+
+/* Detalle de ticket (Gestión de proyectos → Tickets) -- ver auditoría "Mejoras de
+   experiencia en lista de tickets", nov-2026: el .modal-box genérico de arriba pone
+   overflow-y:auto + max-height:90vh en TODO el cuadro, lo que recorta cualquier
+   elemento position:absolute que se salga de esa caja -- en este modal eso cortaba
+   el menú desplegable "Más ▾" de las pestañas (.tab-more-menu), aunque .tab-bar ya
+   tenía overflow:visible, porque el ancestro .modal-box seguía recortando.
+   Solución: SOLO para este modal (clase extra .ticket-detalle-box, el resto de los
+   30+ modales de la app que usan .modal-box no se tocan), el cuadro se vuelve una
+   columna flex sin su propio scroll (overflow:hidden) -- encabezado, barra de
+   estado y pestañas quedan siempre visibles/accesibles -- y el scroll real pasa a
+   .ticket-detalle-cuerpo, que envuelve SOLO el contenido de la pestaña activa y
+   vive por debajo de .tab-bar, así el menú "Más ▾" (que es hijo de .tab-bar, fuera
+   de este wrapper) nunca queda dentro de un contenedor con overflow recortado. */
+.modal-box.ticket-detalle-box { display: flex; flex-direction: column; overflow: hidden; }
+.ticket-detalle-cuerpo { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
 
 .empty-state-block { text-align: center; padding: 32px 20px; display: flex; flex-direction: column; align-items: center; gap: 14px; color: var(--ink-soft); font-size: 14px; }

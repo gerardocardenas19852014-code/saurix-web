@@ -414,22 +414,22 @@
       </div>
 
       <div class="modal-actions">
-        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">Cancelar</button>
-        <button type="submit" class="btn-primary">Guardar</button>
+        <button type="button" class="btn-secondary" [disabled]="guardandoTicket()" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">Cancelar</button>
+        <button type="submit" class="btn-primary" [disabled]="guardandoTicket()">{{ guardandoTicket() ? 'Guardando…' : 'Guardar' }}</button>
       </div>
     </form>
   </div>
 }
 
 @if (ticketActivo(); as activo) {
-  <div class="modal-overlay show" (click)="cerrarDetalle(); toast.info('Cambios descartados.')">
-    <div class="modal-box" style="max-width: 1160px; width: 96%; text-align: left;" (click)="$event.stopPropagation()">
+  <div class="modal-overlay show" (click)="cerrarDetalle()">
+    <div class="modal-box ticket-detalle-box" style="max-width: 1160px; width: 96%; text-align: left;" (click)="$event.stopPropagation()">
       <div class="page-header" style="margin-bottom: 12px;">
         <h3>#{{ activo.numeroTicket }} — {{ activo.titulo }}</h3>
         <div class="page-actions">
-          <button type="button" class="btn-primary small" (click)="guardarTicket()">Guardar cambios</button>
+          <button type="button" class="btn-primary small" [disabled]="guardandoTicket()" (click)="guardarTicket()">{{ guardandoTicket() ? 'Guardando…' : 'Guardar cambios' }}</button>
           <button type="button" class="btn-danger small" (click)="pedirEliminarTicket(activo)">Eliminar ticket</button>
-          <button type="button" class="btn-secondary small" (click)="cerrarDetalle()">Cerrar</button>
+          <button type="button" class="btn-secondary small" (click)="pedirCerrarDetalle()">Cerrar</button>
         </div>
       </div>
 
@@ -531,6 +531,8 @@
           </div>
         </div>
       </div>
+
+      <div class="ticket-detalle-cuerpo">
 
       @if (tabActiva() === 'detalles') {
         <form class="tab-panel edit-form form-grid-4col" [formGroup]="form" (ngSubmit)="guardarTicket()">
@@ -931,10 +933,11 @@
             <textarea rows="6" formControlName="solucion"></textarea>
           </label>
           <div class="form-actions">
-            <button type="submit" class="btn-primary">Guardar solución</button>
+            <button type="submit" class="btn-primary" [disabled]="guardandoTicket()">{{ guardandoTicket() ? 'Guardando…' : 'Guardar solución' }}</button>
           </div>
         </form>
       }
+      </div>
     </div>
   </div>
 }
@@ -945,4 +948,13 @@
   [mensaje]="'¿Eliminar el ticket ' + (ticketAEliminar()?.numeroTicket ?? '') + '?'"
   (confirmar)="confirmarEliminarTicket()"
   (cancelar)="ticketAEliminar.set(null)"
+/>
+
+<app-confirm-dialog
+  [visible]="pedirCerrarSinGuardar()"
+  titulo="Cerrar sin guardar"
+  mensaje="Hay cambios sin guardar en este ticket. ¿Cerrar de todas formas y descartarlos?"
+  textoConfirmar="Cerrar sin guardar"
+  (confirmar)="confirmarCerrarSinGuardar()"
+  (cancelar)="cancelarCerrarSinGuardar()"
 />

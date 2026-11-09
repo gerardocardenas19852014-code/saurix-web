@@ -47,6 +47,18 @@ export interface ColumnaTabla<T> {
    * columnasFila/columnaSubfila más abajo y grid-subfila-* en styles.scss.
    */
   subfila?: boolean;
+  /**
+   * Opcional (requiere `titulo`, para que el valor completo siga disponible
+   * al pasar el mouse): límite de ancho en px para la celda truncada --
+   * aparte de .grid-cell-truncada en styles.scss (pensado para texto libre
+   * tipo nombre/título, hasta 420px). Pensado para columnas tipo "código"
+   * (p.ej. el Folio de un ticket) donde un valor ocasionalmente largo no
+   * debe estirar el renglón tanto como un nombre -- ver columnasLista en
+   * kanban.component.ts (auditoría "Mejoras de experiencia en lista de
+   * tickets", nov-2026). Sin este campo, el comportamiento de las demás
+   * columnas/pantallas que usan DataTableComponent no cambia.
+   */
+  anchoMaximo?: number;
 }
 
 /**

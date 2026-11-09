@@ -210,6 +210,25 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly ticketAEliminar = signal<Ticket | null>(null);
   protected readonly tabActiva = signal<TabDetalle>('detalles');
 
+  /** Evita doble envío de "Guardar cambios"/"Guardar solución" (ambos botones
+   *  llaman guardarTicket()) -- ver auditoría "Mejoras de experiencia en
+   *  lista de tickets", nov-2026: antes no había ningún guard, un doble clic
+   *  (o Enter + clic) podía mandar dos peticiones concurrentes. */
+  protected readonly guardandoTicket = signal(false);
+
+  /** "Cerrar" (el botón dedicado, no el fondo del modal -- ese ya lo cubre
+   *  el aviso GLOBAL de cambios sin guardar de ShellComponent, que escucha
+   *  el clic en el fondo/Escape de CUALQUIER .modal-overlay) pide
+   *  confirmación si this.form (Detalles/Fechas/Solución comparten el mismo
+   *  FormGroup) quedó "dirty" -- a diferencia del mecanismo global (que
+   *  compara valores de los <input> actualmente en el DOM contra una foto
+   *  inicial, y por eso no ve cambios hechos en una pestaña que ya no está
+   *  montada), form.dirty vive en el FormControl mismo y no depende de qué
+   *  pestaña esté visible en este momento -- cubre Detalles/Fechas/Solución
+   *  por igual. Ver pedirCerrarDetalle()/confirmarCerrarSinGuardar() más
+   *  abajo. */
+  protected readonly pedirCerrarSinGuardar = signal(false);
+
   /** Ticket que se está arrastrando en el tablero (drag & drop nativo HTML5, sin librería). */
   protected readonly ticketArrastrando = signal<Ticket | null>(null);
 
@@ -478,8 +497,24 @@ export class KanbanComponent implements OnInit, OnDestroy {
 
   /** Columnas de la vista de Lista (tabla) — alternativa al tablero Kanban, mismo estándar del resto del sistema. */
   protected readonly columnasLista: ColumnaTabla<Ticket>[] = [
-    { campo: 'numeroTicket', etiqueta: 'Folio' },
-    { campo: 'folioInterno', etiqueta: 'Folio interno', formatear: (fila) => fila.folioInterno || '—' },
+    {
+      campo: 'numeroTicket',
+      etiqueta: 'Folio',
+      // Folios largos (p.ej. "SLA-PROD-TEST-1") estiraban el renglón entero --
+      // mismo tratamiento que Sprint/Asignado: se recorta con elipsis a un
+      // ancho de código corto y el valor completo queda disponible al pasar
+      // el mouse (auditoría "Mejoras de experiencia en lista de tickets",
+      // nov-2026).
+      titulo: (fila) => fila.numeroTicket,
+      anchoMaximo: 150,
+    },
+    {
+      campo: 'folioInterno',
+      etiqueta: 'Folio interno',
+      formatear: (fila) => fila.folioInterno || '—',
+      titulo: (fila) => fila.folioInterno || '',
+      anchoMaximo: 150,
+    },
     {
       campo: 'titulo',
       etiqueta: 'Título',
@@ -513,7 +548,16 @@ export class KanbanComponent implements OnInit, OnDestroy {
       titulo: (fila) => this.nombreSprint(fila),
       claseValor: (fila) => (fila.sprintId ? 'grid-badge-success' : 'grid-badge-neutral'),
     },
-    { campo: 'ticketPrioridadId', etiqueta: 'Prioridad', formatear: (fila) => this.nombrePrioridad(fila.ticketPrioridadId) },
+    {
+      campo: 'ticketPrioridadId',
+      etiqueta: 'Prioridad',
+      formatear: (fila) => this.nombrePrioridad(fila.ticketPrioridadId),
+      // Antes era texto plano mientras Estado (abajo) ya era una píldora --
+      // se homologan ambas como píldora neutra para que se vean alineadas
+      // entre sí (mismo criterio visual, sin tocar ninguna regla de
+      // negocio: es la misma píldora genérica que ya usaba Estado).
+      claseValor: () => 'grid-badge-neutral',
+    },
     {
       campo: 'tableroColumnaId',
       etiqueta: 'Estado',
@@ -1102,6 +1146,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
   }
 
   guardarTicket(): void {
+    if (this.guardandoTicket()) return; // evita doble envío (doble clic, Enter + clic, etc.)
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       // Con los campos repartidos en pestañas (Detalles/Fechas/Solución), un campo
@@ -1172,12 +1217,37 @@ export class KanbanComponent implements OnInit, OnDestroy {
       ? this.data.modificacion<Ticket>('Ticket', payload)
       : this.data.alta<Ticket>('Ticket', payload);
 
+    this.guardandoTicket.set(true);
     peticion.subscribe({
       next: (ticketGuardado) => {
-        this.toast.exito(esEdicion ? 'Ticket actualizado.' : 'Ticket creado.');
+        this.guardandoTicket.set(false);
+        this.actualizarTicketLocal(ticketGuardado);
         if (esEdicion) {
           this.refrescarTicketActivo();
+          // Sin esto, form.dirty se queda en true después de un guardado
+          // EXITOSO (refrescarTicketActivo() solo re-trae el ticket y
+          // reconfigura campos editables, nunca resetea el form) -- y el
+          // nuevo botón "Cerrar" (pedirCerrarDetalle(), que decide si avisar
+          // justamente leyendo form.dirty) preguntaría por "cambios sin
+          // guardar" aunque el usuario los acabe de guardar bien. Al marcar
+          // pristine aquí (sin tocar los valores), un Guardar → Cerrar
+          // inmediato ya no muestra el aviso de más.
+          this.form.markAsPristine();
+          // Si el cambio (p.ej. de estado/tipo/prioridad/asignado) hace que el
+          // ticket ya no cumpla los filtros activos de Lista/Tablero, se avisa
+          // explícito en vez de dejar que desaparezca en silencio -- el
+          // contexto (filtros, búsqueda, vista, posición) NO se toca, el
+          // ticket simplemente ya no aparece listado hasta que cambien los
+          // filtros (requisito explícito del mandato de mejoras de Tickets,
+          // nov-2026: "mantener el contexto y mostrar una indicación clara").
+          const sigueVisible = this.ticketsFiltrados().some((t) => Number(t.id) === Number(ticketGuardado.id));
+          if (!sigueVisible && this.hayFiltros()) {
+            this.toast.info('Ticket actualizado — con los filtros activos ya no aparece en la lista.');
+          } else {
+            this.toast.exito('Ticket actualizado.');
+          }
         } else {
+          this.toast.exito('Ticket creado.');
           // Deja registro en Historial de que el ticket nació en esta columna —
           // si no, la pestaña Historial queda vacía hasta el primer cambio de estado.
           this.data
@@ -1190,7 +1260,17 @@ export class KanbanComponent implements OnInit, OnDestroy {
             .subscribe({ error: () => undefined });
           this.modalAbierto.set(false);
         }
-        this.actualizarTicketLocal(ticketGuardado);
+      },
+      // Antes no había manejo de error: si la petición fallaba, el botón se
+      // quedaba "guardando" para siempre (bloqueado) y el usuario no se
+      // enteraba de nada -- lo capturado en el formulario no se pierde (el
+      // form nunca se resetea aquí), pero hacía falta avisar y reactivar el
+      // botón (requisito del mandato: "Conservar los datos capturados si
+      // ocurre un error" + "mostrar confirmación clara" aplica también al
+      // caso de error).
+      error: (error) => {
+        this.guardandoTicket.set(false);
+        this.toast.error('No se pudo guardar el ticket: ' + (error?.message ?? 'intenta de nuevo.'));
       },
     });
   }
@@ -1391,6 +1471,27 @@ export class KanbanComponent implements OnInit, OnDestroy {
   cerrarDetalle(): void {
     this.ticketActivo.set(null);
     this.ticketEnEdicion.set(null);
+  }
+
+  /** Botón "Cerrar" del detalle -- ver comentario de pedirCerrarSinGuardar
+   *  más arriba sobre por qué este botón necesita su PROPIA verificación en
+   *  vez de depender solo del aviso global (que no cubre un botón propio de
+   *  cada pantalla, por diseño -- ver ShellComponent.interceptarCierreDeModal). */
+  protected pedirCerrarDetalle(): void {
+    if (this.form.dirty) {
+      this.pedirCerrarSinGuardar.set(true);
+      return;
+    }
+    this.cerrarDetalle();
+  }
+
+  protected confirmarCerrarSinGuardar(): void {
+    this.pedirCerrarSinGuardar.set(false);
+    this.cerrarDetalle();
+  }
+
+  protected cancelarCerrarSinGuardar(): void {
+    this.pedirCerrarSinGuardar.set(false);
   }
 
   private refrescarTicketActivo(): void {
