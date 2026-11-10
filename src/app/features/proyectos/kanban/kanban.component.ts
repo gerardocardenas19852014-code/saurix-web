@@ -6,6 +6,8 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { Usuario, nombreCompletoUsuario } from '../../seguridad/usuarios/usuario.model';
 import { DataClientService } from '../../../core/services/data-client.service';
+import { SupabaseService } from '../../../core/services/supabase.service';
+import { filaACamel } from '../../../core/services/supabase-data-client.service';
 import { AdjuntosPanelComponent } from '../../../shared/components/adjuntos-panel/adjuntos-panel.component';
 import { ColumnaTabla, DataTableComponent } from '../../../shared/components/data-table/data-table.component';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -74,6 +76,13 @@ type ClaseSla = 'sla-ok' | 'sla-warning' | 'sla-expired';
 })
 export class KanbanComponent implements OnInit, OnDestroy {
   private readonly data = inject(DataClientService);
+  /** Acceso directo al cliente de Supabase -- unicamente para la consulta
+   *  paginada de la vista Lista via proyectos.fn_tickets_lista_pagina() (ver
+   *  buscarLista()/cargarListaDesdeServidor()). El resto de esta pantalla
+   *  (incluyendo el Tablero, que NO se toca) sigue usando exclusivamente
+   *  DataClientService -- mismo patron que HistorialVentasComponent/
+   *  OrdenesCompraComponent para listados via RPC. */
+  private readonly sb = inject(SupabaseService).cliente;
   protected readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
@@ -167,11 +176,19 @@ export class KanbanComponent implements OnInit, OnDestroy {
    *  cargarTickets), así que hay que recargar. */
   protected cambiarMostrarInactivos(valor: boolean): void {
     this.mostrarInactivos.set(valor);
+    if (this.modoVista() === 'lista') {
+      this.tableroSucio = true;
+      return;
+    }
     this.cargarTickets();
   }
 
   protected cambiarMostrarResueltos(valor: boolean): void {
     this.mostrarResueltos.set(valor);
+    if (this.modoVista() === 'lista') {
+      this.tableroSucio = true;
+      return;
+    }
     this.cargarTickets();
   }
 
@@ -860,6 +877,13 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.proyectoSeleccionadoId.set(Number(id));
     this.limpiarFiltros();
     this.cargarTablero();
+    this.filtrosAplicadosLista = null;
+    this.haBuscadoLista.set(false);
+    this.ticketsPaginaLista.set([]);
+    this.totalFilasLista.set(0);
+    this.paginaActualLista.set(1);
+    this.listaSucia = false;
+    this.tableroSucio = false;
   }
 
   limpiarFiltros(): void {
@@ -875,6 +899,13 @@ export class KanbanComponent implements OnInit, OnDestroy {
   cambiarModoVista(vista: 'tablero' | 'lista'): void {
     this.modoVista.set(vista);
     this.configuracionApariencia.cambiarVistaProyectos(vista);
+    if (vista === 'tablero' && this.tableroSucio) {
+      this.tableroSucio = false;
+      this.cargarTickets();
+    } else if (vista === 'lista' && this.listaSucia && this.filtrosAplicadosLista) {
+      this.listaSucia = false;
+      this.cargarListaDesdeServidor();
+    }
   }
 
   exportarTicketsCsv(): void {
@@ -945,6 +976,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       this.ticketsCargados.update((n) => n + 1);
       this.totalTickets.update((n) => n + 1);
     }
+    this.invalidarListaSiCorresponde();
   }
 
   /** Contraparte de actualizarTicketLocal para eliminarTicket — mismo ajuste
@@ -955,6 +987,136 @@ export class KanbanComponent implements OnInit, OnDestroy {
     if (habia) {
       this.ticketsCargados.update((n) => Math.max(0, n - 1));
       this.totalTickets.update((n) => Math.max(0, n - 1));
+    }
+    this.invalidarListaSiCorresponde();
+  }
+
+  // ================= Etapa 2 -- Lista server-side (proyectos.fn_tickets_lista_pagina) =================
+  protected readonly ticketsPaginaLista = signal<Ticket[]>([]);
+  protected readonly totalFilasLista = signal(0);
+  protected readonly paginaActualLista = signal(1);
+  protected readonly columnaOrdenLista = signal<keyof Ticket & string>('numeroTicket');
+  protected readonly direccionOrdenLista = signal<'asc' | 'desc'>('asc');
+  protected readonly cargandoLista = signal(false);
+  protected readonly haBuscadoLista = signal(false);
+
+  private filtrosAplicadosLista: {
+    busqueda: string;
+    tipoId: number;
+    moduloId: number;
+    prioridadId: number;
+    estadoIds: number[];
+    asignadoId: number;
+    planeado: number;
+    mostrarInactivos: boolean;
+    mostrarResueltos: boolean;
+  } | null = null;
+
+  private secuenciaLista = 0;
+  private listaSucia = false;
+  private tableroSucio = false;
+
+  private static readonly ORDEN_COLUMNA_LISTA_SQL: Partial<Record<keyof Ticket & string, string>> = {
+    numeroTicket: 'numero_ticket',
+    folioInterno: 'folio_interno',
+    ticketTipoId: 'ticket_tipo_id',
+    ticketModuloId: 'ticket_modulo_id',
+    sprintId: 'sprint_id',
+    ticketPrioridadId: 'ticket_prioridad_id',
+    tableroColumnaId: 'tablero_columna_id',
+    asignadoUsuarioId: 'asignado_usuario_id',
+    planeado: 'planeado',
+    fechaCreacion: 'fecha_creacion',
+  };
+
+  protected buscarLista(): void {
+    this.filtrosAplicadosLista = {
+      busqueda: this.filtroTexto(),
+      tipoId: this.filtroTipoId(),
+      moduloId: this.filtroModuloId(),
+      prioridadId: this.filtroPrioridadId(),
+      estadoIds: this.filtroEstadoIds(),
+      asignadoId: this.filtroAsignadoId(),
+      planeado: this.filtroPlaneado(),
+      mostrarInactivos: this.mostrarInactivos(),
+      mostrarResueltos: this.mostrarResueltos(),
+    };
+    this.haBuscadoLista.set(true);
+    this.paginaActualLista.set(1);
+    this.listaSucia = false;
+    this.cargarListaDesdeServidor();
+  }
+
+  protected onEnterBusquedaLista(): void {
+    if (this.modoVista() === 'lista') this.buscarLista();
+  }
+
+  protected onPaginaCambioLista(pagina: number): void {
+    this.paginaActualLista.set(pagina);
+    this.cargarListaDesdeServidor();
+  }
+
+  protected onOrdenCambioLista(evento: { campo: keyof Ticket & string; direccion: 'asc' | 'desc' }): void {
+    this.columnaOrdenLista.set(evento.campo);
+    this.direccionOrdenLista.set(evento.direccion);
+    this.paginaActualLista.set(1);
+    this.cargarListaDesdeServidor();
+  }
+
+  private async cargarListaDesdeServidor(): Promise<void> {
+    const f = this.filtrosAplicadosLista;
+    if (!f) return;
+    this.cargandoLista.set(true);
+    const miSecuencia = ++this.secuenciaLista;
+    const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
+    const desde = (this.paginaActualLista() - 1) * tamanio;
+    const ordenColumnaSql = KanbanComponent.ORDEN_COLUMNA_LISTA_SQL[this.columnaOrdenLista()] ?? 'numero_ticket';
+
+    const { data, error } = await this.sb.schema('proyectos').rpc('fn_tickets_lista_pagina', {
+      p_proyecto_id: this.proyectoSeleccionadoId(),
+      p_busqueda: f.busqueda.trim() || null,
+      p_tipo_id: f.tipoId || null,
+      p_modulo_id: f.moduloId || null,
+      p_prioridad_id: f.prioridadId || null,
+      p_estado_ids: f.estadoIds.length ? f.estadoIds : null,
+      p_asignado_usuario_id: f.asignadoId || null,
+      p_planeado: f.planeado,
+      p_sprint_id: null,
+      p_sprint_sin_asignar: false,
+      p_vigencia_estado: null,
+      p_mostrar_inactivos: f.mostrarInactivos,
+      p_mostrar_resueltos: f.mostrarResueltos,
+      p_orden_columna: ordenColumnaSql,
+      p_orden_direccion: this.direccionOrdenLista(),
+      p_desde: desde,
+      p_cantidad: tamanio,
+    });
+
+    if (miSecuencia !== this.secuenciaLista) return;
+
+    if (error) {
+      this.cargandoLista.set(false);
+      this.toast.error('No se pudo cargar la lista de tickets: ' + error.message);
+      return;
+    }
+
+    const filas = (data ?? []) as Record<string, unknown>[];
+    const primera = filas[0];
+    const total = Number(primera?.['total_filas'] ?? 0);
+    const desdeEfectivo = Number(primera?.['desde_efectivo'] ?? 0);
+
+    this.ticketsPaginaLista.set(filas.map((fila) => filaACamel(fila) as unknown as Ticket));
+    this.totalFilasLista.set(total);
+    this.paginaActualLista.set(Math.floor(desdeEfectivo / tamanio) + 1);
+    this.cargandoLista.set(false);
+  }
+
+  private invalidarListaSiCorresponde(): void {
+    if (!this.filtrosAplicadosLista) return;
+    if (this.modoVista() === 'lista') {
+      this.cargarListaDesdeServidor();
+    } else {
+      this.listaSucia = true;
     }
   }
 

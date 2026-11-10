@@ -41,6 +41,7 @@
       placeholder="Folio, folio interno, título, etiqueta o sprint… (varios con coma)"
       [value]="filtroTexto()"
       (input)="filtroTexto.set($any($event.target).value)"
+      (keyup.enter)="onEnterBusquedaLista()"
     />
   </label>
 
@@ -181,14 +182,35 @@
     </p>
   </div>
 } @else if (modoVista() === 'lista') {
-  <app-data-table
-    [columnas]="columnasLista"
-    [filas]="ticketsFiltrados()"
-    [tamanoPagina]="preferenciasGrid.tamanoPagina()"
-    [compacto]="true"
-    (editar)="abrirDetalle($event)"
-    (eliminar)="pedirEliminarTicket($event)"
-  />
+  <div class="board-filters tickets-filtros" style="margin-top: -8px;">
+    <button type="button" class="btn-primary small" [disabled]="cargandoLista()" (click)="buscarLista()">
+      🔍 Buscar
+    </button>
+    @if (haBuscadoLista()) {
+      <span class="hint">{{ totalFilasLista() }} ticket(s) encontrado(s).</span>
+    }
+  </div>
+
+  @if (!haBuscadoLista()) {
+    <p class="hint" style="margin-top:20px;">Ajusta los filtros y presiona "🔍 Buscar" para ver resultados.</p>
+  } @else {
+    <app-data-table
+      [columnas]="columnasLista"
+      [filas]="ticketsPaginaLista()"
+      [cargando]="cargandoLista()"
+      [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+      [compacto]="true"
+      [modoServidor]="true"
+      [paginaExterna]="paginaActualLista()"
+      [totalExterno]="totalFilasLista()"
+      [campoOrdenExterno]="columnaOrdenLista()"
+      [direccionOrdenExterno]="direccionOrdenLista()"
+      (paginaCambio)="onPaginaCambioLista($event)"
+      (ordenCambio)="onOrdenCambioLista($event)"
+      (editar)="abrirDetalle($event)"
+      (eliminar)="pedirEliminarTicket($event)"
+    />
+  }
 } @else {
   <div class="kanban-board">
     @for (columna of columnasTablero(); track columna.id) {
