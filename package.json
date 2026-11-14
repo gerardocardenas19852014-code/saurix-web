@@ -3,9 +3,12 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
-    "build": "ng build",
-    "watch": "ng build --watch --configuration development",
+    "start": "node scripts/verificar-entorno.mjs development && ng serve -c development",
+    "start:staging": "node scripts/verificar-entorno.mjs staging && ng serve -c staging",
+    "build": "node scripts/verificar-entorno.mjs production && ng build -c production",
+    "build:development": "node scripts/verificar-entorno.mjs development && ng build -c development",
+    "build:staging": "node scripts/verificar-entorno.mjs staging && ng build -c staging",
+    "watch": "node scripts/verificar-entorno.mjs development && ng build --watch --configuration development",
     "test": "ng test"
   },
   "private": true,
