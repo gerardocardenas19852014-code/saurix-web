@@ -1,1 +1,36 @@
-// Sin estilos propios por ahora — todo viene de src/styles.scss.
+// Mandato 83 — ajustes finales de diseño de esta pantalla (ver también
+// categorias-producto.component.ts/.html). Todo aquí queda encapsulado por
+// Angular a los elementos de ESTE componente — Productos y servicios y el
+// resto de catálogos, que comparten las mismas clases globales
+// (.grid-filter, .grid-table-scroll, etc.), no se ven afectados.
+
+// Campo "Buscar por clave o nombre": ancho fijo ~260px en escritorio — la
+// regla global (.grid-filter input, styles.scss) solo permite crecer HASTA
+// 260px si hay espacio libre, y con los botones Buscar/Limpiar filtros
+// agregados ahora hay menos espacio en .grid-toolbar, así que podía
+// quedarse más angosto de lo pedido. En móvil ocupa el 100% (mismo punto de
+// quiebre de 640px que ya usa el resto de la app).
+.grid-filter input[type='search'] {
+  flex: 0 0 260px;
+  width: 260px;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .grid-filter input[type='search'] {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+}
+
+// <app-data-table> reserva 260px de alto mínimo en su contenedor
+// (.grid-table-scroll, ver styles.scss) para que no "salte" al pasar de
+// vacía a poblada — pensado para catálogos con muchas filas. Categorías de
+// producto es un catálogo pequeño y ese mínimo dejaba un hueco vacío grande
+// entre la tabla y el contador de resultados. Se reduce SOLO aquí, vía
+// ::ng-deep con :host (scoped por Angular a esta instancia del componente)
+// — nunca se toca el valor global en styles.scss, así que ningún otro
+// catálogo cambia.
+:host ::ng-deep .grid-table-scroll {
+  min-height: 120px;
+}
