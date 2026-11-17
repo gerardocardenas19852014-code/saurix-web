@@ -166,7 +166,7 @@
               step="1"
               style="width: 64px;"
               [value]="cantidadDevolucion(item.id)"
-              (change)="actualizarCantidadDevolucion(item, $any($event.target).value)"
+              (input)="actualizarCantidadDevolucion(item, $any($event.target).value)"
             />
           </div>
         }

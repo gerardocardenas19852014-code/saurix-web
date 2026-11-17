@@ -23,23 +23,37 @@
     <p>Elige un producto para ver su kardex.</p>
   </div>
 } @else {
-  <div class="dashboard-stats" style="margin-bottom:18px;">
-    <div class="dashboard-stat-card">
-      <div class="num">{{ cargandoResumen() ? '…' : existenciaActual() }}</div>
-      <div class="label">Existencia actual{{ filtroBodegaId() ? '' : ' (todas las bodegas)' }}</div>
+  <!-- CORRECCIÓN (hallazgo QA nov-2026, "Kardex: consulta automática al
+       seleccionar producto"): las estadísticas de arriba son del
+       RESULTADO de la última búsqueda ejecutada (filtrosAplicados), nunca
+       del producto recién elegido en el selector — ver elegirProducto()/
+       buscar() en kardex.component.ts. Mientras no se haya presionado
+       "🔍 Buscar" para el producto actual, no se muestra ningún número
+       (ni "0", que se podría confundir con un resultado real). -->
+  @if (!filtrosAplicados()) {
+    <div class="empty-state-block" style="margin-bottom:18px;">
+      <p>Ajusta los filtros si quieres y presiona <strong>🔍 Buscar</strong> para consultar el kardex de este producto.</p>
     </div>
-    <div class="dashboard-stat-card">
-      <div class="num">{{ cargandoListado() ? '…' : totalFilasFiltradas() }}</div>
-      <div class="label">Movimientos registrados</div>
+  } @else {
+    <div class="dashboard-stats" style="margin-bottom:18px;">
+      <div class="dashboard-stat-card">
+        <div class="num">{{ cargandoResumen() ? '…' : existenciaActual() }}</div>
+        <div class="label">Existencia actual{{ filtrosAplicados()?.bodegaId ? '' : ' (todas las bodegas)' }}</div>
+      </div>
+      <div class="dashboard-stat-card">
+        <div class="num">{{ cargandoListado() ? '…' : totalFilasFiltradas() }}</div>
+        <div class="label">Movimientos registrados</div>
+      </div>
     </div>
-  </div>
+  }
 
   <!-- Barra homologada al estándar nuevo de Saurix (mismo patrón que
-       Órdenes de compra/Productos y servicios): ningún filtro dispara una
-       consulta por sí solo — solo "🔍 Buscar" (cambiarFiltro()) consulta al
-       servidor. Ancho completo, igual orden que el resto de los grids. -->
+       Órdenes de compra/Productos y servicios): ningún filtro NI elegir
+       producto disparan una consulta por sí solos — solo "🔍 Buscar"
+       (buscar()) consulta al servidor. Ancho completo, igual orden que el
+       resto de los grids. -->
   <div class="grid-toolbar">
-    <button type="button" class="btn-primary small" [disabled]="cargandoListado()" (click)="cambiarFiltro()">🔍 Buscar</button>
+    <button type="button" class="btn-primary small" [disabled]="cargandoListado()" (click)="buscar()">🔍 Buscar</button>
 
     <div class="grid-filter">
       <select class="toolbar-select" [value]="filtroBodegaId()" (change)="filtroBodegaId.set(+$any($event.target).value)">
@@ -71,23 +85,27 @@
        irAPaginaSiguiente()/irAPaginaAnterior()) — mismo patrón que
        Productos y servicios/Órdenes de compra: un producto con 185,430
        movimientos nunca manda más de una página a la vez. -->
-  <div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-bottom:10px;">
-    <span class="hint" style="margin:0;">
-      Página {{ paginaActual() }} de {{ totalPaginas() }} — {{ totalFilasFiltradas() }} movimiento(s)
-    </span>
-    <button type="button" class="btn-secondary small" [disabled]="paginaActual() <= 1 || cargandoListado()" (click)="irAPaginaAnterior()">
-      ← Anterior
-    </button>
-    <button type="button" class="btn-secondary small" [disabled]="paginaActual() >= totalPaginas() || cargandoListado()" (click)="irAPaginaSiguiente()">
-      Siguiente →
-    </button>
-  </div>
+  @if (filtrosAplicados()) {
+    <div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-bottom:10px;">
+      <span class="hint" style="margin:0;">
+        Página {{ paginaActual() }} de {{ totalPaginas() }} — {{ totalFilasFiltradas() }} movimiento(s)
+      </span>
+      <button type="button" class="btn-secondary small" [disabled]="paginaActual() <= 1 || cargandoListado()" (click)="irAPaginaAnterior()">
+        ← Anterior
+      </button>
+      <button type="button" class="btn-secondary small" [disabled]="paginaActual() >= totalPaginas() || cargandoListado()" (click)="irAPaginaSiguiente()">
+        Siguiente →
+      </button>
+    </div>
+  }
 
-  @if (cargandoListado() && filasListado().length === 0) {
+  @if (!filtrosAplicados()) {
+    <!-- nada que mostrar todavía — ver el aviso de "Presiona Buscar" arriba -->
+  } @else if (cargandoListado() && filasListado().length === 0) {
     <p class="empty">Cargando…</p>
   } @else if (filasListado().length === 0) {
     <div class="empty-state-block">
-      <p>Este producto todavía no tiene ningún movimiento{{ filtroBodegaId() ? ' en esta bodega' : '' }} con los filtros actuales.</p>
+      <p>Este producto todavía no tiene ningún movimiento{{ filtrosAplicados()?.bodegaId ? ' en esta bodega' : '' }} con los filtros actuales.</p>
     </div>
   } @else {
     <div class="grid-table-scroll">
@@ -107,7 +125,7 @@
         <tbody>
           @for (fila of filasListado(); track fila.id) {
             <tr>
-              <td data-label="Fecha">{{ fila.fecha | date: 'dd/MM/yyyy HH:mm' }}</td>
+              <td data-label="Fecha">{{ fila.fecha | date: 'dd/MM/yyyy' }}</td>
               <td data-label="Tipo">
                 @switch (fila.tipo) {
                   @case ('entrada') {

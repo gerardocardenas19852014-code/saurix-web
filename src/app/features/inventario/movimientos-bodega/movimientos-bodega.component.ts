@@ -69,6 +69,47 @@ const TAMANO_LOTE_EXPORTAR = 2000;
 /** Tope de filas en el PDF (reporte acotado, no un volcado completo). */
 const TOPE_FILAS_PDF = 200;
 
+/** Resultado de estado del catálogo de bodegas, tipo compartido entre
+ *  evaluarAperturaMovimiento() y quien la llame. */
+export interface ResultadoAperturaMovimiento {
+  permitido: boolean;
+  mensaje: string | null;
+}
+
+/** Pura (sin inyección de dependencias, sin señales) — decide si
+ *  abrirMovimientoMasivo()/nuevoMovimiento() puede proceder según el
+ *  estado del catálogo de bodegas. Separada de la clase a propósito para
+ *  poder probarla con pruebas unitarias simples (ver
+ *  movimientos-bodega.component.spec.ts).
+ *
+ *  CORRECCIÓN (hallazgo QA nov-2026, "Movimiento masivo: mensaje
+ *  incorrecto durante la carga"): antes de esto, el único criterio era
+ *  "bodegasActivas().length === 0", indistinguible entre "ya se consultó
+ *  y de verdad no hay ninguna" y "todavía no respondió la consulta" — un
+ *  clic rápido justo después de entrar a la pantalla caía en el segundo
+ *  caso y mostraba el aviso equivocado. */
+export function evaluarAperturaMovimiento(
+  estadoBodegas: 'cargando' | 'listo' | 'error',
+  bodegasActivasCount: number,
+  errorBodegas: string | null,
+): ResultadoAperturaMovimiento {
+  if (estadoBodegas === 'cargando') {
+    // Todavía no hay nada que decidir — la plantilla ya deshabilita el
+    // botón mientras tanto; aquí no se avisa nada (no sería ni
+    // advertencia ni error, solo "espera").
+    return { permitido: false, mensaje: null };
+  }
+  if (estadoBodegas === 'error') {
+    return { permitido: false, mensaje: errorBodegas ?? 'No se pudo cargar el catálogo de bodegas.' };
+  }
+  if (bodegasActivasCount === 0) {
+    // Único caso en el que el aviso original sigue siendo correcto: SÍ se
+    // consultó con éxito y de verdad no hay ninguna bodega activa.
+    return { permitido: false, mensaje: 'Antes crea al menos una Bodega activa (Inventario → Bodegas).' };
+  }
+  return { permitido: true, mensaje: null };
+}
+
 /**
  * "Opera fácilmente con distintas bodegas": entradas (mercancía nueva, o la
  * asignación inicial de la existencia que un producto ya traía antes de
@@ -115,6 +156,20 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
   protected readonly opcionesBodega = computed<OpcionBuscable[]>(() =>
     this.bodegasActivas().map((b) => ({ valor: b.id, etiqueta: b.nombre })),
   );
+  // CORRECCIÓN (hallazgo QA nov-2026, "Movimiento masivo: mensaje
+  // incorrecto durante la carga"): antes abrirMovimientoMasivo()/
+  // nuevoMovimiento() decidían "Antes crea al menos una Bodega activa"
+  // viendo solo bodegasActivas().length === 0 — y esa condición es
+  // indistinguible entre "ya consultamos y de verdad no hay ninguna" y
+  // "todavía no responde la consulta de ngOnInit → cargarBodegas()" (el
+  // signal bodegas arranca en [] siempre). Un clic rápido antes de que
+  // responda esa consulta disparaba el aviso equivocado; al reintentar ya
+  // había respondido y por eso "funcionaba". Este estado distingue los
+  // tres casos reales y, de paso, cargarBodegas() ya SÍ maneja un error de
+  // red (antes no tenía try/catch — si tronaba, bodegas se quedaba vacío
+  // para siempre sin ningún aviso ni forma de reintentar).
+  protected readonly estadoBodegas = signal<'cargando' | 'listo' | 'error'>('cargando');
+  protected readonly errorBodegas = signal<string | null>(null);
 
   protected readonly tabActiva = signal<TabMovimientosBodega>('existencia');
   private readonly transitoTabCargada = signal(false);
@@ -126,15 +181,33 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
   protected readonly vistaMasiva = signal(false);
 
   async abrirMovimientoMasivo(): Promise<void> {
-    if (this.bodegasActivas().length === 0) {
-      this.toast.advertencia('Antes crea al menos una Bodega activa (Inventario → Bodegas).');
-      return;
-    }
+    if (!this.validarBodegasListasParaAbrir()) return;
     if (!(await this.hayProductosFisicosActivos())) {
       this.toast.advertencia('No hay productos físicos activos — da de alta alguno en Productos y servicios.');
       return;
     }
     this.vistaMasiva.set(true);
+  }
+
+  /** Guarda común de abrirMovimientoMasivo()/nuevoMovimiento() — ver
+   *  comentario de estadoBodegas(). Mientras la carga esté en curso no
+   *  dice nada (el botón ya está deshabilitado en la plantilla; esto es
+   *  una segunda defensa por si se dispara igual, p.ej. desde el teclado)
+   *  y si la carga falló, muestra el error real en vez del mensaje de
+   *  "crea una bodega" — ese aviso solo es correcto cuando SÍ se consultó
+   *  con éxito y de verdad no hay ninguna bodega activa. */
+  private validarBodegasListasParaAbrir(): boolean {
+    const resultado = evaluarAperturaMovimiento(this.estadoBodegas(), this.bodegasActivas().length, this.errorBodegas());
+    if (!resultado.permitido && resultado.mensaje) {
+      if (this.estadoBodegas() === 'error') this.toast.error(resultado.mensaje);
+      else this.toast.advertencia(resultado.mensaje);
+    }
+    return resultado.permitido;
+  }
+
+  /** Botón "Reintentar" cuando estadoBodegas() === 'error'. */
+  reintentarCargaBodegas(): void {
+    this.cargarBodegas();
   }
 
   cancelarMasiva(): void {
@@ -585,9 +658,25 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
   }
 
   private async cargarBodegas(): Promise<void> {
-    const bodegas = await firstValueFrom(this.data.list<Bodega>('Bodega'));
-    this.bodegas.set(bodegas);
+    // Evita consultas duplicadas (p.ej. un reintento mientras la primera
+    // carga todavía no responde).
+    if (this.estadoBodegas() === 'cargando' && this.bodegasYaConsultadasUnaVez) return;
+    this.bodegasYaConsultadasUnaVez = true;
+    this.estadoBodegas.set('cargando');
+    this.errorBodegas.set(null);
+    try {
+      const bodegas = await firstValueFrom(this.data.list<Bodega>('Bodega'));
+      this.bodegas.set(bodegas);
+      this.estadoBodegas.set('listo');
+    } catch (error) {
+      this.errorBodegas.set(error instanceof Error ? error.message : 'No se pudo cargar el catálogo de bodegas.');
+      this.estadoBodegas.set('error');
+    }
   }
+
+  /** Verdadero desde la primera vez que se llamó a cargarBodegas() — ver
+   *  la guarda contra consultas duplicadas arriba. */
+  private bodegasYaConsultadasUnaVez = false;
 
   /** Existencia de al menos un producto físico activo — un query acotado
    *  (1 fila), nunca el catálogo completo, solo para decidir si vale la
@@ -618,10 +707,7 @@ export class MovimientosBodegaComponent implements OnInit, OnDestroy {
   }
 
   async nuevoMovimiento(tipo: TipoMovimiento = 'traspaso'): Promise<void> {
-    if (this.bodegasActivas().length === 0) {
-      this.toast.advertencia('Antes crea al menos una Bodega activa (Inventario → Bodegas).');
-      return;
-    }
+    if (!this.validarBodegasListasParaAbrir()) return;
     if (!(await this.hayProductosFisicosActivos())) {
       this.toast.advertencia('No hay productos físicos activos — da de alta alguno en Productos y servicios.');
       return;

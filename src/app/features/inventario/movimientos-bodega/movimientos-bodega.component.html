@@ -23,7 +23,17 @@
 
 @if (tabActiva() === 'existencia') {
   <div class="grid-toolbar">
-    <button type="button" class="toolbar-btn" (click)="abrirMovimientoMasivo()">📦 Movimiento masivo</button>
+    <button
+      type="button"
+      class="toolbar-btn"
+      [disabled]="estadoBodegas() === 'cargando'"
+      (click)="abrirMovimientoMasivo()"
+    >
+      {{ estadoBodegas() === 'cargando' ? 'Cargando bodegas…' : '📦 Movimiento masivo' }}
+    </button>
+    @if (estadoBodegas() === 'error') {
+      <button type="button" class="btn-secondary small" (click)="reintentarCargaBodegas()">↻ Reintentar carga de bodegas</button>
+    }
     <button type="button" class="btn-primary small" (click)="cambiarFiltroExistencia()">🔍 Buscar</button>
 
     <div class="grid-filter">
@@ -99,7 +109,17 @@
   }
 } @else if (tabActiva() === 'historial') {
   <div class="grid-toolbar">
-    <button type="button" class="toolbar-btn" (click)="abrirMovimientoMasivo()">📦 Movimiento masivo</button>
+    <button
+      type="button"
+      class="toolbar-btn"
+      [disabled]="estadoBodegas() === 'cargando'"
+      (click)="abrirMovimientoMasivo()"
+    >
+      {{ estadoBodegas() === 'cargando' ? 'Cargando bodegas…' : '📦 Movimiento masivo' }}
+    </button>
+    @if (estadoBodegas() === 'error') {
+      <button type="button" class="btn-secondary small" (click)="reintentarCargaBodegas()">↻ Reintentar carga de bodegas</button>
+    }
     <button type="button" class="btn-primary small" (click)="cambiarFiltroHistorial()">🔍 Buscar</button>
 
     <div class="toolbar-group">
@@ -197,7 +217,17 @@
   }
 } @else {
   <div class="grid-toolbar">
-    <button type="button" class="toolbar-btn" (click)="abrirMovimientoMasivo()">📦 Movimiento masivo</button>
+    <button
+      type="button"
+      class="toolbar-btn"
+      [disabled]="estadoBodegas() === 'cargando'"
+      (click)="abrirMovimientoMasivo()"
+    >
+      {{ estadoBodegas() === 'cargando' ? 'Cargando bodegas…' : '📦 Movimiento masivo' }}
+    </button>
+    @if (estadoBodegas() === 'error') {
+      <button type="button" class="btn-secondary small" (click)="reintentarCargaBodegas()">↻ Reintentar carga de bodegas</button>
+    }
     <button type="button" class="btn-primary small" (click)="cambiarFiltroTransito()">🔍 Buscar</button>
 
     <div class="grid-filter">

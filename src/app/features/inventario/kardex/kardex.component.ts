@@ -58,7 +58,7 @@ const TOPE_FILAS_PDF = 200;
  *    Producto) — nunca descarga el catálogo completo.
  *  - Nada de Kardex se consulta hasta elegir un producto (ver elegirProducto()).
  *  - Bodega/Tipo de movimiento/Desde/Hasta quedan en memoria hasta
- *    presionar "🔍 Buscar" (cambiarFiltro()) — igual que Órdenes de compra/
+ *    presionar "🔍 Buscar" (buscar()) — igual que Órdenes de compra/
  *    Productos y servicios: ningún filtro dispara una consulta por sí solo.
  *  - El listado se pide paginado contra fn_kardex_listar() (OFFSET/LIMIT,
  *    mismo tamaño de página que el resto de Saurix vía PreferenciasGridService):
@@ -120,12 +120,30 @@ export class KardexComponent implements OnInit, OnDestroy {
 
   // ── Filtros — igual que Órdenes de compra: son los mismos signals que
   // lee la consulta, pero NINGUNO dispara una consulta por sí solo; solo
-  // cambiarFiltro() (botón "🔍 Buscar") o elegir un producto nuevo. ───────
+  // buscar() (botón "🔍 Buscar") — elegir un producto nuevo solo prepara. ─
   protected readonly filtroBodegaId = signal(0);
   protected readonly filtroTipo = signal<'' | TipoMovimiento>('');
   protected readonly filtroDesde = signal('');
   protected readonly filtroHasta = signal('');
   protected readonly paginaActual = signal(1);
+
+  // ── CORRECCIÓN (hallazgo QA nov-2026, "Kardex: consulta automática al
+  // seleccionar producto") — "filtros en edición" (arriba) vs. "filtros
+  // aplicados" (snapshot de la última búsqueda ejecutada), mismo patrón ya
+  // usado en HistorialVentasComponent/OrdenesCompraComponent: elegir un
+  // producto o tocar cualquier filtro de arriba NUNCA dispara una
+  // consulta por sí solo — solo buscar() (botón "🔍 Buscar") la dispara, y
+  // paginación/exportaciones SIEMPRE leen de este snapshot, nunca de los
+  // signals en edición, para no mezclar un filtro recién tocado (todavía
+  // no buscado) con la página/export que se está pidiendo. null = todavía
+  // no se ha presionado "Buscar" para el producto actual. ────────────────
+  protected readonly filtrosAplicados = signal<{
+    productoId: number;
+    bodegaId: number;
+    tipo: '' | TipoMovimiento;
+    desde: string;
+    hasta: string;
+  } | null>(null);
 
   protected readonly totalPaginas = computed(() =>
     Math.max(1, Math.ceil(this.totalFilasFiltradas() / this.tamanioPagina())),
@@ -194,15 +212,37 @@ export class KardexComponent implements OnInit, OnDestroy {
     this.filtroDesde.set('');
     this.filtroHasta.set('');
     this.paginaActual.set(1);
-    this.cargarResumen();
-    this.cargarListado();
+    // Invalida cualquier respuesta en vuelo de un producto anterior (ver
+    // secuenciaResumen/secuenciaListado) y limpia los resultados ya
+    // mostrados — son del producto anterior; mezclarlos con el
+    // encabezado/nombre del producto nuevo sería exactamente el defecto
+    // "no mezclar encabezado/totales de producto nuevo con resultados de
+    // búsqueda anterior". NO se consulta nada todavía: elegir un producto
+    // solo actualiza filtros en edición — hace falta presionar "🔍 Buscar"
+    // (ver buscar()).
+    ++this.secuenciaResumen;
+    ++this.secuenciaListado;
+    this.filtrosAplicados.set(null);
+    this.existenciaActual.set(0);
+    this.filasListado.set([]);
+    this.totalFilasFiltradas.set(0);
   }
 
-  /** Cualquier cambio de filtro vuelve a la página 1. Solo se llama desde el
-   *  botón "🔍 Buscar" — ningún filtro dispara una consulta por sí solo. La
-   *  Bodega SÍ afecta la Existencia actual, así que también recarga el
-   *  resumen (Tipo/Desde/Hasta no lo afectan — ver fn_kardex_resumen()). */
-  protected cambiarFiltro(): void {
+  /** Único disparador de una consulta nueva (botón "🔍 Buscar") — ningún
+   *  filtro ni la elección de producto consultan por sí solos. Toma una
+   *  "foto" de los filtros en edición + el producto actual en
+   *  filtrosAplicados, que es lo único que leen cargarResumen()/
+   *  cargarListado()/paginación/exportaciones de aquí en adelante. */
+  protected buscar(): void {
+    const productoId = this.productoId();
+    if (!productoId) return;
+    this.filtrosAplicados.set({
+      productoId,
+      bodegaId: this.filtroBodegaId(),
+      tipo: this.filtroTipo(),
+      desde: this.filtroDesde(),
+      hasta: this.filtroHasta(),
+    });
     this.paginaActual.set(1);
     this.cargarResumen();
     this.cargarListado();
@@ -227,14 +267,15 @@ export class KardexComponent implements OnInit, OnDestroy {
   /** Existencia actual (total o de la bodega filtrada) — ver
    *  fn_kardex_resumen(): lee ExistenciaBodega/Producto.existencia
    *  directamente, igual que existenciaTotal() en producto.util.ts, nunca
-   *  derivada del historial de movimientos. */
+   *  derivada del historial de movimientos. Lee SIEMPRE de
+   *  filtrosAplicados (la última búsqueda ejecutada con "🔍 Buscar"),
+   *  nunca de los filtros en edición — ver buscar(). */
   private async cargarResumen(): Promise<void> {
-    const productoId = this.productoId();
-    if (!productoId) return;
+    const aplicados = this.filtrosAplicados();
+    if (!aplicados) return;
     this.cargandoResumen.set(true);
     const miSecuencia = ++this.secuenciaResumen;
-    const bodegaId = this.filtroBodegaId() || null;
-    const existencia = await this.cargarResumenSupabase(productoId, bodegaId);
+    const existencia = await this.cargarResumenSupabase(aplicados.productoId, aplicados.bodegaId || null);
     if (miSecuencia !== this.secuenciaResumen) return; // respuesta vieja — descartar
     this.existenciaActual.set(existencia);
     this.cargandoResumen.set(false);
@@ -254,13 +295,14 @@ export class KardexComponent implements OnInit, OnDestroy {
   }
 
   /** Página del Kardex, según paginaActual()/preferenciasGrid.tamanoPagina()
-   *  — ver fn_kardex_listar(). */
+   *  — ver fn_kardex_listar(). Lee SIEMPRE de filtrosAplicados — ver
+   *  comentario de cargarResumen(). */
   private async cargarListado(): Promise<void> {
-    const productoId = this.productoId();
-    if (!productoId) return;
+    const aplicados = this.filtrosAplicados();
+    if (!aplicados) return;
     this.cargandoListado.set(true);
     const miSecuencia = ++this.secuenciaListado;
-    const resultado = await this.cargarListadoSupabase(productoId, null, null);
+    const resultado = await this.cargarListadoSupabase(aplicados, null, null);
     if (miSecuencia !== this.secuenciaListado) return; // respuesta vieja — descartar
     // Si la página en la que estábamos quedó vacía (filtro nuevo con menos
     // páginas que la posición actual), retrocede a la última página real —
@@ -278,20 +320,24 @@ export class KardexComponent implements OnInit, OnDestroy {
 
   /** p_desde/p_cantidad explícitos (usados por exportarCsv()/exportarPdf()
    *  para pedir lotes grandes o acotados) — null en ambos usa la página y
-   *  tamaño de página actuales (uso normal de la pantalla). */
+   *  tamaño de página actuales (uso normal de la pantalla). `filtros`
+   *  SIEMPRE viene de filtrosAplicados (la última búsqueda ejecutada) —
+   *  nunca de los signals en edición — así que paginación y exportaciones
+   *  usan exactamente lo mismo que se buscó, aunque el usuario ya haya
+   *  tocado un filtro en edición sin volver a presionar "Buscar". */
   private async cargarListadoSupabase(
-    productoId: number,
+    filtros: { productoId: number; bodegaId: number; tipo: '' | TipoMovimiento; desde: string; hasta: string },
     desdeExplicito: number | null,
     cantidadExplicita: number | null,
   ): Promise<{ filas: FilaKardex[]; total: number }> {
     const tamanio = cantidadExplicita ?? this.tamanioPagina();
     const desde = desdeExplicito ?? (this.paginaActual() - 1) * tamanio;
     const { data, error } = await this.sb.schema('inventario').rpc('fn_kardex_listar', {
-      p_producto_id: productoId,
-      p_bodega_id: this.filtroBodegaId() || null,
-      p_tipo: this.filtroTipo() || null,
-      p_desde_fecha: this.filtroDesde() || null,
-      p_hasta_fecha: this.filtroHasta() || null,
+      p_producto_id: filtros.productoId,
+      p_bodega_id: filtros.bodegaId || null,
+      p_tipo: filtros.tipo || null,
+      p_desde_fecha: filtros.desde || null,
+      p_hasta_fecha: filtros.hasta || null,
       p_desde: desde,
       p_cantidad: tamanio,
     });
@@ -360,14 +406,17 @@ export class KardexComponent implements OnInit, OnDestroy {
    *  grande que ese lote, y la UI no se bloquea entre lotes (await dentro
    *  del ciclo, nunca Promise.all). */
   async exportarCsv(): Promise<void> {
-    const productoId = this.productoId();
-    if (!productoId) return;
+    const aplicados = this.filtrosAplicados();
+    if (!aplicados) {
+      this.toast.advertencia('Presiona 🔍 Buscar antes de exportar.');
+      return;
+    }
 
     const todas: Record<string, unknown>[] = [];
     let desde = 0;
     let total = Infinity;
     while (desde < total) {
-      const { filas, total: totalRespuesta } = await this.cargarListadoSupabase(productoId, desde, TAMANO_LOTE_EXPORTAR);
+      const { filas, total: totalRespuesta } = await this.cargarListadoSupabase(aplicados, desde, TAMANO_LOTE_EXPORTAR);
       if (filas.length === 0) break;
       total = totalRespuesta;
       for (const f of filas) todas.push(this.filaParaExportar(f));
@@ -380,14 +429,17 @@ export class KardexComponent implements OnInit, OnDestroy {
    *  criterio que MovimientosBodegaComponent.exportarPdfHistorial()/
    *  ValorStockComponent.exportarPdfProductos(). */
   async exportarPdf(): Promise<void> {
-    const productoId = this.productoId();
-    if (!productoId) return;
+    const aplicados = this.filtrosAplicados();
+    if (!aplicados) {
+      this.toast.advertencia('Presiona 🔍 Buscar antes de exportar.');
+      return;
+    }
 
-    const resultado = await this.cargarListadoSupabase(productoId, 0, TOPE_FILAS_PDF);
+    const resultado = await this.cargarListadoSupabase(aplicados, 0, TOPE_FILAS_PDF);
     const filasListado = resultado.filas;
     const totalFiltrado = resultado.total;
 
-    const bodega = this.bodegas().find((b) => b.id === this.filtroBodegaId());
+    const bodega = this.bodegas().find((b) => b.id === aplicados.bodegaId);
     const notaListado =
       totalFiltrado > filasListado.length
         ? `Mostrando los primeros ${filasListado.length} de ${totalFiltrado} movimientos filtrados (exporta CSV para el detalle completo).`

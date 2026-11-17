@@ -14,7 +14,13 @@ import { VentaService } from '../venta/venta.service';
 import { Devolucion, DevolucionItem } from '../devolucion/devolucion.model';
 import { CuentaPorCobrar } from '../cuenta-por-cobrar/cuenta-por-cobrar.model';
 import { CuentaPorCobrarService } from '../cuenta-por-cobrar/cuenta-por-cobrar.service';
-import { cantidadDisponibleParaDevolver, DevolucionService, LineaDevolucionEntrada } from '../devolucion/devolucion.service';
+import {
+  calcularSubtotalDevolucion,
+  cantidadDisponibleParaDevolver,
+  DevolucionService,
+  LineaDevolucionEntrada,
+  lineaDevolucionEnCeros,
+} from '../devolucion/devolucion.service';
 import { construirTicketHtml, estiloTicket, formatMoneda, redondear } from '../ventas.util';
 import { exportarCsv } from '../../../shared/utils/csv.util';
 import { exportarTablaPdf } from '../../../shared/utils/pdf-tabla.util';
@@ -398,7 +404,33 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
     this.modalDevolucionAbierto.set(false);
   }
 
+  /** Trae los DevolucionItem MÁS RECIENTES de esta venta directo del
+   *  servidor — nunca lo que ya esté en devolucionItemsDetalle(), que se
+   *  cargó cuando se abrió el detalle y puede haber quedado desactualizado
+   *  si, mientras el modal de Devolución estaba abierto, se registró otra
+   *  devolución sobre la misma venta desde otra pestaña/sesión. Se usa
+   *  justo antes de escribir, como última línea de defensa contra devolver
+   *  más de lo disponible por una condición de carrera (ver
+   *  confirmarDevolucion() y el comentario de DevolucionService.registrar()
+   *  sobre la validación real en el servidor, pendiente del RPC atómico
+   *  propuesto). */
+  private async obtenerDevolucionItemsFrescos(ventaId: number): Promise<DevolucionItem[]> {
+    const devoluciones = await firstValueFrom(this.data.list<Devolucion>('Devolucion', { ventaId }));
+    if (devoluciones.length === 0) return [];
+    const itemsPorDevolucion = await Promise.all(
+      devoluciones.map((d) => firstValueFrom(this.data.list<DevolucionItem>('DevolucionItem', { devolucionId: d.id }))),
+    );
+    return itemsPorDevolucion.flat();
+  }
+
   async confirmarDevolucion(): Promise<void> {
+    // Guarda de reentrada: el botón ya se deshabilita con
+    // [disabled]="guardandoDevolucion()", pero esta comprobación es
+    // síncrona e inmediata (no depende de que Angular vuelva a pintar el
+    // DOM), así que también cubre un doble Enter/clic disparado en el
+    // mismo tick — ver hallazgo QA "evitar devoluciones duplicadas".
+    if (this.guardandoDevolucion()) return;
+
     const venta = this.ventaDetalle();
     const usuario = this.auth.usuarioActual();
     if (!venta || !usuario) return;
@@ -408,20 +440,31 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
       .filter((item) => (cantidades[item.id] ?? 0) > 0)
       .map((item) => {
         const cantidad = cantidades[item.id];
-        const precioNeto = item.cantidad > 0 ? item.subtotal / item.cantidad : 0;
         return {
           ventaItemId: item.id,
           productoId: item.productoId,
           descripcion: item.descripcion,
           cantidad,
           precioUnitario: item.precioUnitario,
-          subtotal: redondear(cantidad * precioNeto),
+          subtotal: calcularSubtotalDevolucion(item, cantidad),
           bodegaId: item.bodegaId,
         };
       });
 
     if (lineas.length === 0) {
       this.toast.advertencia('Indica al menos una cantidad a devolver.');
+      return;
+    }
+    // Nunca procesar un renglón con cantidad positiva pero importe
+    // calculado en $0 (o negativo) — el síntoma exacto del hallazgo QA
+    // "Devolución parcial: total a reembolsar en $0". DevolucionService
+    // repite esta misma guarda del lado del servicio (defensa en
+    // profundidad), pero validar aquí también evita el viaje de red.
+    const lineaEnCeros = lineaDevolucionEnCeros(lineas);
+    if (lineaEnCeros) {
+      this.toast.error(
+        `El importe a reembolsar de "${lineaEnCeros.descripcion}" quedó en $0.00 — revisa la cantidad antes de confirmar.`,
+      );
       return;
     }
     if (this.devolucionForm.invalid) {
@@ -431,6 +474,23 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
 
     this.guardandoDevolucion.set(true);
     try {
+      // Revalida contra el servidor justo antes de escribir (ver
+      // obtenerDevolucionItemsFrescos()) — limita la cantidad al saldo
+      // pendiente de devolución REAL, no al que se calculó cuando se abrió
+      // el detalle.
+      const devolucionItemsFrescos = await this.obtenerDevolucionItemsFrescos(venta.id);
+      const excedida = lineas.find((l) => {
+        const item = this.itemsDetalle().find((i) => i.id === l.ventaItemId);
+        if (!item) return true;
+        return l.cantidad > cantidadDisponibleParaDevolver(item, devolucionItemsFrescos);
+      });
+      if (excedida) {
+        this.toast.error(
+          'La disponibilidad para devolver cambió mientras el formulario estaba abierto. Cierra y vuelve a abrir el detalle para intentarlo de nuevo.',
+        );
+        return;
+      }
+
       const valor = this.devolucionForm.getRawValue();
       const devolucion = await this.devolucionService.registrar({
         ventaId: venta.id,
@@ -443,6 +503,12 @@ export class HistorialVentasComponent implements OnInit, OnDestroy {
       this.modalDevolucionAbierto.set(false);
       await this.cargarDetalle(venta);
       await this.cargarListado();
+    } catch (error) {
+      // DevolucionService ya revierte lo que se haya alcanzado a escribir
+      // (ver su comentario de clase) — aquí solo falta avisar al usuario,
+      // porque un throw de validación (p.ej. importe en ceros) no pasa por
+      // conToast() y no habría mostrado ningún mensaje por su cuenta.
+      this.toast.error(error instanceof Error ? error.message : 'No se pudo registrar la devolución.');
     } finally {
       this.guardandoDevolucion.set(false);
     }
