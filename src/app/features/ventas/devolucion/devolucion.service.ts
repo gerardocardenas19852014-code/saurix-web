@@ -39,11 +39,13 @@ export interface LineaDevolucionEntrada {
  * existencia de cada renglón con producto real (Entrada, mismo criterio
  * que VentaService.cancelar() pero solo de lo devuelto) y refleja el
  * reembolso como un VentaPago EN NEGATIVO ligado a la venta original —
- * así TurnoCajaService.resumen() (que solo suma VentaPago.monto por
- * método) ya lo resta solo, sin tener que tocar ese cálculo. El reembolso
- * queda atribuido al turno de la VENTA ORIGINAL (no al turno que esté
- * abierto ahora mismo al momento de devolver) — simplificación consciente
- * para no tener que rastrear "en qué turno se procesó cada devolución".
+ * así cualquier suma de VentaPago.monto por método (ver
+ * dashboard-ventas.component.ts) ya lo resta solo, sin tener que tocar ese
+ * cálculo. El reembolso queda atribuido al turno de la VENTA ORIGINAL (no
+ * al turno que esté abierto ahora mismo al momento de devolver) —
+ * simplificación consciente para no tener que rastrear "en qué turno se
+ * procesó cada devolución" (turno que, desde Mandato 86, el usuario ya ni
+ * siquiera ve).
  */
 @Injectable({ providedIn: 'root' })
 export class DevolucionService {

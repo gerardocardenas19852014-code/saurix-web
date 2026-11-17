@@ -33,14 +33,6 @@ const GRUPOS: GrupoConfig[] = [
         descripcion: 'Tema, asistente de IA y tamaño de página, por usuario.',
         grupo: 'General',
       },
-      {
-        ruta: 'parametros',
-        icono: '🧮',
-        color: 'generic',
-        titulo: 'Parámetros del sistema',
-        descripcion: 'Parámetros que afectan a otros módulos — p.ej. el conteo de caja por denominación en Ventas.',
-        grupo: 'General',
-      },
     ],
   },
 ];

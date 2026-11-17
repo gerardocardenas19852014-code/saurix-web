@@ -75,9 +75,9 @@ const CANTIDAD_POR_PAGINA_TOP = 10;
  * "Más vendidos" neta devoluciones, con la fórmula exacta del mandato:
  * cantidad neta = cantidad vendida − cantidad devuelta. "Métodos de
  * pago"/"Canales" netean de forma natural porque sumar `VentaPago.monto`
- * ya incluye los movimientos negativos de una devolución — mismo
- * precedente ya en producción en `TurnoCajaService.resumen()`, no una
- * regla nueva.
+ * ya incluye los movimientos negativos de una devolución — mismo criterio
+ * aritmético que ya se usaba (antes de Mandato 86) para resumir el efectivo
+ * de un turno de caja, no una regla nueva.
  */
 @Component({
   selector: 'app-dashboard-ventas',

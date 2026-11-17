@@ -61,7 +61,6 @@ export const DESTINOS: DestinoPaleta[] = [
 
   { label: 'Inicio', grupo: 'Panel de Control', ruta: '/panel-control', icono: '⌂' },
   { label: 'Apariencia', grupo: 'Panel de Control', ruta: '/panel-control/apariencia', icono: '🎨' },
-  { label: 'Parámetros del sistema', grupo: 'Panel de Control', ruta: '/panel-control/parametros', icono: '🧮' },
 
   // Faltaba el módulo Familia completo (hallado 2026-10-10 al agregar
   // Directorio familiar) — sin esto, WikiDocs no podía referenciar ninguna
@@ -101,9 +100,6 @@ export const DESTINOS: DestinoPaleta[] = [
   { label: 'Tipos de lista de precio', grupo: 'Inventario', ruta: '/inventario/tipos-lista-precio', icono: '💲' },
   { label: 'Inicio', grupo: 'Ventas', ruta: '/ventas', icono: '⌂' },
   { label: 'Cobro', grupo: 'Ventas', ruta: '/ventas/cobro', icono: '🧾' },
-  { label: 'Apertura de caja', grupo: 'Ventas', ruta: '/ventas/apertura-turno', icono: '🔓' },
-  { label: 'Corte de caja', grupo: 'Ventas', ruta: '/ventas/corte-turno', icono: '📋' },
-  { label: 'Cierre de caja', grupo: 'Ventas', ruta: '/ventas/cierre-turno', icono: '🔒' },
   { label: 'Historial de ventas', grupo: 'Ventas', ruta: '/ventas/historial', icono: '🧾' },
   { label: 'Dashboard de ventas', grupo: 'Ventas', ruta: '/ventas/dashboard', icono: '📊' },
   { label: 'Cotizaciones', grupo: 'Ventas', ruta: '/ventas/cotizaciones', icono: '📝' },

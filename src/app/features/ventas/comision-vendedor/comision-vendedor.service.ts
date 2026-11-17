@@ -17,7 +17,7 @@ export class ComisionVendedorService {
   }
 
   /** Crea o actualiza la comisión de un vendedor (get-or-create por
-   *  usuarioId, mismo criterio que ConfiguracionVentasService). */
+   *  usuarioId, fila única por usuario). */
   async guardar(usuarioId: number, tipo: ComisionVendedor['tipo'], valor: number): Promise<ComisionVendedor> {
     const existente = await this.obtenerPorUsuario(usuarioId);
     if (existente) {

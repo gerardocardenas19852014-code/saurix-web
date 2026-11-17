@@ -1,3 +1,24 @@
-/* Sin estilos propios: usa íntegramente las clases globales del grid de
- * catálogos (ver src/styles.scss), mismo criterio que
- * tipos-lista-precio.component.scss. */
+// Mandato 85 — homologación al estándar SAURIX-CAT-001 v1.1 (ver
+// unidades-medida.component.scss / categorias-producto.component.scss, de
+// donde viene este patrón). Todo aquí queda encapsulado por Angular a este
+// componente — ningún otro catálogo se ve afectado.
+
+.grid-filter input[type='search'] {
+  flex: 0 0 260px;
+  width: 260px;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .grid-filter input[type='search'] {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+}
+
+// Catálogo pequeño (~12-24 filas en producción, una siembra por empresa) —
+// mismo ajuste que el resto de catálogos chicos para evitar un hueco vacío
+// grande bajo la tabla, sin tocar el valor global en styles.scss.
+:host ::ng-deep .grid-table-scroll {
+  min-height: 120px;
+}

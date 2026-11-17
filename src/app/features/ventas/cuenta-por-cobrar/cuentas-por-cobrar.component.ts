@@ -137,13 +137,8 @@ export class CuentasPorCobrarComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // turnoAbiertoOCrear(): si "Apertura de caja" está desactivada, abre uno
-    // en silencio en vez de bloquear — ver su comentario en TurnoCajaService.
+    // Mandato 86 (Fase A): el turno se abre siempre en silencio, nunca null.
     const turno = await this.turnoCajaService.turnoAbiertoOCrear(usuario.id);
-    if (!turno) {
-      this.toast.advertencia('Abre un turno de caja antes de registrar un abono.');
-      return;
-    }
 
     this.guardandoAbono.set(true);
     try {

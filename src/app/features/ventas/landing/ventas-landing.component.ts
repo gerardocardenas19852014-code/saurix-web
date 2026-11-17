@@ -1,6 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, inject, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { ConfiguracionVentasService } from '../../../shared/services/configuracion-ventas.service';
 
 type ColorIcono = 'accent' | 'slate';
 
@@ -18,8 +17,11 @@ interface GrupoModulo {
 }
 
 /** Mismo criterio de agrupado que InventarioLandingComponent: Inicio es
- *  solo un índice de pantallas, con Proceso (el día a día de la caja),
- *  Administración y Catálogos (lo que se configura de vez en cuando) separados. */
+ *  solo un índice de pantallas, con Proceso (el día a día de ventas),
+ *  Administración y Catálogos (lo que se configura de vez en cuando) separados.
+ *
+ *  Mandato 86 (Fase A, nov-2026): se retiraron del todo Apertura/Corte/
+ *  Cierre de caja — ya no existen ni como pantallas ni como tarjetas aquí. */
 const GRUPOS: GrupoModulo[] = [
   {
     titulo: 'Proceso',
@@ -32,32 +34,11 @@ const GRUPOS: GrupoModulo[] = [
         descripcion: 'Pantalla de venta — captura rápida, pensada para móvil/touch.',
       },
       {
-        ruta: 'apertura-turno',
-        icono: '🔓',
-        color: 'accent',
-        titulo: 'Apertura de caja',
-        descripcion: 'Abre un turno de caja con el efectivo inicial, antes de poder cobrar.',
-      },
-      {
-        ruta: 'corte-turno',
-        icono: '📋',
-        color: 'accent',
-        titulo: 'Corte de caja',
-        descripcion: 'Reporte de cómo va el turno abierto, sin cerrarlo.',
-      },
-      {
-        ruta: 'cierre-turno',
-        icono: '🔒',
-        color: 'accent',
-        titulo: 'Cierre de caja',
-        descripcion: 'Termina el turno: cuenta el efectivo físico contra lo esperado.',
-      },
-      {
         ruta: 'cotizaciones',
         icono: '📝',
         color: 'accent',
         titulo: 'Cotizaciones',
-        descripcion: 'Propuestas de precio que no afectan inventario/caja hasta convertirse en venta.',
+        descripcion: 'Propuestas de precio que no afectan inventario hasta convertirse en venta.',
       },
       {
         ruta: 'pedidos-tienda',
@@ -111,6 +92,13 @@ const GRUPOS: GrupoModulo[] = [
         titulo: 'Clientes',
         descripcion: 'Contactos con datos fiscales para facturar — incluye "Público en General".',
       },
+      {
+        ruta: 'configuracion-lealtad',
+        icono: '🎁',
+        color: 'slate',
+        titulo: 'Programa de lealtad',
+        descripcion: 'Activa o desactiva el programa de puntos y define cuánto vale cada punto.',
+      },
     ],
   },
   {
@@ -130,13 +118,6 @@ const GRUPOS: GrupoModulo[] = [
         titulo: 'Comisiones de vendedores',
         descripcion: 'Porcentaje o monto fijo de comisión por vendedor.',
       },
-      {
-        ruta: 'configuracion-lealtad',
-        icono: '🎁',
-        color: 'slate',
-        titulo: 'Programa de lealtad',
-        descripcion: 'Activa o desactiva el programa de puntos y define cuánto vale cada punto.',
-      },
     ],
   },
 ];
@@ -149,26 +130,6 @@ const GRUPOS: GrupoModulo[] = [
   styleUrl: './ventas-landing.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class VentasLandingComponent implements OnInit {
-  private readonly configuracionVentas = inject(ConfiguracionVentasService);
-
-  /** Quita las tarjetas de Corte/Cierre de caja cuando están apagadas en
-   *  Panel de Control → Parámetros del sistema (ver
-   *  ConfiguracionVentasService) — mismo criterio que ya las oculta del
-   *  menú lateral en ShellComponent. */
-  protected readonly grupos = computed(() =>
-    GRUPOS.map((grupo) => ({
-      ...grupo,
-      enlaces: grupo.enlaces.filter((enlace) => {
-        if (enlace.ruta === 'apertura-turno') return this.configuracionVentas.aperturaCajaActivo();
-        if (enlace.ruta === 'corte-turno') return this.configuracionVentas.corteCajaActivo();
-        if (enlace.ruta === 'cierre-turno') return this.configuracionVentas.cierreCajaActivo();
-        return true;
-      }),
-    })).filter((grupo) => grupo.enlaces.length > 0),
-  );
-
-  async ngOnInit(): Promise<void> {
-    await this.configuracionVentas.cargar();
-  }
+export class VentasLandingComponent {
+  protected readonly grupos = signal(GRUPOS);
 }

@@ -432,13 +432,8 @@ export class CotizacionesComponent implements OnInit, OnDestroy {
     const usuario = this.auth.usuarioActual();
     if (!usuario) return;
 
-    // turnoAbiertoOCrear(): si "Apertura de caja" está desactivada, abre uno
-    // en silencio en vez de bloquear — ver su comentario en TurnoCajaService.
-    const turno = await this.turnoCajaService.turnoAbiertoOCrear(usuario.id);
-    if (!turno) {
-      this.toast.advertencia('Abre un turno de caja antes de convertir una cotización en venta.');
-      return;
-    }
+    // Mandato 86 (Fase A): el turno se abre siempre en silencio, nunca null.
+    await this.turnoCajaService.turnoAbiertoOCrear(usuario.id);
     this.conversionForm.reset({ metodoPago: 'Efectivo' });
     this.modalConvertirAbierto.set(true);
   }
@@ -464,10 +459,6 @@ export class CotizacionesComponent implements OnInit, OnDestroy {
     this.convirtiendo.set(true);
     try {
       const turno = await this.turnoCajaService.turnoAbiertoOCrear(usuario.id);
-      if (!turno) {
-        this.toast.advertencia('Ya no tienes un turno de caja abierto.');
-        return;
-      }
 
       const valor = this.conversionForm.getRawValue();
       const venta = await this.cotizacionService.convertirAVenta(cotizacion, this.itemsDetalle(), {

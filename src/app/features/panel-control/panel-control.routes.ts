@@ -10,8 +10,4 @@ export const PANEL_CONTROL_ROUTES: Routes = [
     path: 'apariencia',
     loadComponent: () => import('./apariencia/apariencia.component').then((m) => m.AparienciaComponent),
   },
-  {
-    path: 'parametros',
-    loadComponent: () => import('./parametros/parametros.component').then((m) => m.ParametrosComponent),
-  },
 ];

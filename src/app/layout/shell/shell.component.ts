@@ -10,7 +10,6 @@ import { DataClientService } from '../../core/services/data-client.service';
 import { MiPerfilComponent } from '../../shared/components/mi-perfil/mi-perfil.component';
 import { ToastComponent } from '../../shared/components/toast/toast.component';
 import { ConfiguracionAparienciaService } from '../../shared/services/configuracion-apariencia.service';
-import { ConfiguracionVentasService } from '../../shared/services/configuracion-ventas.service';
 import { Ticket } from '../../features/proyectos/kanban/ticket.model';
 import { MovimientoPresupuesto } from '../../features/presupuesto/movimientos/movimiento.model';
 import { MiembroFamilia } from '../../features/familia/miembro-familia.model';
@@ -216,14 +215,6 @@ export class ShellComponent implements OnDestroy {
    *  si está apagado en Apariencia, el asistente no se muestra en ningún módulo. */
   protected readonly asistenteIaActivo = this.configuracionApariencia.asistenteIaActivo;
 
-  /** Gatea "Corte de caja"/"Cierre de caja" en el menú de Ventas y en su
-   *  Inicio (ver VentasLandingComponent) — parámetros de Panel de Control →
-   *  Parámetros del sistema, default encendidos. */
-  private readonly configuracionVentas = inject(ConfiguracionVentasService);
-  protected readonly aperturaCajaActivo = this.configuracionVentas.aperturaCajaActivo;
-  protected readonly corteCajaActivo = this.configuracionVentas.corteCajaActivo;
-  protected readonly cierreCajaActivo = this.configuracionVentas.cierreCajaActivo;
-
   constructor() {
     // Restaura la posición del botón del asistente si el usuario ya lo
     // había arrastrado antes en este navegador (ver aiFabPos arriba).
@@ -234,7 +225,6 @@ export class ShellComponent implements OnDestroy {
     // (login fresco o sesión restaurada) — no solo lo que había en
     // localStorage de este navegador.
     void this.configuracionApariencia.cargarParaUsuarioActual();
-    void this.configuracionVentas.cargar();
     this.mediaQuerySidebarAngosta.addEventListener('change', this.onCambioSidebarAngosta);
     effect(() => {
       this.urlActual();

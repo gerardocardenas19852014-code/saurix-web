@@ -1,9 +1,8 @@
 /**
- * Programa de lealtad/puntos — fila única (singleton), igual que
- * ConfiguracionVentas, pero propia de Ventas (no se pidió controlarla desde
- * Panel de Control). `programaActivo` apaga/enciende todo el programa de
- * un jalón (sin esto, ganar o canjear puntos sigue el mismo soft-delete
- * `activo` que todas las tablas, así que se necesita un nombre distinto).
+ * Programa de lealtad/puntos — fila única (singleton) por empresa.
+ * `programaActivo` apaga/enciende todo el programa de un jalón (sin esto,
+ * ganar o canjear puntos sigue el mismo soft-delete `activo` que todas las
+ * tablas, así que se necesita un nombre distinto).
  */
 export interface ConfiguracionLealtad {
   id: number;

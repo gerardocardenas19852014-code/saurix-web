@@ -1,1 +1,24 @@
-// Sin estilos propios por ahora — todo viene de src/styles.scss.
+// Mandato 84 — homologación al estándar SAURIX-CAT-001 (ver
+// categorias-producto.component.scss, de donde viene este patrón). Todo
+// aquí queda encapsulado por Angular a este componente — ningún otro
+// catálogo se ve afectado.
+
+.grid-filter input[type='search'] {
+  flex: 0 0 260px;
+  width: 260px;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .grid-filter input[type='search'] {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+}
+
+// Catálogo pequeño (2 filas en producción) — mismo ajuste que Categorías
+// de producto para evitar un hueco vacío grande bajo la tabla, sin tocar
+// el valor global en styles.scss.
+:host ::ng-deep .grid-table-scroll {
+  min-height: 120px;
+}

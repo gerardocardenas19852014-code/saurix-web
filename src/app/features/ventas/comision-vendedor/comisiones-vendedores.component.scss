@@ -1,1 +1,16 @@
-/* Reutiliza .modal-overlay/.tipo-producto-toggle/.checkbox-inline globales. */
+// Mandato 85 — homologación al estándar SAURIX-CAT-001 v1.1 (ver
+// unidades-medida.component.scss, de donde viene este patrón). Reutiliza
+// .modal-overlay/.tipo-producto-toggle/.checkbox-inline globales.
+
+.grid-filter input[type='search'] {
+  flex: 0 0 260px;
+  width: 260px;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .grid-filter input[type='search'] {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+}

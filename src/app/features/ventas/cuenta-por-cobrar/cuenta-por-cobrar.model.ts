@@ -24,9 +24,8 @@ export interface CuentaPorCobrar {
 }
 
 /** Un pago parcial o total contra una CuentaPorCobrar — turnoCajaId es el
- *  turno ABIERTO al momento de abonar (no el de la venta original), para
- *  que ese efectivo/tarjeta/transferencia entre al arqueo del turno en
- *  curso (ver TurnoCajaService.resumen()). */
+ *  turno (interno, invisible desde Mandato 86) ABIERTO al momento de
+ *  abonar, no el de la venta original. */
 export interface AbonoCuentaPorCobrar {
   id: number;
   cuentaPorCobrarId: number;

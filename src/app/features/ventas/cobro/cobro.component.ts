@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { DataClientService, FILTRO_BUSQUEDA } from '../../../core/services/data-client.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -141,7 +140,6 @@ export class CobroComponent implements OnInit, OnDestroy {
    *  VentaService.sb. */
   private readonly sb = inject(SupabaseService).cliente;
   private readonly toast = inject(ToastService);
-  private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   private readonly clienteService = inject(ClienteService);
   private readonly turnoCajaService = inject(TurnoCajaService);
@@ -357,15 +355,9 @@ export class CobroComponent implements OnInit, OnDestroy {
 
     await this.lealtadService.cargar();
 
-    // turnoAbiertoOCrear(): si "Apertura de caja" está desactivada, abre un
-    // turno en silencio en vez de mandar a una pantalla que ya ni aparece en
-    // el menú (ver su comentario en TurnoCajaService) — así Cobro no se queda
-    // esperando algo que el negocio nunca podría crear.
+    // Mandato 86 (Fase A): ya no hay pantalla de Apertura de caja -- el turno
+    // se abre siempre en silencio (ver TurnoCajaService), nunca null.
     const turno = await this.turnoCajaService.turnoAbiertoOCrear(usuario.id);
-    if (!turno) {
-      this.router.navigateByUrl('/ventas/apertura-turno');
-      return;
-    }
     this.turno.set(turno);
 
     // Catálogos chicos (Categoría/Bodega/TipoListaPrecio): se quedan

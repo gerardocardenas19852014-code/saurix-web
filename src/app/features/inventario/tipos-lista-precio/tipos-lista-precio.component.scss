@@ -1,1 +1,21 @@
-// Sin estilos propios por ahora — todo viene de src/styles.scss.
+// Mandato 84 — homologación al estándar SAURIX-CAT-001 (ver
+// categorias-producto.component.scss).
+
+.grid-filter input[type='search'] {
+  flex: 0 0 260px;
+  width: 260px;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .grid-filter input[type='search'] {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+}
+
+// Catálogo vacío hoy en producción (0 filas) — mismo ajuste que Categorías
+// de producto para evitar un hueco vacío bajo la tabla.
+:host ::ng-deep .grid-table-scroll {
+  min-height: 120px;
+}

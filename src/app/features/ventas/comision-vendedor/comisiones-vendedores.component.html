@@ -1,30 +1,75 @@
-<div class="page-header">
-  <h1>Comisiones de vendedores</h1>
-</div>
+<div class="page-header"><h1>Comisiones de vendedores</h1></div>
 
 <p class="hint" style="margin-top:-6px;">
   Configura el porcentaje o monto fijo de comisión de cada vendedor — el cálculo por periodo está en
   Reporte de comisiones.
 </p>
 
+<div class="grid-toolbar">
+  <button type="button" class="btn-primary small" title="Buscar (Alt+B)" (click)="buscar()">🔍 Buscar</button>
+  <button type="button" class="btn-secondary small" title="Limpiar filtros (Alt+L)" (click)="limpiarFiltros()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px; margin-right:4px;">
+      <path d="M12.531 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14v6a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341l.427-.473" />
+      <path d="m16.5 3.5 5 5" />
+      <path d="m21.5 3.5-5 5" />
+    </svg>
+    Limpiar filtros
+  </button>
+
+  <div class="grid-filter">
+    <input
+      type="search"
+      placeholder="Buscar vendedor por nombre o usuario…"
+      [value]="busquedaEnEdicion()"
+      (input)="busquedaEnEdicion.set($any($event.target).value)"
+      (keyup.enter)="buscar()"
+    />
+    <label class="board-filter-field board-filter-checkbox" style="margin:0;">
+      <input
+        type="checkbox"
+        [checked]="mostrarInactivosEnEdicion()"
+        (change)="mostrarInactivosEnEdicion.set($any($event.target).checked)"
+      />
+      Mostrar inactivos
+    </label>
+  </div>
+</div>
+
+<!-- Mandato 85: no se consulta nada al abrir la pantalla (ver ngOnInit() en
+     el .ts) -- solo se muestra esta invitación hasta que el usuario presione
+     "Buscar" o Enter por primera vez. -->
+@if (!haBuscado()) {
+  <p class="empty" style="margin-top:20px;">Presiona "🔍 Buscar" para consultar los registros.</p>
+} @else {
 <app-data-table
+  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
   [columnas]="columnas"
   [filas]="filas()"
   [cargando]="cargando()"
-  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+  [modoServidor]="true"
+  [paginaExterna]="paginaActual()"
+  [totalExterno]="totalFiltrado()"
   [ocultarEditarEliminar]="true"
   accionExtraEtiqueta="✏️ Editar"
+  accionExtraTitulo="Configurar porcentaje o monto fijo de comisión"
   (accionExtra)="abrirEditar($event)"
+  (paginaCambio)="onPaginaCambio($event)"
 />
+}
 
 @if (filaEditando(); as fila) {
-  <div class="modal-overlay">
-    <div class="modal-box" style="max-width: 400px;">
+  <div class="modal-overlay show" (click)="onClicFondoModal($event)">
+    <div
+      class="modal-box"
+      style="max-width: 400px;"
+      (click)="$event.stopPropagation()"
+      (keydown)="onTabDentroDelModal($event)"
+    >
       <h2>Comisión — {{ fila.usuario.nombre }}</h2>
       <form class="edit-form" [formGroup]="form" (ngSubmit)="guardar()">
         <div class="tipo-producto-toggle" role="group" aria-label="Tipo de comisión">
           <label class="checkbox-inline">
-            <input type="radio" formControlName="tipo" value="Porcentaje" />
+            <input type="radio" formControlName="tipo" value="Porcentaje" #primerCampo />
             Porcentaje del total vendido
           </label>
           <label class="checkbox-inline">
@@ -38,10 +83,21 @@
         </label>
 
         <div class="modal-actions">
-          <button type="button" class="btn-secondary" (click)="cerrarEditar()">Cancelar</button>
-          <button type="submit" class="btn-primary" [disabled]="guardando()">Guardar</button>
+          <button type="button" class="btn-secondary" title="Cancelar (Esc)" [disabled]="guardando()" (click)="cancelar()">Cancelar</button>
+          <button type="submit" class="btn-primary" title="Guardar (Ctrl+Enter)" [disabled]="guardando()">
+            {{ guardando() ? 'Guardando…' : 'Guardar' }}
+          </button>
         </div>
       </form>
     </div>
   </div>
 }
+
+<app-confirm-dialog
+  [visible]="avisoCierreVisible()"
+  titulo="Cambios sin guardar"
+  mensaje="Este formulario tiene cambios sin guardar. ¿Seguro que quieres cerrarlo sin guardarlos?"
+  textoConfirmar="Cerrar sin guardar"
+  (confirmar)="confirmarCierreSinGuardar()"
+  (cancelar)="cancelarCierreSinGuardar()"
+/>
