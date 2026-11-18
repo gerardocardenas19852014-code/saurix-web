@@ -90,6 +90,17 @@ export interface ColumnaTabla<T> {
    * styles.scss.
    */
   subEtiqueta?: (fila: T) => string;
+  /**
+   * Opcional: si se define, antepone a la celda una pequeña muestra de
+   * color (misma clase .color-swatch que ya usa el resto de la app --
+   * ver styles.scss) con el hex que esta función devuelva. Pensado para
+   * catálogos con un campo codigoHex propio (p.ej. Prioridades de
+   * ticket) que antes se mostraban en una tabla hecha a mano -- Mandato 87
+   * (homologación a SAURIX-CAT-001 v1.1). Puramente aditivo: ninguna otra
+   * pantalla que ya usa <app-data-table> define este campo, así que su
+   * aspecto no cambia.
+   */
+  colorHex?: (fila: T) => string;
 }
 
 /**

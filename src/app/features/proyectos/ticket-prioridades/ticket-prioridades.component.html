@@ -3,80 +3,84 @@
 </div>
 
 <div class="grid-toolbar">
-  <button type="button" class="toolbar-btn" (click)="nueva()">+ Nueva</button>
+  <button type="button" class="toolbar-btn" title="Nueva prioridad (Alt+N)" (click)="nueva()">+ Nueva</button>
+  <button type="button" class="btn-primary small" title="Buscar (Alt+B)" (click)="buscar()">🔍 Buscar</button>
+  <button type="button" class="btn-secondary small" title="Limpiar filtros (Alt+L)" (click)="limpiarFiltros()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px; margin-right:4px;">
+      <path d="M12.531 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14v6a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341l.427-.473" />
+      <path d="m16.5 3.5 5 5" />
+      <path d="m21.5 3.5-5 5" />
+    </svg>
+    Limpiar filtros
+  </button>
 
-  <label class="board-filter-field board-filter-checkbox" style="margin:0;">
-    <input type="checkbox" [checked]="mostrarInactivos()" (change)="mostrarInactivos.set($any($event.target).checked)" />
-    Mostrar inactivas
-  </label>
+  <div class="grid-filter">
+    <input
+      type="search"
+      placeholder="Buscar por clave o nombre…"
+      [value]="busquedaEnEdicion()"
+      (input)="busquedaEnEdicion.set($any($event.target).value)"
+      (keyup.enter)="buscar()"
+    />
+    <label class="board-filter-field board-filter-checkbox" style="margin:0;">
+      <input
+        type="checkbox"
+        [checked]="mostrarInactivasEnEdicion()"
+        (change)="mostrarInactivasEnEdicion.set($any($event.target).checked)"
+      />
+      Mostrar inactivas
+    </label>
+  </div>
 </div>
 
-<div class="grid-table-scroll">
-  <table class="grid-table">
-    <thead>
-      <tr>
-        <th>Clave</th>
-        <th>Nombre</th>
-        <th>Color</th>
-        <th>SLA (hrs)</th>
-        <th>Aviso (hrs antes)</th>
-        <th>Activa</th>
-        <th>Crítica</th>
-        <th class="grid-actions-col">Acciones</th>
-      </tr>
-    </thead>
-    <tbody>
-      @for (prioridad of prioridadesFiltradas(); track prioridad.id) {
-        <tr>
-          <td data-label="Clave">{{ prioridad.clave }}</td>
-          <td data-label="Nombre">{{ prioridad.nombre }}</td>
-          <td data-label="Color"><span class="color-swatch" [style.background]="prioridad.codigoHex"></span></td>
-          <td data-label="SLA (hrs)">{{ prioridad.vigenciaHoras }}</td>
-          <td data-label="Aviso (hrs antes)">{{ prioridad.avisoHoras }}</td>
-          <td data-label="Activa">
-            <span class="grid-badge {{ prioridad.activo !== false ? 'grid-badge-success' : 'grid-badge-muted' }}">
-              {{ prioridad.activo !== false ? 'Sí' : 'No' }}
-            </span>
-          </td>
-          <td data-label="Crítica">
-            @if (prioridad.critica) {
-              <span class="grid-badge grid-badge-danger">🚨 Sí</span>
-            } @else {
-              <span class="grid-badge grid-badge-muted">No</span>
-            }
-          </td>
-          <td class="grid-actions-col" data-label="Acciones">
-            <button type="button" class="btn-secondary small" (click)="editar(prioridad)">Editar</button>
-            <button type="button" class="btn-danger small" (click)="pedirEliminar(prioridad)">Eliminar</button>
-          </td>
-        </tr>
-      } @empty {
-        <tr>
-          <td colspan="8">
-            <div class="empty-state-block">
-              <p>Sin registros para mostrar.</p>
-            </div>
-          </td>
-        </tr>
-      }
-    </tbody>
-  </table>
-</div>
+<!-- Mandato 87: no se consulta nada al abrir la pantalla (ver ngOnInit() en
+     el .ts). Esta tabla hecha a mano se reemplaza por <app-data-table
+     modoServidor> siguiendo el estándar -- la columna "Color" usa el nuevo
+     campo opcional colorHex (ver ColumnaTabla en data-table.component.ts),
+     que solo esta pantalla usa. -->
+@if (!haBuscado()) {
+  <p class="empty" style="margin-top:20px;">Presiona "🔍 Buscar" para consultar los registros.</p>
+} @else {
+<app-data-table
+  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+  [columnas]="columnas"
+  [filas]="prioridadesPagina()"
+  [cargando]="cargando()"
+  [modoServidor]="true"
+  [paginaExterna]="paginaActual()"
+  [totalExterno]="totalFiltrado()"
+  (editar)="editar($event)"
+  (eliminar)="pedirEliminar($event)"
+  (paginaCambio)="onPaginaCambio($event)"
+/>
+}
 
 @if (modalAbierto()) {
-  <div class="modal-overlay show" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
-    <form class="modal-box" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+  <div class="modal-overlay show" (click)="onClicFondoModal($event)">
+    <form
+      class="modal-box"
+      [formGroup]="form"
+      (click)="$event.stopPropagation()"
+      (ngSubmit)="guardar()"
+      (keydown)="onTabDentroDelModal($event)"
+    >
       <h3>{{ prioridadEnEdicion() ? 'Editar prioridad' : 'Nueva prioridad' }}</h3>
 
       <div class="edit-form" style="margin-bottom: 18px;">
         <label>
           Nombre
-          <input type="text" formControlName="nombre" />
+          <input type="text" formControlName="nombre" #primerCampo />
+          @if (form.controls.nombre.invalid && form.controls.nombre.touched) {
+            <small class="form-error" style="display:block;margin-top:4px;padding:4px 8px;font-size:12px;">El nombre es obligatorio.</small>
+          }
         </label>
 
         <label>
           Clave
           <input type="text" formControlName="clave" />
+          @if (form.controls.clave.invalid && form.controls.clave.touched) {
+            <small class="form-error" style="display:block;margin-top:4px;padding:4px 8px;font-size:12px;">La clave es obligatoria.</small>
+          }
         </label>
 
         <label>
@@ -113,8 +117,10 @@
       </div>
 
       <div class="modal-actions">
-        <button type="button" class="btn-secondary" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">Cancelar</button>
-        <button type="submit" class="btn-primary">Guardar</button>
+        <button type="button" class="btn-secondary" title="Cancelar (Esc)" [disabled]="guardando()" (click)="cancelar()">Cancelar</button>
+        <button type="submit" class="btn-primary" title="Guardar (Ctrl+Enter)" [disabled]="form.invalid || guardando()">
+          {{ guardando() ? 'Guardando…' : 'Guardar' }}
+        </button>
       </div>
     </form>
   </div>
@@ -126,4 +132,13 @@
   [mensaje]="'¿Eliminar ' + (prioridadAEliminar()?.nombre ?? '') + '?'"
   (confirmar)="confirmarEliminar()"
   (cancelar)="prioridadAEliminar.set(null)"
+/>
+
+<app-confirm-dialog
+  [visible]="avisoCierreVisible()"
+  titulo="Cambios sin guardar"
+  mensaje="Este formulario tiene cambios sin guardar. ¿Seguro que quieres cerrarlo sin guardarlos?"
+  textoConfirmar="Cerrar sin guardar"
+  (confirmar)="confirmarCierreSinGuardar()"
+  (cancelar)="cancelarCierreSinGuardar()"
 />

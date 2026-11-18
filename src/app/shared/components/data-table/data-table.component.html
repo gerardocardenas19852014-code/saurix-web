@@ -24,6 +24,9 @@
         <tr [class.grid-fila-con-subfila]="tieneSubfila(fila)">
           @for (columna of columnasFila(); track columna.claveColumna ?? columna.campo) {
             <td [attr.data-label]="columna.etiqueta" [style.width.px]="columna.anchoColumna ?? null">
+              @if (columna.colorHex) {
+                <span class="color-swatch" [style.background]="columna.colorHex(fila)"></span>
+              }
               @if (columna.subEtiqueta) {
                 <div class="grid-cell-contenido">
                   @if (columna.claseValor) {
