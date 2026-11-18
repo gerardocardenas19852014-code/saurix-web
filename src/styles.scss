@@ -2026,7 +2026,16 @@ button { font-family: inherit; }
 
 .tienda-hero-texto {
   margin: 0 0 14px;
-  max-width: 480px;
+  /* Antes max-width:480px -- en escritorio (hero ancho, ver grid de 2
+   * columnas en catalogo-tienda.component.scss) eso dejaba la descripción
+   * forzada a una columna angosta con demasiado espacio vacío a la
+   * derecha del banner, y provocaba saltos de línea aunque hubiera sitio
+   * de sobra. Ahora usa un porcentaje del ancho disponible del HERO
+   * (75-85%, ver mandato "Ajuste visual del banner de la tienda pública",
+   * nov-2026) en vez de un límite fijo en px -- el título, el botón y el
+   * resto del banner no cambian. En móvil (media query abajo) sigue
+   * sobreescrito a max-width:none, sin cambios ahí. */
+  max-width: 80%;
   font-size: 0.95rem;
   opacity: 0.95;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
