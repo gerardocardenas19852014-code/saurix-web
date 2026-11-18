@@ -836,11 +836,41 @@ html[data-theme='dark'] .edit-form input[type=date], html[data-theme='ocean'] .e
   pointer-events: auto;
   transform: translateX(-50%) translateY(0);
 }
+/* Variante que ABRE HACIA ABAJO en vez de hacia arriba -- para un .info-tip
+ * que esta en la PRIMERA fila de un formulario, pegado a .tab-bar, sin
+ * espacio arriba (.modal-box tiene max-height:90vh + overflow-y:auto, que
+ * recorta cualquier hijo position:absolute que se salga por arriba -- ver
+ * mandato "Reacomodar elemento negro en Nueva empresa", nov-2026: el
+ * tooltip del campo Clave, primer campo de la pestaña General, quedaba
+ * oculto/recortado contra las pestañas al abrir hacia arriba como el
+ * resto). Agregar esta clase junto a .info-tip invierte SOLO la dirección
+ * vertical -- contenido, ancho, tipografía, z-index y el resto del
+ * comportamiento de .info-tip-texto (incluido el estado :hover/:focus de
+ * arriba, que ya usa translateY(0) y sirve igual para ambas direcciones)
+ * no cambian. El resto de los .info-tip de la app, que sí tienen espacio
+ * arriba, no llevan esta clase y no se ven afectados. */
+.info-tip-abajo .info-tip-texto {
+  bottom: auto;
+  top: calc(100% + 8px);
+  transform: translateX(-50%) translateY(-4px);
+}
+.info-tip-abajo .info-tip-texto::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: #0D1B2A;
+}
 @media (max-width: 480px) {
   .info-tip-texto { left: auto; right: -8px; transform: translateY(4px); }
   .info-tip:hover .info-tip-texto,
   .info-tip:focus .info-tip-texto,
   .info-tip:focus-visible .info-tip-texto { transform: translateY(0); }
+  /* Mismo ajuste que arriba (left:auto; right:-8px) ya aplica en móvil a
+   * TODOS los .info-tip-texto, incluido este -- aquí solo se deja el
+   * estado oculto sin el translateX(-50%) (ya no aplica centrado, el
+   * tooltip quedó anclado a la derecha), igual que ya hace el bloque de
+   * arriba para la variante que abre hacia arriba. */
+  .info-tip-abajo .info-tip-texto { transform: translateY(-4px); }
 }
 .image-upload-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .anexos-upload-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }

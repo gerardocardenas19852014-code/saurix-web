@@ -63,7 +63,13 @@
             <label>
               <span class="label-con-tip">
                 Clave
-                <button type="button" class="info-tip" aria-label="Más información"><span class="info-tip-texto">Minúsculas, números o guiones. No se puede cambiar después.</span></button>
+                <!-- info-tip-abajo: este es el primer campo de la pestaña General, pegado
+                     a .tab-bar sin espacio arriba -- abre hacia abajo en vez de hacia
+                     arriba para no quedar recortado/oculto contra las pestañas (ver
+                     mandato "Reacomodar elemento negro en Nueva empresa", nov-2026, y el
+                     comentario de .info-tip-abajo en styles.scss). Contenido y
+                     funcionalidad del tooltip sin cambios. -->
+                <button type="button" class="info-tip info-tip-abajo" aria-label="Más información"><span class="info-tip-texto">Minúsculas, números o guiones. No se puede cambiar después.</span></button>
               </span>
               <input type="text" class="form-control" formControlName="clave" placeholder="p.ej. acme" />
             </label>
