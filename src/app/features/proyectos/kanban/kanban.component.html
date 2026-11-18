@@ -26,12 +26,35 @@
     <button type="button" class="btn-primary small" [disabled]="cargandoLista()" (click)="buscarLista()">
       🔍 Buscar
     </button>
+    <!-- "Limpiar filtros" reubicado aquí (antes vivía al final de la fila de
+         filtros, solo como botón condicional) -- mandato "Optimización
+         visual y funcional de la Lista de tickets", nov-2026: mismo botón,
+         misma función (limpiarFiltros(), sin tocarla), ahora siempre visible
+         en la barra de acciones con el icono "filter-x" (mismo SVG que usa
+         el estándar SAURIX-CAT-001 en categorias-producto.component.html,
+         por consistencia visual). -->
+    <button type="button" class="btn-secondary small" title="Limpiar filtros" (click)="limpiarFiltros()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px; margin-right:4px;">
+        <path d="M12.531 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14v6a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341l.427-.473" />
+        <path d="m16.5 3.5 5 5" />
+        <path d="m21.5 3.5-5 5" />
+      </svg>
+      Limpiar filtros
+    </button>
     <button type="button" class="toolbar-btn" (click)="nuevoTicket(columnaPorDefecto())">
       + Nuevo ticket
     </button>
   </div>
 </div>
 
+<!-- Mandato "Optimización visual y funcional de la Lista de tickets",
+     nov-2026: filtros reorganizados en dos filas explícitas (antes eran un
+     solo <div> que envolvía según el ancho disponible, en el orden original
+     de declaración) -- orden pedido: Proyecto/Buscar/Estado/Prioridad/
+     Asignado a arriba, Tipo/Módulo/Planeado/Mostrar inactivos/Mostrar
+     resueltos abajo. Mismos campos, mismos bindings, misma lógica -- solo
+     cambia el agrupamiento visual. "Limpiar filtros" se reubicó en la barra
+     de acciones de arriba (ver page-actions), así que ya no vive aquí. -->
 <div class="board-filters tickets-filtros">
   <label class="board-filter-field">
     Proyecto
@@ -51,37 +74,6 @@
       (input)="filtroTexto.set($any($event.target).value)"
       (keyup.enter)="onEnterBusquedaLista()"
     />
-  </label>
-
-  <label class="board-filter-field">
-    Tipo
-    <select [value]="filtroTipoId()" (change)="filtroTipoId.set(+$any($event.target).value)">
-      <option [value]="0">Todos</option>
-      @for (tipo of tipos(); track tipo.id) {
-        <option [value]="tipo.id">{{ tipo.icono }} {{ tipo.nombre }}</option>
-      }
-    </select>
-  </label>
-
-  <label class="board-filter-field">
-    Módulo
-    <select [value]="filtroModuloId()" (change)="filtroModuloId.set(+$any($event.target).value)">
-      <option [value]="0">Todos</option>
-      <option [value]="-1">Sin módulo</option>
-      @for (modulo of modulos(); track modulo.id) {
-        <option [value]="modulo.id">{{ modulo.icono }} {{ modulo.nombre }}</option>
-      }
-    </select>
-  </label>
-
-  <label class="board-filter-field">
-    Prioridad
-    <select [value]="filtroPrioridadId()" (change)="filtroPrioridadId.set(+$any($event.target).value)">
-      <option [value]="0">Todas</option>
-      @for (prioridad of prioridades(); track prioridad.id) {
-        <option [value]="prioridad.id">{{ prioridad.nombre }}</option>
-      }
-    </select>
   </label>
 
   <div class="board-filter-field filtro-estado-wrap">
@@ -114,11 +106,44 @@
   </div>
 
   <label class="board-filter-field">
+    Prioridad
+    <select [value]="filtroPrioridadId()" (change)="filtroPrioridadId.set(+$any($event.target).value)">
+      <option [value]="0">Todas</option>
+      @for (prioridad of prioridades(); track prioridad.id) {
+        <option [value]="prioridad.id">{{ prioridad.nombre }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="board-filter-field">
     Asignado a
     <select [value]="filtroAsignadoId()" (change)="filtroAsignadoId.set(+$any($event.target).value)">
       <option [value]="0">Todos</option>
       @for (usuario of usuarios(); track usuario.id) {
         <option [value]="usuario.id">{{ usuario.nombreCompleto }}</option>
+      }
+    </select>
+  </label>
+</div>
+
+<div class="board-filters tickets-filtros">
+  <label class="board-filter-field">
+    Tipo
+    <select [value]="filtroTipoId()" (change)="filtroTipoId.set(+$any($event.target).value)">
+      <option [value]="0">Todos</option>
+      @for (tipo of tipos(); track tipo.id) {
+        <option [value]="tipo.id">{{ tipo.icono }} {{ tipo.nombre }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="board-filter-field">
+    Módulo
+    <select [value]="filtroModuloId()" (change)="filtroModuloId.set(+$any($event.target).value)">
+      <option [value]="0">Todos</option>
+      <option [value]="-1">Sin módulo</option>
+      @for (modulo of modulos(); track modulo.id) {
+        <option [value]="modulo.id">{{ modulo.icono }} {{ modulo.nombre }}</option>
       }
     </select>
   </label>
@@ -149,10 +174,6 @@
     />
     Mostrar resueltos
   </label>
-
-  @if (hayFiltros()) {
-    <button type="button" class="btn-secondary small" (click)="limpiarFiltros()">✕ Limpiar filtros</button>
-  }
 </div>
 
 @if (hayMasTicketsPorCargar()) {
@@ -190,14 +211,21 @@
     </p>
   </div>
 } @else if (modoVista() === 'lista') {
-  @if (haBuscadoLista()) {
-    <div class="board-filters tickets-filtros" style="margin-top: -8px;">
-      <span class="hint">{{ totalFilasLista() }} ticket(s) encontrado(s).</span>
+  <!-- Indicador discreto de "hay filtros aplicados" (no es el contador de
+       resultados -- ese ya lo muestra el pie de <app-data-table>,
+       inmediatamente debajo del grid, vía totalExterno -- ver mandato
+       "Optimización visual y funcional de la Lista de tickets", nov-2026).
+       Solo refleja la búsqueda YA EJECUTADA (hayFiltrosAplicadosLista, fijada
+       en buscarLista()), no los filtros en edición -- si el usuario edita un
+       filtro sin volver a pulsar Buscar, este indicador no cambia todavía. -->
+  @if (haBuscadoLista() && hayFiltrosAplicadosLista()) {
+    <div class="board-filters tickets-filtros" style="margin-top: -8px; margin-bottom: 8px;">
+      <span class="hint grid-badge grid-badge-neutral">🔎 Filtros aplicados</span>
     </div>
   }
 
   @if (!haBuscadoLista()) {
-    <p class="hint" style="margin-top:20px;">Ajusta los filtros y presiona "🔍 Buscar" para ver resultados.</p>
+    <p class="hint" style="margin-top:20px;">Presiona "🔍 Buscar" para consultar los tickets.</p>
   } @else {
     <app-data-table
       [columnas]="columnasLista"

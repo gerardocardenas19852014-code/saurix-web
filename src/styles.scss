@@ -375,8 +375,28 @@ html[data-wide='grid'] .content { max-width: 1600px; }
    aprovecha el espacio extra) absorba lo que sobra. Clase extra
    ".tickets-filtros" en el propio <div class="board-filters"> de Tickets --
    el resto de pantallas que usan .board-filters no se ven afectadas. */
-.board-filters.tickets-filtros .board-filter-field { flex: 0 1 170px; }
-.board-filters.tickets-filtros .board-filter-field-buscar { flex: 2 1 260px; }
+/* Mandato "Optimización visual y funcional de la Lista de tickets",
+   nov-2026: los filtros se reorganizaron en DOS filas de 5 campos cada una
+   (antes eran 10 en una sola fila que se envolvía). Con flex-grow:0 fijo
+   (como estaba) cada fila deja un hueco vacío a la derecha en pantallas
+   anchas -- ahora los combos SÍ crecen (flex-grow:1, antes 0) para
+   aprovechar ese espacio, con un tope (max-width:260px) para que no se
+   vean exageradamente anchos; "Buscar" sigue creciendo más rápido (flex:2)
+   y sin tope, igual que antes -- sigue siendo el campo que más aprovecha el
+   espacio extra de su fila. Los checkboxes (.board-filter-checkbox) no se
+   ven afectados: siguen con su ancho fijo de siempre (regla genérica de
+   .board-filter-field.board-filter-checkbox, más abajo en este archivo). */
+.board-filters.tickets-filtros .board-filter-field { flex: 1 1 170px; max-width: 260px; }
+.board-filters.tickets-filtros .board-filter-field-buscar { flex: 2 1 260px; max-width: none; }
+/* La regla de arriba (.board-filter-field con flex-grow:1 y max-width:260px)
+   también matchea a los checkboxes "Mostrar inactivos"/"Mostrar resueltos"
+   (ambos llevan la clase .board-filter-field además de .board-filter-checkbox)
+   y, por tener más clases en el selector, pesa MÁS que la regla genérica
+   .board-filter-field.board-filter-checkbox (flex:0 0 auto) de más abajo en
+   este archivo -- sin esto, los checkboxes se estirarían y verían con un
+   hueco vacío alrededor, que es justo lo que NO se quiere. Se restaura aquí
+   su ancho fijo de siempre, solo dentro de esta pantalla. */
+.board-filters.tickets-filtros .board-filter-field.board-filter-checkbox { flex: 0 0 auto; max-width: none; }
 
 // Filtro de Estado con selección múltiple (tickets › Lista de tickets): un
 // botón con la misma pinta que los <select> vecinos que abre un desplegable

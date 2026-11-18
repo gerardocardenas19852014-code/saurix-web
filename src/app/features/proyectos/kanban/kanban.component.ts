@@ -628,13 +628,22 @@ export class KanbanComponent implements OnInit, OnDestroy {
       anchoColumna: 70,
     },
     {
+      // Mandato "Optimización visual y funcional de la Lista de tickets",
+      // nov-2026: anchoMaximo: 80 recortaba con elipsis el texto MÁS la
+      // píldora completa -- el caso más largo ("🕐 faltan 99d 23h") no
+      // entraba ni de cerca en 80px, así que SIEMPRE se veía cortado, no
+      // solo en casos extremos. Sin anchoMaximo, [class.grid-badge-recortada]
+      // ya no se activa (ver data-table.component.html) y la píldora se
+      // dibuja a su ancho natural, sin overflow:hidden/text-overflow:ellipsis
+      // -- anchoColumna sigue siendo solo una PISTA de layout (no un tope
+      // duro, table-layout sigue en auto), ahora holgada para el caso más
+      // largo en vez de para el más corto.
       campo: 'fechaCreacion',
       etiqueta: 'Vigencia',
       formatear: (fila) => this.textoSla(fila) || '—',
       claseValor: (fila) => this.claseBadgeSla(fila),
       titulo: (fila) => this.textoSla(fila) || '',
-      anchoMaximo: 80,
-      anchoColumna: 90,
+      anchoColumna: 140,
     },
     {
       // Descripción completa del ticket, en un segundo renglón de ancho
@@ -899,6 +908,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
     this.cargarTablero();
     this.filtrosAplicadosLista = null;
     this.haBuscadoLista.set(false);
+    this.hayFiltrosAplicadosLista.set(false);
     this.ticketsPaginaLista.set([]);
     this.totalFilasLista.set(0);
     this.paginaActualLista.set(1);
@@ -1019,6 +1029,16 @@ export class KanbanComponent implements OnInit, OnDestroy {
   protected readonly direccionOrdenLista = signal<'asc' | 'desc'>('asc');
   protected readonly cargandoLista = signal(false);
   protected readonly haBuscadoLista = signal(false);
+  /** true si la búsqueda YA APLICADA (la última vez que se pulsó Buscar/Enter
+   *  en esta vista) tenía algún filtro distinto del valor por defecto -- a
+   *  diferencia de `hayFiltros()` (que refleja los filtros EN EDICIÓN, los
+   *  mismos que ya usa el Tablero en vivo), esta señal es un indicador
+   *  discreto para la vista Lista: se fija en buscarLista() junto con el
+   *  propio snapshot filtrosAplicadosLista, así que no cambia mientras el
+   *  usuario sigue editando filtros sin volver a pulsar Buscar -- ver
+   *  mandato "Optimización visual y funcional de la Lista de tickets",
+   *  nov-2026. */
+  protected readonly hayFiltrosAplicadosLista = signal(false);
 
   private filtrosAplicadosLista: {
     busqueda: string;
@@ -1061,6 +1081,19 @@ export class KanbanComponent implements OnInit, OnDestroy {
       mostrarInactivos: this.mostrarInactivos(),
       mostrarResueltos: this.mostrarResueltos(),
     };
+    this.hayFiltrosAplicadosLista.set(
+      !!(
+        this.filtrosAplicadosLista.busqueda.trim() ||
+        this.filtrosAplicadosLista.tipoId ||
+        this.filtrosAplicadosLista.moduloId ||
+        this.filtrosAplicadosLista.prioridadId ||
+        this.filtrosAplicadosLista.estadoIds.length ||
+        this.filtrosAplicadosLista.asignadoId ||
+        this.filtrosAplicadosLista.planeado ||
+        this.filtrosAplicadosLista.mostrarInactivos ||
+        this.filtrosAplicadosLista.mostrarResueltos
+      ),
+    );
     this.haBuscadoLista.set(true);
     this.paginaActualLista.set(1);
     this.listaSucia = false;
