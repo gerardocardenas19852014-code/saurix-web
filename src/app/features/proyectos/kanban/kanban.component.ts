@@ -515,32 +515,36 @@ export class KanbanComponent implements OnInit, OnDestroy {
   /** Columnas de la vista de Lista (tabla) — alternativa al tablero Kanban, mismo estándar del resto del sistema. */
   protected readonly columnasLista: ColumnaTabla<Ticket>[] = [
     {
-      // Folio + Título fusionados en una sola celda -- ver mandato "Ajuste
-      // visual de Lista de tickets", nov-2026: el Título ya no vive en su
-      // propio renglón de ancho completo (subfila), que era justo lo que
-      // más aumentaba la altura de cada registro. Ahora es una segunda
-      // línea COMPACTA dentro de la misma celda del Folio
-      // (ColumnaTabla.subEtiqueta, ver grid-cell-contenido/grid-cell-sub en
-      // styles.scss) -- una sola línea recortada con el texto completo
-      // disponible al pasar el mouse, sin estirar el renglón. Junto con
-      // Módulo y Asignado a, es de las columnas con MÁS espacio (pedido
-      // explícito del mandato) -- el que dejan libre Prioridad/Estado/
-      // Planeado/Vigencia al acotarse abajo -- pero sigue con un tope
-      // (ver anchoMaximo/anchoColumna abajo): sin uno, un título atípico
-      // podía antes estirar la tabla entera sin límite.
+      // Folio + Requerimiento en una sola celda, UNA sola fila por ticket --
+      // ver mandato "Corrección visual de Lista de tickets", nov-2026: el
+      // mandato anterior había puesto la descripción en un renglón aparte de
+      // ancho completo (ColumnaTabla.subfila, "Requerimiento:") A LA VEZ que
+      // esta celda seguía mostrando el Título como segunda línea -- el
+      // resultado se veía duplicado (dos versiones del "requerimiento" por
+      // ticket) y ocupaba demasiado alto. Se quitó esa columna subfila (ver
+      // más abajo, ya no existe) y esta segunda línea ahora muestra la
+      // descripción completa (o el título si no hay descripción capturada)
+      // -- SIN truncar, con saltos de línea naturales y respetando los que
+      // ya tenga el texto (ver subEtiqueta de ColumnaTabla y .grid-cell-sub
+      // en styles.scss: white-space:pre-wrap, sin max-width ni elipsis). La
+      // altura de la fila crece sola según el contenido (no hay límite de
+      // alto fijo en ningún lado de esta celda).
       campo: 'numeroTicket',
       etiqueta: 'Folio',
       titulo: (fila) => fila.numeroTicket,
-      subEtiqueta: (fila) => fila.titulo,
-      // Sin tope, un folio o un título largo hacía crecer la celda (y la
-      // tabla entera, en layout automático) sin límite -- anchoMaximo acota
-      // CADA línea (folio y título) y anchoColumna acota la columna misma;
-      // 280/300px es generoso (varias veces más que Folio interno,
-      // Prioridad o Estado) sin dejar que una sola fila atípica rompa el
-      // ancho de toda la tabla. El valor completo de ambas líneas sigue
-      // disponible al pasar el mouse.
+      subEtiqueta: (fila) => fila.descripcion || fila.titulo,
+      // anchoMaximo SOLO topa la primera línea (el folio, p.ej. "SAU-00123"
+      // -- ver data-table.component.html: el tope ya no se le pasa a la
+      // segunda línea/subEtiqueta, solo al valor principal). anchoColumna es
+      // la pista de ancho de TODA la columna -- se amplió de 240 a 340 para
+      // darle a la descripción más espacio horizontal antes de partir línea
+      // (menos renglones = fila más compacta), sin comprimir Vigencia
+      // (anchoColumna: 140) ni Acciones (ancho fijo propio,
+      // .grid-actions-col) -- con table-layout:auto cada columna sigue
+      // respetando su propia pista; si no cabe todo, el scroll horizontal ya
+      // existente (.grid-table-scroll) se encarga en pantallas chicas.
       anchoMaximo: 220,
-      anchoColumna: 240,
+      anchoColumna: 340,
     },
     {
       campo: 'folioInterno',
@@ -644,26 +648,6 @@ export class KanbanComponent implements OnInit, OnDestroy {
       claseValor: (fila) => this.claseBadgeSla(fila),
       titulo: (fila) => this.textoSla(fila) || '',
       anchoColumna: 140,
-    },
-    {
-      // Descripción completa del ticket, en un segundo renglón de ancho
-      // completo debajo de los datos principales (ColumnaTabla.subfila) --
-      // ver mandato "Mejora visual de descripción en Lista de tickets",
-      // nov-2026 (referencia: ABS CorEvo). A diferencia de Folio/Título
-      // arriba (que SÍ recortan con elipsis, por ser texto corto de una
-      // sola línea), la descripción es texto libre potencialmente largo con
-      // saltos de línea propios -- se muestra completa, sin recortar (ver
-      // .grid-subfila-valor en styles.scss: white-space:pre-wrap respeta
-      // esos saltos y envuelve el texto de forma natural, sin alto fijo).
-      // El dato ya viene en cada fila de fn_tickets_lista_pagina (columna
-      // `descripcion` de la propia tabla `ticket`) -- no se pide nada
-      // adicional al servidor por ticket. Si el ticket no tiene descripción
-      // capturada, DataTableComponent.tieneSubfila() oculta el renglón
-      // entero (sin dejar un "Requerimiento:" vacío ni el espacio en blanco
-      // que eso dejaría).
-      campo: 'descripcion',
-      etiqueta: 'Requerimiento',
-      subfila: true,
     },
   ];
 

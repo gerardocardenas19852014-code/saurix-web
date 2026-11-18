@@ -1283,16 +1283,21 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
    Prioridad/Estado inusualmente largo) -- ver ColumnaTabla.anchoMaximo. */
 .grid-badge-recortada { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
-/* Segunda línea compacta DENTRO de la misma celda (ColumnaTabla.subEtiqueta)
-   -- a diferencia de .grid-subfila-* (renglón de ancho completo aparte),
-   esta vive pegada al valor principal sin aumentar la altura del renglón
-   más que una línea extra pequeña. Pensada para el Título de un ticket
-   debajo de su Folio -- ver mandato "Ajuste visual de Lista de tickets",
-   nov-2026. */
+/* Segunda línea DENTRO de la misma celda (ColumnaTabla.subEtiqueta) -- a
+   diferencia de .grid-subfila-* (renglón de ancho completo aparte, ya sin
+   ningún consumidor desde el mandato "Corrección visual de Lista de
+   tickets", nov-2026: esa columna aparte duplicaba lo que ya mostraba esta
+   misma línea), esta vive pegada al valor principal, dentro de la misma
+   fila del grid -- cada ticket sigue ocupando un solo renglón. Antes
+   recortaba a una línea con elipsis (pensada para el Título); ahora
+   envuelve en tantas líneas como haga falta y respeta los saltos de línea
+   reales del texto (pre-wrap) -- pensada para la descripción completa de
+   un ticket debajo de su Folio. La altura de la fila se ajusta sola según
+   el contenido: no hay ningún alto fijo ni máscara en esta celda. */
 .grid-cell-contenido { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .grid-cell-sub {
   font-size: 12px; color: var(--ink-soft); max-width: 100%;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word;
 }
 
 /* Variante de .grid-cell-truncada que envuelve hasta 2 renglones en vez de
@@ -1404,12 +1409,14 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
      display:block arriba) — solo falta alinear a la izquierda, igual que
      el resto de contenido con colspan en móvil. */
   .grid-subfila-celda { text-align: left; }
-  /* Mismo criterio que .grid-cell-truncada arriba: en la tarjeta apilada no
-     hay renglón que estirar, así que la sub-línea (ColumnaTabla.subEtiqueta,
-     p.ej. el Título debajo del Folio) se ve completa en vez de recortada,
-     y el apilado vertical se alinea a la derecha como el resto del valor. */
-  .grid-cell-contenido { align-items: flex-end; }
-  .grid-cell-sub { max-width: none; white-space: normal; text-align: right; }
+  /* La sub-línea (ColumnaTabla.subEtiqueta, la descripción del ticket debajo
+     de su Folio) ya no se recorta en ningún ancho -- ver regla de arriba,
+     fuera de este bloque de móvil -- pero aquí se alinea a la IZQUIERDA en
+     vez de a la derecha como el resto de valores de la tarjeta apilada: un
+     párrafo envuelto en varias líneas se lee mal alineado a la derecha, a
+     diferencia de un valor corto de una sola línea. */
+  .grid-cell-contenido { align-items: flex-start; }
+  .grid-cell-sub { text-align: left; }
   /* Mismo criterio: una píldora recortada (ColumnaTabla.anchoMaximo sobre
      claseValor, p.ej. Prioridad/Estado/Vigencia de un ticket) tampoco tiene
      renglón que estirar en la tarjeta apilada -- se ve completa. El

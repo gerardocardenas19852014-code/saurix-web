@@ -39,7 +39,15 @@
                   } @else {
                     {{ valorCelda(fila, columna) }}
                   }
-                  <div class="grid-cell-sub" [style.max-width.px]="columna.anchoMaximo ?? null" [title]="columna.subEtiqueta(fila)">{{ columna.subEtiqueta(fila) }}</div>
+                  <!-- Sin [style.max-width.px]="columna.anchoMaximo" -- ver mandato
+                       "Corrección visual de Lista de tickets", nov-2026: ese tope era
+                       el mismo que usa la línea principal (columna.titulo, arriba), pensado
+                       para un valor corto de una sola línea (p.ej. el folio). subEtiqueta
+                       ahora es texto libre potencialmente largo (ver .grid-cell-sub en
+                       styles.scss: white-space:pre-wrap, sin elipsis) -- aplicarle el mismo
+                       tope lo habría truncado igual que antes, solo que silenciosamente vía
+                       overflow en vez de con "…" visible. -->
+                  <div class="grid-cell-sub" [title]="columna.subEtiqueta(fila)">{{ columna.subEtiqueta(fila) }}</div>
                 </div>
               } @else if (columna.claseValor) {
                 <span class="grid-badge {{ columna.claseValor(fila) }}" [class.grid-badge-recortada]="columna.anchoMaximo" [style.max-width.px]="columna.anchoMaximo ?? null" [title]="columna.titulo ? columna.titulo(fila) : ''">{{ valorCelda(fila, columna) }}</span>

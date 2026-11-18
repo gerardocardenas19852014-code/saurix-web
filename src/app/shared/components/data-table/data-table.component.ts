@@ -76,12 +76,18 @@ export interface ColumnaTabla<T> {
    */
   anchoColumna?: number;
   /**
-   * Opcional: una segunda línea, compacta, DENTRO de la misma celda (no un
-   * renglón de ancho completo como `subfila`) -- pensado para mostrar un
-   * dato secundario pegado al principal sin inflar la altura del renglón
-   * (p.ej. el Título de un ticket debajo de su Folio). Se recorta a una
-   * línea con elipsis; el valor completo queda disponible al pasar el
-   * mouse. Ver `.grid-cell-sub`/`.grid-cell-contenido` en styles.scss.
+   * Opcional: una segunda línea DENTRO de la misma celda (no un renglón de
+   * ancho completo como `subfila`) -- pensado para mostrar un dato
+   * secundario pegado al principal, en la misma fila del grid. A partir del
+   * mandato "Corrección visual de Lista de tickets" (nov-2026, Folio +
+   * descripción del ticket) ya NO se recorta: envuelve en tantas líneas
+   * como haga falta (`white-space: pre-wrap`, respeta saltos de línea
+   * reales del texto) y la fila crece su alto según el contenido -- sin
+   * `anchoMaximo` (ese tope solo aplica a la línea principal, ver
+   * data-table.component.html). Pensado para texto libre más largo que
+   * acompaña al valor principal (p.ej. la descripción de un ticket debajo
+   * de su Folio). Ver `.grid-cell-sub`/`.grid-cell-contenido` en
+   * styles.scss.
    */
   subEtiqueta?: (fila: T) => string;
 }
