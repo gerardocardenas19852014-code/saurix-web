@@ -272,6 +272,22 @@ export class DataTableComponent<T extends { id: number }> {
     return valor === null || valor === undefined ? '' : String(valor);
   }
 
+  /**
+   * true si ESTA fila en particular debe mostrar el renglón de subfila de
+   * ancho completo (hay una columna marcada `subfila` Y su valor para esta
+   * fila no está vacío) -- a diferencia de `columnaSubfila()` (que solo dice
+   * si HAY una columna así configurada, igual para todas las filas), esto
+   * evita un renglón "Etiqueta:" vacío -- y el borde que se le quita a la
+   * fila principal para fundirse visualmente con él (ver
+   * .grid-fila-con-subfila en styles.scss) -- cuando un registro puntual no
+   * tiene valor (p.ej. un ticket sin descripción capturada). Ver mandato
+   * "Mejora visual de descripción en Lista de tickets", nov-2026.
+   */
+  tieneSubfila(fila: T): boolean {
+    const columna = this.columnaSubfila();
+    return columna ? this.valorCelda(fila, columna).trim().length > 0 : false;
+  }
+
   irAPagina(pagina: number): void {
     if (pagina < 1 || pagina > this.totalPaginas()) return;
     if (this.modoServidor()) {

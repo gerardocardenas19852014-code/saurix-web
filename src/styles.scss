@@ -1295,20 +1295,33 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
    una sola fila visual, y el borde + hover se mueven a este renglón. */
 .grid-table tr.grid-fila-con-subfila td { border-bottom: none; }
 .grid-subfila-celda {
-  padding: 0 16px 11px;
+  padding: 7px 16px 10px;
   border-bottom: 1px solid var(--line);
   font-size: 13px;
   color: var(--ink-soft);
+  /* Fondo sutil (mismo tono que el encabezado de la tabla, ver .grid-table
+     th) para distinguir visualmente esta fila de descripción de la fila
+     principal de datos, sin introducir ningún color nuevo -- ver mandato
+     "Mejora visual de descripción en Lista de tickets", nov-2026. */
+  background: var(--paper);
 }
 .grid-subfila-celda strong { color: var(--text-strong); font-weight: 600; margin-right: 5px; }
 .grid-table tbody tr.grid-fila-con-subfila:hover + tr.grid-subfila-fila td,
 .grid-table tbody tr.grid-subfila-fila:hover td { background-color: var(--accent-soft); }
+/* Antes recortaba a 3 renglones con elipsis (pensado para el Título de un
+   ticket, ya migrado a .grid-cell-sub -- ver comentario arriba de
+   ColumnaTabla.subfila en data-table.component.ts). Ningún catálogo activo
+   usa hoy columnaSubfila con ese recorte, así que se reemplaza aquí mismo
+   (sin crear una clase aparte) por el comportamiento que pide el mandato de
+   "Mejora visual de descripción en Lista de tickets": texto completo, sin
+   truncar, respetando los saltos de línea ya capturados (pre-wrap) y
+   partiendo línea de forma natural donde haga falta -- sin alto fijo, así
+   que una descripción corta ocupa solo el alto que necesita. */
 .grid-subfila-valor {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 /* Celdas de estado (Activo, Vigencia, Rol...) mostradas como píldora en vez

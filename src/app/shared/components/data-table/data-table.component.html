@@ -21,7 +21,7 @@
     </thead>
     <tbody>
       @for (fila of filasPagina(); track fila.id) {
-        <tr [class.grid-fila-con-subfila]="columnaSubfila()">
+        <tr [class.grid-fila-con-subfila]="tieneSubfila(fila)">
           @for (columna of columnasFila(); track columna.claveColumna ?? columna.campo) {
             <td [attr.data-label]="columna.etiqueta" [style.width.px]="columna.anchoColumna ?? null">
               @if (columna.subEtiqueta) {
@@ -119,16 +119,18 @@
           }
         </tr>
         @if (columnaSubfila(); as subfila) {
-          <tr class="grid-subfila-fila">
-            <td [attr.colspan]="soloLectura() ? columnasFila().length : columnasFila().length + 1" class="grid-subfila-celda">
-              <strong>{{ subfila.etiqueta }}:</strong>
-              <span
-                class="grid-subfila-valor"
-                [title]="subfila.titulo ? subfila.titulo(fila) : ''"
-                >{{ valorCelda(fila, subfila) }}</span
-              >
-            </td>
-          </tr>
+          @if (tieneSubfila(fila)) {
+            <tr class="grid-subfila-fila">
+              <td [attr.colspan]="soloLectura() ? columnasFila().length : columnasFila().length + 1" class="grid-subfila-celda">
+                <strong>{{ subfila.etiqueta }}:</strong>
+                <span
+                  class="grid-subfila-valor"
+                  [title]="subfila.titulo ? subfila.titulo(fila) : ''"
+                  >{{ valorCelda(fila, subfila) }}</span
+                >
+              </td>
+            </tr>
+          }
         }
       } @empty {
         <tr>

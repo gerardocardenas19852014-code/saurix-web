@@ -10,6 +10,19 @@
   margin-bottom: 4px;
 }
 
+// Esta pantalla usa ancho completo (html[data-wide='grid'] en styles.scss,
+// hasta 1600px), pero las dos instrucciones ("Estos estados forman las
+// columnas..." arriba, y "Arrastra una caja..." en el diagrama de flujo)
+// heredaban la clase global `.hint { max-width: 640px }` (pensada para
+// avisos cortos debajo de un campo de formulario) y quedaban en una
+// columna angosta con mucho espacio libre a la derecha. Se amplía solo
+// aquí, con ámbito de este componente, sin tocar `.hint` en ningún otro
+// módulo. En pantallas angostas el texto sigue partiendo línea de forma
+// natural: no se fija ningún ancho mínimo ni white-space: nowrap.
+.hint-ancho {
+  max-width: none;
+}
+
 .flujo-toolbar .btn-secondary.is-active {
   background: var(--accent);
   border-color: var(--accent);

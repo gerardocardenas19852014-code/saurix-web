@@ -636,6 +636,26 @@ export class KanbanComponent implements OnInit, OnDestroy {
       anchoMaximo: 80,
       anchoColumna: 90,
     },
+    {
+      // Descripción completa del ticket, en un segundo renglón de ancho
+      // completo debajo de los datos principales (ColumnaTabla.subfila) --
+      // ver mandato "Mejora visual de descripción en Lista de tickets",
+      // nov-2026 (referencia: ABS CorEvo). A diferencia de Folio/Título
+      // arriba (que SÍ recortan con elipsis, por ser texto corto de una
+      // sola línea), la descripción es texto libre potencialmente largo con
+      // saltos de línea propios -- se muestra completa, sin recortar (ver
+      // .grid-subfila-valor en styles.scss: white-space:pre-wrap respeta
+      // esos saltos y envuelve el texto de forma natural, sin alto fijo).
+      // El dato ya viene en cada fila de fn_tickets_lista_pagina (columna
+      // `descripcion` de la propia tabla `ticket`) -- no se pide nada
+      // adicional al servidor por ticket. Si el ticket no tiene descripción
+      // capturada, DataTableComponent.tieneSubfila() oculta el renglón
+      // entero (sin dejar un "Requerimiento:" vacío ni el espacio en blanco
+      // que eso dejaría).
+      campo: 'descripcion',
+      etiqueta: 'Requerimiento',
+      subfila: true,
+    },
   ];
 
   private readonly datePipe = new DatePipe('es-MX');
