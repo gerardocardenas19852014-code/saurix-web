@@ -227,12 +227,22 @@
   @if (!haBuscadoLista()) {
     <p class="hint" style="margin-top:20px;">Presiona "🔍 Buscar" para consultar los tickets.</p>
   } @else {
+    <!-- redimensionable/scrollVisible/anchosColumnas/anchoColumnaCambio:
+         mandato "Ajuste de ancho y desplazamiento del grid de tickets",
+         nov-2026 -- arrastrar el borde de un encabezado ajusta su ancho y
+         se guarda vía PreferenciasGridService (anchosColumnasLista, ver
+         kanban.component.ts); ninguna otra pantalla pasa estos inputs, así
+         que DataTableComponent se comporta igual que siempre en el resto
+         del sistema. -->
     <app-data-table
       [columnas]="columnasLista"
       [filas]="ticketsPaginaLista()"
       [cargando]="cargandoLista()"
       [tamanoPagina]="preferenciasGrid.tamanoPagina()"
       [compacto]="true"
+      [redimensionable]="true"
+      [scrollVisible]="true"
+      [anchosColumnas]="anchosColumnasLista()"
       [modoServidor]="true"
       [paginaExterna]="paginaActualLista()"
       [totalExterno]="totalFilasLista()"
@@ -240,6 +250,7 @@
       [direccionOrdenExterno]="direccionOrdenLista()"
       (paginaCambio)="onPaginaCambioLista($event)"
       (ordenCambio)="onOrdenCambioLista($event)"
+      (anchoColumnaCambio)="alCambiarAnchoColumnaLista($event)"
       (editar)="abrirDetalle($event)"
       (eliminar)="pedirEliminarTicket($event)"
     />
