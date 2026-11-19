@@ -1434,23 +1434,35 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
 
 /* Alternancia de color por TICKET completo -- ambos renglones del bloque
    (fila principal + su subfila) comparten siempre el mismo fondo, nunca
-   solo uno de los dos -- ver ColumnaTabla... no, DataTableComponent.filas
-   Alternadas (opt-in, false por defecto: no afecta ninguna otra pantalla).
-   El fondo va en el propio <tr>, no en cada <td>: por el modelo de capas
-   de fondo de las tablas (CSS2.1 §17.5.1) el fondo de la fila se pinta
-   DEBAJO del de cada celda, así que basta para que se vea en celdas sin
-   fondo propio y cede automáticamente ante cualquier <td> que sí defina
-   el suyo -- p.ej. el hover (.grid-table tbody tr:hover td), que sigue
-   viéndose exactamente igual que antes encima de este color. La única
-   celda que YA tenía un fondo propio antes de este mandato es
-   .grid-subfila-celda (gris muy claro, var(--paper)); para esa sí hace
-   falta una regla aparte que la sobreescriba -- calibrada para ganarle a
-   esa base pero seguir perdiendo frente al hover de la propia subfila
-   (líneas de arriba), que debe seguir viéndose igual que siempre.
-   Ver mandato "Colores alternados por requerimiento en Lista de tickets",
-   nov-2026. */
+   solo uno de los dos -- ver DataTableComponent.filasAlternadas (opt-in,
+   false por defecto: no afecta ninguna otra pantalla). El fondo va en el
+   propio <tr>, no en cada <td>: por el modelo de capas de fondo de las
+   tablas (CSS2.1 §17.5.1) el fondo de la fila se pinta DEBAJO del de cada
+   celda, así que basta para que se vea en celdas sin fondo propio y cede
+   automáticamente ante cualquier <td> que sí defina el suyo -- p.ej. el
+   hover (.grid-table tbody tr:hover td), que sigue viéndose igual que
+   antes encima de este color.
+   La única celda que YA tenía un fondo propio antes de este mandato es
+   .grid-subfila-celda (gris claro fijo, var(--paper), pensado para
+   cuando no existía alternancia) -- esa sí necesita una regla aparte que
+   la sobreescriba, y no solo para el ticket verde: el primer intento
+   (mandato "Colores alternados...") solo cubría ese caso, así que el
+   ticket "blanco" se quedaba con su franja de Requerimiento en el gris
+   de siempre en vez de blanco -- rompiendo la continuidad de color entre
+   sus dos renglones. Corrección (mandato "Corrección de fondos
+   alternados en Lista de tickets", nov-2026): una clase explícita por
+   cada estado (grid-fila-alterna / grid-fila-blanca, según el índice del
+   TICKET -- fila.id en filasPagina(), no el <tr> renderizado, ya que el
+   índice se toma del @for sobre los registros, antes de desdoblarse en
+   dos filas HTML) en vez de depender del gris base como "color por
+   defecto". Ambas reglas están calibradas igual: le ganan a la base
+   (.grid-subfila-celda, un solo selector de clase) pero siguen perdiendo
+   frente al hover de la propia subfila (líneas de arriba), que debe
+   seguir viéndose igual que siempre en ambos tickets. */
 .grid-table tbody tr.grid-fila-alterna { background: #EAF3E2; }
+.grid-table tbody tr.grid-fila-blanca { background: #FFFFFF; }
 .grid-subfila-fila.grid-fila-alterna .grid-subfila-celda { background: #EAF3E2; }
+.grid-subfila-fila.grid-fila-blanca .grid-subfila-celda { background: #FFFFFF; }
 
 /* Celdas de estado (Activo, Vigencia, Rol...) mostradas como píldora en vez
    de texto plano — ver ColumnaTabla.claseValor en data-table.component.ts. */

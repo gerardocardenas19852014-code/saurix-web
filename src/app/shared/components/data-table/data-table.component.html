@@ -38,6 +38,7 @@
         <tr
           [class.grid-fila-con-subfila]="tieneSubfila(fila)"
           [class.grid-fila-alterna]="filasAlternadas() && i % 2 === 1"
+          [class.grid-fila-blanca]="filasAlternadas() && i % 2 === 0"
         >
           @for (columna of columnasFila(); track columna.claveColumna ?? columna.campo) {
             <td [attr.data-label]="columna.etiqueta" [style.width.px]="anchoEfectivo(columna)">
@@ -148,7 +149,11 @@
         </tr>
         @if (columnaSubfila(); as subfila) {
           @if (tieneSubfila(fila)) {
-            <tr class="grid-subfila-fila" [class.grid-fila-alterna]="filasAlternadas() && i % 2 === 1">
+            <tr
+              class="grid-subfila-fila"
+              [class.grid-fila-alterna]="filasAlternadas() && i % 2 === 1"
+              [class.grid-fila-blanca]="filasAlternadas() && i % 2 === 0"
+            >
               <td [attr.colspan]="soloLectura() ? columnasFila().length : columnasFila().length + 1" class="grid-subfila-celda">
                 <strong>{{ subfila.etiqueta }}:</strong>
                 <span
