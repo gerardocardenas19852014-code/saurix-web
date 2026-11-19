@@ -2011,30 +2011,53 @@ button { font-family: inherit; }
  * a la vez foto-menos y toda la identidad). Sin foto disponible
  * (.tienda-hero-sin-foto) cae a un degradado liso con el color de marca. ── */
 .tienda-hero {
+  /* Segunda vuelta (mandato "Corrección del banner de tienda pública",
+   * nov-2026): se abandona el mecanismo background-image/background-size
+   * sobre este contenedor (ver historial arriba: "contain" dejaba
+   * franjas vacías, "cover" recortaba logotipo/producto -- ningún valor
+   * fijo de background-size resuelve ambos problemas a la vez porque la
+   * caja tenía una ALTURA FIJA independiente de la imagen). Ahora la foto
+   * es un <img class="tienda-hero-foto"> normal (ver regla de abajo) cuya
+   * altura se deriva de su propia proporción -- este contenedor ya no
+   * fuerza una altura fija, solo aporta position:relative (ancla el
+   * overlay absoluto y el <img>), overflow:hidden (recorta a las esquinas
+   * redondeadas) y el color de fondo de respaldo.
+   * min-height aquí NO es para forzar el tamaño de la foto (eso ya lo
+   * decide el <img> con su propia proporción) -- es el piso mínimo para
+   * que el overlay (position:absolute, title+descripción+botón) nunca
+   * quede más alto que el propio contenedor y se recorte contra
+   * overflow:hidden, en el caso raro de una imagen muy panorámica y baja.
+   * También es la altura que usa el degradado de marca cuando la empresa
+   * no configuró imagenPortada (.tienda-hero-sin-foto no tiene <img> que
+   * le dé altura propia). */
   position: relative;
   margin: 0 -16px 18px;
-  min-height: 220px;
-  display: flex;
-  align-items: flex-end;
+  min-height: 180px;
   background-color: var(--store-primary-dark);
-  /* cover, NO contain (mandato "Corrección del banner de tienda pública",
-   * nov-2026): se revierte la decisión anterior de usar "contain" (ver
-   * historial arriba). Ahora la portada debe cubrir el 100% del ancho y
-   * alto del banner sin franjas vacías a los lados, aceptando el recorte
-   * proporcional cuando la imagen no coincide con las dimensiones del
-   * contenedor -- background-position:center ya existente centra el
-   * recorte; overflow:hidden (abajo) contiene cualquier parte de la
-   * imagen que exceda la caja. Si la empresa no tiene foto de portada,
-   * .tienda-hero-sin-foto (siguiente regla) sigue aplicando su propio
-   * degradado de marca sin cambios. */
-  background-size: cover;
-  background-repeat: no-repeat;
-  background-position: center;
   border-radius: 0 0 24px 24px;
   overflow: hidden;
 }
 
+.tienda-hero-foto {
+  /* object-fit:contain real (mandato nov-2026): width:100% + height:auto
+   * hace que ESTA caja adopte la proporción natural de la imagen -- nunca
+   * hay franja vacía salvo que max-height tenga que recortar la altura
+   * (imagen muy vertical, caso raro), y en ese único caso object-fit:
+   * contain sigue mostrando la foto completa, sin deformar ni recortar,
+   * dejando como máximo una franja lateral angosta. display:block evita
+   * el espacio fantasma bajo la imagen que deja el renderizado inline
+   * por defecto de <img>. */
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 420px;
+  object-fit: contain;
+  object-position: center;
+}
+
 .tienda-hero-sin-foto {
+  /* La altura (min-height) ya la pone la regla base .tienda-hero arriba
+   * -- aquí solo queda el degradado de marca, sin cambios. */
   background-image: linear-gradient(135deg, var(--store-primary), var(--store-primary-dark));
 }
 
@@ -2044,7 +2067,17 @@ button { font-family: inherit; }
    * oscuro sobre la fotografía -- se ven sus colores reales. La legibilidad
    * del título y la descripción se apoya únicamente en el text-shadow que
    * ya tenían (.tienda-hero-titulo / .tienda-hero-texto, sin cambios). No
-   * reintroducir aquí una capa oscura sobre toda la foto. */
+   * reintroducir aquí una capa oscura sobre toda la foto.
+   * position:absolute (segunda vuelta, nov-2026): el overlay ya no puede
+   * depender de un layout flex/align-items:flex-end del contenedor padre
+   * (ese mecanismo se quitó arriba) -- ahora se ancla directamente abajo
+   * sobre la imagen o el degradado, sin importar la altura que tenga
+   * cada uno. */
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
   width: 100%;
   padding: 28px 20px 24px;
   color: #fff;
@@ -2369,6 +2402,10 @@ button { font-family: inherit; }
     min-height: 140px;
     margin: 0 -14px 12px;
     border-radius: 0 0 16px 16px;
+  }
+
+  .tienda-hero-foto {
+    max-height: 260px;
   }
 
   .tienda-hero-overlay {

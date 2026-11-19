@@ -72,14 +72,27 @@
     <!-- HERO: pieza protagonista con foto grande — título=nombre de la
          empresa, texto=descripción pública (mismos datos que ya se
          mostraban en el banner anterior, no hay columna nueva en la BD).
-         Sin ningún producto con foto cargada (heroImagenUrl() null), cae
-         al degradado liso con el color de marca de la empresa (ver
-         .tienda-hero-sin-foto en el .scss) — nunca una caja vacía. -->
-    <section
-      class="tienda-hero"
-      [class.tienda-hero-sin-foto]="!heroImagenUrl()"
-      [style.background-image]="heroImagenUrl() ? ('url(' + heroImagenUrl() + ')') : null"
-    >
+         Sin imagenPortada configurada (heroImagenUrl() null), cae al
+         degradado liso con el color de marca de la empresa (ver
+         .tienda-hero-sin-foto en el .scss) — nunca una caja vacía.
+         Corrección "banner de tienda pública" (nov-2026, segunda vuelta):
+         antes se usaba background-image + background-size en este
+         section, lo que obligaba a la foto a encajar en una caja de
+         ALTURA FIJA independiente de su proporción real (con "contain"
+         dejaba franjas vacías a los lados; con "cover" recortaba
+         logotipo/producto). Ahora la foto es un <img> normal con
+         object-fit:contain (ver .tienda-hero-foto en el .scss) cuya
+         ALTURA la define la propia imagen (width:100%, height:auto) --
+         así el banner muestra la foto completa sin recortes y sin dejar
+         espacio vacío salvo en el caso extremo de una imagen muy vertical
+         (tope de max-height, con un recorte mínimo aceptado solo en ese
+         caso). El overlay con título/descripción/botón pasa a
+         position:absolute para quedar anclado abajo sobre la imagen sin
+         depender de su altura. -->
+    <section class="tienda-hero" [class.tienda-hero-sin-foto]="!heroImagenUrl()">
+      @if (heroImagenUrl(); as foto) {
+        <img class="tienda-hero-foto" [src]="foto" [alt]="d.empresa.nombre" />
+      }
       <div class="tienda-hero-overlay">
         <h1 class="tienda-hero-titulo">{{ d.empresa.nombre }}</h1>
         @if (d.empresa.descripcion) {
