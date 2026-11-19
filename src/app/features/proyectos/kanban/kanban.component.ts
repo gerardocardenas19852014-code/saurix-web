@@ -571,8 +571,16 @@ export class KanbanComponent implements OnInit, OnDestroy {
       // podía crecer sin límite igual que pasaba con Folio/Título.
       formatear: (fila) => (fila.ticketModuloId ? `${this.iconoModulo(fila.ticketModuloId)} ${this.nombreModulo(fila.ticketModuloId)}`.trim() : 'Sin módulo'),
       titulo: (fila) => (fila.ticketModuloId ? this.nombreModulo(fila.ticketModuloId) : 'Sin módulo'),
-      anchoMaximo: 150,
-      anchoColumna: 170,
+      // anchoMaximo ampliado de 150 a 220 (mandato "Ajuste de alineación y
+      // visibilidad del grid de tickets", nov-2026): nombres de módulo
+      // reales de dos o tres palabras ("Control de Inventario",
+      // "Facturación y Cobranza") no cabían en 150px y se truncaban
+      // siempre, no solo en casos extremos. Se conserva el recorte con
+      // elipsis + tooltip (a diferencia de los badges de arriba, Módulo es
+      // texto libre potencialmente muy largo -- aquí sí tiene sentido un
+      // tope, solo que calibrado más holgado).
+      anchoMaximo: 220,
+      anchoColumna: 220,
     },
     {
       campo: 'sprintId',
@@ -583,8 +591,14 @@ export class KanbanComponent implements OnInit, OnDestroy {
       formatear: (fila) => nombreSprintCorto(this.nombreSprint(fila)),
       titulo: (fila) => this.nombreSprint(fila),
       claseValor: (fila) => (fila.sprintId ? 'grid-badge-success' : 'grid-badge-neutral'),
-      anchoMaximo: 75,
-      anchoColumna: 85,
+      // anchoMaximo: 75 (quitado, mandato "Ajuste de alineación y
+      // visibilidad del grid de tickets", nov-2026) recortaba la píldora
+      // con elipsis incluso para el nombre YA ACORTADO por
+      // nombreSprintCorto() (hasta 22 caracteres) -- un doble recorte
+      // silencioso. Mismo patrón que la corrección de Vigencia en Mandato
+      // 88: sin anchoMaximo, [class.grid-badge-recortada] ya no se activa
+      // y la píldora se dibuja a su ancho natural.
+      anchoColumna: 130,
     },
     {
       campo: 'ticketPrioridadId',
@@ -596,10 +610,14 @@ export class KanbanComponent implements OnInit, OnDestroy {
       // negocio: es la misma píldora genérica que ya usaba Estado).
       claseValor: () => 'grid-badge-neutral',
       titulo: (fila) => this.nombrePrioridad(fila.ticketPrioridadId),
-      // Campo corto -- el mandato pide reducir su ancho para liberar
-      // espacio a Folio/Título, Módulo y Asignado a.
-      anchoMaximo: 75,
-      anchoColumna: 85,
+      // anchoMaximo quitado (mandato "Ajuste de alineación y visibilidad
+      // del grid de tickets", nov-2026): Prioridad es un catálogo
+      // editable por el usuario (ver ticket-prioridades.component.ts) sin
+      // límite de longitud en el nombre -- un recorte fijo de 75px
+      // truncaba con elipsis cualquier nombre de más de ~8-9 caracteres
+      // (p.ej. "Bloqueante"). anchoColumna sigue siendo solo una pista de
+      // layout (table-layout:auto).
+      anchoColumna: 110,
     },
     {
       campo: 'tableroColumnaId',
@@ -607,8 +625,17 @@ export class KanbanComponent implements OnInit, OnDestroy {
       formatear: (fila) => this.nombreColumna(fila.tableroColumnaId),
       claseValor: () => 'grid-badge-neutral',
       titulo: (fila) => this.nombreColumna(fila.tableroColumnaId),
-      anchoMaximo: 90,
-      anchoColumna: 100,
+      // anchoMaximo: 90 (quitado, mandato "Ajuste de alineación y
+      // visibilidad del grid de tickets", nov-2026): el nombre de la
+      // columna del tablero (p.ej. "Desarrollo 1") es texto libre
+      // configurado por el usuario (ver tableros/columnas) sin límite de
+      // longitud -- 90px truncaba con elipsis prácticamente cualquier
+      // nombre de dos palabras, perdiendo información real (el "1" de
+      // "Desarrollo 1" dejaba de verse, indistinguible de "Desarrollo 2").
+      // Mismo patrón que la corrección de Vigencia en Mandato 88: sin
+      // anchoMaximo, [class.grid-badge-recortada] ya no se activa y la
+      // píldora muestra el texto completo.
+      anchoColumna: 140,
     },
     {
       campo: 'asignadoUsuarioId',
@@ -621,8 +648,13 @@ export class KanbanComponent implements OnInit, OnDestroy {
       // Folio/Módulo arriba.
       formatear: (fila) => this.nombreUsuario(fila.asignadoUsuarioId),
       titulo: (fila) => this.nombreUsuario(fila.asignadoUsuarioId),
-      anchoMaximo: 130,
-      anchoColumna: 150,
+      // anchoMaximo ampliado de 130 a 190 (mandato "Ajuste de alineación y
+      // visibilidad del grid de tickets", nov-2026): un nombre completo
+      // real de 2-3 palabras ("Juan Gerardo Cárdenas") no cabía en 130px.
+      // Se conserva el recorte con elipsis + tooltip para nombres
+      // excepcionalmente largos (mismo criterio que Módulo arriba).
+      anchoMaximo: 190,
+      anchoColumna: 190,
     },
     {
       campo: 'planeado',
