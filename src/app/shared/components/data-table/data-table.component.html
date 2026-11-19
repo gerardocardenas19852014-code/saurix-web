@@ -1,9 +1,9 @@
-<div class="grid-table-scroll">
+<div class="grid-table-scroll" [class.grid-table-scroll-visible]="scrollVisible()">
   <table class="grid-table" [class.grid-table-compacta]="compacto()" [attr.data-cargando]="cargando()">
     <thead>
       <tr>
         @for (columna of columnasFila(); track columna.claveColumna ?? columna.campo) {
-          <th [style.width.px]="columna.anchoColumna ?? null">
+          <th [style.width.px]="anchoEfectivo(columna)" [class.grid-th-redimensionable]="redimensionable()">
             <button
               type="button"
               class="grid-sort-button"
@@ -12,6 +12,20 @@
             >
               {{ columna.etiqueta }} <span aria-hidden="true">{{ indicadorOrden(columna) }}</span>
             </button>
+            @if (redimensionable()) {
+              <!-- Handle de arrastre -- <span> HERMANO del botón de orden (no
+                   un hijo), así que su mousedown nunca puede disparar el
+                   click de ordenar. stopPropagation() en
+                   iniciarRedimension() además evita cualquier otro listener
+                   de clic en el <th>. -->
+              <span
+                class="grid-resize-handle"
+                role="separator"
+                aria-orientation="vertical"
+                [attr.aria-label]="'Ajustar ancho de columna ' + columna.etiqueta"
+                (mousedown)="iniciarRedimension($event, columna)"
+              ></span>
+            }
           </th>
         }
         @if (!soloLectura()) {
@@ -23,7 +37,7 @@
       @for (fila of filasPagina(); track fila.id) {
         <tr [class.grid-fila-con-subfila]="tieneSubfila(fila)">
           @for (columna of columnasFila(); track columna.claveColumna ?? columna.campo) {
-            <td [attr.data-label]="columna.etiqueta" [style.width.px]="columna.anchoColumna ?? null">
+            <td [attr.data-label]="columna.etiqueta" [style.width.px]="anchoEfectivo(columna)">
               @if (columna.colorHex) {
                 <span class="color-swatch" [style.background]="columna.colorHex(fila)"></span>
               }

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, computed, input, output, signal } from '@angular/core';
 
 export interface ColumnaTabla<T> {
   campo: keyof T & string;
@@ -101,6 +101,16 @@ export interface ColumnaTabla<T> {
    * aspecto no cambia.
    */
   colorHex?: (fila: T) => string;
+  /**
+   * Opcional: ancho mínimo (px) que esta columna puede alcanzar al
+   * redimensionarse manualmente (ver DataTableComponent.redimensionable) --
+   * evita que el usuario la encoja hasta ocultar su contenido por completo
+   * (p.ej. un badge o un icono). Sin pantalla con [redimensionable]="true"
+   * este campo no tiene ningún efecto -- ver mandato "Ajuste de ancho y
+   * desplazamiento del grid de tickets", nov-2026. Si no se define, se usa
+   * un piso genérico de 60px.
+   */
+  anchoMinimo?: number;
 }
 
 /**
@@ -116,7 +126,7 @@ export interface ColumnaTabla<T> {
   styleUrl: './data-table.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class DataTableComponent<T extends { id: number }> {
+export class DataTableComponent<T extends { id: number }> implements OnDestroy {
   readonly columnas = input.required<ColumnaTabla<T>[]>();
   readonly filas = input.required<T[]>();
   readonly tamanoPagina = input<number>(10);
@@ -138,6 +148,36 @@ export class DataTableComponent<T extends { id: number }> {
    *  versiones de WikiDocs), donde editar/eliminar el registro tal cual no
    *  tiene sentido. */
   readonly ocultarEditarEliminar = input<boolean>(false);
+
+  /**
+   * true = habilita el redimensionado manual de columnas (arrastrar el
+   * borde derecho de cada encabezado) -- ver .grid-resize-handle en
+   * styles.scss. Por defecto false: ninguna de las ~34 pantallas que ya
+   * usan <app-data-table> muestra el handle ni cambia de aspecto. Pensado
+   * para tablas con muchas columnas donde el usuario quiere ajustar el
+   * espacio a su gusto (p.ej. Lista de tickets, ver mandato "Ajuste de
+   * ancho y desplazamiento del grid de tickets", nov-2026). Este
+   * componente NO persiste nada por sí mismo (no inyecta ningún servicio,
+   * igual que el resto de sus inputs/outputs) -- emite anchoColumnaCambio
+   * y el padre decide si lo guarda (p.ej. vía PreferenciasGridService).
+   */
+  readonly redimensionable = input<boolean>(false);
+  /** true = estiliza la barra de desplazamiento horizontal de
+   *  .grid-table-scroll para que sea más visible/fácil de agarrar (en vez
+   *  de la barra fina/auto-ocultable del navegador) -- pensado para la
+   *  misma pantalla que necesita redimensionable, no cambia ninguna otra
+   *  por defecto. */
+  readonly scrollVisible = input<boolean>(false);
+  /** Anchos de columna personalizados por el usuario (clave = claveColumna
+   *  ?? campo), para que el padre pueda restaurarlos al volver a entrar a
+   *  la pantalla (ver PreferenciasGridService). Si una columna no aparece
+   *  aquí, se usa su anchoColumna de siempre. */
+  readonly anchosColumnas = input<Record<string, number>>({});
+  /** Se emite al soltar el mouse tras arrastrar un borde de encabezado,
+   *  con el ancho final en px -- el padre decide si lo persiste. No se
+   *  emite nada durante el arrastre (solo al soltar), para no generar
+   *  escrituras innecesarias. */
+  readonly anchoColumnaCambio = output<{ clave: string; ancho: number }>();
 
   readonly editar = output<T>();
   readonly eliminar = output<T>();
@@ -321,5 +361,93 @@ export class DataTableComponent<T extends { id: number }> {
     if (typeof a === 'number' && typeof b === 'number') return a < b ? -1 : 1;
     if (typeof a === 'boolean' && typeof b === 'boolean') return a === false ? -1 : 1;
     return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+  }
+
+  // ── Redimensionado manual de columnas (ColumnaTabla.anchoMinimo,
+  // DataTableComponent.redimensionable) -- ver mandato "Ajuste de ancho y
+  // desplazamiento del grid de tickets", nov-2026. Todo lo de aquí abajo
+  // queda inactivo (nunca se llama) mientras redimensionable() sea false,
+  // que es el valor por defecto -- ninguna pantalla existente cambia.
+
+  /** Ancho (en vivo, mientras se arrastra) de la columna que se está
+   *  redimensionando en este momento -- null cuando no hay arrastre activo.
+   *  Separado de anchosColumnas() (que viene del padre/persistencia) para
+   *  no tener que emitir en cada pixel de movimiento del mouse. */
+  protected readonly anchoEnArrastre = signal<{ clave: string; ancho: number } | null>(null);
+
+  /** Estado del arrastre en curso -- campo plano (no signal), no se lee
+   *  desde la plantilla. */
+  private arrastre: { clave: string; anchoInicial: number; xInicial: number; anchoMinimo: number } | null = null;
+
+  private readonly alMoverLigado = (evento: MouseEvent): void => this.alMoverArrastre(evento);
+  private readonly alSoltarLigado = (): void => this.alSoltarArrastre();
+
+  /** Clave de columna consistente con el `track` del @for en la plantilla
+   *  (columna.claveColumna ?? columna.campo). */
+  protected claveColumna(columna: ColumnaTabla<T>): string {
+    return columna.claveColumna ?? columna.campo;
+  }
+
+  /** Ancho efectivo a aplicar a esta columna (th y td): el que se esté
+   *  arrastrando en este instante, si no el que el padre haya persistido,
+   *  si no el anchoColumna de siempre -- igual que antes cuando no hay
+   *  override. */
+  protected anchoEfectivo(columna: ColumnaTabla<T>): number | null {
+    const clave = this.claveColumna(columna);
+    const enArrastre = this.anchoEnArrastre();
+    if (enArrastre && enArrastre.clave === clave) return enArrastre.ancho;
+    return this.anchosColumnas()[clave] ?? columna.anchoColumna ?? null;
+  }
+
+  protected iniciarRedimension(evento: MouseEvent, columna: ColumnaTabla<T>): void {
+    if (!this.redimensionable()) return;
+    // Evita que el mousedown dispare nada más (p.ej. seleccionar texto) --
+    // el handle es un <span> hermano del botón de orden, no un hijo suyo,
+    // así que esto NUNCA interfiere con el click de ordenar.
+    evento.preventDefault();
+    evento.stopPropagation();
+    const th = (evento.currentTarget as HTMLElement).closest('th');
+    const anchoActual = th?.getBoundingClientRect().width ?? columna.anchoColumna ?? 120;
+    this.arrastre = {
+      clave: this.claveColumna(columna),
+      anchoInicial: anchoActual,
+      xInicial: evento.clientX,
+      anchoMinimo: columna.anchoMinimo ?? 60,
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', this.alMoverLigado);
+    document.addEventListener('mouseup', this.alSoltarLigado);
+  }
+
+  private alMoverArrastre(evento: MouseEvent): void {
+    if (!this.arrastre) return;
+    const delta = evento.clientX - this.arrastre.xInicial;
+    const nuevoAncho = Math.max(this.arrastre.anchoMinimo, Math.round(this.arrastre.anchoInicial + delta));
+    this.anchoEnArrastre.set({ clave: this.arrastre.clave, ancho: nuevoAncho });
+  }
+
+  private alSoltarArrastre(): void {
+    if (!this.arrastre) return;
+    const resultado = this.anchoEnArrastre();
+    this.limpiarListenersArrastre();
+    this.arrastre = null;
+    this.anchoEnArrastre.set(null);
+    if (resultado) {
+      this.anchoColumnaCambio.emit(resultado);
+    }
+  }
+
+  private limpiarListenersArrastre(): void {
+    document.removeEventListener('mousemove', this.alMoverLigado);
+    document.removeEventListener('mouseup', this.alSoltarLigado);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }
+
+  /** Por si el componente se destruye (navegación) con un arrastre en
+   *  curso -- sin esto, los listeners quedarían colgados en `document`. */
+  ngOnDestroy(): void {
+    this.limpiarListenersArrastre();
   }
 }

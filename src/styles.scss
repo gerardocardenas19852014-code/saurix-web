@@ -1277,8 +1277,42 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
    pero cubre el caso típico — una tabla con datos reales — sin tocar la
    lógica de las 34 pantallas que usan <app-data-table>. */
 .grid-table-scroll { overflow-x: auto; border-radius: 0 0 10px 10px; min-height: 260px; }
+/* Barra de desplazamiento horizontal más visible/fácil de agarrar (en vez
+ * de la fina/auto-ocultable del navegador) -- solo aparece cuando la
+ * pantalla pasa [scrollVisible]="true" a <app-data-table> (aditivo, ver
+ * DataTableComponent.scrollVisible); ninguna otra pantalla cambia. Pensado
+ * para tablas con muchas columnas donde hay que desplazarse para ver las
+ * últimas (p.ej. Lista de tickets) -- ver mandato "Ajuste de ancho y
+ * desplazamiento del grid de tickets", nov-2026. */
+.grid-table-scroll-visible { scrollbar-width: auto; }
+.grid-table-scroll-visible::-webkit-scrollbar { height: 10px; }
+.grid-table-scroll-visible::-webkit-scrollbar-track { background: var(--paper); }
+.grid-table-scroll-visible::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
+.grid-table-scroll-visible::-webkit-scrollbar-thumb:hover { background: var(--ink-soft); }
 .grid-table { width: 100%; min-width: 560px; border-collapse: separate; border-spacing: 0; font-size: 14px; background: var(--paper-raised); border: 1px solid var(--line); border-top: none; border-radius: 0 0 10px 10px; overflow: hidden; }
 .grid-table th { text-align: left; padding: 11px 16px; background: var(--paper); font-family: 'Montserrat', sans-serif; font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-soft); border-bottom: 1px solid var(--line); white-space: nowrap; }
+/* Redimensionado manual de columnas (aditivo, ver DataTableComponent.
+ * redimensionable y ColumnaTabla.anchoMinimo) -- el <th> solo gana
+ * position:relative cuando la pantalla pasa [redimensionable]="true";
+ * ningún otro encabezado de los ~34 que usan <app-data-table> cambia. Ver
+ * mandato "Ajuste de ancho y desplazamiento del grid de tickets",
+ * nov-2026. */
+.grid-th-redimensionable { position: relative; }
+.grid-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
+  /* Sin fondo en reposo -- aparece solo al pasar el mouse, para no
+   * ensuciar el encabezado en el estado normal. El cursor col-resize ya
+   * es visible sin esto (requisito "mostrar el cursor al pasar por el
+   * borde"). */
+  background: transparent;
+}
+.grid-resize-handle:hover, .grid-resize-handle:active { background: var(--accent-soft); }
 .grid-sort-button { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
 .grid-sort-button:hover, .grid-sort-button:focus-visible { color: var(--accent); }
 .grid-sort-button span { font-size: 12px; line-height: 1; opacity: .7; }
