@@ -1399,19 +1399,38 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
 .grid-table tbody tr.grid-subfila-fila:hover td { background-color: var(--accent-soft); }
 /* Antes recortaba a 3 renglones con elipsis (pensado para el Título de un
    ticket, ya migrado a .grid-cell-sub -- ver comentario arriba de
-   ColumnaTabla.subfila en data-table.component.ts). Ningún catálogo activo
-   usa hoy columnaSubfila con ese recorte, así que se reemplaza aquí mismo
+   ColumnaTabla.subfila en data-table.component.ts). Se reemplazó aquí mismo
    (sin crear una clase aparte) por el comportamiento que pide el mandato de
    "Mejora visual de descripción en Lista de tickets": texto completo, sin
    truncar, respetando los saltos de línea ya capturados (pre-wrap) y
    partiendo línea de forma natural donde haga falta -- sin alto fijo, así
-   que una descripción corta ocupa solo el alto que necesita. */
+   que una descripción corta ocupa solo el alto que necesita. Vuelve a tener
+   consumidor desde el mandato "Rediseño de Lista de tickets con
+   requerimiento expandido" (nov-2026): la columna "Requerimiento" de
+   columnasLista en kanban.component.ts. */
 .grid-subfila-valor {
   display: block;
   white-space: pre-wrap;
   overflow-wrap: break-word;
   word-break: break-word;
 }
+
+/* Badges secundarios dentro del mismo renglón de ancho completo (ver
+ * ColumnaTabla.badgesSubfila) -- flex-wrap para que, según el espacio
+ * disponible, queden en la misma línea o pasen a la siguiente ("Debajo o a
+ * continuación, según el espacio" -- mandato "Rediseño de Lista de tickets
+ * con requerimiento expandido", nov-2026). Sin anchoMaximo/ancho fijo
+ * alguno -- los badges nunca se recortan aquí (a diferencia de cuando
+ * Sprint/Vigencia eran columnas propias del renglón principal). */
+.grid-subfila-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  margin-top: 6px;
+}
+.grid-subfila-badge-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.grid-subfila-badge-item strong { color: var(--text-strong); font-weight: 600; font-size: 13px; }
 
 /* Celdas de estado (Activo, Vigencia, Rol...) mostradas como píldora en vez
    de texto plano — ver ColumnaTabla.claseValor en data-table.component.ts. */

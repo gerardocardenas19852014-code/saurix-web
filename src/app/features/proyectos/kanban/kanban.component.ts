@@ -529,49 +529,39 @@ export class KanbanComponent implements OnInit, OnDestroy {
     return mapa;
   });
 
-  /** Columnas de la vista de Lista (tabla) — alternativa al tablero Kanban, mismo estándar del resto del sistema. */
+  /** Columnas de la vista de Lista (tabla) — alternativa al tablero Kanban, mismo estándar del resto del sistema.
+   *
+   *  Rediseño "bloque de dos renglones" (mandato "Rediseño de Lista de
+   *  tickets con requerimiento expandido", nov-2026, tomando como
+   *  referencia el reporte de requerimientos del sistema ABS): el primer
+   *  renglón son las 8 columnas de datos principales (Folio, Folio
+   *  interno, Tipo, Módulo, Prioridad, Estado, Asignado a, Acciones);
+   *  Sprint, Vigencia y Planeado DEJARON de ser columnas independientes
+   *  aquí -- Sprint y Vigencia ahora se muestran como badges dentro del
+   *  segundo renglón (ver la columna "Requerimiento" al final de este
+   *  arreglo, con subfila:true y badgesSubfila); Planeado se quitó de la
+   *  vista por completo (su filtro -- filtroPlaneado, el <select> "Planeado"
+   *  de la barra de filtros -- y su checkbox en el formulario de
+   *  edición/alta NO se tocaron, siguen funcionando igual). Folio ya NO
+   *  lleva la descripción como segunda línea (subEtiqueta) -- se quitó de
+   *  ahí para no duplicarla con el nuevo renglón "Requerimiento". */
   protected readonly columnasLista: ColumnaTabla<Ticket>[] = [
     {
-      // Folio + Requerimiento en una sola celda, UNA sola fila por ticket --
-      // ver mandato "Corrección visual de Lista de tickets", nov-2026: el
-      // mandato anterior había puesto la descripción en un renglón aparte de
-      // ancho completo (ColumnaTabla.subfila, "Requerimiento:") A LA VEZ que
-      // esta celda seguía mostrando el Título como segunda línea -- el
-      // resultado se veía duplicado (dos versiones del "requerimiento" por
-      // ticket) y ocupaba demasiado alto. Se quitó esa columna subfila (ver
-      // más abajo, ya no existe) y esta segunda línea ahora muestra la
-      // descripción completa (o el título si no hay descripción capturada)
-      // -- SIN truncar, con saltos de línea naturales y respetando los que
-      // ya tenga el texto (ver subEtiqueta de ColumnaTabla y .grid-cell-sub
-      // en styles.scss: white-space:pre-wrap, sin max-width ni elipsis). La
-      // altura de la fila crece sola según el contenido (no hay límite de
-      // alto fijo en ningún lado de esta celda).
       campo: 'numeroTicket',
       etiqueta: 'Folio',
       titulo: (fila) => fila.numeroTicket,
-      subEtiqueta: (fila) => fila.descripcion || fila.titulo,
-      // anchoMaximo SOLO topa la primera línea (el folio, p.ej. "SAU-00123"
-      // -- ver data-table.component.html: el tope ya no se le pasa a la
-      // segunda línea/subEtiqueta, solo al valor principal). anchoColumna es
-      // la pista de ancho de TODA la columna -- se amplió de 240 a 340 para
-      // darle a la descripción más espacio horizontal antes de partir línea
-      // (menos renglones = fila más compacta), sin comprimir Vigencia
-      // (anchoColumna: 140) ni Acciones (ancho fijo propio,
-      // .grid-actions-col) -- con table-layout:auto cada columna sigue
-      // respetando su propia pista; si no cabe todo, el scroll horizontal ya
-      // existente (.grid-table-scroll) se encarga en pantallas chicas.
-      anchoMaximo: 220,
-      anchoColumna: 340,
-      anchoMinimo: 180,
+      // Ya no lleva subEtiqueta (ver comentario de arriba) -- el folio
+      // vuelve a ser una celda corta de una sola línea, por eso el ancho
+      // baja de 340 a 140 (ya no necesita espacio para la descripción).
+      anchoMaximo: 140,
+      anchoColumna: 140,
+      anchoMinimo: 110,
     },
     {
       campo: 'folioInterno',
       etiqueta: 'Folio interno',
       formatear: (fila) => fila.folioInterno || '—',
       titulo: (fila) => fila.folioInterno || '',
-      // anchoColumna (ancho de LA COLUMNA, no solo del texto): columna
-      // secundaria -- debe seguir visible (mandato) pero no competir por
-      // espacio con Folio/Título, Módulo o Asignado a.
       anchoMaximo: 90,
       anchoColumna: 95,
       anchoMinimo: 70,
@@ -586,59 +576,22 @@ export class KanbanComponent implements OnInit, OnDestroy {
     {
       campo: 'ticketModuloId',
       etiqueta: 'Módulo',
-      // Más espacio que Tipo/Prioridad/Estado (pedido explícito del
-      // mandato) pero con un tope -- sin él, un nombre de módulo largo
-      // podía crecer sin límite igual que pasaba con Folio/Título.
       formatear: (fila) => (fila.ticketModuloId ? `${this.iconoModulo(fila.ticketModuloId)} ${this.nombreModulo(fila.ticketModuloId)}`.trim() : 'Sin módulo'),
       titulo: (fila) => (fila.ticketModuloId ? this.nombreModulo(fila.ticketModuloId) : 'Sin módulo'),
-      // anchoMaximo ampliado de 150 a 220 (mandato "Ajuste de alineación y
-      // visibilidad del grid de tickets", nov-2026): nombres de módulo
-      // reales de dos o tres palabras ("Control de Inventario",
-      // "Facturación y Cobranza") no cabían en 150px y se truncaban
-      // siempre, no solo en casos extremos. Se conserva el recorte con
-      // elipsis + tooltip (a diferencia de los badges de arriba, Módulo es
-      // texto libre potencialmente muy largo -- aquí sí tiene sentido un
-      // tope, solo que calibrado más holgado).
-      anchoMaximo: 220,
-      anchoColumna: 220,
-      anchoMinimo: 100,
-    },
-    {
-      campo: 'sprintId',
-      etiqueta: 'Sprint',
-      // Nombre corto (p.ej. solo "10.74.0") para que el renglón no se estire con
-      // nombres largos de sprint — el nombre completo queda disponible al pasar
-      // el mouse (columna.titulo, ver data-table.component.html).
-      formatear: (fila) => nombreSprintCorto(this.nombreSprint(fila)),
-      titulo: (fila) => this.nombreSprint(fila),
-      claseValor: (fila) => (fila.sprintId ? 'grid-badge-success' : 'grid-badge-neutral'),
-      // anchoMaximo: 75 (quitado, mandato "Ajuste de alineación y
-      // visibilidad del grid de tickets", nov-2026) recortaba la píldora
-      // con elipsis incluso para el nombre YA ACORTADO por
-      // nombreSprintCorto() (hasta 22 caracteres) -- un doble recorte
-      // silencioso. Mismo patrón que la corrección de Vigencia en Mandato
-      // 88: sin anchoMaximo, [class.grid-badge-recortada] ya no se activa
-      // y la píldora se dibuja a su ancho natural.
-      anchoColumna: 130,
-      anchoMinimo: 70,
+      // Ensanchada de 220 a 240 (mandato nov-2026, "dar espacio suficiente
+      // a Módulo, Estado y Asignado a") -- con Sprint/Vigencia/Planeado ya
+      // fuera del renglón principal sobra espacio para repartir entre las
+      // 7 columnas que quedan.
+      anchoMaximo: 240,
+      anchoColumna: 240,
+      anchoMinimo: 110,
     },
     {
       campo: 'ticketPrioridadId',
       etiqueta: 'Prioridad',
       formatear: (fila) => this.nombrePrioridad(fila.ticketPrioridadId),
-      // Antes era texto plano mientras Estado (abajo) ya era una píldora --
-      // se homologan ambas como píldora neutra para que se vean alineadas
-      // entre sí (mismo criterio visual, sin tocar ninguna regla de
-      // negocio: es la misma píldora genérica que ya usaba Estado).
       claseValor: () => 'grid-badge-neutral',
       titulo: (fila) => this.nombrePrioridad(fila.ticketPrioridadId),
-      // anchoMaximo quitado (mandato "Ajuste de alineación y visibilidad
-      // del grid de tickets", nov-2026): Prioridad es un catálogo
-      // editable por el usuario (ver ticket-prioridades.component.ts) sin
-      // límite de longitud en el nombre -- un recorte fijo de 75px
-      // truncaba con elipsis cualquier nombre de más de ~8-9 caracteres
-      // (p.ej. "Bloqueante"). anchoColumna sigue siendo solo una pista de
-      // layout (table-layout:auto).
       anchoColumna: 110,
       anchoMinimo: 70,
     },
@@ -648,65 +601,51 @@ export class KanbanComponent implements OnInit, OnDestroy {
       formatear: (fila) => this.nombreColumna(fila.tableroColumnaId),
       claseValor: () => 'grid-badge-neutral',
       titulo: (fila) => this.nombreColumna(fila.tableroColumnaId),
-      // anchoMaximo: 90 (quitado, mandato "Ajuste de alineación y
-      // visibilidad del grid de tickets", nov-2026): el nombre de la
-      // columna del tablero (p.ej. "Desarrollo 1") es texto libre
-      // configurado por el usuario (ver tableros/columnas) sin límite de
-      // longitud -- 90px truncaba con elipsis prácticamente cualquier
-      // nombre de dos palabras, perdiendo información real (el "1" de
-      // "Desarrollo 1" dejaba de verse, indistinguible de "Desarrollo 2").
-      // Mismo patrón que la corrección de Vigencia en Mandato 88: sin
-      // anchoMaximo, [class.grid-badge-recortada] ya no se activa y la
-      // píldora muestra el texto completo.
-      anchoColumna: 140,
-      anchoMinimo: 90,
+      // Ensanchada de 140 a 160 (mismo motivo que Módulo arriba).
+      anchoColumna: 160,
+      anchoMinimo: 100,
     },
     {
       campo: 'asignadoUsuarioId',
       etiqueta: 'Asignado a',
-      // Mismo criterio que Folio/Título/Módulo en esta tabla: un nombre
-      // largo no debe estirar el renglón ni cortarse a la mitad — se
-      // recorta con elipsis y el nombre completo queda disponible al pasar
-      // el mouse. Más espacio que Tipo/Prioridad/Estado/Planeado/Vigencia
-      // (pedido explícito del mandato) pero con tope, mismo motivo que
-      // Folio/Módulo arriba.
       formatear: (fila) => this.nombreUsuario(fila.asignadoUsuarioId),
       titulo: (fila) => this.nombreUsuario(fila.asignadoUsuarioId),
-      // anchoMaximo ampliado de 130 a 190 (mandato "Ajuste de alineación y
-      // visibilidad del grid de tickets", nov-2026): un nombre completo
-      // real de 2-3 palabras ("Juan Gerardo Cárdenas") no cabía en 130px.
-      // Se conserva el recorte con elipsis + tooltip para nombres
-      // excepcionalmente largos (mismo criterio que Módulo arriba).
-      anchoMaximo: 190,
-      anchoColumna: 190,
-      anchoMinimo: 100,
+      // Ensanchada de 190 a 220 (mismo motivo que Módulo/Estado arriba).
+      anchoMaximo: 220,
+      anchoColumna: 220,
+      anchoMinimo: 110,
     },
     {
-      campo: 'planeado',
-      etiqueta: 'Planeado',
-      formatear: (fila) => (fila.planeado !== false ? 'Sí' : 'No'),
-      claseValor: (fila) => (fila.planeado !== false ? 'grid-badge-success' : 'grid-badge-muted'),
-      anchoColumna: 70,
-      anchoMinimo: 55,
-    },
-    {
-      // Mandato "Optimización visual y funcional de la Lista de tickets",
-      // nov-2026: anchoMaximo: 80 recortaba con elipsis el texto MÁS la
-      // píldora completa -- el caso más largo ("🕐 faltan 99d 23h") no
-      // entraba ni de cerca en 80px, así que SIEMPRE se veía cortado, no
-      // solo en casos extremos. Sin anchoMaximo, [class.grid-badge-recortada]
-      // ya no se activa (ver data-table.component.html) y la píldora se
-      // dibuja a su ancho natural, sin overflow:hidden/text-overflow:ellipsis
-      // -- anchoColumna sigue siendo solo una PISTA de layout (no un tope
-      // duro, table-layout sigue en auto), ahora holgada para el caso más
-      // largo en vez de para el más corto.
-      campo: 'fechaCreacion',
-      etiqueta: 'Vigencia',
-      formatear: (fila) => this.textoSla(fila) || '—',
-      claseValor: (fila) => this.claseBadgeSla(fila),
-      titulo: (fila) => this.textoSla(fila) || '',
-      anchoColumna: 140,
-      anchoMinimo: 100,
+      // Segundo renglón de ancho completo, UNA vez por ticket (ver
+      // ColumnaTabla.subfila/badgesSubfila en data-table.component.ts) --
+      // reemplaza tanto la antigua subEtiqueta de Folio (descripción) como
+      // las columnas independientes Sprint y Vigencia, que ahora viven
+      // aquí como badges compactos vía badgesSubfila en vez de columnas
+      // propias del renglón principal. claveColumna evita cualquier
+      // posible colisión de tracking con 'descripcion' en otro lado.
+      campo: 'descripcion',
+      claveColumna: 'requerimiento',
+      etiqueta: 'Requerimiento',
+      subfila: true,
+      formatear: (fila) => fila.descripcion || fila.titulo,
+      badgesSubfila: [
+        {
+          campo: 'sprintId',
+          claveColumna: 'requerimiento-sprint',
+          etiqueta: 'Sprint',
+          formatear: (fila) => nombreSprintCorto(this.nombreSprint(fila)),
+          titulo: (fila) => this.nombreSprint(fila),
+          claseValor: (fila) => (fila.sprintId ? 'grid-badge-success' : 'grid-badge-neutral'),
+        },
+        {
+          campo: 'fechaCreacion',
+          claveColumna: 'requerimiento-vigencia',
+          etiqueta: 'Vigencia',
+          formatear: (fila) => this.textoSla(fila) || '—',
+          titulo: (fila) => this.textoSla(fila) || '',
+          claseValor: (fila) => this.claseBadgeSla(fila),
+        },
+      ],
     },
   ];
 

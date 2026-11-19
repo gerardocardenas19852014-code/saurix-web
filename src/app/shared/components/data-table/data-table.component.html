@@ -153,6 +153,26 @@
                   [title]="subfila.titulo ? subfila.titulo(fila) : ''"
                   >{{ valorCelda(fila, subfila) }}</span
                 >
+                @if (subfila.badgesSubfila; as badges) {
+                  <!-- ColumnaTabla.badgesSubfila -- datos secundarios del
+                       MISMO renglón de ancho completo, como badges
+                       compactos (p.ej. Sprint/Vigencia de un ticket) en vez
+                       de columnas propias del renglón principal. Ver
+                       mandato "Rediseño de Lista de tickets con
+                       requerimiento expandido", nov-2026. -->
+                  <div class="grid-subfila-badges">
+                    @for (badgeCol of badges; track badgeCol.claveColumna ?? badgeCol.campo) {
+                      <span class="grid-subfila-badge-item">
+                        <strong>{{ badgeCol.etiqueta }}:</strong>
+                        <span
+                          class="grid-badge {{ badgeCol.claseValor ? badgeCol.claseValor(fila) : '' }}"
+                          [title]="badgeCol.titulo ? badgeCol.titulo(fila) : ''"
+                          >{{ valorCelda(fila, badgeCol) }}</span
+                        >
+                      </span>
+                    }
+                  </div>
+                }
               </td>
             </tr>
           }

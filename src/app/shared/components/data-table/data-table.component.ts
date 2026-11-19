@@ -48,6 +48,23 @@ export interface ColumnaTabla<T> {
    */
   subfila?: boolean;
   /**
+   * Opcional (solo tiene efecto junto con `subfila: true`): columnas extra
+   * que se muestran como badges compactos dentro del MISMO renglón de
+   * ancho completo, después de la etiqueta/valor principal -- pensadas
+   * para datos secundarios que antes competían por espacio como columnas
+   * propias del renglón principal (p.ej. Sprint y Vigencia de un ticket).
+   * Cada entrada es una ColumnaTabla normal (se le aplican sus propios
+   * formatear/claseValor/titulo vía valorCelda(), igual que cualquier
+   * columna) pero NUNCA aparece en el renglón principal ni en el
+   * encabezado -- viven únicamente dentro de este arreglo, no hace falta
+   * (de hecho no se debe) repetirlas también en el arreglo `columnas` de
+   * nivel superior. Sin anchoMaximo/anchoColumna (no hay columna de ancho
+   * fijo que recortar aquí) -- ver .grid-subfila-badges en styles.scss. Ver
+   * mandato "Rediseño de Lista de tickets con requerimiento expandido",
+   * nov-2026.
+   */
+  badgesSubfila?: ColumnaTabla<T>[];
+  /**
    * Opcional (requiere `titulo`, para que el valor completo siga disponible
    * al pasar el mouse): límite de ancho en px para la celda truncada --
    * aparte de .grid-cell-truncada en styles.scss (pensado para texto libre
