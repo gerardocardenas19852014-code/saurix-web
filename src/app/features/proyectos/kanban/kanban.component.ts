@@ -90,6 +90,23 @@ export class KanbanComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
 
+  /** Anchos de columna personalizados por el usuario para la Vista Lista
+   *  (arrastrar el borde de un encabezado -- ver DataTableComponent.
+   *  redimensionable) -- se inicializa leyendo lo que ya se haya guardado
+   *  antes (localStorage, vía PreferenciasGridService) y se actualiza en
+   *  cada ajuste (ver alCambiarAnchoColumnaLista()). 'tickets-lista' es el
+   *  idGrid -- exclusivo de esta pantalla, no colisiona con ninguna otra.
+   *  Ver mandato "Ajuste de ancho y desplazamiento del grid de tickets",
+   *  nov-2026. */
+  protected readonly anchosColumnasLista = signal<Record<string, number>>(
+    this.preferenciasGrid.leerAnchosColumnas('tickets-lista'),
+  );
+
+  protected alCambiarAnchoColumnaLista(evento: { clave: string; ancho: number }): void {
+    this.preferenciasGrid.guardarAnchoColumna('tickets-lista', evento.clave, evento.ancho);
+    this.anchosColumnasLista.update((actuales) => ({ ...actuales, [evento.clave]: evento.ancho }));
+  }
+
   protected readonly iniciales = iniciales;
   protected readonly colorAvatar = colorAvatar;
 
@@ -545,6 +562,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       // existente (.grid-table-scroll) se encarga en pantallas chicas.
       anchoMaximo: 220,
       anchoColumna: 340,
+      anchoMinimo: 180,
     },
     {
       campo: 'folioInterno',
@@ -556,12 +574,14 @@ export class KanbanComponent implements OnInit, OnDestroy {
       // espacio con Folio/Título, Módulo o Asignado a.
       anchoMaximo: 90,
       anchoColumna: 95,
+      anchoMinimo: 70,
     },
     {
       campo: 'ticketTipoId',
       etiqueta: 'Tipo',
       formatear: (fila) => `${this.iconoTipo(fila.ticketTipoId)} ${this.nombreTipo(fila.ticketTipoId)}`.trim(),
       anchoColumna: 90,
+      anchoMinimo: 70,
     },
     {
       campo: 'ticketModuloId',
@@ -581,6 +601,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       // tope, solo que calibrado más holgado).
       anchoMaximo: 220,
       anchoColumna: 220,
+      anchoMinimo: 100,
     },
     {
       campo: 'sprintId',
@@ -599,6 +620,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       // 88: sin anchoMaximo, [class.grid-badge-recortada] ya no se activa
       // y la píldora se dibuja a su ancho natural.
       anchoColumna: 130,
+      anchoMinimo: 70,
     },
     {
       campo: 'ticketPrioridadId',
@@ -618,6 +640,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       // (p.ej. "Bloqueante"). anchoColumna sigue siendo solo una pista de
       // layout (table-layout:auto).
       anchoColumna: 110,
+      anchoMinimo: 70,
     },
     {
       campo: 'tableroColumnaId',
@@ -636,6 +659,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       // anchoMaximo, [class.grid-badge-recortada] ya no se activa y la
       // píldora muestra el texto completo.
       anchoColumna: 140,
+      anchoMinimo: 90,
     },
     {
       campo: 'asignadoUsuarioId',
@@ -655,6 +679,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       // excepcionalmente largos (mismo criterio que Módulo arriba).
       anchoMaximo: 190,
       anchoColumna: 190,
+      anchoMinimo: 100,
     },
     {
       campo: 'planeado',
@@ -662,6 +687,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       formatear: (fila) => (fila.planeado !== false ? 'Sí' : 'No'),
       claseValor: (fila) => (fila.planeado !== false ? 'grid-badge-success' : 'grid-badge-muted'),
       anchoColumna: 70,
+      anchoMinimo: 55,
     },
     {
       // Mandato "Optimización visual y funcional de la Lista de tickets",
@@ -680,6 +706,7 @@ export class KanbanComponent implements OnInit, OnDestroy {
       claseValor: (fila) => this.claseBadgeSla(fila),
       titulo: (fila) => this.textoSla(fila) || '',
       anchoColumna: 140,
+      anchoMinimo: 100,
     },
   ];
 
