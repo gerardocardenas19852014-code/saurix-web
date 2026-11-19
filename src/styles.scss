@@ -2017,17 +2017,17 @@ button { font-family: inherit; }
   display: flex;
   align-items: flex-end;
   background-color: var(--store-primary-dark);
-  /* contain, NO cover (nov-2026): la portada es configurable por cada
-   * empresa (ver Addendum 3, tienda-publica-rediseno-visual-2026-11.md) y
-   * puede llegar con cualquier proporción -- una foto panorámica, pero
-   * también un cartel/gráfico vertical u horizontal con texto/diseño cerca
-   * de los bordes (caso real reportado: el título y las fotos de producto
-   * quedaban cortados por el recorte de "cover" al forzar la imagen dentro
-   * de esta caja ancha y baja). "contain" siempre muestra la imagen
-   * completa, sin recortar nada; el color de marca ya puesto arriba
-   * (background-color) rellena cualquier franja que quede libre en vez de
-   * dejarla vacía. */
-  background-size: contain;
+  /* cover, NO contain (mandato "Corrección del banner de tienda pública",
+   * nov-2026): se revierte la decisión anterior de usar "contain" (ver
+   * historial arriba). Ahora la portada debe cubrir el 100% del ancho y
+   * alto del banner sin franjas vacías a los lados, aceptando el recorte
+   * proporcional cuando la imagen no coincide con las dimensiones del
+   * contenedor -- background-position:center ya existente centra el
+   * recorte; overflow:hidden (abajo) contiene cualquier parte de la
+   * imagen que exceda la caja. Si la empresa no tiene foto de portada,
+   * .tienda-hero-sin-foto (siguiente regla) sigue aplicando su propio
+   * degradado de marca sin cambios. */
+  background-size: cover;
   background-repeat: no-repeat;
   background-position: center;
   border-radius: 0 0 24px 24px;
@@ -2039,9 +2039,14 @@ button { font-family: inherit; }
 }
 
 .tienda-hero-overlay {
+  /* Sombra oscura inferior eliminada (mandato "Corrección del banner de
+   * tienda pública", nov-2026): ya no se superpone ningún degradado/filtro
+   * oscuro sobre la fotografía -- se ven sus colores reales. La legibilidad
+   * del título y la descripción se apoya únicamente en el text-shadow que
+   * ya tenían (.tienda-hero-titulo / .tienda-hero-texto, sin cambios). No
+   * reintroducir aquí una capa oscura sobre toda la foto. */
   width: 100%;
   padding: 28px 20px 24px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.68) 0%, rgba(0, 0, 0, 0.22) 65%, transparent 100%);
   color: #fff;
 }
 
