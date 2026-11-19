@@ -1432,6 +1432,26 @@ button:disabled.btn-primary, button:disabled.btn-secondary, button:disabled.btn-
 .grid-subfila-badge-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .grid-subfila-badge-item strong { color: var(--text-strong); font-weight: 600; font-size: 13px; }
 
+/* Alternancia de color por TICKET completo -- ambos renglones del bloque
+   (fila principal + su subfila) comparten siempre el mismo fondo, nunca
+   solo uno de los dos -- ver ColumnaTabla... no, DataTableComponent.filas
+   Alternadas (opt-in, false por defecto: no afecta ninguna otra pantalla).
+   El fondo va en el propio <tr>, no en cada <td>: por el modelo de capas
+   de fondo de las tablas (CSS2.1 §17.5.1) el fondo de la fila se pinta
+   DEBAJO del de cada celda, así que basta para que se vea en celdas sin
+   fondo propio y cede automáticamente ante cualquier <td> que sí defina
+   el suyo -- p.ej. el hover (.grid-table tbody tr:hover td), que sigue
+   viéndose exactamente igual que antes encima de este color. La única
+   celda que YA tenía un fondo propio antes de este mandato es
+   .grid-subfila-celda (gris muy claro, var(--paper)); para esa sí hace
+   falta una regla aparte que la sobreescriba -- calibrada para ganarle a
+   esa base pero seguir perdiendo frente al hover de la propia subfila
+   (líneas de arriba), que debe seguir viéndose igual que siempre.
+   Ver mandato "Colores alternados por requerimiento en Lista de tickets",
+   nov-2026. */
+.grid-table tbody tr.grid-fila-alterna { background: #EAF3E2; }
+.grid-subfila-fila.grid-fila-alterna .grid-subfila-celda { background: #EAF3E2; }
+
 /* Celdas de estado (Activo, Vigencia, Rol...) mostradas como píldora en vez
    de texto plano — ver ColumnaTabla.claseValor en data-table.component.ts. */
 .grid-badge {

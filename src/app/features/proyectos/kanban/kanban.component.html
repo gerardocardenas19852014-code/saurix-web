@@ -231,9 +231,11 @@
          mandato "Ajuste de ancho y desplazamiento del grid de tickets",
          nov-2026 -- arrastrar el borde de un encabezado ajusta su ancho y
          se guarda vía PreferenciasGridService (anchosColumnasLista, ver
-         kanban.component.ts); ninguna otra pantalla pasa estos inputs, así
-         que DataTableComponent se comporta igual que siempre en el resto
-         del sistema. -->
+         kanban.component.ts); filasAlternadas: mandato "Colores alternados
+         por requerimiento en Lista de tickets", nov-2026 -- blanco/verde
+         pastel por ticket completo. Ninguna otra pantalla pasa estos
+         inputs, así que DataTableComponent se comporta igual que siempre
+         en el resto del sistema. -->
     <app-data-table
       [columnas]="columnasLista"
       [filas]="ticketsPaginaLista()"
@@ -243,6 +245,7 @@
       [redimensionable]="true"
       [scrollVisible]="true"
       [anchosColumnas]="anchosColumnasLista()"
+      [filasAlternadas]="true"
       [modoServidor]="true"
       [paginaExterna]="paginaActualLista()"
       [totalExterno]="totalFilasLista()"

@@ -34,8 +34,11 @@
       </tr>
     </thead>
     <tbody>
-      @for (fila of filasPagina(); track fila.id) {
-        <tr [class.grid-fila-con-subfila]="tieneSubfila(fila)">
+      @for (fila of filasPagina(); track fila.id; let i = $index) {
+        <tr
+          [class.grid-fila-con-subfila]="tieneSubfila(fila)"
+          [class.grid-fila-alterna]="filasAlternadas() && i % 2 === 1"
+        >
           @for (columna of columnasFila(); track columna.claveColumna ?? columna.campo) {
             <td [attr.data-label]="columna.etiqueta" [style.width.px]="anchoEfectivo(columna)">
               @if (columna.colorHex) {
@@ -145,7 +148,7 @@
         </tr>
         @if (columnaSubfila(); as subfila) {
           @if (tieneSubfila(fila)) {
-            <tr class="grid-subfila-fila">
+            <tr class="grid-subfila-fila" [class.grid-fila-alterna]="filasAlternadas() && i % 2 === 1">
               <td [attr.colspan]="soloLectura() ? columnasFila().length : columnasFila().length + 1" class="grid-subfila-celda">
                 <strong>{{ subfila.etiqueta }}:</strong>
                 <span

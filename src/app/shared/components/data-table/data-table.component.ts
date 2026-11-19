@@ -185,6 +185,17 @@ export class DataTableComponent<T extends { id: number }> implements OnDestroy {
    *  misma pantalla que necesita redimensionable, no cambia ninguna otra
    *  por defecto. */
   readonly scrollVisible = input<boolean>(false);
+  /** true = alterna el fondo de cada bloque de registro completo (fila
+   *  principal + su subfila, si tiene) entre blanco y un color suave --
+   *  pensado para distinguir visualmente registros consecutivos cuando la
+   *  franja gris clara de la subfila ya no basta por sí sola (p.ej. Lista
+   *  de tickets, cuyo "Requerimiento" ocupa todo el ancho). Opt-in y en
+   *  false por defecto: ninguna otra pantalla cambia. El color en sí vive
+   *  en .grid-table tbody tr.grid-fila-alterna (styles.scss), no aquí, para
+   *  que quede en un solo lugar si algún día se necesita variar por
+   *  pantalla -- ver mandato "Colores alternados por requerimiento en
+   *  Lista de tickets", nov-2026. */
+  readonly filasAlternadas = input<boolean>(false);
   /** Anchos de columna personalizados por el usuario (clave = claveColumna
    *  ?? campo), para que el padre pueda restaurarlos al volver a entrar a
    *  la pantalla (ver PreferenciasGridService). Si una columna no aparece
