@@ -16,46 +16,88 @@
 @if (vista() === 'lista') {
   <div class="page-header">
     <h1>Documentos</h1>
-    <div class="page-actions">
-      @if (seccionFijaId) {
-        <button type="button" class="btn-secondary" (click)="descargarSeccion()">⬇️ Descargar sección</button>
-      }
-      <button type="button" class="toolbar-btn" (click)="nuevoDocumento()">+ Nuevo documento</button>
-    </div>
   </div>
 
   <div class="grid-toolbar">
+    <button type="button" class="toolbar-btn" title="Nuevo documento (Alt+N)" (click)="nuevoDocumento()">+ Nuevo documento</button>
+    <button type="button" class="btn-primary small" title="Buscar (Alt+B)" (click)="buscar()">🔍 Buscar</button>
+    <button type="button" class="btn-secondary small" title="Limpiar filtros (Alt+L)" (click)="limpiarFiltros()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px; margin-right:4px;">
+        <path d="M12.531 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14v6a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341l.427-.473" />
+        <path d="m16.5 3.5 5 5" />
+        <path d="m21.5 3.5-5 5" />
+      </svg>
+      Limpiar filtros
+    </button>
+
+    @if (seccionFijaId) {
+      <div class="toolbar-group">
+        <button type="button" class="btn-secondary small" (click)="descargarSeccion()">⬇️ Descargar sección</button>
+      </div>
+    }
+
     <div class="grid-filter">
       <input
         type="search"
         placeholder="Buscar por título o contenido…"
-        [value]="busqueda()"
-        (input)="busqueda.set($any($event.target).value)"
+        [value]="busquedaEnEdicion()"
+        (input)="busquedaEnEdicion.set($any($event.target).value)"
+        (keyup.enter)="buscar()"
       />
+      <label class="checkbox-inline">
+        <input
+          type="checkbox"
+          [checked]="soloFavoritosEnEdicion()"
+          (change)="soloFavoritosEnEdicion.set($any($event.target).checked)"
+        />
+        ⭐ Solo favoritos
+      </label>
+      <label
+        class="checkbox-inline"
+        title="Sin ninguna tabla, proceso, módulo u otro documento referenciado (ni que lo referencien a él)"
+      >
+        <input
+          type="checkbox"
+          [checked]="soloHuerfanosEnEdicion()"
+          (change)="soloHuerfanosEnEdicion.set($any($event.target).checked)"
+        />
+        🔗 Solo huérfanos
+      </label>
+      <label class="checkbox-inline">
+        <input
+          type="checkbox"
+          [checked]="mostrarInactivosEnEdicion()"
+          (change)="mostrarInactivosEnEdicion.set($any($event.target).checked)"
+        />
+        Mostrar inactivos
+      </label>
     </div>
-    <label class="checkbox-inline">
-      <input type="checkbox" [checked]="soloFavoritos()" (change)="soloFavoritos.set($any($event.target).checked)" />
-      ⭐ Solo favoritos
-    </label>
-    <label class="checkbox-inline" title="Sin ninguna tabla, proceso, módulo u otro documento referenciado (ni que lo referencien a él)">
-      <input type="checkbox" [checked]="soloHuerfanos()" (change)="soloHuerfanos.set($any($event.target).checked)" />
-      🔗 Solo huérfanos
-    </label>
   </div>
 
-  <app-data-table
-    [columnas]="columnas"
-    [filas]="documentos()"
-    [cargando]="cargando()"
-    [tamanoPagina]="preferenciasGrid.tamanoPagina()"
-    [accionExtra2EtiquetaFn]="iconoFavorito"
-    accionExtra2Titulo="Marcar/quitar favorito"
-    (accionExtra2)="toggleFavorito($event)"
-    accionExtraEtiqueta="Ver"
-    (accionExtra)="verDocumento($event)"
-    (editar)="editarDocumento($event)"
-    (eliminar)="pedirEliminar($event)"
-  />
+  @if (!haBuscado()) {
+    <p class="empty" style="margin-top:20px;">Presiona "Buscar" para consultar registros.</p>
+  } @else {
+    <app-data-table
+      [columnas]="columnas"
+      [filas]="registrosPagina()"
+      [cargando]="cargando()"
+      [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+      [modoServidor]="true"
+      [paginaExterna]="paginaActual()"
+      [totalExterno]="totalFiltrado()"
+      [campoOrdenExterno]="columnaOrden()"
+      [direccionOrdenExterno]="direccionOrden()"
+      (paginaCambio)="onPaginaCambio($event)"
+      (ordenCambio)="onOrdenCambio($event)"
+      [accionExtra2EtiquetaFn]="iconoFavoritoFila"
+      accionExtra2Titulo="Marcar/quitar favorito"
+      (accionExtra2)="toggleFavorito($event.id)"
+      accionExtraEtiqueta="Ver"
+      (accionExtra)="verDesdeFila($event)"
+      (editar)="editarDesdeFila($event)"
+      (eliminar)="pedirEliminar($event)"
+    />
+  }
 } @else {
   <div class="page-header">
     <h1>
@@ -64,9 +106,9 @@
         <button
           type="button"
           class="btn-favorito-inline"
-          [title]="esFavorito(documentoActual()!) ? 'Quitar de favoritos' : 'Marcar como favorito'"
-          (click)="toggleFavorito(documentoActual()!)"
-        >{{ esFavorito(documentoActual()!) ? '⭐' : '☆' }}</button>
+          [title]="esFavoritoActual() ? 'Quitar de favoritos' : 'Marcar como favorito'"
+          (click)="toggleFavorito(documentoActual()!.id)"
+        >{{ esFavoritoActual() ? '⭐' : '☆' }}</button>
       }
     </h1>
     <div class="page-actions">
@@ -320,4 +362,13 @@
   textoConfirmar="Restaurar"
   (confirmar)="confirmarRestaurar()"
   (cancelar)="versionARestaurar.set(null)"
+/>
+
+<app-confirm-dialog
+  [visible]="avisoCierreVisible()"
+  titulo="Cambios sin guardar"
+  mensaje="Este formulario tiene cambios sin guardar. ¿Seguro que quieres cerrarlo sin guardarlos?"
+  textoConfirmar="Cerrar sin guardar"
+  (confirmar)="confirmarCierreSinGuardar()"
+  (cancelar)="cancelarCierreSinGuardar()"
 />

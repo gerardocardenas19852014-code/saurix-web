@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
@@ -6,6 +6,8 @@ import { marked } from 'marked';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { DataClientService } from '../../core/services/data-client.service';
+import { SupabaseService } from '../../core/services/supabase.service';
+import { filaACamel } from '../../core/services/supabase-data-client.service';
 import { AuthService } from '../../core/services/auth.service';
 import { AdjuntosPanelComponent } from '../../shared/components/adjuntos-panel/adjuntos-panel.component';
 import { EditorTextoComponent } from '../../shared/components/editor-texto/editor-texto.component';
@@ -39,6 +41,42 @@ interface Migaja {
 }
 
 /**
+ * Fila del listado tal como la devuelve `wikidocs.fn_documentos_lista_pagina`
+ * (ver mandato "WikiDocs Documentos: validación final previa a
+ * implementación", nov-2026) — a propósito NO incluye `contenido` (el campo
+ * más pesado de la tabla: HTML con imágenes incrustadas), porque el listado
+ * nunca lo necesita para pintar sus columnas. `esFavorito`/`tieneTrazabilidad`
+ * ya vienen calculados por fila desde el servidor, así que ya no hace falta
+ * cargar las 4 tablas de trazabilidad completas ni los favoritos del
+ * usuario como "cargas globales" aparte (ver auditoría previa) — se
+ * calculan una sola vez, en la misma consulta, server-side.
+ */
+interface DocumentoListaFila {
+  id: number;
+  seccionId: number;
+  titulo: string;
+  activo: boolean;
+  fechaCreacion?: string;
+  fechaModificacion?: string;
+  esFavorito: boolean;
+  tieneTrazabilidad: boolean;
+}
+
+const COLUMNA_ORDEN_DEFECTO: keyof DocumentoListaFila & string = 'titulo';
+/** Mismo criterio que Plantillas/Tipo de sistema/Categoría/Secciones
+ *  (TAMANO_LOTE_EXPORTAR) — usado aquí solo por "Descargar sección", que sí
+ *  necesita el contenido completo de cada documento (el listado paginado no
+ *  lo trae a propósito, ver DocumentoListaFila). */
+const TAMANO_LOTE_DESCARGA_SECCION = 500;
+/** Tope razonable para el selector "Enlazar documento" del editor — no se
+ *  pagina ni se vuelve a consultar mientras el usuario escribe (el propio
+ *  EditorTextoComponent filtra en cliente sobre esta lista ya cargada), así
+ *  que alcanza con traer un número generoso de documentos activos sin su
+ *  contenido (reutiliza la misma función RPC del listado, que ya lo
+ *  excluye). */
+const TOPE_DOCUMENTOS_PARA_ENLAZAR = 500;
+
+/**
  * Ventana de Documentos (WikiDocs). El filtro por Sección es opcional,
  * así que esta misma ventana sirve para:
  *  - /wikidocs/documentos → todos los documentos, sin filtrar.
@@ -56,6 +94,21 @@ interface Migaja {
  * por nivel de la jerarquía TipoSistema→Categoria→Seccion); el Id de la
  * Sección elegida es lo único que persiste en el Documento. Si ya se llegó
  * con una sección fija, todo este paso se omite.
+ *
+ * Fase B de homologación SAURIX-CAT-001 v1.1 (mandato "WikiDocs Documentos:
+ * implementación integral", nov-2026) — el LISTADO (antes `list()` + 4
+ * cargas globales de trazabilidad + carga global de favoritos, todo
+ * paginado/filtrado en el cliente) ahora usa paginación, orden, búsqueda y
+ * los filtros "Solo favoritos"/"Solo huérfanos"/"Mostrar inactivos" 100%
+ * server-side, vía `wikidocs.fn_documentos_lista_pagina` (validada en el
+ * mandato anterior: aislamiento multiempresa, filtros combinados,
+ * paginación real y SECURITY INVOKER verificados contra producción). Sin
+ * consulta automática al abrir ni mientras se escribe/cambian filtros
+ * (`haBuscado` + edición/aplicada, mismo patrón que Tipo de
+ * sistema/Categoría/Secciones/Plantillas). El resto de la pantalla —
+ * editor, adjuntos, historial de versiones, exportaciones PDF/HTML,
+ * pestaña Referencias, navegación profunda por `?documento=` — sigue
+ * exactamente igual, usando `DataClientService` como antes.
  */
 @Component({
   selector: 'app-documentos-list',
@@ -76,6 +129,7 @@ interface Migaja {
 export class DocumentosListComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly data = inject(DataClientService);
+  private readonly sb = inject(SupabaseService).cliente;
   private readonly auth = inject(AuthService);
   protected readonly toast = inject(ToastService);
   protected readonly preferenciasGrid = inject(PreferenciasGridService);
@@ -85,37 +139,29 @@ export class DocumentosListComponent implements OnInit {
   protected seccionFijaId: number | null = null;
   protected seccionFijaNombre = '';
 
-  private readonly documentosTodos = signal<Documento[]>([]);
+  // ── Búsqueda, filtros, orden y paginación (SAURIX-CAT-001 v1.1) ──────────
+  // Sin consulta automática al abrir la ventana ni mientras se escribe o se
+  // cambian los filtros — todo queda en "...EnEdicion" hasta presionar
+  // Buscar/Enter, que lo copia a "...Aplicado" y dispara la única consulta.
+  protected readonly registrosPagina = signal<DocumentoListaFila[]>([]);
+  protected readonly totalFiltrado = signal(0);
+  protected readonly paginaActual = signal(1);
   protected readonly cargando = signal(false);
-  protected readonly busqueda = signal('');
+  protected readonly haBuscado = signal(false);
 
-  /** Búsqueda por título Y por el texto del contenido, todo en cliente (mismo
-   *  criterio ya usado en Usuarios) — así encuentra un documento aunque la
-   *  palabra buscada no esté en el título, solo en la redacción. */
-  protected readonly soloFavoritos = signal(false);
-  /** Ids de documentos favoritos del usuario actual — un Set para O(1) al
-   *  pintar la estrella de cada renglón y al filtrar "Solo favoritos". */
-  private readonly favoritos = signal<Map<number, DocumentoFavorito>>(new Map());
+  protected readonly columnaOrden = signal<keyof DocumentoListaFila & string>(COLUMNA_ORDEN_DEFECTO);
+  protected readonly direccionOrden = signal<'asc' | 'desc'>('asc');
 
-  /** "Solo huérfanos" — documentos sin NINGUNA referencia de trazabilidad
-   *  (ni saliente: tabla/proceso/módulo/relación: ni entrante: otro
-   *  documento que lo relacione a él). Ver documentosConTrazabilidad(). */
-  protected readonly soloHuerfanos = signal(false);
+  protected readonly busquedaEnEdicion = signal('');
+  protected readonly soloFavoritosEnEdicion = signal(false);
+  protected readonly soloHuerfanosEnEdicion = signal(false);
+  protected readonly mostrarInactivosEnEdicion = signal(false);
+  private busquedaAplicada = '';
+  private soloFavoritosAplicado = false;
+  private soloHuerfanosAplicado = false;
+  private mostrarInactivosAplicado = false;
 
-  protected readonly documentos = computed(() => {
-    const texto = this.busqueda().trim().toLowerCase();
-    const soloFav = this.soloFavoritos();
-    const soloHuerf = this.soloHuerfanos();
-    const favoritos = this.favoritos();
-    const conectados = this.documentosConTrazabilidad();
-    let lista = this.documentosTodos();
-    if (soloFav) lista = lista.filter((doc) => favoritos.has(doc.id));
-    if (soloHuerf) lista = lista.filter((doc) => !conectados.has(doc.id));
-    if (!texto) return lista;
-    return lista.filter(
-      (doc) => doc.titulo.toLowerCase().includes(texto) || this.textoPlano(doc.contenido).toLowerCase().includes(texto),
-    );
-  });
+  private secuencia = 0;
 
   protected readonly migajas = signal<Migaja[]>([]);
 
@@ -124,44 +170,32 @@ export class DocumentosListComponent implements OnInit {
   protected readonly secciones = signal<SeccionOpcion[]>([]);
 
   /** Plantillas activas, para el selector "Usar plantilla" al crear un
-   *  documento nuevo (no aplica al editar uno ya existente). */
+   *  documento nuevo (no aplica al editar uno ya existente). Catálogo
+   *  acotado, no es "documentos" — se sigue cargando al abrir la pantalla. */
   protected readonly plantillas = signal<PlantillaDocumento[]>([]);
 
   /** Todas las secciones (sin filtrar), solo para mostrar el nombre de la
-   *  sección de cada documento en la columna del listado en vez de su Id. */
+   *  sección de cada documento en la columna del listado en vez de su Id.
+   *  Catálogo acotado (no es la tabla Documento), se sigue cargando al
+   *  abrir la pantalla igual que antes. */
   private readonly todasLasSecciones = signal<SeccionOpcion[]>([]);
   private readonly mapaSecciones = computed(() => new Map(this.todasLasSecciones().map((s) => [s.id, s])));
 
-  /** Copias SIN filtrar de las 4 tablas de trazabilidad (a diferencia de
-   *  tablasReferenciadas/etc., que sí filtran por el documento abierto en
-   *  cargarReferencias()) — solo para calcular qué documentos tienen
-   *  alguna referencia, en el listado completo. Mismo criterio que
-   *  todasLasSecciones para pintar una columna sin tener que ir
-   *  documento por documento. */
-  private readonly todasLasReferenciasTabla = signal<DocumentoReferenciaTabla[]>([]);
-  private readonly todasLasReferenciasProceso = signal<DocumentoReferenciaProceso[]>([]);
-  private readonly todasLasReferenciasModulo = signal<DocumentoReferenciaModulo[]>([]);
-  private readonly todasLasRelaciones = signal<DocumentoRelacion[]>([]);
-
-  /** Ids de documentos con alguna referencia de trazabilidad — saliente
-   *  (tabla/proceso/módulo/relación) o entrante (otro documento lo
-   *  relaciona a él, "backlink") — usado por la columna "Trazabilidad" y
-   *  el filtro "Solo huérfanos" del listado. */
-  private readonly documentosConTrazabilidad = computed(() => {
-    const ids = new Set<number>();
-    for (const fila of this.todasLasReferenciasTabla()) ids.add(fila.documentoId);
-    for (const fila of this.todasLasReferenciasProceso()) ids.add(fila.documentoId);
-    for (const fila of this.todasLasReferenciasModulo()) ids.add(fila.documentoId);
-    for (const relacion of this.todasLasRelaciones()) {
-      ids.add(relacion.documentoId);
-      ids.add(relacion.documentoRelacionadoId);
-    }
-    return ids;
+  /** Lista acotada (sin `contenido`, hasta TOPE_DOCUMENTOS_PARA_ENLAZAR) para
+   *  el selector "Enlazar documento" del editor — se carga una sola vez al
+   *  entrar a "editar"/"nuevo", reutilizando la misma función RPC del
+   *  listado (que ya excluye `contenido`), nunca la carga completa de
+   *  `list('Documento')` que existía antes. */
+  private readonly documentosParaEnlazarBase = signal<{ id: number; titulo: string }[]>([]);
+  protected readonly documentosParaEnlazar = computed(() => {
+    const actualId = this.documentoActual()?.id ?? 0;
+    return this.documentosParaEnlazarBase().filter((doc) => doc.id !== actualId);
   });
 
-  protected esHuerfano(documento: Documento): boolean {
-    return !this.documentosConTrazabilidad().has(documento.id);
-  }
+  /** Cache de títulos resueltos bajo demanda (pestaña Referencias / chips de
+   *  "Documentos relacionados") — reemplaza la búsqueda en memoria sobre
+   *  `documentosTodos` que existía antes de esta fase. */
+  private readonly tituloPorId = signal<Map<number, string>>(new Map());
 
   /** null = listado; 'ver'/'editar'/'adjuntos' = documento abierto en esa pestaña. */
   protected readonly vista = signal<'lista' | 'ver' | 'editar' | 'adjuntos' | 'historial' | 'referencias'>('lista');
@@ -190,7 +224,13 @@ export class DocumentosListComponent implements OnInit {
     onCleanup(() => document.documentElement.removeAttribute('data-wide'));
   });
   protected readonly documentoActual = signal<Documento | null>(null);
-  protected readonly documentoAEliminar = signal<Documento | null>(null);
+  protected readonly documentoAEliminar = signal<DocumentoListaFila | null>(null);
+
+  /** Favorito del documento actualmente abierto (vista Ver/Editar) —
+   *  resuelto bajo demanda al abrir (lookup acotado a un documento, no la
+   *  carga global de favoritos que existía antes), y refrescado
+   *  localmente en cada toggle sin volver a consultar. */
+  protected readonly favoritoActual = signal(false);
 
   protected readonly versiones = signal<DocumentoVersion[]>([]);
   protected readonly versionARestaurar = signal<DocumentoVersion | null>(null);
@@ -210,8 +250,8 @@ export class DocumentosListComponent implements OnInit {
 
   protected readonly esNuevo = computed(() => this.vista() !== 'lista' && this.documentoActual() === null);
 
-  protected readonly columnas: ColumnaTabla<Documento>[] = [
-    { campo: 'titulo', etiqueta: 'Título' },
+  protected readonly columnas: ColumnaTabla<DocumentoListaFila>[] = [
+    { campo: 'titulo', etiqueta: 'Título', multilinea: true, titulo: (fila) => fila.titulo },
     {
       campo: 'seccionId',
       etiqueta: 'Sección',
@@ -219,13 +259,14 @@ export class DocumentosListComponent implements OnInit {
     },
     {
       campo: 'id',
+      claveColumna: 'trazabilidad',
       etiqueta: 'Trazabilidad',
-      formatear: (fila) => (this.esHuerfano(fila) ? 'Huérfano' : 'Conectado'),
-      claseValor: (fila) => (this.esHuerfano(fila) ? 'grid-badge-warning' : 'grid-badge-success'),
+      formatear: (fila) => (fila.tieneTrazabilidad ? 'Conectado' : 'Huérfano'),
+      claseValor: (fila) => (fila.tieneTrazabilidad ? 'grid-badge-success' : 'grid-badge-warning'),
       titulo: (fila) =>
-        this.esHuerfano(fila)
-          ? 'Sin ninguna tabla, proceso, módulo u otro documento referenciado (ni que lo referencien a él)'
-          : 'Tiene al menos una referencia de trazabilidad capturada',
+        fila.tieneTrazabilidad
+          ? 'Tiene al menos una referencia de trazabilidad capturada'
+          : 'Sin ninguna tabla, proceso, módulo u otro documento referenciado (ni que lo referencien a él)',
     },
     { campo: 'activo', etiqueta: 'Activo', formatear: (fila) => (fila.activo ? 'Sí' : 'No') },
   ];
@@ -248,18 +289,6 @@ export class DocumentosListComponent implements OnInit {
 
   protected readonly contenidoRenderizado = computed<SafeHtml>(() => {
     return this.sanitizer.bypassSecurityTrustHtml(this.tocYContenido().html);
-  });
-
-  /** Documentos que el editor puede ofrecer para "Enlazar documento" — los
-   *  ya cargados en esta ventana (mismo alcance que la búsqueda/listado),
-   *  sin el documento que se está editando (enlazarse a sí mismo no tiene
-   *  caso). Solo id/título, para no acoplar el editor compartido al
-   *  modelo `Documento`. */
-  protected readonly documentosParaEnlazar = computed(() => {
-    const actualId = this.documentoActual()?.id ?? 0;
-    return this.documentosTodos()
-      .filter((doc) => doc.id !== actualId)
-      .map((doc) => ({ id: doc.id, titulo: doc.titulo }));
   });
 
   // ---------------- Referencias (trazabilidad) ----------------
@@ -320,10 +349,25 @@ export class DocumentosListComponent implements OnInit {
     return this.etiquetaTipoRelacion.get(tipo) ?? 'Relacionado con';
   }
 
-  /** Título del documento relacionado, para pintar el chip (los datos de
-   *  DocumentoRelacion solo guardan el id). */
+  /** Título del documento relacionado, para pintar el chip (DocumentoRelacion
+   *  solo guarda el id) — se resuelve bajo demanda y queda en caché, en vez
+   *  de buscarlo en una lista completa de documentos ya cargada en memoria. */
   protected tituloDocumento(documentoId: number): string {
-    return this.documentosTodos().find((d) => d.id === documentoId)?.titulo ?? `Documento #${documentoId}`;
+    return this.tituloPorId().get(documentoId) ?? `Documento #${documentoId}`;
+  }
+
+  private resolverTitulosFaltantes(ids: number[]): void {
+    const cache = this.tituloPorId();
+    const faltantes = [...new Set(ids)].filter((id) => id > 0 && !cache.has(id));
+    if (faltantes.length === 0) return;
+    faltantes.forEach((id) => {
+      this.data.getById<Documento>('Documento', id).subscribe({
+        next: (documento) => {
+          this.tituloPorId.update((mapa) => new Map(mapa).set(id, documento.titulo));
+        },
+        error: () => {},
+      });
+    });
   }
 
   private cargarReferencias(): void {
@@ -340,48 +384,22 @@ export class DocumentosListComponent implements OnInit {
       .subscribe({ next: (filas) => this.modulosReferenciados.set(filas), error: () => this.modulosReferenciados.set([]) });
     this.data
       .list<DocumentoRelacion>('DocumentoRelacion', { documentoId: doc.id })
-      .subscribe({ next: (filas) => this.documentosRelacionados.set(filas), error: () => this.documentosRelacionados.set([]) });
+      .subscribe({
+        next: (filas) => {
+          this.documentosRelacionados.set(filas);
+          this.resolverTitulosFaltantes(filas.map((f) => f.documentoRelacionadoId));
+        },
+        error: () => this.documentosRelacionados.set([]),
+      });
     this.data
       .list<DocumentoRelacion>('DocumentoRelacion', { documentoRelacionadoId: doc.id })
       .subscribe({
-        next: (filas) => this.documentosQueMeReferencian.set(filas),
+        next: (filas) => {
+          this.documentosQueMeReferencian.set(filas);
+          this.resolverTitulosFaltantes(filas.map((f) => f.documentoId));
+        },
         error: () => this.documentosQueMeReferencian.set([]),
       });
-
-    // La columna "Trazabilidad"/"Solo huérfanos" del listado completo se
-    // alimenta de copias sin filtrar (ver documentosConTrazabilidad) — hay
-    // que refrescarlas aquí también, si no quedan obsoletas en cuanto se
-    // agrega/quita una referencia y se vuelve a la lista sin recargar la
-    // página.
-    this.cargarTrazabilidadGlobal();
-  }
-
-  /** Copias SIN filtrar de las 4 tablas de trazabilidad, para
-   *  documentosConTrazabilidad() (columna "Trazabilidad" y filtro "Solo
-   *  huérfanos" del listado completo) — se llama una vez en ngOnInit y de
-   *  nuevo cada vez que cargarReferencias() corre, para no quedar
-   *  obsoleta tras un alta/baja. Error silencioso (sin volver a tostar:
-   *  SupabaseDataClientService ya muestra su propio toast) — hasta que
-   *  estas 4 tablas existan también en Supabase (ver
-   *  esquema-tablas-saurix.md del proyecto), en modo Nube esto se degrada
-   *  a "sin datos de trazabilidad" en vez de romper el listado completo. */
-  private cargarTrazabilidadGlobal(): void {
-    this.data.list<DocumentoReferenciaTabla>('DocumentoReferenciaTabla').subscribe({
-      next: (filas) => this.todasLasReferenciasTabla.set(filas),
-      error: () => this.todasLasReferenciasTabla.set([]),
-    });
-    this.data.list<DocumentoReferenciaProceso>('DocumentoReferenciaProceso').subscribe({
-      next: (filas) => this.todasLasReferenciasProceso.set(filas),
-      error: () => this.todasLasReferenciasProceso.set([]),
-    });
-    this.data.list<DocumentoReferenciaModulo>('DocumentoReferenciaModulo').subscribe({
-      next: (filas) => this.todasLasReferenciasModulo.set(filas),
-      error: () => this.todasLasReferenciasModulo.set([]),
-    });
-    this.data.list<DocumentoRelacion>('DocumentoRelacion').subscribe({
-      next: (filas) => this.todasLasRelaciones.set(filas),
-      error: () => this.todasLasRelaciones.set([]),
-    });
   }
 
   agregarTablaReferenciada(): void {
@@ -507,10 +525,19 @@ export class DocumentosListComponent implements OnInit {
     contenido: ['', Validators.required],
   });
 
+  /** Snapshot del formulario al entrar a "editar"/"nuevo" — mismo criterio
+   *  que el resto de catálogos homologados (hayCambiosSinGuardar), para
+   *  confirmar antes de descartar cambios en Cancelar. */
+  private valoresOriginales = '';
+
   ngOnInit(): void {
     const param = this.route.snapshot.paramMap.get('seccionId');
     this.seccionFijaId = param ? Number(param) : null;
 
+    // Fase B (SAURIX-CAT-001 v1.1): NO se consulta el listado de documentos
+    // al abrir la ventana (ver cargar()/buscar() más abajo) — solo los
+    // catálogos de apoyo, acotados, que ya necesitaba el formulario de alta
+    // y las migajas/columna "Sección".
     if (!this.seccionFijaId) {
       this.data.list<TipoSistemaOpcion>('TipoSistema').subscribe({
         next: (tipos) => this.tiposSistema.set(tipos),
@@ -522,18 +549,14 @@ export class DocumentosListComponent implements OnInit {
 
     this.data.list<SeccionOpcion>('Seccion').subscribe((secciones) => this.todasLasSecciones.set(secciones));
 
-    this.cargarTrazabilidadGlobal();
-
     this.data
       .list<PlantillaDocumento>('PlantillaDocumento', { activo: true })
       .subscribe((plantillas) => this.plantillas.set(plantillas));
 
-    this.cargarFavoritos();
-    this.cargar();
-
     // Deep link (p.ej. desde el Asistente Saurix): ?documento=123 abre
     // directo ese documento, mismo patrón que ?ticket= en el tablero de
-    // Proyectos.
+    // Proyectos. Esto NO es "consultar el listado al abrir" — es ir
+    // directo a un documento puntual que no pasa por la cuadrícula.
     this.route.queryParamMap.subscribe((params) => {
       const documentoIdParam = Number(params.get('documento')) || 0;
       if (!documentoIdParam) return;
@@ -544,53 +567,143 @@ export class DocumentosListComponent implements OnInit {
     });
   }
 
+  // ── Búsqueda, filtros, orden y paginación server-side ────────────────────
 
-  private cargarFavoritos(): void {
-    const usuario = this.auth.usuarioActual()?.nombreUsuario;
-    if (!usuario) return;
-    this.data.list<DocumentoFavorito>('DocumentoFavorito', { usuario }).subscribe((favoritos) => {
-      this.favoritos.set(new Map(favoritos.map((f) => [f.documentoId, f])));
+  private async cargar(): Promise<void> {
+    this.cargando.set(true);
+    const miSecuencia = ++this.secuencia;
+    const tamanio = Math.max(1, this.preferenciasGrid.tamanoPagina());
+    const desde = (this.paginaActual() - 1) * tamanio;
+
+    const { data, error } = await this.sb.schema('wikidocs').rpc('fn_documentos_lista_pagina', {
+      p_busqueda: this.busquedaAplicada.trim() || null,
+      p_seccion_id: this.seccionFijaId,
+      p_mostrar_inactivos: this.mostrarInactivosAplicado,
+      p_solo_favoritos: this.soloFavoritosAplicado,
+      p_solo_huerfanos: this.soloHuerfanosAplicado,
+      p_orden_columna: this.columnaOrden(),
+      p_orden_direccion: this.direccionOrden(),
+      p_desde: desde,
+      p_cantidad: tamanio,
     });
-  }
 
-  protected esFavorito(documento: Documento): boolean {
-    return this.favoritos().has(documento.id);
-  }
+    if (miSecuencia !== this.secuencia) return;
 
-  protected iconoFavorito = (documento: Documento): string => (this.esFavorito(documento) ? '⭐' : '☆');
-
-  toggleFavorito(documento: Documento): void {
-    const usuario = this.auth.usuarioActual()?.nombreUsuario;
-    if (!usuario) return;
-    const existente = this.favoritos().get(documento.id);
-
-    if (existente) {
-      this.data.baja('DocumentoFavorito', existente.id).subscribe({
-        next: () => {
-          this.favoritos.update((mapa) => {
-            const nuevo = new Map(mapa);
-            nuevo.delete(documento.id);
-            return nuevo;
-          });
-        },
-        error: () => this.toast.error('No se pudo quitar de favoritos.'),
-      });
+    if (error) {
+      this.cargando.set(false);
+      this.toast.error('No se pudo cargar la lista de documentos: ' + error.message);
       return;
     }
 
+    const filas = (data ?? []) as Record<string, unknown>[];
+    const primera = filas[0];
+    const total = Number(primera?.['total_filas'] ?? 0);
+    const desdeEfectivo = Number(primera?.['desde_efectivo'] ?? 0);
+
+    this.registrosPagina.set(filas.map((fila) => filaACamel(fila) as unknown as DocumentoListaFila));
+    this.totalFiltrado.set(total);
+    this.paginaActual.set(Math.floor(desdeEfectivo / tamanio) + 1);
+    this.cargando.set(false);
+  }
+
+  private reiniciarYCargar(): void {
+    this.paginaActual.set(1);
+    void this.cargar();
+  }
+
+  protected buscar(): void {
+    this.haBuscado.set(true);
+    this.busquedaAplicada = this.busquedaEnEdicion();
+    this.soloFavoritosAplicado = this.soloFavoritosEnEdicion();
+    this.soloHuerfanosAplicado = this.soloHuerfanosEnEdicion();
+    this.mostrarInactivosAplicado = this.mostrarInactivosEnEdicion();
+    this.reiniciarYCargar();
+  }
+
+  protected limpiarFiltros(): void {
+    this.busquedaEnEdicion.set('');
+    this.soloFavoritosEnEdicion.set(false);
+    this.soloHuerfanosEnEdicion.set(false);
+    this.mostrarInactivosEnEdicion.set(false);
+  }
+
+  protected onPaginaCambio(pagina: number): void {
+    this.paginaActual.set(pagina);
+    void this.cargar();
+  }
+
+  protected onOrdenCambio(evento: { campo: keyof DocumentoListaFila & string; direccion: 'asc' | 'desc' }): void {
+    this.columnaOrden.set(evento.campo);
+    this.direccionOrden.set(evento.direccion);
+    this.reiniciarYCargar();
+  }
+
+  @HostListener('keydown', ['$event'])
+  protected onAtajoTeclado(evento: KeyboardEvent): void {
+    if (this.vista() !== 'lista') return;
+    if (!evento.altKey || evento.ctrlKey || evento.metaKey) return;
+    const tecla = evento.key.toLowerCase();
+    if (tecla === 'n') {
+      evento.preventDefault();
+      this.nuevoDocumento();
+    } else if (tecla === 'b') {
+      evento.preventDefault();
+      this.buscar();
+    } else if (tecla === 'l') {
+      evento.preventDefault();
+      this.limpiarFiltros();
+    }
+  }
+
+  // ── Favoritos ─────────────────────────────────────────────────────────
+  // Sin "carga global" de favoritos: el listado ya trae `esFavorito` por
+  // fila (calculado server-side); el estado del documento actualmente
+  // abierto (favoritoActual) y el toggle se resuelven con una consulta
+  // puntual, acotada a un solo documento, nunca a toda la tabla.
+
+  protected esFavoritoActual(): boolean {
+    return this.favoritoActual();
+  }
+
+  private resolverFavoritoActual(documentoId: number): void {
+    const usuario = this.auth.usuarioActual()?.nombreUsuario;
+    if (!usuario) {
+      this.favoritoActual.set(false);
+      return;
+    }
     this.data
-      .alta<DocumentoFavorito>('DocumentoFavorito', { documentoId: documento.id, usuario })
-      .subscribe({
-        next: (favorito) => {
-          this.favoritos.update((mapa) => {
-            const nuevo = new Map(mapa);
-            nuevo.set(documento.id, favorito);
-            return nuevo;
-          });
-        },
+      .list<DocumentoFavorito>('DocumentoFavorito', { documentoId, usuario })
+      .subscribe((filas) => this.favoritoActual.set(filas.length > 0));
+  }
+
+  private marcarFavoritoLocal(documentoId: number, valor: boolean): void {
+    if (this.documentoActual()?.id === documentoId) this.favoritoActual.set(valor);
+    this.registrosPagina.update((filas) =>
+      filas.map((fila) => (fila.id === documentoId ? { ...fila, esFavorito: valor } : fila)),
+    );
+  }
+
+  toggleFavorito(documentoId: number): void {
+    const usuario = this.auth.usuarioActual()?.nombreUsuario;
+    if (!usuario) return;
+
+    this.data.list<DocumentoFavorito>('DocumentoFavorito', { documentoId, usuario }).subscribe((filas) => {
+      const existente = filas[0];
+      if (existente) {
+        this.data.baja('DocumentoFavorito', existente.id).subscribe({
+          next: () => this.marcarFavoritoLocal(documentoId, false),
+          error: () => this.toast.error('No se pudo quitar de favoritos.'),
+        });
+        return;
+      }
+      this.data.alta<DocumentoFavorito>('DocumentoFavorito', { documentoId, usuario }).subscribe({
+        next: () => this.marcarFavoritoLocal(documentoId, true),
         error: () => this.toast.error('No se pudo marcar como favorito.'),
       });
+    });
   }
+
+  protected iconoFavoritoFila = (fila: DocumentoListaFila): string => (fila.esFavorito ? '⭐' : '☆');
 
   private cargarMigajas(seccionId: number): void {
     this.data.getById<SeccionOpcion>('Seccion', seccionId).subscribe((seccion) => {
@@ -599,20 +712,6 @@ export class DocumentosListComponent implements OnInit {
         { etiqueta: 'Secciones', ruta: '/wikidocs/secciones' },
         { etiqueta: seccion.nombre },
       ]);
-    });
-  }
-
-  cargar(): void {
-    this.cargando.set(true);
-    const filtro: Record<string, unknown> = {};
-    if (this.seccionFijaId) filtro['seccionId'] = this.seccionFijaId;
-
-    this.data.list<Documento>('Documento', filtro).subscribe({
-      next: (documentos) => {
-        this.documentosTodos.set(documentos);
-        this.cargando.set(false);
-      },
-      error: () => this.cargando.set(false),
     });
   }
 
@@ -640,6 +739,26 @@ export class DocumentosListComponent implements OnInit {
     this.data.list<SeccionOpcion>('Seccion', { categoriaId }).subscribe((secciones) => this.secciones.set(secciones));
   }
 
+  /** Carga (una sola vez por entrada a edición) la lista acotada para
+   *  "Enlazar documento" — ver documentosParaEnlazarBase. */
+  private cargarDocumentosParaEnlazar(): void {
+    this.sb
+      .schema('wikidocs')
+      .rpc('fn_documentos_lista_pagina', {
+        p_seccion_id: this.seccionFijaId,
+        p_orden_columna: 'titulo',
+        p_orden_direccion: 'asc',
+        p_cantidad: TOPE_DOCUMENTOS_PARA_ENLAZAR,
+      })
+      .then(({ data, error }: { data: unknown; error: { message: string } | null }) => {
+        if (error) return;
+        const filas = (data ?? []) as Record<string, unknown>[];
+        this.documentosParaEnlazarBase.set(
+          filas.map((fila) => ({ id: Number(fila['id']), titulo: String(fila['titulo']) })),
+        );
+      });
+  }
+
   nuevoDocumento(): void {
     this.documentoActual.set(null);
     this.form.reset({
@@ -652,6 +771,9 @@ export class DocumentosListComponent implements OnInit {
     });
     this.categorias.set([]);
     this.secciones.set([]);
+    this.favoritoActual.set(false);
+    this.valoresOriginales = JSON.stringify(this.form.getRawValue());
+    this.cargarDocumentosParaEnlazar();
     this.vista.set('editar');
   }
 
@@ -668,19 +790,44 @@ export class DocumentosListComponent implements OnInit {
 
   verDocumento(documento: Documento): void {
     this.documentoActual.set(documento);
+    this.resolverFavoritoActual(documento.id);
     this.vista.set('ver');
+  }
+
+  /** Acción "Ver" desde una fila de la cuadrícula — la fila del listado no
+   *  trae `contenido` a propósito (ver DocumentoListaFila), así que se pide
+   *  el documento completo antes de mostrarlo. */
+  verDesdeFila(fila: DocumentoListaFila): void {
+    this.data.getById<Documento>('Documento', fila.id).subscribe({
+      next: (documento) => this.verDocumento(documento),
+      error: () => this.toast.error('No se pudo abrir el documento.'),
+    });
   }
 
   editarDocumento(documento: Documento): void {
     this.documentoActual.set(documento);
+    this.resolverFavoritoActual(documento.id);
     this.cargarFormDesde(documento);
+    this.cargarDocumentosParaEnlazar();
     this.vista.set('editar');
+  }
+
+  /** Acción "Editar" desde una fila de la cuadrícula — mismo motivo que
+   *  verDesdeFila(): hay que traer el documento completo primero. */
+  editarDesdeFila(fila: DocumentoListaFila): void {
+    this.data.getById<Documento>('Documento', fila.id).subscribe({
+      next: (documento) => this.editarDocumento(documento),
+      error: () => this.toast.error('No se pudo abrir el documento para editar.'),
+    });
   }
 
   cambiarTab(tab: 'ver' | 'editar' | 'adjuntos' | 'historial' | 'referencias'): void {
     if (tab === 'editar') {
       const doc = this.documentoActual();
-      if (doc) this.cargarFormDesde(doc);
+      if (doc) {
+        this.cargarFormDesde(doc);
+        this.cargarDocumentosParaEnlazar();
+      }
     }
     if (tab === 'historial') this.cargarVersiones();
     if (tab === 'referencias') this.cargarReferencias();
@@ -746,7 +893,15 @@ export class DocumentosListComponent implements OnInit {
     });
     this.categorias.set([]);
     this.secciones.set([]);
-    if (this.seccionFijaId) return;
+
+    const terminar = () => {
+      this.valoresOriginales = JSON.stringify(this.form.getRawValue());
+    };
+
+    if (this.seccionFijaId) {
+      terminar();
+      return;
+    }
 
     // Documento solo guarda su seccionId — para que Tipo de sistema y
     // Categoría aparezcan ya seleccionados (con sus listas en cascada
@@ -763,6 +918,7 @@ export class DocumentosListComponent implements OnInit {
           .subscribe((categorias) => this.categorias.set(categorias));
 
         this.form.patchValue({ tipoSistemaId: categoria.tipoSistemaId, categoriaId: categoria.id });
+        terminar();
       });
     });
   }
@@ -770,12 +926,32 @@ export class DocumentosListComponent implements OnInit {
   volverALista(): void {
     this.documentoActual.set(null);
     this.vista.set('lista');
-    this.cargar();
+    if (this.haBuscado()) void this.cargar();
   }
 
+  private hayCambiosSinGuardar(): boolean {
+    return JSON.stringify(this.form.getRawValue()) !== this.valoresOriginales;
+  }
+
+  protected readonly avisoCierreVisible = signal(false);
+
   cancelarEdicion(): void {
+    if (!this.hayCambiosSinGuardar()) {
+      this.toast.info('Cambios descartados.');
+      this.volverALista();
+      return;
+    }
+    this.avisoCierreVisible.set(true);
+  }
+
+  protected confirmarCierreSinGuardar(): void {
+    this.avisoCierreVisible.set(false);
     this.toast.info('Cambios descartados.');
     this.volverALista();
+  }
+
+  protected cancelarCierreSinGuardar(): void {
+    this.avisoCierreVisible.set(false);
   }
 
   guardar(): void {
@@ -805,9 +981,11 @@ export class DocumentosListComponent implements OnInit {
       peticion.subscribe({
         next: (documento) => {
           this.toast.exito(esEdicion ? 'Documento actualizado.' : 'Documento creado.');
+          this.valoresOriginales = JSON.stringify(this.form.getRawValue());
           this.documentoActual.set(documento);
+          this.resolverFavoritoActual(documento.id);
           this.vista.set('ver');
-          this.cargar();
+          if (this.haBuscado()) void this.cargar();
         },
         error: () => this.toast.error('No se pudo guardar el documento. Intenta de nuevo.'),
       });
@@ -927,19 +1105,50 @@ export class DocumentosListComponent implements OnInit {
     this.descargarBlob(`${documento.titulo || 'documento'}.html`, html);
   }
 
-  /** Descarga TODOS los documentos de la sección actual (solo disponible en
-   *  la vista ya filtrada por sección) en un único archivo HTML — igual que
-   *  "downloadSection" en el prototipo de referencia. */
-  descargarSeccion(): void {
-    const documentos = this.documentos();
-    if (!documentos.length) {
-      this.toast.advertencia('No hay documentos para descargar en esta sección.');
+  /** Descarga TODOS los documentos ACTIVOS de la sección actual (solo
+   *  disponible en la vista ya filtrada por sección) en un único archivo
+   *  HTML — igual que "downloadSection" en el prototipo de referencia.
+   *
+   *  A propósito NO reutiliza `registrosPagina` (que no trae `contenido`,
+   *  ver DocumentoListaFila) ni pide "todos los documentos" sueltos: pagina
+   *  en lotes con el mismo `DataClientService.listarPagina()` genérico que
+   *  ya soporta un filtro de una sola columna (`seccionId`/`activo`), igual
+   *  que el patrón ya usado para exportar CSV en otros catálogos. Acción
+   *  explícita y poco frecuente — no afecta el listado normal. */
+  async descargarSeccion(): Promise<void> {
+    if (!this.seccionFijaId) return;
+    this.toast.info('Preparando descarga…');
+
+    const todos: Documento[] = [];
+    let desde = 0;
+    let total = Infinity;
+    try {
+      while (desde < total) {
+        const { filas, total: totalReal } = await new Promise<{ filas: Documento[]; total: number }>(
+          (resolve, reject) => {
+            this.data
+              .listarPagina<Documento>('Documento', { seccionId: this.seccionFijaId, activo: true }, desde, TAMANO_LOTE_DESCARGA_SECCION)
+              .subscribe({ next: resolve, error: reject });
+          },
+        );
+        if (filas.length === 0) break;
+        todos.push(...filas);
+        total = totalReal;
+        desde += TAMANO_LOTE_DESCARGA_SECCION;
+      }
+    } catch {
+      this.toast.error('No se pudo preparar la descarga de la sección.');
+      return;
+    }
+
+    if (todos.length === 0) {
+      this.toast.advertencia('No hay documentos activos para descargar en esta sección.');
       return;
     }
 
     const titulo = this.seccionFijaNombre || 'Sección';
     const partes = [`<h1>${titulo}</h1>`];
-    documentos.forEach((doc, indice) => {
+    todos.forEach((doc, indice) => {
       if (indice > 0) partes.push('<hr>');
       partes.push(`<h2>${doc.titulo}</h2>`);
       partes.push(`<p>Última modificación: ${this.formatearFecha(doc)}</p>`);
@@ -965,20 +1174,26 @@ export class DocumentosListComponent implements OnInit {
     return new Date(iso).toLocaleString('es-MX');
   }
 
-  pedirEliminar(documento: Documento): void {
-    this.documentoAEliminar.set(documento);
+  pedirEliminar(fila: DocumentoListaFila): void {
+    this.documentoAEliminar.set(fila);
   }
 
   confirmarEliminar(): void {
-    const documento = this.documentoAEliminar();
-    if (!documento) return;
+    const fila = this.documentoAEliminar();
+    if (!fila) return;
 
-    this.data.baja('Documento', documento.id).subscribe({
+    this.data.baja('Documento', fila.id).subscribe({
       next: () => {
         this.toast.exito('Documento eliminado.');
         this.documentoAEliminar.set(null);
-        if (this.documentoActual()?.id === documento.id) this.volverALista();
-        else this.cargar();
+        if (this.documentoActual()?.id === fila.id) {
+          this.volverALista();
+          return;
+        }
+        if (this.registrosPagina().length === 1 && this.paginaActual() > 1) {
+          this.paginaActual.update((p) => p - 1);
+        }
+        if (this.haBuscado()) void this.cargar();
       },
       error: () => this.toast.error('No se pudo eliminar el documento. Intenta de nuevo.'),
     });

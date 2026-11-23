@@ -16,3 +16,11 @@
  * a la derecha. Modificador propio de esta pantalla, no toca el
  * `.edit-form` que usan los catálogos simples en otras pantallas. */
 .edit-form--plantilla { max-width: none; }
+
+// Fase B (mandato "WikiDocs: continuación de Fase B", nov-2026) — mismo
+// ajuste que Tipo de sistema/Categoría/Secciones: el alto mínimo global
+// de .grid-table-scroll (260px) deja un hueco grande antes del contador
+// de resultados cuando hay pocas filas. Se reduce SOLO en esta pantalla.
+:host ::ng-deep .grid-table-scroll {
+  min-height: 120px;
+}

@@ -6,7 +6,16 @@
 </div>
 
 <div class="grid-toolbar">
-  <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nueva plantilla</button>
+  <button type="button" class="toolbar-btn" title="Nueva plantilla (Alt+N)" (click)="nuevo()">+ Nueva plantilla</button>
+  <button type="button" class="btn-primary small" title="Buscar (Alt+B)" (click)="buscar()">🔍 Buscar</button>
+  <button type="button" class="btn-secondary small" title="Limpiar filtros (Alt+L)" (click)="limpiarFiltros()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px; margin-right:4px;">
+      <path d="M12.531 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14v6a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341l.427-.473" />
+      <path d="m16.5 3.5 5 5" />
+      <path d="m21.5 3.5-5 5" />
+    </svg>
+    Limpiar filtros
+  </button>
 
   <div class="toolbar-group">
     <button
@@ -25,30 +34,63 @@
     <input
       type="search"
       placeholder="Buscar por nombre…"
-      [value]="busqueda()"
-      (input)="busqueda.set($any($event.target).value)"
+      [value]="busquedaEnEdicion()"
+      (input)="busquedaEnEdicion.set($any($event.target).value)"
+      (keyup.enter)="buscar()"
     />
+    <label class="board-filter-field board-filter-checkbox" style="margin:0;">
+      <input
+        type="checkbox"
+        [checked]="mostrarInactivasEnEdicion()"
+        (change)="mostrarInactivasEnEdicion.set($any($event.target).checked)"
+      />
+      Mostrar inactivas
+    </label>
   </div>
 </div>
 
-<app-data-table
-  [columnas]="columnas"
-  [filas]="registros()"
-  [cargando]="cargando()"
-  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
-  (editar)="editar($event)"
-  (eliminar)="pedirEliminar($event)"
-/>
+@if (!haBuscado()) {
+  <p class="empty" style="margin-top:20px;">Presiona "🔍 Buscar" para consultar los registros.</p>
+} @else {
+  <app-data-table
+    [columnas]="columnas"
+    [filas]="registrosPagina()"
+    [cargando]="cargando()"
+    [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+    [modoServidor]="true"
+    [paginaExterna]="paginaActual()"
+    [totalExterno]="totalFiltrado()"
+    [campoOrdenExterno]="columnaOrden()"
+    [direccionOrdenExterno]="direccionOrden()"
+    (paginaCambio)="onPaginaCambio($event)"
+    (ordenCambio)="onOrdenCambio($event)"
+    (editar)="editar($event)"
+    (eliminar)="pedirEliminar($event)"
+  />
+}
 
 @if (modalAbierto()) {
-  <div class="modal-overlay modal show d-block" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">
-    <form class="modal-box modal-dialog modal-content plantilla-modal" [formGroup]="form" (click)="$event.stopPropagation()" (ngSubmit)="guardar()">
+  <div class="modal-overlay modal show d-block" (click)="onClicFondoModal($event)">
+    <form
+      class="modal-box modal-dialog modal-content plantilla-modal"
+      [formGroup]="form"
+      (click)="$event.stopPropagation()"
+      (ngSubmit)="guardar()"
+      (keydown)="onTabDentroDelModal($event)"
+    >
       <h3 class="modal-title mb-3">{{ registroEnEdicion() ? 'Editar plantilla' : 'Nueva plantilla' }}</h3>
 
       <div class="edit-form edit-form--plantilla">
         <label class="floating-field full-span">
           <span>Nombre <b>*</b></span>
-          <input type="text" class="form-control pill-control" formControlName="nombre" placeholder=" " aria-label="Nombre" />
+          <input
+            type="text"
+            class="form-control pill-control"
+            formControlName="nombre"
+            placeholder=" "
+            aria-label="Nombre"
+            #primerCampo
+          />
         </label>
 
         <label class="full-span">
@@ -63,8 +105,10 @@
       </div>
 
       <div class="modal-actions">
-        <button type="button" class="btn-secondary btn btn-outline-secondary" (click)="modalAbierto.set(false); toast.info('Cambios descartados.')">Cancelar</button>
-        <button type="submit" class="btn-primary btn btn-primary">Guardar</button>
+        <button type="button" class="btn-secondary btn btn-outline-secondary" title="Cancelar (Esc)" [disabled]="guardando()" (click)="cancelar()">Cancelar</button>
+        <button type="submit" class="btn-primary btn btn-primary" title="Guardar (Ctrl+Enter)" [disabled]="form.invalid || guardando()">
+          {{ guardando() ? 'Guardando…' : 'Guardar' }}
+        </button>
       </div>
     </form>
   </div>
@@ -76,4 +120,13 @@
   [mensaje]="'¿Eliminar la plantilla ' + (registroAEliminar()?.nombre ?? '') + '?'"
   (confirmar)="confirmarEliminar()"
   (cancelar)="registroAEliminar.set(null)"
+/>
+
+<app-confirm-dialog
+  [visible]="avisoCierreVisible()"
+  titulo="Cambios sin guardar"
+  mensaje="Este formulario tiene cambios sin guardar. ¿Seguro que quieres cerrarlo sin guardarlos?"
+  textoConfirmar="Cerrar sin guardar"
+  (confirmar)="confirmarCierreSinGuardar()"
+  (cancelar)="cancelarCierreSinGuardar()"
 />
