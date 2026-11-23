@@ -40,6 +40,19 @@
           <a routerLink="/wikidocs/tipos-sistema" routerLinkActive="active">🗂️ Tipo de sistema</a>
           <a routerLink="/wikidocs/categorias" routerLinkActive="active">📖 Categoría</a>
           <a routerLink="/wikidocs/secciones" routerLinkActive="active">📑 Secciones</a>
+        }
+
+        <!-- Configuración: mandato "WikiDocs: estandarización y organización
+             del menú", nov-2026 -- Plantillas se reubicó aquí desde
+             Catálogos (único movimiento pedido; mismo mecanismo genérico
+             toggleGrupo/grupoAbierto que ya usan los demás módulos, misma
+             clave sin acento 'Configuracion' que ya usa Proyectos para
+             el mismo nombre de grupo). Ruta, permisos y funcionalidad de
+             Plantillas sin cambios. -->
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('wikidocs', 'Configuracion')">
+          <span>{{ grupoAbierto('wikidocs', 'Configuracion') ? '▾' : '▸' }} Configuración</span>
+        </button>
+        @if (grupoAbierto('wikidocs', 'Configuracion')) {
           <a routerLink="/wikidocs/plantillas" routerLinkActive="active">🧩 Plantillas</a>
         }
       </nav>
