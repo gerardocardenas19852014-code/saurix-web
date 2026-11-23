@@ -1,3 +1,11 @@
 // Este catálogo reutiliza el estándar visual global (styles.scss):
 // .grid-toolbar, .grid-filter, .edit-form/.floating-field, .pill-control,
-// modal-*, etc. No se necesitan reglas propias aquí.
+// modal-*, etc.
+//
+// Catálogo pequeño por naturaleza — mismo ajuste que Categorías de
+// producto/Bodegas/Tipo de sistema: el alto mínimo global de
+// .grid-table-scroll (260px) deja un hueco grande antes del contador de
+// resultados cuando hay pocas filas. Se reduce SOLO en esta pantalla.
+:host ::ng-deep .grid-table-scroll {
+  min-height: 120px;
+}
