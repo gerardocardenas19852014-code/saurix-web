@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, HostListener, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { marked } from 'marked';
 import { jsPDF } from 'jspdf';
@@ -175,6 +175,20 @@ interface ReferenciaAEliminar {
   selector: 'app-documentos-list',
   standalone: true,
   imports: [
+    // `FormsModule` es indispensable aquí (Corrección 01 al Mandato 89,
+    // nov-2026): los 4 formularios de alta/edición de la pestaña
+    // Referencias son `<form (ngSubmit)="...">` SIN `[formGroup]` (usan un
+    // borrador basado en signals, no un FormGroup reactivo). El output
+    // `ngSubmit` en un `<form>` sin `[formGroup]` lo provee la directiva
+    // `NgForm` de FormsModule (selector `form:not([formGroup])`) — sin
+    // FormsModule importado, ningún directiva reclama ese binding, así que
+    // el botón `type="submit"` caía al envío NATIVO del navegador: una
+    // navegación completa (GET a la URL actual) que recargaba toda la SPA
+    // desde cero, perdiendo el documento abierto y regresando a la lista
+    // — exactamente el bug reportado. `NgForm` nunca se aplica al
+    // `<form [formGroup]="form">` del documento (ese selector lo excluye
+    // explícitamente), así que este import no cambia nada en ese formulario.
+    FormsModule,
     ReactiveFormsModule,
     RouterLink,
     DataTableComponent,

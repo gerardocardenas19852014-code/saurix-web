@@ -2,6 +2,29 @@
   <h1>WikiDocs</h1>
 </div>
 
+@for (grupo of grupos; track grupo.titulo) {
+  <div class="catalog-group">
+    <h2 class="catalog-group-title">
+      {{ grupo.titulo }}
+      <span class="catalog-group-count">{{ grupo.enlaces.length }}</span>
+    </h2>
+
+    <div class="tiles-grid tiles-grid-landing">
+      @for (enlace of grupo.enlaces; track enlace.titulo) {
+        <a
+          class="module-tile module-tile-{{ enlace.color }}"
+          [routerLink]="enlace.ruta"
+          [queryParams]="enlace.queryParams"
+          [title]="enlace.descripcion"
+        >
+          <div class="module-tile-icon">{{ enlace.icono }}</div>
+          <div class="module-tile-label">{{ enlace.titulo }}</div>
+        </a>
+      }
+    </div>
+  </div>
+}
+
 @if (resumen(); as r) {
   <div class="dashboard-stats">
     <a class="dashboard-stat-card" routerLink="documentos" style="text-decoration:none; color:inherit;">
@@ -120,26 +143,3 @@
     }
   </div>
 </div>
-
-@for (grupo of grupos; track grupo.titulo) {
-  <div class="catalog-group">
-    <h2 class="catalog-group-title">
-      {{ grupo.titulo }}
-      <span class="catalog-group-count">{{ grupo.enlaces.length }}</span>
-    </h2>
-
-    <div class="tiles-grid tiles-grid-landing">
-      @for (enlace of grupo.enlaces; track enlace.titulo) {
-        <a
-          class="module-tile module-tile-{{ enlace.color }}"
-          [routerLink]="enlace.ruta"
-          [queryParams]="enlace.queryParams"
-          [title]="enlace.descripcion"
-        >
-          <div class="module-tile-icon">{{ enlace.icono }}</div>
-          <div class="module-tile-label">{{ enlace.titulo }}</div>
-        </a>
-      }
-    </div>
-  </div>
-}

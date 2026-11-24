@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { SupabaseService } from '../../../core/services/supabase.service';
@@ -142,6 +142,22 @@ interface DocumentoReciente {
  * completas. Los "Accesos rápidos" (antes el único contenido de esta
  * ventana) se conservan tal cual, con 2 tiles nuevos (Favoritos, Mapa de
  * trazabilidad).
+ *
+ * Corrección funcional 02 al Mandato 89 (nov-2026): se restaura el orden
+ * original de bloques en el HTML (menús WikiDocs/Catálogos primero,
+ * Dashboard debajo — ver `git show 5e17ce9`, el commit que intercaló el
+ * Dashboard ENTRE el encabezado y los menús en vez de agregarlo después) y
+ * se agrega `data-wide='grid'` en `ngOnInit`/`ngOnDestroy`, el mismo
+ * mecanismo ya homologado en otros Dashboards de Saurix (p.ej.
+ * `ProyectosDashboardComponent`, `InventarioDashboardComponent`) para
+ * ensanchar `.content` (980px a 1600px, regla ya existente en styles.scss).
+ * Sin esto, las 2 tablas de cada `.dashboard-columnas-2` (cada `.grid-table`
+ * con `min-width:560px` global) no cabían en los 980px por defecto y cada
+ * `.grid-table-scroll` activaba su propio scroll horizontal, de ahí las
+ * barras de desplazamiento innecesarias y el espacio lateral desaprovechado
+ * reportados. No se tocó ningún CSS global ni se creó ninguna regla nueva:
+ * solo se reutiliza el atributo `data-wide` que ya existe en styles.scss,
+ * exactamente como lo hacen los demás módulos.
  */
 @Component({
   selector: 'app-wikidocs-landing',
@@ -151,7 +167,7 @@ interface DocumentoReciente {
   styleUrl: './wikidocs-landing.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class WikidocsLandingComponent implements OnInit {
+export class WikidocsLandingComponent implements OnInit, OnDestroy {
   private readonly sb = inject(SupabaseService).cliente;
   private readonly toast = inject(ToastService);
 
@@ -165,9 +181,18 @@ export class WikidocsLandingComponent implements OnInit {
   protected readonly favoritosRecientes = signal<FavoritoReciente[]>([]);
 
   ngOnInit(): void {
+    // Pantalla a ancho completo (html[data-wide='grid'] en styles.scss) —
+    // Corrección 02 al Mandato 89: mismo patrón ya usado en los Dashboards
+    // de Proyectos e Inventario, para que las 2 tablas de distribución no
+    // fuercen su propio scroll horizontal dentro de un `.content` angosto.
+    document.documentElement.setAttribute('data-wide', 'grid');
     void this.cargarResumen();
     void this.cargarDistribuciones();
     void this.cargarListas();
+  }
+
+  ngOnDestroy(): void {
+    document.documentElement.removeAttribute('data-wide');
   }
 
   private async cargarResumen(): Promise<void> {
