@@ -124,6 +124,13 @@
     </h1>
     <div class="page-actions">
       @if (documentoActual()) {
+        <button type="button" class="btn-secondary" title="Copiar enlace directo a este documento" (click)="copiarEnlace()">🔗 Copiar enlace</button>
+        <a
+          class="btn-secondary"
+          routerLink="/wikidocs/mapa-trazabilidad"
+          [queryParams]="{ documento: documentoActual()!.id }"
+          title="Ver este documento en el Mapa de trazabilidad"
+        >🗺️ Ver en mapa</a>
         <button type="button" class="btn-secondary" (click)="descargar(documentoActual()!)">⬇️ Descargar</button>
         <button type="button" class="btn-secondary" (click)="exportarPdf(documentoActual()!)">🧾 Descargar PDF</button>
       }
@@ -135,9 +142,18 @@
     <div class="tab-bar">
       <button type="button" class="tab-btn" [class.is-active]="vista() === 'ver'" (click)="cambiarTab('ver')">Ver</button>
       <button type="button" class="tab-btn" [class.is-active]="vista() === 'editar'" (click)="cambiarTab('editar')">Editar</button>
-      <button type="button" class="tab-btn" [class.is-active]="vista() === 'adjuntos'" (click)="cambiarTab('adjuntos')">Adjuntos</button>
-      <button type="button" class="tab-btn" [class.is-active]="vista() === 'historial'" (click)="cambiarTab('historial')">Historial</button>
-      <button type="button" class="tab-btn" [class.is-active]="vista() === 'referencias'" (click)="cambiarTab('referencias')">Referencias</button>
+      <button type="button" class="tab-btn" [class.is-active]="vista() === 'adjuntos'" (click)="cambiarTab('adjuntos')">
+        Adjuntos
+        @if (contadorAdjuntos() !== null) { <span class="tab-contador">{{ contadorAdjuntos() }}</span> }
+      </button>
+      <button type="button" class="tab-btn" [class.is-active]="vista() === 'historial'" (click)="cambiarTab('historial')">
+        Historial
+        @if (contadorHistorial() !== null) { <span class="tab-contador">{{ contadorHistorial() }}</span> }
+      </button>
+      <button type="button" class="tab-btn" [class.is-active]="vista() === 'referencias'" (click)="cambiarTab('referencias')">
+        Referencias
+        @if (contadorReferencias() !== null) { <span class="tab-contador">{{ contadorReferencias() }}</span> }
+      </button>
     </div>
   }
 
@@ -164,6 +180,7 @@
       campoPadre="documentoId"
       [padreId]="documentoActual()!.id"
       etiqueta="Adjuntos"
+      (totalCambio)="contadorAdjuntos.set($event)"
     />
   } @else if (vista() === 'historial') {
     @if (versiones().length === 0) {
@@ -182,113 +199,305 @@
       />
     }
   } @else if (vista() === 'referencias') {
-    <div class="wikidoc-referencias">
-      <section class="wikidoc-ref-bloque">
-        <h3>Tablas de base de datos</h3>
-        <p class="wikidoc-ref-ayuda">Texto libre — anota aquí en qué tabla(s) se apoya este proceso/documento (ej. "Proyectos.Ticket").</p>
+    <div class="wikidoc-ref-header">
+      <p class="wikidoc-ref-contador">
+        @if (contadorReferencias() !== null) {
+          <strong>{{ contadorReferencias() }}</strong> referencia(s) de trazabilidad en total.
+        } @else {
+          Cargando referencias…
+        }
+      </p>
+    </div>
+
+    <div class="wikidoc-ref-grid">
+      <!-- Tablas de base de datos -->
+      <section class="wikidoc-ref-tarjeta">
+        <header class="wikidoc-ref-tarjeta-header">
+          <h3>🗄️ Tablas de base de datos <span class="wikidoc-ref-badge">{{ tablasReferenciadas().length }}</span></h3>
+          @if (formAbierto() !== 'tabla') {
+            <button type="button" class="btn-secondary small" (click)="abrirAgregarReferencia('tabla')">+ Agregar</button>
+          }
+        </header>
+        <p class="wikidoc-ref-ayuda">Cualquier sistema — Saurix, SIIF, SAP, propio o externo.</p>
+
+        @if (formAbierto() === 'tabla') {
+          <form class="wikidoc-ref-form-tarjeta" (ngSubmit)="guardarTabla()">
+            <app-texto-sugerido
+              placeholder="Sistema (ej. SIIF, SAP, Saurix…)"
+              [value]="draftTabla().sistema"
+              (valueChange)="draftTabla.set({ ...draftTabla(), sistema: $event })"
+              [busquedaRemota]="sugerirSistema"
+            />
+            <div class="wikidoc-ref-form-fila">
+              <app-texto-sugerido
+                placeholder="Esquema (opcional)"
+                [value]="draftTabla().esquema"
+                (valueChange)="draftTabla.set({ ...draftTabla(), esquema: $event })"
+                [busquedaRemota]="sugerirEsquema"
+              />
+              <app-texto-sugerido
+                placeholder="Tabla *"
+                [value]="draftTabla().tabla"
+                (valueChange)="draftTabla.set({ ...draftTabla(), tabla: $event })"
+                [busquedaRemota]="sugerirTabla"
+              />
+            </div>
+            <input
+              type="text"
+              placeholder="Descripción (opcional)"
+              [value]="draftTabla().descripcion"
+              (input)="draftTabla.set({ ...draftTabla(), descripcion: $any($event.target).value })"
+            />
+            <div class="form-actions">
+              <button type="submit" class="btn-primary small">{{ draftTabla().id ? 'Guardar cambios' : 'Agregar' }}</button>
+              <button type="button" class="btn-secondary small" (click)="cancelarFormReferencia()">Cancelar</button>
+            </div>
+          </form>
+        }
+
         @if (tablasReferenciadas().length === 0) {
-          <p class="empty">Sin tablas referenciadas todavía.</p>
+          @if (formAbierto() !== 'tabla') {
+            <p class="empty">Sin tablas referenciadas todavía.</p>
+          }
         } @else {
-          <div class="wikidoc-ref-chips">
+          <ul class="wikidoc-ref-lista">
             @for (fila of tablasReferenciadas(); track fila.id) {
-              <span class="tag wikidoc-ref-chip" (click)="quitarTablaReferenciada(fila)" title="Clic para quitar">{{ fila.texto }} ✕</span>
+              <li>
+                <div class="wikidoc-ref-item-texto">
+                  <strong>{{ fila.tabla }}</strong>
+                  @if (fila.esquema) { <span class="wikidoc-ref-sub">{{ fila.esquema }}</span> }
+                  @if (fila.sistema) { <span class="wikidoc-ref-sistema">{{ fila.sistema }}</span> }
+                  @if (fila.descripcion) { <p class="wikidoc-ref-desc">{{ fila.descripcion }}</p> }
+                </div>
+                <div class="wikidoc-ref-item-acciones">
+                  <button type="button" class="icon-btn" title="Editar" (click)="abrirEditarTabla(fila)">✏️</button>
+                  <button type="button" class="icon-btn" title="Eliminar" (click)="pedirQuitarTabla(fila)">🗑️</button>
+                </div>
+              </li>
             }
-          </div>
+          </ul>
         }
-        <form [formGroup]="formNuevaTabla" (ngSubmit)="agregarTablaReferenciada()" class="wikidoc-ref-form">
-          <input type="text" formControlName="texto" placeholder="Ej. Proyectos.Ticket" />
-          <button type="submit" class="btn-secondary">+ Agregar</button>
-        </form>
       </section>
 
-      <section class="wikidoc-ref-bloque">
-        <h3>Procesos de negocio</h3>
-        <p class="wikidoc-ref-ayuda">Texto libre — el flujo o procedimiento que describe este documento (ej. "Alta de ticket", "Cierre de mes").</p>
+      <!-- Procesos de negocio -->
+      <section class="wikidoc-ref-tarjeta">
+        <header class="wikidoc-ref-tarjeta-header">
+          <h3>⚙️ Procesos de negocio <span class="wikidoc-ref-badge">{{ procesosReferenciados().length }}</span></h3>
+          @if (formAbierto() !== 'proceso') {
+            <button type="button" class="btn-secondary small" (click)="abrirAgregarReferencia('proceso')">+ Agregar</button>
+          }
+        </header>
+        <p class="wikidoc-ref-ayuda">El flujo o procedimiento que describe este documento (ej. "Cierre de mes").</p>
+
+        @if (formAbierto() === 'proceso') {
+          <form class="wikidoc-ref-form-tarjeta" (ngSubmit)="guardarProceso()">
+            <app-texto-sugerido
+              placeholder="Sistema (ej. SIIF, SAP, Saurix…)"
+              [value]="draftProceso().sistema"
+              (valueChange)="draftProceso.set({ ...draftProceso(), sistema: $event })"
+              [busquedaRemota]="sugerirSistema"
+            />
+            <app-texto-sugerido
+              placeholder="Proceso *"
+              [value]="draftProceso().proceso"
+              (valueChange)="draftProceso.set({ ...draftProceso(), proceso: $event })"
+              [busquedaRemota]="sugerirProceso"
+            />
+            <input
+              type="text"
+              placeholder="Descripción (opcional)"
+              [value]="draftProceso().descripcion"
+              (input)="draftProceso.set({ ...draftProceso(), descripcion: $any($event.target).value })"
+            />
+            <div class="form-actions">
+              <button type="submit" class="btn-primary small">{{ draftProceso().id ? 'Guardar cambios' : 'Agregar' }}</button>
+              <button type="button" class="btn-secondary small" (click)="cancelarFormReferencia()">Cancelar</button>
+            </div>
+          </form>
+        }
+
         @if (procesosReferenciados().length === 0) {
-          <p class="empty">Sin procesos referenciados todavía.</p>
+          @if (formAbierto() !== 'proceso') {
+            <p class="empty">Sin procesos referenciados todavía.</p>
+          }
         } @else {
-          <div class="wikidoc-ref-chips">
+          <ul class="wikidoc-ref-lista">
             @for (fila of procesosReferenciados(); track fila.id) {
-              <span class="tag wikidoc-ref-chip" (click)="quitarProcesoReferenciado(fila)" title="Clic para quitar">{{ fila.texto }} ✕</span>
+              <li>
+                <div class="wikidoc-ref-item-texto">
+                  <strong>{{ fila.proceso }}</strong>
+                  @if (fila.sistema) { <span class="wikidoc-ref-sistema">{{ fila.sistema }}</span> }
+                  @if (fila.descripcion) { <p class="wikidoc-ref-desc">{{ fila.descripcion }}</p> }
+                </div>
+                <div class="wikidoc-ref-item-acciones">
+                  <button type="button" class="icon-btn" title="Editar" (click)="abrirEditarProceso(fila)">✏️</button>
+                  <button type="button" class="icon-btn" title="Eliminar" (click)="pedirQuitarProceso(fila)">🗑️</button>
+                </div>
+              </li>
             }
-          </div>
+          </ul>
         }
-        <form [formGroup]="formNuevoProceso" (ngSubmit)="agregarProcesoReferenciado()" class="wikidoc-ref-form">
-          <input type="text" formControlName="texto" placeholder="Ej. Cierre de mes" />
-          <button type="submit" class="btn-secondary">+ Agregar</button>
-        </form>
       </section>
 
-      <section class="wikidoc-ref-bloque">
-        <h3>Módulos / pantallas del sistema</h3>
-        <p class="wikidoc-ref-ayuda">Se elige de las pantallas reales de Saurix, no es texto libre.</p>
+      <!-- Módulos / pantallas del sistema -->
+      <section class="wikidoc-ref-tarjeta">
+        <header class="wikidoc-ref-tarjeta-header">
+          <h3>🧭 Módulos / pantallas <span class="wikidoc-ref-badge">{{ modulosReferenciados().length }}</span></h3>
+          @if (formAbierto() !== 'modulo') {
+            <button type="button" class="btn-secondary small" (click)="abrirAgregarReferencia('modulo')">+ Agregar</button>
+          }
+        </header>
+        <p class="wikidoc-ref-ayuda">De cualquier sistema — incluye módulos sin pantalla propia (procesos por lotes, integraciones).</p>
+
+        @if (formAbierto() === 'modulo') {
+          <form class="wikidoc-ref-form-tarjeta" (ngSubmit)="guardarModulo()">
+            <div class="wikidoc-ref-form-fila">
+              <app-texto-sugerido
+                placeholder="Sistema *"
+                [value]="draftModulo().sistema"
+                (valueChange)="draftModulo.set({ ...draftModulo(), sistema: $event })"
+                [busquedaRemota]="sugerirSistema"
+              />
+              <app-texto-sugerido
+                placeholder="Módulo *"
+                [value]="draftModulo().modulo"
+                (valueChange)="draftModulo.set({ ...draftModulo(), modulo: $event })"
+                [busquedaRemota]="sugerirModulo"
+              />
+            </div>
+            <app-texto-sugerido
+              placeholder="Pantalla / funcionalidad (opcional)"
+              [value]="draftModulo().pantallaFuncionalidad"
+              (valueChange)="draftModulo.set({ ...draftModulo(), pantallaFuncionalidad: $event })"
+              [busquedaRemota]="sugerirPantalla"
+            />
+            <input
+              type="text"
+              placeholder="URL (opcional)"
+              [value]="draftModulo().url"
+              (input)="draftModulo.set({ ...draftModulo(), url: $any($event.target).value })"
+            />
+            <input
+              type="text"
+              placeholder="Descripción (opcional)"
+              [value]="draftModulo().descripcion"
+              (input)="draftModulo.set({ ...draftModulo(), descripcion: $any($event.target).value })"
+            />
+            <div class="form-actions">
+              <button type="submit" class="btn-primary small">{{ draftModulo().id ? 'Guardar cambios' : 'Agregar' }}</button>
+              <button type="button" class="btn-secondary small" (click)="cancelarFormReferencia()">Cancelar</button>
+            </div>
+          </form>
+        }
+
         @if (modulosReferenciados().length === 0) {
-          <p class="empty">Sin módulos referenciados todavía.</p>
+          @if (formAbierto() !== 'modulo') {
+            <p class="empty">Sin módulos referenciados todavía.</p>
+          }
         } @else {
-          <div class="wikidoc-ref-chips">
+          <ul class="wikidoc-ref-lista">
             @for (fila of modulosReferenciados(); track fila.id) {
-              <span class="tag wikidoc-ref-chip" (click)="quitarModuloReferenciado(fila)" title="Clic para quitar">{{ fila.grupo }} · {{ fila.etiqueta }} ✕</span>
+              <li>
+                <div class="wikidoc-ref-item-texto">
+                  <strong>{{ fila.modulo }}</strong>
+                  @if (fila.pantallaFuncionalidad) { <span class="wikidoc-ref-sub">{{ fila.pantallaFuncionalidad }}</span> }
+                  <span class="wikidoc-ref-sistema">{{ fila.sistema }}</span>
+                  @if (fila.url && esUrlSegura(fila.url)) {
+                    <p class="wikidoc-ref-desc"><a [href]="fila.url" target="_blank" rel="noopener">{{ fila.url }}</a></p>
+                  } @else if (fila.url) {
+                    <p class="wikidoc-ref-desc">{{ fila.url }}</p>
+                  }
+                  @if (fila.descripcion) { <p class="wikidoc-ref-desc">{{ fila.descripcion }}</p> }
+                </div>
+                <div class="wikidoc-ref-item-acciones">
+                  <button type="button" class="icon-btn" title="Editar" (click)="abrirEditarModulo(fila)">✏️</button>
+                  <button type="button" class="icon-btn" title="Eliminar" (click)="pedirQuitarModulo(fila)">🗑️</button>
+                </div>
+              </li>
             }
-          </div>
+          </ul>
         }
-        <div class="wikidoc-ref-form">
-          <app-select-buscable
-            [opciones]="opcionesModulo()"
-            [value]="moduloAAgregar()"
-            (valueChange)="moduloAAgregar.set($event ? ($event + '') : null)"
-            placeholder="Buscar módulo o pantalla…"
-          />
-          <button type="button" class="btn-secondary" [disabled]="!moduloAAgregar()" (click)="agregarModuloReferenciado()">+ Agregar</button>
-        </div>
       </section>
 
-      <section class="wikidoc-ref-bloque">
-        <h3>Otros documentos</h3>
-        <p class="wikidoc-ref-ayuda">Relaciona este documento con otro ya existente (depende de, reemplaza a, o simplemente relacionado).</p>
+      <!-- Otros documentos -->
+      <section class="wikidoc-ref-tarjeta">
+        <header class="wikidoc-ref-tarjeta-header">
+          <h3>📑 Documentos relacionados <span class="wikidoc-ref-badge">{{ documentosRelacionados().length }}</span></h3>
+          @if (formAbierto() !== 'relacion') {
+            <button type="button" class="btn-secondary small" (click)="abrirAgregarReferencia('relacion')">+ Agregar</button>
+          }
+        </header>
+        <p class="wikidoc-ref-ayuda">Relaciona este documento con otro ya existente.</p>
+
+        @if (formAbierto() === 'relacion') {
+          <form class="wikidoc-ref-form-tarjeta" (ngSubmit)="guardarRelacion()">
+            <app-select-buscable
+              [opciones]="opcionesDocumentoRelacionado()"
+              [value]="draftRelacion().documentoRelacionadoId"
+              (valueChange)="draftRelacion.set({ ...draftRelacion(), documentoRelacionadoId: $event ? +$event : null })"
+              placeholder="Buscar documento…"
+            />
+            <select
+              [value]="draftRelacion().tipo"
+              (change)="draftRelacion.set({ ...draftRelacion(), tipo: $any($event.target).value })"
+            >
+              @for (t of tiposRelacion; track t.clave) {
+                <option [value]="t.clave">{{ t.etiqueta }}</option>
+              }
+            </select>
+            <div class="form-actions">
+              <button type="submit" class="btn-primary small" [disabled]="!draftRelacion().documentoRelacionadoId">
+                {{ draftRelacion().id ? 'Guardar cambios' : 'Agregar' }}
+              </button>
+              <button type="button" class="btn-secondary small" (click)="cancelarFormReferencia()">Cancelar</button>
+            </div>
+          </form>
+        }
+
         @if (documentosRelacionados().length === 0) {
-          <p class="empty">Sin documentos relacionados todavía.</p>
+          @if (formAbierto() !== 'relacion') {
+            <p class="empty">Sin documentos relacionados todavía.</p>
+          }
         } @else {
-          <div class="wikidoc-ref-chips">
+          <ul class="wikidoc-ref-lista">
             @for (fila of documentosRelacionados(); track fila.id) {
-              <span
-                class="tag wikidoc-ref-chip"
-                title="Clic en el texto para abrirlo, en ✕ para quitar la relación"
-              >
-                <a (click)="abrirDocumentoRelacionado(fila.documentoRelacionadoId)">{{ textoTipoRelacion(fila.tipo) }}: {{ tituloDocumento(fila.documentoRelacionadoId) }}</a>
-                <span (click)="quitarDocumentoRelacionado(fila)"> ✕</span>
-              </span>
+              <li>
+                <div class="wikidoc-ref-item-texto">
+                  <a class="wikidoc-ref-link" (click)="abrirDocumentoRelacionado(fila.documentoRelacionadoId)">
+                    {{ textoTipoRelacion(fila.tipo) }}: {{ tituloDocumento(fila.documentoRelacionadoId) }}
+                  </a>
+                </div>
+                <div class="wikidoc-ref-item-acciones">
+                  <button type="button" class="icon-btn" title="Editar" (click)="abrirEditarRelacion(fila)">✏️</button>
+                  <button type="button" class="icon-btn" title="Eliminar" (click)="pedirQuitarRelacion(fila)">🗑️</button>
+                </div>
+              </li>
             }
-          </div>
+          </ul>
         }
-        <div class="wikidoc-ref-form wikidoc-ref-form-relacion">
-          <app-select-buscable
-            [opciones]="opcionesDocumentoRelacionado()"
-            [value]="documentoRelacionadoAAgregar()"
-            (valueChange)="documentoRelacionadoAAgregar.set($event ? +$event : null)"
-            placeholder="Buscar documento…"
-          />
-          <select [value]="tipoRelacionAAgregar()" (change)="tipoRelacionAAgregar.set($any($event.target).value)">
-            @for (t of tiposRelacion; track t.clave) {
-              <option [value]="t.clave">{{ t.etiqueta }}</option>
-            }
-          </select>
-          <button type="button" class="btn-secondary" [disabled]="!documentoRelacionadoAAgregar()" (click)="agregarDocumentoRelacionado()">+ Agregar</button>
-        </div>
       </section>
 
-      <section class="wikidoc-ref-bloque wikidoc-ref-bloque--solo-lectura">
-        <h3>Documentos que me referencian</h3>
-        <p class="wikidoc-ref-ayuda">Solo lectura — lo inverso de "Otros documentos": se administra desde la pestaña Referencias del documento de origen, no desde aquí.</p>
+      <!-- Documentos que me referencian (solo lectura) -->
+      <section class="wikidoc-ref-tarjeta wikidoc-ref-tarjeta--solo-lectura">
+        <header class="wikidoc-ref-tarjeta-header">
+          <h3>📥 Documentos que me referencian <span class="wikidoc-ref-badge">{{ documentosQueMeReferencian().length }}</span></h3>
+        </header>
+        <p class="wikidoc-ref-ayuda">Solo lectura — se administra desde la pestaña Referencias del documento de origen.</p>
+
         @if (documentosQueMeReferencian().length === 0) {
           <p class="empty">Ningún documento te referencia todavía.</p>
         } @else {
-          <div class="wikidoc-ref-chips">
+          <ul class="wikidoc-ref-lista">
             @for (fila of documentosQueMeReferencian(); track fila.id) {
-              <span class="tag wikidoc-ref-chip wikidoc-ref-chip--solo-lectura" title="Clic para abrirlo">
-                <a (click)="abrirDocumentoRelacionado(fila.documentoId)">{{ textoTipoRelacion(fila.tipo) }}: {{ tituloDocumento(fila.documentoId) }}</a>
-              </span>
+              <li>
+                <div class="wikidoc-ref-item-texto">
+                  <a class="wikidoc-ref-link" (click)="abrirDocumentoRelacionado(fila.documentoId)">
+                    {{ textoTipoRelacion(fila.tipo) }}: {{ tituloDocumento(fila.documentoId) }}
+                  </a>
+                </div>
+              </li>
             }
-          </div>
+          </ul>
         }
       </section>
     </div>
@@ -296,35 +505,37 @@
     <form [formGroup]="form" (ngSubmit)="guardar()">
       <div class="edit-form edit-form--documento">
         @if (!seccionFijaId) {
-          <label>
-            Tipo de sistema
-            <select formControlName="tipoSistemaId" (change)="onTipoSistemaCambia()">
-              <option [ngValue]="0">Selecciona...</option>
-              @for (tipo of tiposSistema(); track tipo.id) {
-                <option [ngValue]="tipo.id">{{ tipo.nombre }}</option>
-              }
-            </select>
-          </label>
+          <div class="form-grid-3col">
+            <label>
+              Tipo de sistema
+              <select formControlName="tipoSistemaId" (change)="onTipoSistemaCambia()">
+                <option [ngValue]="0">Selecciona...</option>
+                @for (tipo of tiposSistema(); track tipo.id) {
+                  <option [ngValue]="tipo.id">{{ tipo.nombre }}</option>
+                }
+              </select>
+            </label>
 
-          <label>
-            Categoría
-            <select formControlName="categoriaId" (change)="onCategoriaCambia()">
-              <option [ngValue]="0">Selecciona...</option>
-              @for (categoria of categorias(); track categoria.id) {
-                <option [ngValue]="categoria.id">{{ categoria.nombre }}</option>
-              }
-            </select>
-          </label>
+            <label>
+              Categoría
+              <select formControlName="categoriaId" (change)="onCategoriaCambia()">
+                <option [ngValue]="0">Selecciona...</option>
+                @for (categoria of categorias(); track categoria.id) {
+                  <option [ngValue]="categoria.id">{{ categoria.nombre }}</option>
+                }
+              </select>
+            </label>
 
-          <label>
-            Sección
-            <select formControlName="seccionId">
-              <option [ngValue]="0">Selecciona...</option>
-              @for (seccion of secciones(); track seccion.id) {
-                <option [ngValue]="seccion.id">{{ seccion.nombre }}</option>
-              }
-            </select>
-          </label>
+            <label>
+              Sección
+              <select formControlName="seccionId">
+                <option [ngValue]="0">Selecciona...</option>
+                @for (seccion of secciones(); track seccion.id) {
+                  <option [ngValue]="seccion.id">{{ seccion.nombre }}</option>
+                }
+              </select>
+            </label>
+          </div>
         }
 
         <label>
@@ -382,4 +593,12 @@
   textoConfirmar="Cerrar sin guardar"
   (confirmar)="confirmarCierreSinGuardar()"
   (cancelar)="cancelarCierreSinGuardar()"
+/>
+
+<app-confirm-dialog
+  [visible]="referenciaAEliminar() !== null"
+  titulo="Eliminar referencia"
+  [mensaje]="'¿Eliminar la referencia \'' + (referenciaAEliminar()?.etiqueta ?? '') + '\'?'"
+  (confirmar)="confirmarQuitarReferencia()"
+  (cancelar)="referenciaAEliminar.set(null)"
 />

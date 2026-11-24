@@ -1,4 +1,4 @@
-/* Estilos en src/styles.scss (.page-header, .breadcrumbs, .grid-table, .page-body, .page-meta, .tab-bar, .edit-form). */
+/* Estilos en src/styles.scss (.page-header, .breadcrumbs, .grid-table, .page-body, .page-meta, .tab-bar, .edit-form, .form-grid-3col). */
 
 /* `.edit-form` global se limita a 760px (bueno para formularios cortos
  *  en otras pantallas), pero aquí adentro vive el editor de "Contenido"
@@ -10,88 +10,258 @@
  *  solo ensancharlo un poco — así ocupa el 100% de `.content`, que a su
  *  vez ya quedó en 1600px por el data-wide='grid' del effect. Este
  *  modificador solo aplica en esta pantalla (encapsulado por Angular),
- *  así que no afecta ningún otro `.edit-form` del resto de la app. */
+ *  así que no afecta ningún otro `.edit-form` del resto de la app.
+ *  Mandato 89: el trío Tipo de sistema/Categoría/Sección ahora vive en
+ *  `.form-grid-3col` (clase GLOBAL ya existente en src/styles.scss,
+ *  reutilizada tal cual, sin CSS nuevo para eso) anidado dentro de este
+ *  mismo `.edit-form--documento` — Título/plantilla/editor/acciones
+ *  siguen fuera de ese grid, a todo lo ancho, sin cambios. */
 .edit-form--documento {
   max-width: none;
 }
 
-
-/* Pestaña "Referencias" (trazabilidad) — ver documento.model.ts. */
-.wikidoc-referencias {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  max-width: 760px;
+/* Contador de pestaña (Adjuntos/Historial/Referencias) — Mandato 89. Solo
+ *  se pinta cuando el valor ya se conoce (`contador... !== null` en el
+ *  HTML); nunca aparece un "0" antes de la primera consulta real. */
+.tab-contador {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: var(--indigo);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
 }
 
-.wikidoc-ref-bloque h3 {
-  margin: 0 0 4px;
-  font-size: 15px;
+/* ------------------------------------------------------------------
+ * Pestaña "Referencias" (trazabilidad universal) — rediseño completo del
+ * Mandato 89 ("WikiDocs: mejora integral de experiencia de usuario,
+ * referencias universales y limpieza definitiva", nov-2026). Antes era
+ * una lista vertical de chips con formularios de alta SIEMPRE visibles,
+ * capada a 760px (ver `.wikidoc-referencias` que existía aquí) — ahora es
+ * una cuadrícula de tarjetas (2 columnas en escritorio, 1 en pantallas
+ * angostas), cada una con su propio formulario de alta/edición OCULTO
+ * hasta pedirse con "+ Agregar" o el lápiz de una fila existente. Mismos
+ * tokens de color que el resto de la app (var(--line)/var(--paper-raised)/
+ * var(--ink-soft)/var(--indigo)) — ninguno nuevo.
+ * ------------------------------------------------------------------ */
+
+.wikidoc-ref-header {
+  margin-bottom: 14px;
+}
+
+.wikidoc-ref-contador {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+
+  strong {
+    color: var(--text-strong);
+    font-size: 15px;
+  }
+}
+
+.wikidoc-ref-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.wikidoc-ref-tarjeta {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper-raised);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.wikidoc-ref-tarjeta--solo-lectura {
+  opacity: 0.9;
+}
+
+.wikidoc-ref-tarjeta-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 2px;
+
+  h3 {
+    margin: 0;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+}
+
+.wikidoc-ref-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--chip-bg, rgba(99, 102, 241, 0.12));
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  font-weight: 600;
 }
 
 .wikidoc-ref-ayuda {
-  margin: 0 0 10px;
+  margin: 0 0 12px;
   font-size: 12.5px;
   color: var(--ink-soft);
 }
 
-.wikidoc-ref-chips {
+/* Formulario de captura/edición de una tarjeta — oculto hasta "+ Agregar"
+ *  o el lápiz de una fila; mismo campo visual se reutiliza para alta y
+ *  edición (ver draftTabla/draftProceso/draftModulo/draftRelacion en el
+ *  .ts), cambiando solo la etiqueta del botón principal. */
+.wikidoc-ref-form-tarjeta {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 12px;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--paper-raised) 92%, var(--ink-soft) 8%);
 }
 
-.wikidoc-ref-chip {
-  cursor: pointer;
+.wikidoc-ref-form-fila {
+  display: flex;
+  gap: 8px;
+
+  > * {
+    flex: 1;
+    min-width: 0;
+  }
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+  }
+}
+
+.wikidoc-ref-form-tarjeta input[type='text'] {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13.5px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-raised);
+  color: var(--text-strong);
+  width: 100%;
+}
+
+.wikidoc-ref-form-tarjeta select {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13.5px;
+  padding: 8px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-raised);
+  color: var(--text-strong);
+}
+
+.wikidoc-ref-form-tarjeta .form-actions {
+  margin-top: 2px;
+}
+
+.wikidoc-ref-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.wikidoc-ref-lista li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 0;
+
+  & + li {
+    border-top: 1px solid var(--line);
+  }
+}
+
+.wikidoc-ref-item-texto {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 8px;
+  min-width: 0;
+  font-size: 13.5px;
+  color: var(--text-strong);
+}
+
+.wikidoc-ref-sub {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.wikidoc-ref-sistema {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--chip-bg, rgba(99, 102, 241, 0.12));
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 600;
 }
-.wikidoc-ref-chip a {
+
+.wikidoc-ref-desc {
+  flex-basis: 100%;
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+
+  a {
+    color: inherit;
+  }
+}
+
+.wikidoc-ref-link {
   color: inherit;
   text-decoration: underline;
   cursor: pointer;
+  font-size: 13.5px;
 }
 
-/* Backlinks ("Documentos que me referencian") — solo lectura: no hay ✕
- *  para quitar (esa relación vive en el documento de origen), así que el
- *  cursor de "clic para quitar" del chip normal no aplica aquí, solo el
- *  del enlace interno. */
-.wikidoc-ref-bloque--solo-lectura .wikidoc-ref-chip--solo-lectura {
-  cursor: default;
-  opacity: .85;
-}
-
-.wikidoc-ref-form {
+.wikidoc-ref-item-acciones {
   display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.wikidoc-ref-form input[type='text'],
-.wikidoc-ref-form app-select-buscable {
-  flex: 1;
-  min-width: 0;
-}
-.wikidoc-ref-form input[type='text'] {
-  font-family: 'Montserrat', sans-serif;
-  font-size: 14px;
-  padding: 9px 11px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--paper-raised);
-  color: var(--text-strong);
-}
-.wikidoc-ref-form select {
-  font-family: 'Montserrat', sans-serif;
-  font-size: 14px;
-  padding: 9px 8px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--paper-raised);
-  color: var(--text-strong);
+  gap: 2px;
+  flex-shrink: 0;
 }
 
-.wikidoc-ref-form-relacion {
-  flex-wrap: wrap;
+.icon-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: var(--ink-soft);
+
+  &:hover {
+    background: color-mix(in srgb, var(--ink-soft) 14%, transparent);
+  }
 }

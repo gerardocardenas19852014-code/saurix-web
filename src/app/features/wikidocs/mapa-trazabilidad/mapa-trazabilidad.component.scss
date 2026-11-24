@@ -134,6 +134,16 @@
   pointer-events: none;
 }
 
+// Mandato 89: identificación de sistema por nodo — a propósito solo texto,
+// sin un color adicional por sistema (evita saturar el mapa; el color ya
+// distingue el TIPO de elemento, no se superpone otra dimensión de color).
+.mapa-nodo-sistema {
+  font-size: 9px;
+  fill: var(--ink-soft);
+  font-family: 'Montserrat', sans-serif;
+  pointer-events: none;
+}
+
 .mapa-panel-detalle {
   flex: 0 0 280px;
   border: 1px solid var(--line);

@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, HostListener, OnInit, computed, effect, inject, signal } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { marked } from 'marked';
@@ -19,7 +19,7 @@ import { insertarEmbeds } from '../../shared/utils/embeds.util';
 import { generarTablaContenido } from '../../shared/utils/tabla-contenido.util';
 import { truncarTexto } from '../../shared/utils/texto.util';
 import { SelectBuscableComponent, OpcionBuscable } from '../../shared/components/select-buscable/select-buscable.component';
-import { DESTINOS } from '../../shared/utils/navegacion-destinos.util';
+import { TextoSugeridoComponent, SugerenciaTexto } from '../../shared/components/texto-sugerido/texto-sugerido.component';
 import {
   CategoriaOpcion,
   Documento,
@@ -76,6 +76,52 @@ const TAMANO_LOTE_DESCARGA_SECCION = 500;
  *  excluye). */
 const TOPE_DOCUMENTOS_PARA_ENLAZAR = 500;
 
+/** Tipo de referencia universal que puede estar en edición/alta en la
+ *  pestaña Referencias (Mandato 89, nov-2026). 'relacion' es el único que no
+ *  depende de ningún sistema externo (relaciona dos Documento entre sí). */
+type TipoReferenciaUniversal = 'tabla' | 'proceso' | 'modulo' | 'relacion';
+
+/** Borrador de captura/edición — signal-based (no FormGroup) para poder
+ *  reutilizar el mismo objeto tanto al agregar (id=null) como al editar
+ *  (id=el de la fila), y para que "Cancelar" sea tan simple como descartar
+ *  el borrador sin tocar la fila real. Todos los campos de texto libre
+ *  llegan ya con autocompletado opcional vía TextoSugeridoComponent. */
+interface DraftTabla {
+  id: number | null;
+  sistema: string;
+  esquema: string;
+  tabla: string;
+  descripcion: string;
+}
+interface DraftProceso {
+  id: number | null;
+  sistema: string;
+  proceso: string;
+  descripcion: string;
+}
+interface DraftModulo {
+  id: number | null;
+  sistema: string;
+  modulo: string;
+  pantallaFuncionalidad: string;
+  url: string;
+  descripcion: string;
+}
+interface DraftRelacion {
+  id: number | null;
+  documentoRelacionadoId: number | null;
+  tipo: TipoRelacionDocumento;
+}
+
+/** Referencia señalada para eliminar (pide confirmación antes de la baja
+ *  real) — guarda también una etiqueta ya resuelta para el mensaje del
+ *  diálogo, sin tener que volver a mirar la fila original ahí. */
+interface ReferenciaAEliminar {
+  tipo: TipoReferenciaUniversal;
+  id: number;
+  etiqueta: string;
+}
+
 /**
  * Ventana de Documentos (WikiDocs). El filtro por Sección es opcional,
  * así que esta misma ventana sirve para:
@@ -93,7 +139,11 @@ const TOPE_DOCUMENTOS_PARA_ENLAZAR = 500;
  * Tipo de sistema → Categoría → Sección en cascada real (3 selects, uno
  * por nivel de la jerarquía TipoSistema→Categoria→Seccion); el Id de la
  * Sección elegida es lo único que persiste en el Documento. Si ya se llegó
- * con una sección fija, todo este paso se omite.
+ * con una sección fija, todo este paso se omite. Mandato 89 (nov-2026):
+ * los 3 selects viven en una sola fila (`.form-grid-3col`, clase global ya
+ * existente — reutilizada tal cual, sin CSS nuevo) en vez de apilados, para
+ * aprovechar el ancho ya ampliado de esta pantalla; el resto del formulario
+ * (Título/plantilla/editor/acciones) sigue fuera de ese grid, sin cambios.
  *
  * Fase B de homologación SAURIX-CAT-001 v1.1 (mandato "WikiDocs Documentos:
  * implementación integral", nov-2026) — el LISTADO (antes `list()` + 4
@@ -107,8 +157,19 @@ const TOPE_DOCUMENTOS_PARA_ENLAZAR = 500;
  * (`haBuscado` + edición/aplicada, mismo patrón que Tipo de
  * sistema/Categoría/Secciones/Plantillas). El resto de la pantalla —
  * editor, adjuntos, historial de versiones, exportaciones PDF/HTML,
- * pestaña Referencias, navegación profunda por `?documento=` — sigue
- * exactamente igual, usando `DataClientService` como antes.
+ * navegación profunda por `?documento=` — sigue exactamente igual, usando
+ * `DataClientService` como antes.
+ *
+ * La pestaña Referencias fue rediseñada por completo en el Mandato 89
+ * ("WikiDocs: mejora integral de experiencia de usuario, referencias
+ * universales y limpieza definitiva", nov-2026): ya no depende del catálogo
+ * interno de navegación de Saurix (`DESTINOS` — ese import se eliminó de
+ * este archivo), las 4 categorías de referencia (Tabla/Proceso/Módulo/
+ * Documento relacionado) son ahora universales (cualquier sistema, interno
+ * o externo), cada tarjeta tiene su propio formulario de alta/edición oculto
+ * hasta pedirse explícitamente (nunca permanentemente abierto), con
+ * autocompletado server-side opcional (`wikidocs.fn_referencias_sugerencias`,
+ * nunca un catálogo obligatorio) y confirmación antes de eliminar.
  */
 @Component({
   selector: 'app-documentos-list',
@@ -121,6 +182,7 @@ const TOPE_DOCUMENTOS_PARA_ENLAZAR = 500;
     AdjuntosPanelComponent,
     EditorTextoComponent,
     SelectBuscableComponent,
+    TextoSugeridoComponent,
   ],
   templateUrl: './documentos-list.component.html',
   styleUrl: './documentos-list.component.scss',
@@ -184,10 +246,11 @@ export class DocumentosListComponent implements OnInit {
   private readonly mapaSecciones = computed(() => new Map(this.todasLasSecciones().map((s) => [s.id, s])));
 
   /** Lista acotada (sin `contenido`, hasta TOPE_DOCUMENTOS_PARA_ENLAZAR) para
-   *  el selector "Enlazar documento" del editor — se carga una sola vez al
-   *  entrar a "editar"/"nuevo", reutilizando la misma función RPC del
-   *  listado (que ya excluye `contenido`), nunca la carga completa de
-   *  `list('Documento')` que existía antes. */
+   *  el selector "Enlazar documento" del editor y para "Documento
+   *  relacionado" en Referencias — se carga una sola vez al entrar a
+   *  "editar"/"nuevo", reutilizando la misma función RPC del listado (que ya
+   *  excluye `contenido`), nunca la carga completa de `list('Documento')`
+   *  que existía antes. */
   private readonly documentosParaEnlazarBase = signal<{ id: number; titulo: string }[]>([]);
   protected readonly documentosParaEnlazar = computed(() => {
     const actualId = this.documentoActual()?.id ?? 0;
@@ -211,16 +274,17 @@ export class DocumentosListComponent implements OnInit {
    *  espacio solo) y, para "Editar", se complementa con el modificador
    *  `.edit-form--documento` (ver documentos-list.component.scss), porque
    *  `.edit-form` tiene su propio tope de 760px independiente de `.content`
-   *  que si no se queda angosto aunque el padre se ensanche. "Adjuntos"/
-   *  "Historial"/"Referencias" se dejan con el ancho angosto por defecto,
-   *  ya que no tienen el mismo problema. Este effect mantiene `data-wide`
-   *  sincronizado con la vista actual en vez de dejarlo fijo todo el tiempo
-   *  que el componente está montado, y lo quita al salir de la pantalla
-   *  (onCleanup corre tanto entre cambios de vista como al destruirse el
-   *  componente). */
+   *  que si no se queda angosto aunque el padre se ensanche. Mandato 89:
+   *  "Referencias" se agrega también aquí, porque su rediseño en tarjetas de
+   *  2 columnas necesita el mismo ancho ampliado (antes se dejaba angosta a
+   *  propósito, cuando era una simple lista de chips en una sola columna).
+   *  Este effect mantiene `data-wide` sincronizado con la vista actual en
+   *  vez de dejarlo fijo todo el tiempo que el componente está montado, y lo
+   *  quita al salir de la pantalla (onCleanup corre tanto entre cambios de
+   *  vista como al destruirse el componente). */
   private readonly _anchoSegunVista = effect((onCleanup) => {
     const vista = this.vista();
-    if (vista === 'lista' || vista === 'ver' || vista === 'editar') {
+    if (vista === 'lista' || vista === 'ver' || vista === 'editar' || vista === 'referencias') {
       document.documentElement.setAttribute('data-wide', 'grid');
     }
     onCleanup(() => document.documentElement.removeAttribute('data-wide'));
@@ -293,12 +357,26 @@ export class DocumentosListComponent implements OnInit {
     return this.sanitizer.bypassSecurityTrustHtml(this.tocYContenido().html);
   });
 
-  // ---------------- Referencias (trazabilidad) ----------------
-  // Pestaña "Referencias": permite anotar en qué tablas/procesos/módulos
-  // se apoya este documento, y con qué otros documentos se relaciona. Ver
-  // DocumentoReferenciaTabla/Proceso/Modulo y DocumentoRelacion en
+  // ---------------- Contadores de pestañas (Mandato 89) ----------------
+  // `null` = todavía no se ha consultado esta pestaña en esta visita al
+  // documento (no se muestra ningún badge) — nunca se pinta "0" como si
+  // fuera un conteo confirmado sin haberlo consultado. Se resuelven con los
+  // datos que la propia pestaña ya necesita cargar para mostrarse (nunca
+  // una consulta extra solo para el número), y se actualizan in-place tras
+  // agregar/quitar, sin recargar el documento completo.
+  protected readonly contadorAdjuntos = signal<number | null>(null);
+  protected readonly contadorHistorial = signal<number | null>(null);
+  protected readonly contadorReferencias = signal<number | null>(null);
+
+  // ---------------- Referencias (trazabilidad universal) ----------------
+  // Pestaña "Referencias" (Mandato 89, nov-2026 — "WikiDocs: mejora integral
+  // de experiencia de usuario, referencias universales y limpieza
+  // definitiva"): anota en qué tablas/procesos/módulos de CUALQUIER sistema
+  // (propio o externo) se apoya este documento, y con qué otros documentos
+  // se relaciona. Ver DocumentoReferenciaTabla/Proceso/Modulo en
   // documento.model.ts. Mismo patrón de alta/baja inmediata por registro
-  // que TicketEtiqueta/TicketDependencia en el tablero Kanban.
+  // que TicketEtiqueta/TicketDependencia en el tablero Kanban, ahora con
+  // edición in-place además de alta/baja.
 
   protected readonly tablasReferenciadas = signal<DocumentoReferenciaTabla[]>([]);
   protected readonly procesosReferenciados = signal<DocumentoReferenciaProceso[]>([]);
@@ -311,33 +389,45 @@ export class DocumentosListComponent implements OnInit {
    *  este lado. */
   protected readonly documentosQueMeReferencian = signal<DocumentoRelacion[]>([]);
 
-  protected readonly formNuevaTabla = this.fb.nonNullable.group({ texto: ['', Validators.required] });
-  protected readonly formNuevoProceso = this.fb.nonNullable.group({ texto: ['', Validators.required] });
+  /** Sistema del propio documento (resuelto vía Sección→Categoría→Tipo de
+   *  sistema, igual que el nodo central del Mapa de trazabilidad) — se usa
+   *  solo como SUGERENCIA por defecto al abrir "+ Agregar" en cualquier
+   *  tarjeta de referencia; el usuario puede cambiarlo libremente (referencia
+   *  cruzada entre sistemas), nunca se fuerza. */
+  protected readonly sistemaDocumentoActual = signal<string | null>(null);
 
-  /** Opciones para "+ Agregar módulo": todas las pantallas reales del
-   *  sistema (mismo catálogo que ya usa la paleta de comandos), menos las
-   *  que este documento ya referencia. */
-  protected readonly opcionesModulo = computed<OpcionBuscable[]>(() => {
-    const yaAgregadas = new Set(this.modulosReferenciados().map((m) => m.ruta));
-    return DESTINOS.filter((d) => !yaAgregadas.has(d.ruta)).map((d) => ({
-      valor: d.ruta,
-      etiqueta: d.label,
-      grupo: d.grupo,
-    }));
-  });
-  protected readonly moduloAAgregar = signal<string | null>(null);
+  /** Qué tarjeta tiene su formulario de captura/edición visible —
+   *  `null` = ninguna (todas las tarjetas muestran solo su lista + botón
+   *  "+ Agregar"), nunca hay más de un formulario abierto a la vez. */
+  protected readonly formAbierto = signal<TipoReferenciaUniversal | null>(null);
 
-  /** Opciones para "+ Agregar documento relacionado": igual que
-   *  documentosParaEnlazar (sin el propio documento), menos los que ya
-   *  están relacionados. */
-  protected readonly opcionesDocumentoRelacionado = computed<OpcionBuscable[]>(() => {
-    const yaAgregados = new Set(this.documentosRelacionados().map((r) => r.documentoRelacionadoId));
-    return this.documentosParaEnlazar()
-      .filter((d) => !yaAgregados.has(d.id))
-      .map((d) => ({ valor: d.id, etiqueta: d.titulo }));
-  });
-  protected readonly documentoRelacionadoAAgregar = signal<number | null>(null);
-  protected readonly tipoRelacionAAgregar = signal<TipoRelacionDocumento>('relacionado');
+  private draftTablaVacio(): DraftTabla {
+    return { id: null, sistema: this.sistemaDocumentoActual() ?? '', esquema: '', tabla: '', descripcion: '' };
+  }
+  private draftProcesoVacio(): DraftProceso {
+    return { id: null, sistema: this.sistemaDocumentoActual() ?? '', proceso: '', descripcion: '' };
+  }
+  private draftModuloVacio(): DraftModulo {
+    return {
+      id: null,
+      sistema: this.sistemaDocumentoActual() ?? '',
+      modulo: '',
+      pantallaFuncionalidad: '',
+      url: '',
+      descripcion: '',
+    };
+  }
+  private draftRelacionVacio(): DraftRelacion {
+    return { id: null, documentoRelacionadoId: null, tipo: 'relacionado' };
+  }
+
+  protected readonly draftTabla = signal<DraftTabla>(this.draftTablaVacio());
+  protected readonly draftProceso = signal<DraftProceso>(this.draftProcesoVacio());
+  protected readonly draftModulo = signal<DraftModulo>(this.draftModuloVacio());
+  protected readonly draftRelacion = signal<DraftRelacion>(this.draftRelacionVacio());
+
+  protected readonly referenciaAEliminar = signal<ReferenciaAEliminar | null>(null);
+
   protected static readonly TIPOS_RELACION: { clave: TipoRelacionDocumento; etiqueta: string }[] = [
     { clave: 'relacionado', etiqueta: 'Relacionado con' },
     { clave: 'depende_de', etiqueta: 'Depende de' },
@@ -350,6 +440,37 @@ export class DocumentosListComponent implements OnInit {
   protected textoTipoRelacion(tipo: TipoRelacionDocumento): string {
     return this.etiquetaTipoRelacion.get(tipo) ?? 'Relacionado con';
   }
+
+  /** Valida que la URL opcional de una referencia de Módulo sea realmente
+   *  navegable antes de convertirla en enlace (ver comentario en
+   *  DocumentoReferenciaModulo, documento.model.ts): solo http/https, nunca
+   *  `javascript:` ni otros esquemas ejecutables — texto libre capturado
+   *  por el usuario, nunca se confía sin revisar. */
+  protected esUrlSegura(url: string | null): boolean {
+    if (!url) return false;
+    try {
+      const protocolo = new URL(url, location.origin).protocol;
+      return protocolo === 'http:' || protocolo === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
+  /** Opciones para "Documento relacionado": igual que documentosParaEnlazar
+   *  (sin el propio documento), menos los que ya están relacionados —
+   *  salvo que se esté editando esa misma fila (ahí sí debe seguir
+   *  apareciendo, es la que se está modificando). */
+  protected readonly opcionesDocumentoRelacionado = computed<OpcionBuscable[]>(() => {
+    const idEnEdicion = this.draftRelacion().id;
+    const yaAgregados = new Set(
+      this.documentosRelacionados()
+        .filter((r) => r.id !== idEnEdicion)
+        .map((r) => r.documentoRelacionadoId),
+    );
+    return this.documentosParaEnlazar()
+      .filter((d) => !yaAgregados.has(d.id))
+      .map((d) => ({ valor: d.id, etiqueta: d.titulo }));
+  });
 
   /** Título del documento relacionado, para pintar el chip (DocumentoRelacion
    *  solo guarda el id) — se resuelve bajo demanda y queda en caché, en vez
@@ -372,116 +493,418 @@ export class DocumentosListComponent implements OnInit {
     });
   }
 
+  /** Resuelve el sistema del documento actual (Sección→Categoría→Tipo de
+   *  sistema), igual patrón que el nodo central del Mapa de trazabilidad —
+   *  una sola consulta embebida vía PostgREST, no un viaje por cada nivel. */
+  private resolverSistemaDocumentoActual(documentoId: number): void {
+    this.sb
+      .schema('wikidocs')
+      .from('documento')
+      .select('seccion:seccion_id(categoria:categoria_id(tipo_sistema:tipo_sistema_id(nombre)))')
+      .eq('id', documentoId)
+      .maybeSingle()
+      .then(({ data }: { data: unknown }) => {
+        const fila = data as { seccion: { categoria: { tipo_sistema: { nombre: string } | null } | null } | null } | null;
+        this.sistemaDocumentoActual.set(fila?.seccion?.categoria?.tipo_sistema?.nombre ?? null);
+      });
+  }
+
+  /** Carga las 5 listas de referencias del documento actual (en paralelo,
+   *  nunca una tras otra) y, al terminar las 5, fija el contador de la
+   *  pestaña con el total real — nunca antes, para no mostrar un número a
+   *  medio consultar. */
   private cargarReferencias(): void {
     const doc = this.documentoActual();
     if (!doc) return;
-    this.data
-      .list<DocumentoReferenciaTabla>('DocumentoReferenciaTabla', { documentoId: doc.id })
-      .subscribe({ next: (filas) => this.tablasReferenciadas.set(filas), error: () => this.tablasReferenciadas.set([]) });
-    this.data
-      .list<DocumentoReferenciaProceso>('DocumentoReferenciaProceso', { documentoId: doc.id })
-      .subscribe({ next: (filas) => this.procesosReferenciados.set(filas), error: () => this.procesosReferenciados.set([]) });
-    this.data
-      .list<DocumentoReferenciaModulo>('DocumentoReferenciaModulo', { documentoId: doc.id })
-      .subscribe({ next: (filas) => this.modulosReferenciados.set(filas), error: () => this.modulosReferenciados.set([]) });
-    this.data
-      .list<DocumentoRelacion>('DocumentoRelacion', { documentoId: doc.id })
-      .subscribe({
-        next: (filas) => {
-          this.documentosRelacionados.set(filas);
-          this.resolverTitulosFaltantes(filas.map((f) => f.documentoRelacionadoId));
-        },
-        error: () => this.documentosRelacionados.set([]),
-      });
-    this.data
-      .list<DocumentoRelacion>('DocumentoRelacion', { documentoRelacionadoId: doc.id })
-      .subscribe({
-        next: (filas) => {
-          this.documentosQueMeReferencian.set(filas);
-          this.resolverTitulosFaltantes(filas.map((f) => f.documentoId));
-        },
-        error: () => this.documentosQueMeReferencian.set([]),
-      });
+    this.resolverSistemaDocumentoActual(doc.id);
+
+    let pendientes = 5;
+    const unaListaResuelta = (): void => {
+      pendientes--;
+      if (pendientes === 0) {
+        this.contadorReferencias.set(
+          this.tablasReferenciadas().length +
+            this.procesosReferenciados().length +
+            this.modulosReferenciados().length +
+            this.documentosRelacionados().length +
+            this.documentosQueMeReferencian().length,
+        );
+      }
+    };
+
+    this.data.list<DocumentoReferenciaTabla>('DocumentoReferenciaTabla', { documentoId: doc.id }).subscribe({
+      next: (filas) => {
+        this.tablasReferenciadas.set(filas);
+        unaListaResuelta();
+      },
+      error: () => {
+        this.tablasReferenciadas.set([]);
+        unaListaResuelta();
+      },
+    });
+    this.data.list<DocumentoReferenciaProceso>('DocumentoReferenciaProceso', { documentoId: doc.id }).subscribe({
+      next: (filas) => {
+        this.procesosReferenciados.set(filas);
+        unaListaResuelta();
+      },
+      error: () => {
+        this.procesosReferenciados.set([]);
+        unaListaResuelta();
+      },
+    });
+    this.data.list<DocumentoReferenciaModulo>('DocumentoReferenciaModulo', { documentoId: doc.id }).subscribe({
+      next: (filas) => {
+        this.modulosReferenciados.set(filas);
+        unaListaResuelta();
+      },
+      error: () => {
+        this.modulosReferenciados.set([]);
+        unaListaResuelta();
+      },
+    });
+    this.data.list<DocumentoRelacion>('DocumentoRelacion', { documentoId: doc.id }).subscribe({
+      next: (filas) => {
+        this.documentosRelacionados.set(filas);
+        this.resolverTitulosFaltantes(filas.map((f) => f.documentoRelacionadoId));
+        unaListaResuelta();
+      },
+      error: () => {
+        this.documentosRelacionados.set([]);
+        unaListaResuelta();
+      },
+    });
+    this.data.list<DocumentoRelacion>('DocumentoRelacion', { documentoRelacionadoId: doc.id }).subscribe({
+      next: (filas) => {
+        this.documentosQueMeReferencian.set(filas);
+        this.resolverTitulosFaltantes(filas.map((f) => f.documentoId));
+        unaListaResuelta();
+      },
+      error: () => {
+        this.documentosQueMeReferencian.set([]);
+        unaListaResuelta();
+      },
+    });
   }
 
-  agregarTablaReferenciada(): void {
+  // ---- Autocompletado universal (fn_referencias_sugerencias) ----------
+  // Un solo helper genérico: cada campo pide sugerencias ya filtradas por
+  // el "sistema" del borrador correspondiente cuando aplica (p.ej. sugerir
+  // tablas solo del sistema ya elegido) — el propio TextoSugeridoComponent
+  // ya se encarga del debounce de 300ms, el mínimo de 2 caracteres, y de
+  // descartar respuestas obsoletas (ver ese componente).
+
+  private sugerirDesdeServidor(
+    campo: 'sistema' | 'tabla' | 'esquema' | 'proceso' | 'modulo' | 'pantalla_funcionalidad',
+    sistemaFiltro?: () => string | null,
+  ): (texto: string) => Promise<SugerenciaTexto[]> {
+    return async (texto: string): Promise<SugerenciaTexto[]> => {
+      const { data, error } = await this.sb.schema('wikidocs').rpc('fn_referencias_sugerencias', {
+        p_campo: campo,
+        p_texto: texto,
+        p_sistema: sistemaFiltro ? sistemaFiltro() || null : null,
+      });
+      if (error) return [];
+      return ((data ?? []) as Record<string, unknown>[]).map((f) => {
+        const fila = filaACamel(f) as { valor: string; sistema: string | null };
+        return { valor: fila.valor, sistema: fila.sistema };
+      });
+    };
+  }
+
+  protected readonly sugerirSistema = this.sugerirDesdeServidor('sistema');
+  protected readonly sugerirTabla = this.sugerirDesdeServidor('tabla', () => this.draftTabla().sistema || null);
+  protected readonly sugerirEsquema = this.sugerirDesdeServidor('esquema', () => this.draftTabla().sistema || null);
+  protected readonly sugerirProceso = this.sugerirDesdeServidor('proceso', () => this.draftProceso().sistema || null);
+  protected readonly sugerirModulo = this.sugerirDesdeServidor('modulo', () => this.draftModulo().sistema || null);
+  protected readonly sugerirPantalla = this.sugerirDesdeServidor(
+    'pantalla_funcionalidad',
+    () => this.draftModulo().sistema || null,
+  );
+
+  // ---- Abrir/cancelar formularios de captura (compartidos alta/edición) ----
+
+  protected agregarReferenciaDesdeMenu(tipo: string): void {
+    if (tipo === 'tabla' || tipo === 'proceso' || tipo === 'modulo' || tipo === 'relacion') {
+      this.abrirAgregarReferencia(tipo);
+    }
+  }
+
+  protected abrirAgregarReferencia(tipo: TipoReferenciaUniversal): void {
+    if (tipo === 'tabla') this.draftTabla.set(this.draftTablaVacio());
+    else if (tipo === 'proceso') this.draftProceso.set(this.draftProcesoVacio());
+    else if (tipo === 'modulo') this.draftModulo.set(this.draftModuloVacio());
+    else this.draftRelacion.set(this.draftRelacionVacio());
+    this.formAbierto.set(tipo);
+  }
+
+  protected abrirEditarTabla(fila: DocumentoReferenciaTabla): void {
+    this.draftTabla.set({
+      id: fila.id,
+      sistema: fila.sistema ?? '',
+      esquema: fila.esquema ?? '',
+      tabla: fila.tabla,
+      descripcion: fila.descripcion ?? '',
+    });
+    this.formAbierto.set('tabla');
+  }
+
+  protected abrirEditarProceso(fila: DocumentoReferenciaProceso): void {
+    this.draftProceso.set({
+      id: fila.id,
+      sistema: fila.sistema ?? '',
+      proceso: fila.proceso,
+      descripcion: fila.descripcion ?? '',
+    });
+    this.formAbierto.set('proceso');
+  }
+
+  protected abrirEditarModulo(fila: DocumentoReferenciaModulo): void {
+    this.draftModulo.set({
+      id: fila.id,
+      sistema: fila.sistema,
+      modulo: fila.modulo,
+      pantallaFuncionalidad: fila.pantallaFuncionalidad ?? '',
+      url: fila.url ?? '',
+      descripcion: fila.descripcion ?? '',
+    });
+    this.formAbierto.set('modulo');
+  }
+
+  protected abrirEditarRelacion(fila: DocumentoRelacion): void {
+    this.draftRelacion.set({ id: fila.id, documentoRelacionadoId: fila.documentoRelacionadoId, tipo: fila.tipo });
+    this.formAbierto.set('relacion');
+  }
+
+  /** Cancelar nunca altera datos ya guardados — solo descarta el borrador
+   *  en memoria (no hay nada que confirmar: si fuera una edición, la fila
+   *  real no se tocó hasta presionar "Guardar cambios"). */
+  protected cancelarFormReferencia(): void {
+    this.formAbierto.set(null);
+  }
+
+  // ---- Normalización y prevención de duplicados (lado cliente) --------
+  // La restricción real vive en la base de datos (índices únicos parciales
+  // normalizados) — esta validación en Angular solo evita el viaje al
+  // servidor para el caso más común (no cubre condiciones de carrera entre
+  // dos usuarios guardando al mismo tiempo; eso lo resuelve el índice).
+
+  private normalizar(texto: string): string {
+    return texto.trim().toLowerCase();
+  }
+
+  private yaExisteTabla(candidato: DraftTabla): boolean {
+    return this.tablasReferenciadas().some(
+      (f) =>
+        f.id !== candidato.id &&
+        this.normalizar(f.sistema ?? '') === this.normalizar(candidato.sistema) &&
+        this.normalizar(f.esquema ?? '') === this.normalizar(candidato.esquema) &&
+        this.normalizar(f.tabla) === this.normalizar(candidato.tabla),
+    );
+  }
+
+  private yaExisteProceso(candidato: DraftProceso): boolean {
+    return this.procesosReferenciados().some(
+      (f) =>
+        f.id !== candidato.id &&
+        this.normalizar(f.sistema ?? '') === this.normalizar(candidato.sistema) &&
+        this.normalizar(f.proceso) === this.normalizar(candidato.proceso),
+    );
+  }
+
+  private yaExisteModulo(candidato: DraftModulo): boolean {
+    return this.modulosReferenciados().some(
+      (f) =>
+        f.id !== candidato.id &&
+        this.normalizar(f.sistema) === this.normalizar(candidato.sistema) &&
+        this.normalizar(f.modulo) === this.normalizar(candidato.modulo) &&
+        this.normalizar(f.pantallaFuncionalidad ?? '') === this.normalizar(candidato.pantallaFuncionalidad),
+    );
+  }
+
+  /** Mensaje uniforme cuando el propio servidor rechaza un duplicado
+   *  (condición de carrera: otro usuario guardó lo mismo un instante antes)
+   *  — distingue ese caso de cualquier otro error real. */
+  private esErrorDeDuplicado(error: unknown): boolean {
+    const mensaje = String((error as { message?: string; code?: string })?.message ?? '').toLowerCase();
+    const codigo = (error as { code?: string })?.code ?? '';
+    return codigo === '23505' || mensaje.includes('duplicate key') || mensaje.includes('unique');
+  }
+
+  // ---- Guardar (alta o edición, según draft.id) ------------------------
+
+  protected guardarTabla(): void {
     const doc = this.documentoActual();
-    if (!doc || this.formNuevaTabla.invalid) return;
-    this.data
-      .alta<DocumentoReferenciaTabla>('DocumentoReferenciaTabla', {
-        documentoId: doc.id,
-        texto: this.formNuevaTabla.controls.texto.value,
-      })
-      .subscribe(() => {
-        this.formNuevaTabla.reset({ texto: '' });
+    const draft = this.draftTabla();
+    if (!doc || !draft.tabla.trim()) {
+      this.toast.advertencia('Escribe el nombre de la tabla.');
+      return;
+    }
+    if (this.yaExisteTabla(draft)) {
+      this.toast.advertencia('Ya existe una referencia a esta tabla con el mismo sistema/esquema en este documento.');
+      return;
+    }
+    const dto = {
+      documentoId: doc.id,
+      sistema: draft.sistema.trim() || null,
+      esquema: draft.esquema.trim() || null,
+      tabla: draft.tabla.trim(),
+      descripcion: draft.descripcion.trim() || null,
+    };
+    const peticion = draft.id
+      ? this.data.modificacion<DocumentoReferenciaTabla>('DocumentoReferenciaTabla', { id: draft.id, ...dto })
+      : this.data.alta<DocumentoReferenciaTabla>('DocumentoReferenciaTabla', dto);
+    peticion.subscribe({
+      next: () => {
+        this.toast.exito(draft.id ? 'Referencia actualizada.' : 'Tabla agregada.');
+        this.formAbierto.set(null);
         this.cargarReferencias();
-      });
+      },
+      error: (error) =>
+        this.toast.error(
+          this.esErrorDeDuplicado(error)
+            ? 'Ya existe esa referencia para este documento (guardada por otra sesión).'
+            : 'No se pudo guardar la referencia.',
+        ),
+    });
   }
 
-  quitarTablaReferenciada(fila: DocumentoReferenciaTabla): void {
-    this.data.baja('DocumentoReferenciaTabla', fila.id).subscribe(() => this.cargarReferencias());
-  }
-
-  agregarProcesoReferenciado(): void {
+  protected guardarProceso(): void {
     const doc = this.documentoActual();
-    if (!doc || this.formNuevoProceso.invalid) return;
-    this.data
-      .alta<DocumentoReferenciaProceso>('DocumentoReferenciaProceso', {
-        documentoId: doc.id,
-        texto: this.formNuevoProceso.controls.texto.value,
-      })
-      .subscribe(() => {
-        this.formNuevoProceso.reset({ texto: '' });
+    const draft = this.draftProceso();
+    if (!doc || !draft.proceso.trim()) {
+      this.toast.advertencia('Escribe el nombre del proceso.');
+      return;
+    }
+    if (this.yaExisteProceso(draft)) {
+      this.toast.advertencia('Ya existe una referencia a este proceso con el mismo sistema en este documento.');
+      return;
+    }
+    const dto = {
+      documentoId: doc.id,
+      sistema: draft.sistema.trim() || null,
+      proceso: draft.proceso.trim(),
+      descripcion: draft.descripcion.trim() || null,
+    };
+    const peticion = draft.id
+      ? this.data.modificacion<DocumentoReferenciaProceso>('DocumentoReferenciaProceso', { id: draft.id, ...dto })
+      : this.data.alta<DocumentoReferenciaProceso>('DocumentoReferenciaProceso', dto);
+    peticion.subscribe({
+      next: () => {
+        this.toast.exito(draft.id ? 'Referencia actualizada.' : 'Proceso agregado.');
+        this.formAbierto.set(null);
         this.cargarReferencias();
-      });
+      },
+      error: (error) =>
+        this.toast.error(
+          this.esErrorDeDuplicado(error)
+            ? 'Ya existe esa referencia para este documento (guardada por otra sesión).'
+            : 'No se pudo guardar la referencia.',
+        ),
+    });
   }
 
-  quitarProcesoReferenciado(fila: DocumentoReferenciaProceso): void {
-    this.data.baja('DocumentoReferenciaProceso', fila.id).subscribe(() => this.cargarReferencias());
-  }
-
-  agregarModuloReferenciado(): void {
+  protected guardarModulo(): void {
     const doc = this.documentoActual();
-    const ruta = this.moduloAAgregar();
-    if (!doc || !ruta) return;
-    const destino = DESTINOS.find((d) => d.ruta === ruta);
-    if (!destino) return;
-    this.data
-      .alta<DocumentoReferenciaModulo>('DocumentoReferenciaModulo', {
-        documentoId: doc.id,
-        ruta: destino.ruta,
-        etiqueta: destino.label,
-        grupo: destino.grupo,
-      })
-      .subscribe(() => {
-        this.moduloAAgregar.set(null);
+    const draft = this.draftModulo();
+    if (!doc || !draft.sistema.trim() || !draft.modulo.trim()) {
+      this.toast.advertencia('El sistema y el módulo son obligatorios.');
+      return;
+    }
+    if (this.yaExisteModulo(draft)) {
+      this.toast.advertencia('Ya existe esa misma referencia de módulo/pantalla para este documento.');
+      return;
+    }
+    const urlLimpia = draft.url.trim() || null;
+    if (urlLimpia && !this.esUrlSegura(urlLimpia)) {
+      this.toast.advertencia('La URL debe comenzar con http:// o https://');
+      return;
+    }
+    const dto = {
+      documentoId: doc.id,
+      sistema: draft.sistema.trim(),
+      modulo: draft.modulo.trim(),
+      pantallaFuncionalidad: draft.pantallaFuncionalidad.trim() || null,
+      url: urlLimpia,
+      descripcion: draft.descripcion.trim() || null,
+    };
+    const peticion = draft.id
+      ? this.data.modificacion<DocumentoReferenciaModulo>('DocumentoReferenciaModulo', { id: draft.id, ...dto })
+      : this.data.alta<DocumentoReferenciaModulo>('DocumentoReferenciaModulo', dto);
+    peticion.subscribe({
+      next: () => {
+        this.toast.exito(draft.id ? 'Referencia actualizada.' : 'Módulo agregado.');
+        this.formAbierto.set(null);
         this.cargarReferencias();
-      });
+      },
+      error: (error) =>
+        this.toast.error(
+          this.esErrorDeDuplicado(error)
+            ? 'Ya existe esa referencia para este documento (guardada por otra sesión).'
+            : 'No se pudo guardar la referencia.',
+        ),
+    });
   }
 
-  quitarModuloReferenciado(fila: DocumentoReferenciaModulo): void {
-    this.data.baja('DocumentoReferenciaModulo', fila.id).subscribe(() => this.cargarReferencias());
-  }
-
-  agregarDocumentoRelacionado(): void {
+  protected guardarRelacion(): void {
     const doc = this.documentoActual();
-    const relacionadoId = this.documentoRelacionadoAAgregar();
-    if (!doc || !relacionadoId) return;
-    this.data
-      .alta<DocumentoRelacion>('DocumentoRelacion', {
-        documentoId: doc.id,
-        documentoRelacionadoId: relacionadoId,
-        tipo: this.tipoRelacionAAgregar(),
-      })
-      .subscribe(() => {
-        this.documentoRelacionadoAAgregar.set(null);
-        this.tipoRelacionAAgregar.set('relacionado');
+    const draft = this.draftRelacion();
+    if (!doc || !draft.documentoRelacionadoId) {
+      this.toast.advertencia('Elige un documento.');
+      return;
+    }
+    const dto = { documentoId: doc.id, documentoRelacionadoId: draft.documentoRelacionadoId, tipo: draft.tipo };
+    const peticion = draft.id
+      ? this.data.modificacion<DocumentoRelacion>('DocumentoRelacion', { id: draft.id, ...dto })
+      : this.data.alta<DocumentoRelacion>('DocumentoRelacion', dto);
+    peticion.subscribe({
+      next: () => {
+        this.toast.exito(draft.id ? 'Relación actualizada.' : 'Documento relacionado agregado.');
+        this.formAbierto.set(null);
         this.cargarReferencias();
-      });
+      },
+      error: () => this.toast.error('No se pudo guardar la relación.'),
+    });
   }
 
-  quitarDocumentoRelacionado(fila: DocumentoRelacion): void {
-    this.data.baja('DocumentoRelacion', fila.id).subscribe(() => this.cargarReferencias());
+  // ---- Eliminar (con confirmación) -------------------------------------
+
+  protected pedirQuitarTabla(fila: DocumentoReferenciaTabla): void {
+    this.referenciaAEliminar.set({ tipo: 'tabla', id: fila.id, etiqueta: fila.tabla });
+  }
+  protected pedirQuitarProceso(fila: DocumentoReferenciaProceso): void {
+    this.referenciaAEliminar.set({ tipo: 'proceso', id: fila.id, etiqueta: fila.proceso });
+  }
+  protected pedirQuitarModulo(fila: DocumentoReferenciaModulo): void {
+    this.referenciaAEliminar.set({ tipo: 'modulo', id: fila.id, etiqueta: `${fila.sistema} · ${fila.modulo}` });
+  }
+  protected pedirQuitarRelacion(fila: DocumentoRelacion): void {
+    this.referenciaAEliminar.set({
+      tipo: 'relacion',
+      id: fila.id,
+      etiqueta: `${this.textoTipoRelacion(fila.tipo)}: ${this.tituloDocumento(fila.documentoRelacionadoId)}`,
+    });
+  }
+
+  protected confirmarQuitarReferencia(): void {
+    const objetivo = this.referenciaAEliminar();
+    if (!objetivo) return;
+    const entidad =
+      objetivo.tipo === 'tabla'
+        ? 'DocumentoReferenciaTabla'
+        : objetivo.tipo === 'proceso'
+          ? 'DocumentoReferenciaProceso'
+          : objetivo.tipo === 'modulo'
+            ? 'DocumentoReferenciaModulo'
+            : 'DocumentoRelacion';
+    this.data.baja(entidad, objetivo.id).subscribe({
+      next: () => {
+        this.toast.exito('Referencia eliminada.');
+        this.referenciaAEliminar.set(null);
+        if (this.formAbierto() === objetivo.tipo) this.formAbierto.set(null);
+        this.cargarReferencias();
+      },
+      error: () => this.toast.error('No se pudo eliminar la referencia.'),
+    });
   }
 
   /** Abre el documento relacionado (pestaña "Ver") desde un chip de
@@ -555,10 +978,11 @@ export class DocumentosListComponent implements OnInit {
       .list<PlantillaDocumento>('PlantillaDocumento', { activo: true })
       .subscribe((plantillas) => this.plantillas.set(plantillas));
 
-    // Deep link (p.ej. desde el Asistente Saurix): ?documento=123 abre
-    // directo ese documento, mismo patrón que ?ticket= en el tablero de
-    // Proyectos. Esto NO es "consultar el listado al abrir" — es ir
-    // directo a un documento puntual que no pasa por la cuadrícula.
+    // Deep link (p.ej. desde el Asistente Saurix, o desde "Copiar enlace" de
+    // este mismo documento): ?documento=123 abre directo ese documento,
+    // mismo patrón que ?ticket= en el tablero de Proyectos. Esto NO es
+    // "consultar el listado al abrir" — es ir directo a un documento puntual
+    // que no pasa por la cuadrícula.
     this.route.queryParamMap.subscribe((params) => {
       const documentoIdParam = Number(params.get('documento')) || 0;
       if (documentoIdParam) {
@@ -815,6 +1239,9 @@ export class DocumentosListComponent implements OnInit {
   verDocumento(documento: Documento): void {
     this.documentoActual.set(documento);
     this.resolverFavoritoActual(documento.id);
+    this.contadorAdjuntos.set(null);
+    this.contadorHistorial.set(null);
+    this.contadorReferencias.set(null);
     this.vista.set('ver');
   }
 
@@ -854,7 +1281,10 @@ export class DocumentosListComponent implements OnInit {
       }
     }
     if (tab === 'historial') this.cargarVersiones();
-    if (tab === 'referencias') this.cargarReferencias();
+    if (tab === 'referencias') {
+      this.formAbierto.set(null);
+      this.cargarReferencias();
+    }
     this.vista.set(tab);
   }
 
@@ -865,9 +1295,9 @@ export class DocumentosListComponent implements OnInit {
       .list<DocumentoVersion>('DocumentoVersion', { documentoId: doc.id })
       .subscribe((versiones) => {
         // Más reciente primero.
-        this.versiones.set(
-          [...versiones].sort((a, b) => (b.fechaCreacion ?? '').localeCompare(a.fechaCreacion ?? '')),
-        );
+        const ordenadas = [...versiones].sort((a, b) => (b.fechaCreacion ?? '').localeCompare(a.fechaCreacion ?? ''));
+        this.versiones.set(ordenadas);
+        this.contadorHistorial.set(ordenadas.length);
       });
   }
 
@@ -1127,6 +1557,22 @@ export class DocumentosListComponent implements OnInit {
     const meta = `Última modificación: ${this.formatearFecha(documento)}`;
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>${documento.titulo}</title></head><body><h1>${documento.titulo}</h1><p>${meta}</p>${this.renderParaDescarga(documento)}</body></html>`;
     this.descargarBlob(`${documento.titulo || 'documento'}.html`, html);
+  }
+
+  /** Copia al portapapeles el enlace directo a este documento
+   *  (`?documento=<id>`, el mismo deep link que ya acepta ngOnInit) —
+   *  Mandato 89. Usa la ruta actual (sirve igual para /wikidocs/documentos
+   *  y /wikidocs/secciones/:id/documentos). */
+  async copiarEnlace(): Promise<void> {
+    const doc = this.documentoActual();
+    if (!doc) return;
+    const url = `${location.origin}${location.pathname}?documento=${doc.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      this.toast.exito('Enlace copiado al portapapeles.');
+    } catch {
+      this.toast.error('No se pudo copiar el enlace. Cópialo manualmente: ' + url);
+    }
   }
 
   /** Descarga TODOS los documentos ACTIVOS de la sección actual (solo

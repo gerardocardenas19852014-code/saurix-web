@@ -66,39 +66,66 @@ export interface DocumentoVersion {
 
 /**
  * Trazabilidad de WikiDocs: un Documento puede referenciar "cosas" reales
- * del sistema para poder rastrear, por ejemplo, en qué procesos se usa una
- * tabla — idea del usuario (2026-10-10, ver esquema-tablas-saurix.md en el
- * proyecto de Claude). Mismo patrón ya usado por TicketEtiqueta/
- * TicketDependencia/TicketSeguidor en Proyectos: una entidad hija por
- * Documento (no un array embebido), con alta/baja inmediata por registro.
+ * de CUALQUIER sistema (propio o externo) para poder rastrear, por ejemplo,
+ * en qué procesos se usa una tabla — idea del usuario (2026-10-10, ver
+ * esquema-tablas-saurix.md en el proyecto de Claude), evolucionada en el
+ * Mandato 89 (nov-2026, "WikiDocs: mejora integral de experiencia de
+ * usuario, referencias universales y limpieza definitiva") de "solo
+ * pantallas internas de Saurix" a "cualquier sistema, interno o externo".
+ * Mismo patrón ya usado por TicketEtiqueta/TicketDependencia/TicketSeguidor
+ * en Proyectos: una entidad hija por Documento (no un array embebido), con
+ * alta/baja/edición inmediata por registro.
  *
- * Tablas y Procesos son texto libre (no hay catálogo real de tablas SQL ni
- * de procesos de negocio dentro de esta app) — igual que TicketEtiqueta.
- * Módulos SÍ es una relación real: apunta a una pantalla existente del
- * catálogo de navegación (ver navegacion-destinos.util.ts). Documentos
- * relaciona dos Documento entre sí, con un tipo de relación.
+ * Las 3 (Tabla/Proceso/Módulo) son texto libre en TODOS sus campos —
+ * incluido `sistema` — con autocompletado opcional desde
+ * `wikidocs.fn_referencias_sugerencias` (ver TextoSugeridoComponent), nunca
+ * un catálogo administrativo obligatorio. `sistema` queda `null` en
+ * referencias migradas cuyo sistema no se pudo determinar con certeza
+ * (nunca se inventa). Documentos relaciona dos Documento entre sí, con un
+ * tipo de relación — ese sí sigue siendo universal por naturaleza, no
+ * depende de ningún sistema externo.
  */
 export interface DocumentoReferenciaTabla {
   id: number;
   documentoId: number;
-  texto: string;
+  /** Sistema dueño de la tabla (ej. "SIIF", "SAP", "Saurix") — texto libre,
+   *  sugerido por defecto con el sistema del propio documento. `null` =
+   *  sin especificar (dato migrado antes del Mandato 89, o el usuario lo
+   *  dejó en blanco a propósito). */
+  sistema: string | null;
+  /** Esquema de la tabla, cuando aplica (ej. "dbo", "contabilidad"). Opcional. */
+  esquema: string | null;
+  tabla: string;
+  descripcion: string | null;
 }
 
 export interface DocumentoReferenciaProceso {
   id: number;
   documentoId: number;
-  texto: string;
+  sistema: string | null;
+  proceso: string;
+  descripcion: string | null;
 }
 
-/** `etiqueta`/`grupo` se guardan junto con `ruta` (en vez de resolverse en
- *  cada render contra DESTINOS) para que la referencia siga mostrando el
- *  nombre correcto aunque el catálogo de navegación cambie después. */
+/**
+ * Hasta el Mandato 89, Módulo estaba atado al catálogo interno de
+ * navegación de Saurix (`DESTINOS` en navegacion-destinos.util.ts) — ya no:
+ * `sistema`/`modulo` son obligatorios (identifican de qué sistema y qué
+ * módulo se habla, sin exigir que ese módulo exista en ningún catálogo),
+ * `pantallaFuncionalidad`/`url`/`descripcion` son opcionales (permite
+ * documentar un módulo completo sin bajar al nivel de una pantalla
+ * puntual). `url`, cuando se captura, se valida en la UI antes de
+ * convertirse en enlace navegable (solo http/https, nunca javascript: ni
+ * otros esquemas ejecutables).
+ */
 export interface DocumentoReferenciaModulo {
   id: number;
   documentoId: number;
-  ruta: string;
-  etiqueta: string;
-  grupo: string;
+  sistema: string;
+  modulo: string;
+  pantallaFuncionalidad: string | null;
+  url: string | null;
+  descripcion: string | null;
 }
 
 export type TipoRelacionDocumento = 'relacionado' | 'depende_de' | 'reemplaza_a';

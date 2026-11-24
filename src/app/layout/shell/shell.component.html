@@ -30,9 +30,29 @@
     @if (moduloActivo() === 'wikidocs') {
       <span class="sidebar-label">WikiDocs</span>
       <nav class="sidebar-nav" aria-label="Menú de WikiDocs">
-        <a routerLink="/wikidocs" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
-        <a routerLink="/wikidocs/documentos" routerLinkActive="active">📚 Documentos</a>
-        <a routerLink="/wikidocs/mapa-trazabilidad" routerLinkActive="active">🕸️ Mapa de trazabilidad</a>
+        <!-- Reorganización del menú de WikiDocs en grupos desplegables
+             (mandato 88, nov-2026): "Proceso" agrupa Documentos; "Reporte"
+             agrupa el Dashboard (antes "Inicio" suelto arriba -- misma ruta
+             exacta "/wikidocs", solo se renombró la etiqueta y se movió de
+             grupo) y el Mapa de trazabilidad. Catálogos y Configuración
+             sin cambios. Mismo mecanismo genérico toggleGrupo/grupoAbierto
+             que ya usan los demás grupos de este módulo y los demás
+             módulos; arrancan cerrados igual que todos los grupos del
+             sistema (ver gruposAbiertosManualmente en shell.component.ts). -->
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('wikidocs', 'Proceso')">
+          <span>{{ grupoAbierto('wikidocs', 'Proceso') ? '▾' : '▸' }} Proceso</span>
+        </button>
+        @if (grupoAbierto('wikidocs', 'Proceso')) {
+          <a routerLink="/wikidocs/documentos" routerLinkActive="active">📚 Documentos</a>
+        }
+
+        <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('wikidocs', 'Reporte')">
+          <span>{{ grupoAbierto('wikidocs', 'Reporte') ? '▾' : '▸' }} Reporte</span>
+        </button>
+        @if (grupoAbierto('wikidocs', 'Reporte')) {
+          <a routerLink="/wikidocs" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Dashboard</a>
+          <a routerLink="/wikidocs/mapa-trazabilidad" routerLinkActive="active">🕸️ Mapa de trazabilidad</a>
+        }
 
         <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('wikidocs', 'Catálogos')">
           <span>{{ grupoAbierto('wikidocs', 'Catálogos') ? '▾' : '▸' }} Catálogos</span>

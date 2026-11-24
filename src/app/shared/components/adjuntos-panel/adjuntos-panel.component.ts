@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal } from '@angular/core';
 import { DataClientService } from '../../../core/services/data-client.service';
 import { ToastService } from '../../services/toast.service';
 import { ConfirmDialogComponent } from '../confirm-dialog/confirm-dialog.component';
@@ -36,6 +36,11 @@ export class AdjuntosPanelComponent {
   /** Texto del encabezado del panel — por defecto 'Comprobantes' (Presupuesto);
    *  otros usos (p.ej. WikiDocs) pasan 'Adjuntos'. */
   readonly etiqueta = input<string>('Comprobantes');
+  /** Emite el total de adjuntos cada vez que se (re)carga la lista —
+   *  Mandato 89 (nov-2026): permite a quien use este panel (p.ej. el
+   *  contador de la pestaña "Adjuntos" en Documentos) mostrar el número
+   *  real sin volver a consultar nada por su cuenta. */
+  readonly totalCambio = output<number>();
 
   protected readonly adjuntos = signal<AdjuntoGenerico[]>([]);
   protected readonly cargando = signal(false);
@@ -58,6 +63,7 @@ export class AdjuntosPanelComponent {
         next: (registros) => {
           this.adjuntos.set(registros);
           this.cargando.set(false);
+          this.totalCambio.emit(registros.length);
         },
         error: () => this.cargando.set(false),
       });

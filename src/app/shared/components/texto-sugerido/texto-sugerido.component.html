@@ -1,0 +1,31 @@
+<div class="texto-sugerido">
+  <input
+    #campo
+    type="text"
+    [placeholder]="placeholder"
+    [value]="texto()"
+    (input)="onInput($any($event.target).value)"
+    (focus)="onFocus()"
+    (keydown)="onKeydown($event)"
+    autocomplete="off"
+  />
+  @if (abierto() && (sugerencias().length > 0 || mostrarVacio())) {
+    <ul class="texto-sugerido-lista" role="listbox">
+      @for (sugerencia of sugerencias(); track sugerencia.valor + '|' + (sugerencia.sistema ?? ''); let i = $index) {
+        <li
+          role="option"
+          [class.activa]="i === indiceActivo()"
+          (mousedown)="elegir(sugerencia)"
+        >
+          {{ sugerencia.valor }}
+          @if (sugerencia.sistema) {
+            <span class="texto-sugerido-sistema">{{ sugerencia.sistema }}</span>
+          }
+        </li>
+      }
+      @if (mostrarVacio()) {
+        <li class="texto-sugerido-vacio">Sin coincidencias — puedes escribir un valor nuevo.</li>
+      }
+    </ul>
+  }
+</div>

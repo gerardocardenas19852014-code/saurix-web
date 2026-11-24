@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, ElementRef, OnDestroy, ViewChild, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ChangeDetectionStrategy, Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { SupabaseService } from '../../../core/services/supabase.service';
 import { filaACamel } from '../../../core/services/supabase-data-client.service';
 import { ToastService } from '../../../shared/services/toast.service';
@@ -8,13 +8,18 @@ import { SelectBuscableComponent, OpcionBuscable } from '../../../shared/compone
 /** Tipos de elemento que puede traer `fn_mapa_trazabilidad_relaciones`. */
 type TipoElementoRelacion = 'tabla' | 'proceso' | 'modulo' | 'doc_saliente' | 'doc_entrante';
 
-/** Fila cruda de `wikidocs.fn_mapa_trazabilidad_relaciones`. */
+/** Fila cruda de `wikidocs.fn_mapa_trazabilidad_relaciones` — `sistema`
+ *  (Mandato 89, nov-2026: "WikiDocs — referencias universales") identifica
+ *  de qué sistema (Saurix, SIIF, SAP, externo, …) es cada referencia, para
+ *  diferenciar dos elementos con el mismo nombre que pertenecen a sistemas
+ *  distintos (p.ej. dos tablas "cliente"). */
 interface FilaRelacion {
   tipoElemento: TipoElementoRelacion;
   elementoId: number;
   referenciaId: number | null;
   etiqueta: string;
   tipoRelacion: string | null;
+  sistema: string | null;
 }
 
 type TipoNodo = 'central' | 'documento' | 'tabla' | 'proceso' | 'modulo';
@@ -23,6 +28,11 @@ interface NodoGrafo {
   clave: string;
   tipo: TipoNodo;
   etiqueta: string;
+  /** Sistema dueño del elemento (null = no identificado) — se muestra como
+   *  sub-texto bajo el nodo y en el panel de detalle; a propósito NO se usa
+   *  como un color adicional (se evita saturar el mapa con más colores que
+   *  los que ya distinguen el tipo de elemento). */
+  sistema: string | null;
   /** Solo para tipo 'central'/'documento' — permite abrirlo o expandirlo. */
   documentoId?: number;
   profundidad: number;
@@ -93,9 +103,10 @@ const ETIQUETAS_TIPO: Record<TipoNodo, string> = {
   styleUrl: './mapa-trazabilidad.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MapaTrazabilidadComponent implements OnDestroy {
+export class MapaTrazabilidadComponent implements OnInit, OnDestroy {
   private readonly sb = inject(SupabaseService).cliente;
   private readonly toast = inject(ToastService);
+  private readonly route = inject(ActivatedRoute);
 
   @ViewChild('lienzoSvg') private lienzoRef?: ElementRef<SVGSVGElement>;
 
@@ -162,20 +173,53 @@ export class MapaTrazabilidadComponent implements OnDestroy {
 
   // ── Carga / expansión ────────────────────────────────────────────────
 
+  /**
+   * Carga el documento central y sus relaciones directas con UNA sola ronda
+   * de red (las dos consultas van en paralelo): `fn_mapa_trazabilidad_relaciones`
+   * para las relaciones, y una selección embebida (`documento` →
+   * `seccion_id` → `categoria_id` → `tipo_sistema_id`) para resolver título
+   * y sistema propio del documento central — necesario tanto si se llegó
+   * por el buscador (ya se conoce el título, pero no el sistema) como por
+   * el query param `?documento=` (Mandato 89, no se conoce ninguno de los
+   * dos). Ambas consultas respetan RLS: si el documento no es de la empresa
+   * del usuario, `centralResp.data` llega `null` y se aborta sin exponer
+   * nada de otra empresa.
+   */
   private async cargarCentral(documentoId: number, etiquetaConocida?: string): Promise<void> {
     this.cargandoCentral.set(true);
     this.documentoCentralId.set(documentoId);
     this.seleccionado.set(null);
 
-    const { data, error } = await this.sb.schema('wikidocs').rpc('fn_mapa_trazabilidad_relaciones', {
-      p_documento_id: documentoId,
-    });
+    const [relacionesResp, centralResp] = await Promise.all([
+      this.sb.schema('wikidocs').rpc('fn_mapa_trazabilidad_relaciones', { p_documento_id: documentoId }),
+      this.sb
+        .schema('wikidocs')
+        .from('documento')
+        .select('titulo, seccion:seccion_id(categoria:categoria_id(tipo_sistema:tipo_sistema_id(nombre)))')
+        .eq('id', documentoId)
+        .maybeSingle(),
+    ]);
     this.cargandoCentral.set(false);
 
+    const { data, error } = relacionesResp;
     if (error) {
       this.toast.error('No se pudieron cargar las relaciones del documento: ' + error.message);
+      this.documentoCentralId.set(null);
       return;
     }
+
+    if (centralResp.error || !centralResp.data) {
+      this.toast.error('No se encontró el documento o no tienes acceso a él.');
+      this.documentoCentralId.set(null);
+      return;
+    }
+
+    const centralFila = centralResp.data as unknown as {
+      titulo: string;
+      seccion: { categoria: { tipo_sistema: { nombre: string } | null } | null } | null;
+    };
+    const etiquetaCentral = centralFila.titulo || etiquetaConocida || `Documento #${documentoId}`;
+    const sistemaCentral = centralFila.seccion?.categoria?.tipo_sistema?.nombre ?? null;
 
     const filas = ((data ?? []) as Record<string, unknown>[]).map((f) => filaACamel(f) as unknown as FilaRelacion);
 
@@ -183,13 +227,13 @@ export class MapaTrazabilidadComponent implements OnDestroy {
     const nodos = new Map<string, NodoGrafo>();
     const aristas = new Map<string, AristaGrafo>();
 
-    const etiquetaCentral = etiquetaConocida ?? `Documento #${documentoId}`;
     this.etiquetaCentralActual.set(etiquetaCentral);
 
     nodos.set(claveCentral, {
       clave: claveCentral,
       tipo: 'central',
       etiqueta: etiquetaCentral,
+      sistema: sistemaCentral,
       documentoId,
       profundidad: 0,
       x: 0,
@@ -260,7 +304,7 @@ export class MapaTrazabilidadComponent implements OnDestroy {
     aristas: Map<string, AristaGrafo>,
   ): void {
     const profundidadOrigen = nodos.get(claveOrigen)?.profundidad ?? 0;
-    const nuevos: { clave: string; tipo: TipoNodo; etiqueta: string; documentoId?: number }[] = [];
+    const nuevos: { clave: string; tipo: TipoNodo; etiqueta: string; documentoId?: number; sistema: string | null }[] = [];
 
     for (const fila of filas) {
       let claveDestino: string;
@@ -284,7 +328,7 @@ export class MapaTrazabilidadComponent implements OnDestroy {
       }
 
       if (!nodos.has(claveDestino) && !nuevos.some((n) => n.clave === claveDestino)) {
-        nuevos.push({ clave: claveDestino, tipo, etiqueta: fila.etiqueta, documentoId });
+        nuevos.push({ clave: claveDestino, tipo, etiqueta: fila.etiqueta, documentoId, sistema: fila.sistema });
       }
 
       const claveArista = `${claveOrigen}|${claveDestino}|${fila.tipoElemento}`;
@@ -312,6 +356,7 @@ export class MapaTrazabilidadComponent implements OnDestroy {
         clave: info.clave,
         tipo: info.tipo,
         etiqueta: info.etiqueta,
+        sistema: info.sistema,
         documentoId: info.documentoId,
         profundidad: profundidadOrigen + 1,
         x: cx + radio * Math.cos(angulo),
@@ -465,6 +510,20 @@ export class MapaTrazabilidadComponent implements OnDestroy {
     const ancho = Math.max(200, maxX - minX);
     const alto = Math.max(200, maxY - minY);
     this.viewBox.set({ x: minX, y: minY, w: ancho, h: alto });
+  }
+
+  /** Mandato 89: abrir el mapa con `?documento=<id>` selecciona ese
+   *  documento como nodo central automáticamente, sin obligar al usuario a
+   *  volver a buscarlo (p.ej. desde el nuevo botón "Ver en mapa de
+   *  trazabilidad" de Documentos). Se lee una sola vez al entrar: el mapa no
+   *  necesita reaccionar a cambios posteriores del query param dentro de la
+   *  misma visita. */
+  ngOnInit(): void {
+    const idParam = this.route.snapshot.queryParamMap.get('documento');
+    const documentoId = idParam ? Number(idParam) : 0;
+    if (documentoId > 0) {
+      void this.cargarCentral(documentoId);
+    }
   }
 
   ngOnDestroy(): void {

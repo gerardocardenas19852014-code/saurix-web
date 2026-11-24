@@ -1,0 +1,64 @@
+.texto-sugerido {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.texto-sugerido input[type='text'] {
+  width: 100%;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-raised);
+  color: var(--text-strong);
+}
+
+.texto-sugerido-lista {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 16px 32px -14px rgba(0, 0, 0, 0.35);
+}
+
+.texto-sugerido-lista li {
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 13.5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.texto-sugerido-lista li.activa,
+.texto-sugerido-lista li:hover {
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.texto-sugerido-sistema {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.texto-sugerido-vacio {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  cursor: default;
+}
+.texto-sugerido-vacio:hover {
+  background: transparent;
+}

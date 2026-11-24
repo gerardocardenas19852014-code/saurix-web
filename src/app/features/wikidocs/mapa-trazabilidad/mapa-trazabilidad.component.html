@@ -94,6 +94,9 @@
             <text class="mapa-nodo-etiqueta" text-anchor="middle" dy="42">
               {{ nodo.etiqueta.length > 18 ? nodo.etiqueta.slice(0, 17) + '…' : nodo.etiqueta }}
             </text>
+            @if (nodo.sistema) {
+              <text class="mapa-nodo-sistema" text-anchor="middle" dy="56">{{ nodo.sistema }}</text>
+            }
             @if (nodo.cargando) {
               <text class="mapa-nodo-estado" text-anchor="middle" dy="-34">Cargando…</text>
             } @else if (nodo.expandible && !nodo.expandido) {
@@ -107,7 +110,12 @@
     <div class="mapa-panel-detalle">
       @if (seleccionado(); as n) {
         <h3>{{ iconoTipo(n.tipo) }} {{ n.etiqueta }}</h3>
-        <p class="mapa-panel-tipo">{{ ETIQUETAS_TIPO[n.tipo] }}</p>
+        <p class="mapa-panel-tipo">
+          {{ ETIQUETAS_TIPO[n.tipo] }}
+          @if (n.sistema) {
+            · {{ n.sistema }}
+          }
+        </p>
 
         @if (n.tipo === 'documento' || n.tipo === 'central') {
           <div class="mapa-panel-acciones">
