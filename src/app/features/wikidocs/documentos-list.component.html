@@ -63,6 +63,17 @@
         />
         🔗 Solo huérfanos
       </label>
+      <label
+        class="checkbox-inline"
+        title="Con alguna tabla, proceso, módulo u otro documento referenciado (o que lo referencien a él)"
+      >
+        <input
+          type="checkbox"
+          [checked]="soloConectadosEnEdicion()"
+          (change)="soloConectadosEnEdicion.set($any($event.target).checked)"
+        />
+        🕸️ Solo conectados
+      </label>
       <label class="checkbox-inline">
         <input
           type="checkbox"

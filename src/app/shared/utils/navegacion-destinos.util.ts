@@ -25,6 +25,7 @@ export const DESTINOS: DestinoPaleta[] = [
   { label: 'Tipo de sistema', grupo: 'WikiDocs', ruta: '/wikidocs/tipos-sistema', icono: '🗂️' },
   { label: 'Categoría', grupo: 'WikiDocs', ruta: '/wikidocs/categorias', icono: '📖' },
   { label: 'Secciones', grupo: 'WikiDocs', ruta: '/wikidocs/secciones', icono: '📑' },
+  { label: 'Mapa de trazabilidad', grupo: 'WikiDocs', ruta: '/wikidocs/mapa-trazabilidad', icono: '🕸️' },
 
   { label: 'Inicio', grupo: 'Presupuesto Personal', ruta: '/presupuesto', icono: '⌂' },
   { label: 'Dashboard', grupo: 'Presupuesto Personal', ruta: '/presupuesto/dashboard', icono: '📊' },

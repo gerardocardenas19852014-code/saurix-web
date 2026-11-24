@@ -10,6 +10,11 @@ export const WIKIDOCS_ROUTES: Routes = [
     loadComponent: () => import('./documentos-list.component').then((m) => m.DocumentosListComponent),
   },
   {
+    path: 'mapa-trazabilidad',
+    loadComponent: () =>
+      import('./mapa-trazabilidad/mapa-trazabilidad.component').then((m) => m.MapaTrazabilidadComponent),
+  },
+  {
     path: 'secciones/:seccionId/documentos',
     loadComponent: () => import('./documentos-list.component').then((m) => m.DocumentosListComponent),
   },

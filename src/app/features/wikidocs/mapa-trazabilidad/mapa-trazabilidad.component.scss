@@ -1,0 +1,176 @@
+// Paleta de nodos reutilizando los tokens de color YA definidos en
+// src/styles.scss (--indigo/--client/--teal/--amber/--technical) — ninguno
+// nuevo, consistente con el resto de Saurix y ya adaptado a los 3 temas
+// existentes (claro/oscuro/sepia). No existe ninguna librería de grafos en
+// el proyecto (ver auditoría previa del mandato), así que todo este lienzo
+// es SVG + CSS hecho a mano.
+
+.mapa-buscador {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 520px;
+  margin-bottom: 16px;
+}
+
+.mapa-cargando {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.mapa-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 14px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.mapa-leyenda-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mapa-punto {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.mapa-punto-central { background: var(--indigo); }
+.mapa-punto-documento { background: var(--client); }
+.mapa-punto-tabla { background: var(--teal); }
+.mapa-punto-proceso { background: var(--amber); }
+.mapa-punto-modulo { background: var(--technical); }
+
+.mapa-cuerpo {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  margin-top: 14px;
+
+  @media (max-width: 900px) {
+    flex-direction: column;
+  }
+}
+
+.mapa-lienzo-contenedor {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: min(70vh, 640px);
+  min-height: 420px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper-raised);
+  overflow: hidden;
+}
+
+.mapa-lienzo {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+}
+
+.mapa-lienzo:active {
+  cursor: grabbing;
+}
+
+.mapa-arista {
+  stroke-width: 1.6;
+  opacity: 0.55;
+}
+
+.mapa-arista-tabla { stroke: var(--teal); }
+.mapa-arista-proceso { stroke: var(--amber); }
+.mapa-arista-modulo { stroke: var(--technical); }
+.mapa-arista-doc_saliente,
+.mapa-arista-doc_entrante { stroke: var(--client); }
+
+.mapa-nodo {
+  cursor: pointer;
+}
+
+.mapa-nodo circle {
+  stroke: var(--paper-raised);
+  stroke-width: 2;
+  fill: var(--technical);
+}
+
+.mapa-nodo-central circle { fill: var(--indigo); }
+.mapa-nodo-documento circle { fill: var(--client); }
+.mapa-nodo-tabla circle { fill: var(--teal); }
+.mapa-nodo-proceso circle { fill: var(--amber); }
+.mapa-nodo-modulo circle { fill: var(--technical); }
+
+.mapa-nodo-seleccionado circle {
+  stroke: var(--text-strong);
+  stroke-width: 3.5;
+}
+
+.mapa-nodo-expandible circle {
+  stroke-dasharray: 4 3;
+}
+
+.mapa-nodo-icono {
+  font-size: 18px;
+  pointer-events: none;
+}
+
+.mapa-nodo-etiqueta {
+  font-size: 11px;
+  fill: var(--text-strong);
+  font-family: 'Montserrat', sans-serif;
+  pointer-events: none;
+}
+
+.mapa-nodo-estado {
+  font-size: 9.5px;
+  fill: var(--ink-soft);
+  pointer-events: none;
+}
+
+.mapa-panel-detalle {
+  flex: 0 0 280px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper-raised);
+  padding: 18px 20px;
+
+  @media (max-width: 900px) {
+    flex: 1 1 auto;
+  }
+
+  h3 {
+    margin: 0 0 6px;
+    font-size: 16px;
+    word-break: break-word;
+  }
+}
+
+.mapa-panel-tipo {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin: 0 0 16px;
+}
+
+.mapa-panel-texto {
+  font-size: 13.5px;
+  color: var(--text-strong);
+  word-break: break-word;
+}
+
+.mapa-panel-acciones {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mapa-panel-ayuda {
+  color: var(--ink-soft);
+  font-size: 13px;
+}

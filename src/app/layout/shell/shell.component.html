@@ -32,6 +32,7 @@
       <nav class="sidebar-nav" aria-label="Menú de WikiDocs">
         <a routerLink="/wikidocs" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
         <a routerLink="/wikidocs/documentos" routerLinkActive="active">📚 Documentos</a>
+        <a routerLink="/wikidocs/mapa-trazabilidad" routerLinkActive="active">🕸️ Mapa de trazabilidad</a>
 
         <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('wikidocs', 'Catálogos')">
           <span>{{ grupoAbierto('wikidocs', 'Catálogos') ? '▾' : '▸' }} Catálogos</span>

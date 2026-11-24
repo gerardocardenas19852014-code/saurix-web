@@ -1,10 +1,15 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { SupabaseService } from '../../../core/services/supabase.service';
+import { filaACamel } from '../../../core/services/supabase-data-client.service';
+import { ToastService } from '../../../shared/services/toast.service';
 
 type ColorIcono = 'siif' | 'personal' | 'generic';
 
 interface EnlaceModulo {
   ruta: string;
+  queryParams?: Record<string, string | number>;
   icono: string;
   color: ColorIcono;
   titulo: string;
@@ -26,6 +31,21 @@ const GRUPOS: GrupoModulo[] = [
         color: 'siif',
         titulo: 'Documentos',
         descripcion: 'Todas las páginas de documentación, con adjuntos y descarga en HTML.',
+      },
+      {
+        ruta: 'documentos',
+        queryParams: { soloFavoritos: 1 },
+        icono: '⭐',
+        color: 'siif',
+        titulo: 'Favoritos',
+        descripcion: 'Tus documentos marcados como favoritos.',
+      },
+      {
+        ruta: 'mapa-trazabilidad',
+        icono: '🕸️',
+        color: 'siif',
+        titulo: 'Mapa de trazabilidad',
+        descripcion: 'Explora visualmente las relaciones de un documento con tablas, procesos, módulos y otros documentos.',
       },
     ],
   },
@@ -64,19 +84,147 @@ const GRUPOS: GrupoModulo[] = [
   },
 ];
 
+/** Fila de `wikidocs.fn_dashboard_resumen` (ver mandato "Evolución de
+ *  WikiDocs: Dashboard y Mapa de trazabilidad", nov-2026) — un solo
+ *  registro con los 8 indicadores, todos calculados server-side. */
+interface ResumenDashboard {
+  documentosActivos: number;
+  documentosInactivos: number;
+  misFavoritos: number;
+  documentosConectados: number;
+  documentosHuerfanos: number;
+  totalSistemas: number;
+  totalCategorias: number;
+  totalSecciones: number;
+}
+
+interface DistribucionSistemaFila {
+  tipoSistemaId: number;
+  nombre: string;
+  totalDocumentos: number;
+}
+
+interface DistribucionCategoriaFila {
+  categoriaId: number;
+  nombre: string;
+  totalDocumentos: number;
+}
+
+interface FavoritoReciente {
+  documentoId: number;
+  titulo: string;
+  seccionId: number;
+  marcadoEn?: string;
+}
+
+/** Fila de `wikidocs.fn_documentos_lista_pagina` reutilizada tal cual
+ *  (sin `contenido`) para "Últimos 10 documentos actualizados". */
+interface DocumentoReciente {
+  id: number;
+  titulo: string;
+  seccionId: number;
+  fechaCreacion?: string;
+  fechaModificacion?: string;
+}
+
 /**
- * Landing propia de WikiDocs — mismo patrón que ProyectosLandingComponent:
- * los catálogos de este módulo (Tipo de sistema, Categoría, Secciones) ya
- * no viven en la landing genérica de Catálogos, viven aquí.
+ * Landing propia de WikiDocs — mismo patrón que ProyectosLandingComponent,
+ * ahora ampliada con el Dashboard pedido en el mandato "Evolución de
+ * WikiDocs: Dashboard y Mapa de trazabilidad" (nov-2026): indicadores,
+ * distribución por sistema/categoría, últimos documentos actualizados y
+ * favoritos recientes, todo calculado server-side vía 5 funciones RPC
+ * ligeras (`fn_dashboard_resumen`, `fn_dashboard_distribucion_sistema`,
+ * `fn_dashboard_distribucion_categoria`, `fn_dashboard_favoritos_recientes`
+ * y la ya existente `fn_documentos_lista_pagina`) — mismo patrón de
+ * carga ya usado en `DashboardVentasComponent`. Ninguna de las 5 descarga
+ * `contenido` ni hace polling; los catálogos (Tipo de sistema/Categoría/
+ * Secciones) nunca se pagina, así que sus distribuciones se traen
+ * completas. Los "Accesos rápidos" (antes el único contenido de esta
+ * ventana) se conservan tal cual, con 2 tiles nuevos (Favoritos, Mapa de
+ * trazabilidad).
  */
 @Component({
   selector: 'app-wikidocs-landing',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, DatePipe],
   templateUrl: './wikidocs-landing.component.html',
   styleUrl: './wikidocs-landing.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class WikidocsLandingComponent {
+export class WikidocsLandingComponent implements OnInit {
+  private readonly sb = inject(SupabaseService).cliente;
+  private readonly toast = inject(ToastService);
+
   protected readonly grupos = GRUPOS;
+
+  protected readonly cargandoResumen = signal(true);
+  protected readonly resumen = signal<ResumenDashboard | null>(null);
+  protected readonly distribucionSistema = signal<DistribucionSistemaFila[]>([]);
+  protected readonly distribucionCategoria = signal<DistribucionCategoriaFila[]>([]);
+  protected readonly ultimosActualizados = signal<DocumentoReciente[]>([]);
+  protected readonly favoritosRecientes = signal<FavoritoReciente[]>([]);
+
+  ngOnInit(): void {
+    void this.cargarResumen();
+    void this.cargarDistribuciones();
+    void this.cargarListas();
+  }
+
+  private async cargarResumen(): Promise<void> {
+    this.cargandoResumen.set(true);
+    const { data, error } = await this.sb.schema('wikidocs').rpc('fn_dashboard_resumen');
+    this.cargandoResumen.set(false);
+    if (error) {
+      this.toast.error('No se pudieron cargar los indicadores del Dashboard: ' + error.message);
+      return;
+    }
+    const fila = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined;
+    if (fila) this.resumen.set(filaACamel(fila) as unknown as ResumenDashboard);
+  }
+
+  private async cargarDistribuciones(): Promise<void> {
+    const [sistema, categoria] = await Promise.all([
+      this.sb.schema('wikidocs').rpc('fn_dashboard_distribucion_sistema'),
+      this.sb.schema('wikidocs').rpc('fn_dashboard_distribucion_categoria'),
+    ]);
+    if (sistema.error) {
+      this.toast.error('No se pudo cargar la distribución por sistema: ' + sistema.error.message);
+    } else {
+      this.distribucionSistema.set(
+        ((sistema.data ?? []) as Record<string, unknown>[]).map((f) => filaACamel(f) as unknown as DistribucionSistemaFila),
+      );
+    }
+    if (categoria.error) {
+      this.toast.error('No se pudo cargar la distribución por categoría: ' + categoria.error.message);
+    } else {
+      this.distribucionCategoria.set(
+        ((categoria.data ?? []) as Record<string, unknown>[]).map((f) => filaACamel(f) as unknown as DistribucionCategoriaFila),
+      );
+    }
+  }
+
+  private async cargarListas(): Promise<void> {
+    const [ultimos, favoritos] = await Promise.all([
+      this.sb.schema('wikidocs').rpc('fn_documentos_lista_pagina', {
+        p_orden_columna: 'fecha_modificacion',
+        p_orden_direccion: 'desc',
+        p_cantidad: 10,
+      }),
+      this.sb.schema('wikidocs').rpc('fn_dashboard_favoritos_recientes', { p_cantidad: 10 }),
+    ]);
+    if (ultimos.error) {
+      this.toast.error('No se pudieron cargar los últimos documentos actualizados: ' + ultimos.error.message);
+    } else {
+      this.ultimosActualizados.set(
+        ((ultimos.data ?? []) as Record<string, unknown>[]).map((f) => filaACamel(f) as unknown as DocumentoReciente),
+      );
+    }
+    if (favoritos.error) {
+      this.toast.error('No se pudieron cargar los favoritos recientes: ' + favoritos.error.message);
+    } else {
+      this.favoritosRecientes.set(
+        ((favoritos.data ?? []) as Record<string, unknown>[]).map((f) => filaACamel(f) as unknown as FavoritoReciente),
+      );
+    }
+  }
 }

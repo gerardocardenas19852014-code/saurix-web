@@ -155,10 +155,12 @@ export class DocumentosListComponent implements OnInit {
   protected readonly busquedaEnEdicion = signal('');
   protected readonly soloFavoritosEnEdicion = signal(false);
   protected readonly soloHuerfanosEnEdicion = signal(false);
+  protected readonly soloConectadosEnEdicion = signal(false);
   protected readonly mostrarInactivosEnEdicion = signal(false);
   private busquedaAplicada = '';
   private soloFavoritosAplicado = false;
   private soloHuerfanosAplicado = false;
+  private soloConectadosAplicado = false;
   private mostrarInactivosAplicado = false;
 
   private secuencia = 0;
@@ -559,11 +561,30 @@ export class DocumentosListComponent implements OnInit {
     // directo a un documento puntual que no pasa por la cuadrícula.
     this.route.queryParamMap.subscribe((params) => {
       const documentoIdParam = Number(params.get('documento')) || 0;
-      if (!documentoIdParam) return;
-      this.data.getById<Documento>('Documento', documentoIdParam).subscribe({
-        next: (documento) => this.verDocumento(documento),
-        error: () => {},
-      });
+      if (documentoIdParam) {
+        this.data.getById<Documento>('Documento', documentoIdParam).subscribe({
+          next: (documento) => this.verDocumento(documento),
+          error: () => {},
+        });
+      }
+
+      // Navegación-con-filtro desde el Dashboard de WikiDocs (mandato
+      // "Evolución de WikiDocs: Dashboard y Mapa de trazabilidad", nov-2026):
+      // un clic en un indicador es tan intencional como presionar "Buscar" —
+      // aquí se precargan los filtros correspondientes y se dispara una
+      // única búsqueda automática, nunca al abrir la ventana "a secas".
+      const tieneFiltroDashboard =
+        params.get('soloFavoritos') === '1' ||
+        params.get('soloHuerfanos') === '1' ||
+        params.get('soloConectados') === '1' ||
+        params.get('mostrarInactivos') === '1';
+      if (tieneFiltroDashboard) {
+        this.soloFavoritosEnEdicion.set(params.get('soloFavoritos') === '1');
+        this.soloHuerfanosEnEdicion.set(params.get('soloHuerfanos') === '1');
+        this.soloConectadosEnEdicion.set(params.get('soloConectados') === '1');
+        this.mostrarInactivosEnEdicion.set(params.get('mostrarInactivos') === '1');
+        this.buscar();
+      }
     });
   }
 
@@ -581,6 +602,7 @@ export class DocumentosListComponent implements OnInit {
       p_mostrar_inactivos: this.mostrarInactivosAplicado,
       p_solo_favoritos: this.soloFavoritosAplicado,
       p_solo_huerfanos: this.soloHuerfanosAplicado,
+      p_solo_conectados: this.soloConectadosAplicado,
       p_orden_columna: this.columnaOrden(),
       p_orden_direccion: this.direccionOrden(),
       p_desde: desde,
@@ -616,6 +638,7 @@ export class DocumentosListComponent implements OnInit {
     this.busquedaAplicada = this.busquedaEnEdicion();
     this.soloFavoritosAplicado = this.soloFavoritosEnEdicion();
     this.soloHuerfanosAplicado = this.soloHuerfanosEnEdicion();
+    this.soloConectadosAplicado = this.soloConectadosEnEdicion();
     this.mostrarInactivosAplicado = this.mostrarInactivosEnEdicion();
     this.reiniciarYCargar();
   }
@@ -624,6 +647,7 @@ export class DocumentosListComponent implements OnInit {
     this.busquedaEnEdicion.set('');
     this.soloFavoritosEnEdicion.set(false);
     this.soloHuerfanosEnEdicion.set(false);
+    this.soloConectadosEnEdicion.set(false);
     this.mostrarInactivosEnEdicion.set(false);
   }
 

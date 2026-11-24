@@ -1,0 +1,136 @@
+<div class="page-header">
+  <h1>Mapa de trazabilidad</h1>
+</div>
+
+<div class="mapa-buscador">
+  <app-select-buscable
+    placeholder="Buscar un documento para centrar el mapa…"
+    [busquedaRemota]="buscarDocumentoCentral"
+    [value]="documentoCentralId()"
+    [etiquetaValorExterno]="etiquetaCentralActual()"
+    (valueChange)="seleccionarCentral($event)"
+  />
+  @if (cargandoCentral()) {
+    <span class="mapa-cargando">Cargando…</span>
+  }
+</div>
+
+@if (documentoCentralId()) {
+  <div class="mapa-leyenda">
+    <span class="mapa-leyenda-item"><span class="mapa-punto mapa-punto-central"></span> Documento central</span>
+    <span class="mapa-leyenda-item"><span class="mapa-punto mapa-punto-documento"></span> Documento relacionado</span>
+    <span class="mapa-leyenda-item"><span class="mapa-punto mapa-punto-tabla"></span> Tabla</span>
+    <span class="mapa-leyenda-item"><span class="mapa-punto mapa-punto-proceso"></span> Proceso</span>
+    <span class="mapa-leyenda-item"><span class="mapa-punto mapa-punto-modulo"></span> Módulo</span>
+  </div>
+
+  <div class="grid-toolbar">
+    <label class="checkbox-inline">
+      <input type="checkbox" [checked]="filtroDocumento()" (change)="filtroDocumento.set($any($event.target).checked)" />
+      📑 Documentos
+    </label>
+    <label class="checkbox-inline">
+      <input type="checkbox" [checked]="filtroTabla()" (change)="filtroTabla.set($any($event.target).checked)" />
+      🗄️ Tablas
+    </label>
+    <label class="checkbox-inline">
+      <input type="checkbox" [checked]="filtroProceso()" (change)="filtroProceso.set($any($event.target).checked)" />
+      ⚙️ Procesos
+    </label>
+    <label class="checkbox-inline">
+      <input type="checkbox" [checked]="filtroModulo()" (change)="filtroModulo.set($any($event.target).checked)" />
+      🧭 Módulos
+    </label>
+
+    <div class="toolbar-group">
+      <button type="button" class="btn-secondary small" title="Acercar" (click)="zoomBoton(0.85)">➕</button>
+      <button type="button" class="btn-secondary small" title="Alejar" (click)="zoomBoton(1.18)">➖</button>
+      <button type="button" class="btn-secondary small" title="Ajustar mapa a pantalla" (click)="ajustarAPantalla()">🖼️ Ajustar a pantalla</button>
+    </div>
+
+    <a class="btn-secondary small" routerLink="/wikidocs/documentos" [queryParams]="{ soloHuerfanos: 1 }" style="text-decoration:none;">
+      🔌 Ver documentos sin conexiones
+    </a>
+  </div>
+
+  <div class="mapa-cuerpo">
+    <div class="mapa-lienzo-contenedor">
+      <svg
+        #lienzoSvg
+        class="mapa-lienzo"
+        [attr.viewBox]="viewBox().x + ' ' + viewBox().y + ' ' + viewBox().w + ' ' + viewBox().h"
+        (pointerdown)="onPointerDown($event)"
+        (pointermove)="onPointerMove($event)"
+        (pointerup)="onPointerUp($event)"
+        (pointercancel)="onPointerUp($event)"
+        (pointerleave)="onPointerUp($event)"
+        (wheel)="onWheel($event)"
+      >
+        @for (arista of aristasVisibles(); track arista.clave) {
+          @let origen = nodoPorClave(arista.origen);
+          @let destino = nodoPorClave(arista.destino);
+          @if (origen && destino) {
+            <line
+              class="mapa-arista mapa-arista-{{ arista.tipoElemento }}"
+              [attr.x1]="origen.x"
+              [attr.y1]="origen.y"
+              [attr.x2]="destino.x"
+              [attr.y2]="destino.y"
+            />
+          }
+        }
+
+        @for (nodo of nodosVisibles(); track nodo.clave) {
+          <g
+            class="mapa-nodo mapa-nodo-{{ nodo.tipo }}"
+            [class.mapa-nodo-seleccionado]="seleccionado()?.clave === nodo.clave"
+            [class.mapa-nodo-expandible]="nodo.expandible && !nodo.expandido"
+            [attr.transform]="'translate(' + nodo.x + ',' + nodo.y + ')'"
+            (click)="seleccionarNodo(nodo)"
+            (dblclick)="nodo.expandible ? expandirNodo(nodo) : null"
+          >
+            <circle r="26" />
+            <text class="mapa-nodo-icono" text-anchor="middle" dy="7">{{ iconoTipo(nodo.tipo) }}</text>
+            <text class="mapa-nodo-etiqueta" text-anchor="middle" dy="42">
+              {{ nodo.etiqueta.length > 18 ? nodo.etiqueta.slice(0, 17) + '…' : nodo.etiqueta }}
+            </text>
+            @if (nodo.cargando) {
+              <text class="mapa-nodo-estado" text-anchor="middle" dy="-34">Cargando…</text>
+            } @else if (nodo.expandible && !nodo.expandido) {
+              <text class="mapa-nodo-estado" text-anchor="middle" dy="-34">Doble clic para expandir</text>
+            }
+          </g>
+        }
+      </svg>
+    </div>
+
+    <div class="mapa-panel-detalle">
+      @if (seleccionado(); as n) {
+        <h3>{{ iconoTipo(n.tipo) }} {{ n.etiqueta }}</h3>
+        <p class="mapa-panel-tipo">{{ ETIQUETAS_TIPO[n.tipo] }}</p>
+
+        @if (n.tipo === 'documento' || n.tipo === 'central') {
+          <div class="mapa-panel-acciones">
+            <a class="btn-secondary small" routerLink="/wikidocs/documentos" [queryParams]="{ documento: n.documentoId }" style="text-decoration:none;">
+              📂 Abrir documento
+            </a>
+            @if (n.tipo === 'documento') {
+              <button type="button" class="btn-secondary small" (click)="hacerCentro(n)">🎯 Hacer centro</button>
+              @if (!n.expandido) {
+                <button type="button" class="btn-primary small" [disabled]="n.cargando" (click)="expandirNodo(n)">
+                  🔎 Expandir relaciones
+                </button>
+              }
+            }
+          </div>
+        } @else {
+          <p class="mapa-panel-texto">{{ n.etiqueta }}</p>
+        }
+      } @else {
+        <p class="mapa-panel-ayuda">Selecciona un nodo del mapa para ver su detalle.</p>
+      }
+    </div>
+  </div>
+} @else {
+  <p class="empty" style="margin-top:20px;">Busca y elige un documento arriba para ver su mapa de trazabilidad.</p>
+}
