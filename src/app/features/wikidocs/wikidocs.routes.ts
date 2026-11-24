@@ -6,6 +6,10 @@ export const WIKIDOCS_ROUTES: Routes = [
     loadComponent: () => import('./landing/wikidocs-landing.component').then((m) => m.WikidocsLandingComponent),
   },
   {
+    path: 'dashboard',
+    loadComponent: () => import('./dashboard/wikidocs-dashboard.component').then((m) => m.WikidocsDashboardComponent),
+  },
+  {
     path: 'documentos',
     loadComponent: () => import('./documentos-list.component').then((m) => m.DocumentosListComponent),
   },

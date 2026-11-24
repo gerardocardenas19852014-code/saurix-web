@@ -1,9 +1,5 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { SupabaseService } from '../../../core/services/supabase.service';
-import { filaACamel } from '../../../core/services/supabase-data-client.service';
-import { ToastService } from '../../../shared/services/toast.service';
 
 type ColorIcono = 'siif' | 'personal' | 'generic';
 
@@ -50,6 +46,19 @@ const GRUPOS: GrupoModulo[] = [
     ],
   },
   {
+    titulo: 'Reportes',
+    enlaces: [
+      {
+        ruta: 'dashboard',
+        icono: '📊',
+        color: 'siif',
+        titulo: 'Dashboard',
+        descripcion:
+          'Indicadores de WikiDocs: documentos activos/inactivos/huérfanos, distribución por sistema y categoría, últimos documentos actualizados y favoritos recientes.',
+      },
+    ],
+  },
+  {
     titulo: 'Catálogos',
     enlaces: [
       {
@@ -84,172 +93,37 @@ const GRUPOS: GrupoModulo[] = [
   },
 ];
 
-/** Fila de `wikidocs.fn_dashboard_resumen` (ver mandato "Evolución de
- *  WikiDocs: Dashboard y Mapa de trazabilidad", nov-2026) — un solo
- *  registro con los 8 indicadores, todos calculados server-side. */
-interface ResumenDashboard {
-  documentosActivos: number;
-  documentosInactivos: number;
-  misFavoritos: number;
-  documentosConectados: number;
-  documentosHuerfanos: number;
-  totalSistemas: number;
-  totalCategorias: number;
-  totalSecciones: number;
-}
-
-interface DistribucionSistemaFila {
-  tipoSistemaId: number;
-  nombre: string;
-  totalDocumentos: number;
-}
-
-interface DistribucionCategoriaFila {
-  categoriaId: number;
-  nombre: string;
-  totalDocumentos: number;
-}
-
-interface FavoritoReciente {
-  documentoId: number;
-  titulo: string;
-  seccionId: number;
-  marcadoEn?: string;
-}
-
-/** Fila de `wikidocs.fn_documentos_lista_pagina` reutilizada tal cual
- *  (sin `contenido`) para "Últimos 10 documentos actualizados". */
-interface DocumentoReciente {
-  id: number;
-  titulo: string;
-  seccionId: number;
-  fechaCreacion?: string;
-  fechaModificacion?: string;
-}
-
 /**
- * Landing propia de WikiDocs — mismo patrón que ProyectosLandingComponent,
- * ahora ampliada con el Dashboard pedido en el mandato "Evolución de
- * WikiDocs: Dashboard y Mapa de trazabilidad" (nov-2026): indicadores,
- * distribución por sistema/categoría, últimos documentos actualizados y
- * favoritos recientes, todo calculado server-side vía 5 funciones RPC
- * ligeras (`fn_dashboard_resumen`, `fn_dashboard_distribucion_sistema`,
- * `fn_dashboard_distribucion_categoria`, `fn_dashboard_favoritos_recientes`
- * y la ya existente `fn_documentos_lista_pagina`) — mismo patrón de
- * carga ya usado en `DashboardVentasComponent`. Ninguna de las 5 descarga
- * `contenido` ni hace polling; los catálogos (Tipo de sistema/Categoría/
- * Secciones) nunca se pagina, así que sus distribuciones se traen
- * completas. Los "Accesos rápidos" (antes el único contenido de esta
- * ventana) se conservan tal cual, con 2 tiles nuevos (Favoritos, Mapa de
- * trazabilidad).
+ * Landing propia de WikiDocs — mismo patrón que ProyectosLandingComponent/
+ * InventarioLandingComponent/VentasLandingComponent: Inicio es SOLO un
+ * índice de pantallas (cuadrícula de accesos), sin ninguna carga de datos
+ * propia.
  *
- * Corrección funcional 02 al Mandato 89 (nov-2026): se restaura el orden
- * original de bloques en el HTML (menús WikiDocs/Catálogos primero,
- * Dashboard debajo — ver `git show 5e17ce9`, el commit que intercaló el
- * Dashboard ENTRE el encabezado y los menús en vez de agregarlo después) y
- * se agrega `data-wide='grid'` en `ngOnInit`/`ngOnDestroy`, el mismo
- * mecanismo ya homologado en otros Dashboards de Saurix (p.ej.
- * `ProyectosDashboardComponent`, `InventarioDashboardComponent`) para
- * ensanchar `.content` (980px a 1600px, regla ya existente en styles.scss).
- * Sin esto, las 2 tablas de cada `.dashboard-columnas-2` (cada `.grid-table`
- * con `min-width:560px` global) no cabían en los 980px por defecto y cada
- * `.grid-table-scroll` activaba su propio scroll horizontal, de ahí las
- * barras de desplazamiento innecesarias y el espacio lateral desaprovechado
- * reportados. No se tocó ningún CSS global ni se creó ninguna regla nueva:
- * solo se reutiliza el atributo `data-wide` que ya existe en styles.scss,
- * exactamente como lo hacen los demás módulos.
+ * Rectificación a la Corrección 02 del Mandato 89 (nov-2026): la corrección
+ * anterior había movido el bloque de menús (WikiDocs/Catálogos) a la parte
+ * de arriba de esta misma pantalla, pero el Dashboard (indicadores,
+ * distribución por sistema/categoría, últimos documentos, favoritos) seguía
+ * viviendo aquí también — dos responsabilidades en un solo componente, que
+ * no es como funcionan los demás módulos. Se corrige homologando con el
+ * patrón real de Inventario/Ventas: Inicio y Dashboard son dos RUTAS y dos
+ * COMPONENTES independientes (`wikidocs` → este componente; `wikidocs/
+ * dashboard` → `WikidocsDashboardComponent`, ver dashboard/
+ * wikidocs-dashboard.component.ts). Este componente volvió a ser un simple
+ * índice de pantallas: ninguna llamada a Supabase, ningún signal de datos,
+ * ningún `OnInit`/`OnDestroy` — exactamente como
+ * `InventarioLandingComponent`/`VentasLandingComponent`. Se agregó el grupo
+ * "Reportes" con el tile "Dashboard" (mismo criterio que Inventario/Ventas:
+ * "Reportes" es su propio grupo, con Dashboard como su pantalla), para que
+ * el Dashboard siga siendo accesible desde Inicio.
  */
 @Component({
   selector: 'app-wikidocs-landing',
   standalone: true,
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink],
   templateUrl: './wikidocs-landing.component.html',
   styleUrl: './wikidocs-landing.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class WikidocsLandingComponent implements OnInit, OnDestroy {
-  private readonly sb = inject(SupabaseService).cliente;
-  private readonly toast = inject(ToastService);
-
+export class WikidocsLandingComponent {
   protected readonly grupos = GRUPOS;
-
-  protected readonly cargandoResumen = signal(true);
-  protected readonly resumen = signal<ResumenDashboard | null>(null);
-  protected readonly distribucionSistema = signal<DistribucionSistemaFila[]>([]);
-  protected readonly distribucionCategoria = signal<DistribucionCategoriaFila[]>([]);
-  protected readonly ultimosActualizados = signal<DocumentoReciente[]>([]);
-  protected readonly favoritosRecientes = signal<FavoritoReciente[]>([]);
-
-  ngOnInit(): void {
-    // Pantalla a ancho completo (html[data-wide='grid'] en styles.scss) —
-    // Corrección 02 al Mandato 89: mismo patrón ya usado en los Dashboards
-    // de Proyectos e Inventario, para que las 2 tablas de distribución no
-    // fuercen su propio scroll horizontal dentro de un `.content` angosto.
-    document.documentElement.setAttribute('data-wide', 'grid');
-    void this.cargarResumen();
-    void this.cargarDistribuciones();
-    void this.cargarListas();
-  }
-
-  ngOnDestroy(): void {
-    document.documentElement.removeAttribute('data-wide');
-  }
-
-  private async cargarResumen(): Promise<void> {
-    this.cargandoResumen.set(true);
-    const { data, error } = await this.sb.schema('wikidocs').rpc('fn_dashboard_resumen');
-    this.cargandoResumen.set(false);
-    if (error) {
-      this.toast.error('No se pudieron cargar los indicadores del Dashboard: ' + error.message);
-      return;
-    }
-    const fila = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined;
-    if (fila) this.resumen.set(filaACamel(fila) as unknown as ResumenDashboard);
-  }
-
-  private async cargarDistribuciones(): Promise<void> {
-    const [sistema, categoria] = await Promise.all([
-      this.sb.schema('wikidocs').rpc('fn_dashboard_distribucion_sistema'),
-      this.sb.schema('wikidocs').rpc('fn_dashboard_distribucion_categoria'),
-    ]);
-    if (sistema.error) {
-      this.toast.error('No se pudo cargar la distribución por sistema: ' + sistema.error.message);
-    } else {
-      this.distribucionSistema.set(
-        ((sistema.data ?? []) as Record<string, unknown>[]).map((f) => filaACamel(f) as unknown as DistribucionSistemaFila),
-      );
-    }
-    if (categoria.error) {
-      this.toast.error('No se pudo cargar la distribución por categoría: ' + categoria.error.message);
-    } else {
-      this.distribucionCategoria.set(
-        ((categoria.data ?? []) as Record<string, unknown>[]).map((f) => filaACamel(f) as unknown as DistribucionCategoriaFila),
-      );
-    }
-  }
-
-  private async cargarListas(): Promise<void> {
-    const [ultimos, favoritos] = await Promise.all([
-      this.sb.schema('wikidocs').rpc('fn_documentos_lista_pagina', {
-        p_orden_columna: 'fecha_modificacion',
-        p_orden_direccion: 'desc',
-        p_cantidad: 10,
-      }),
-      this.sb.schema('wikidocs').rpc('fn_dashboard_favoritos_recientes', { p_cantidad: 10 }),
-    ]);
-    if (ultimos.error) {
-      this.toast.error('No se pudieron cargar los últimos documentos actualizados: ' + ultimos.error.message);
-    } else {
-      this.ultimosActualizados.set(
-        ((ultimos.data ?? []) as Record<string, unknown>[]).map((f) => filaACamel(f) as unknown as DocumentoReciente),
-      );
-    }
-    if (favoritos.error) {
-      this.toast.error('No se pudieron cargar los favoritos recientes: ' + favoritos.error.message);
-    } else {
-      this.favoritosRecientes.set(
-        ((favoritos.data ?? []) as Record<string, unknown>[]).map((f) => filaACamel(f) as unknown as FavoritoReciente),
-      );
-    }
-  }
 }
