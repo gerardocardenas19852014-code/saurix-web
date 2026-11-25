@@ -28,14 +28,6 @@ const GRUPOS: GrupoModulo[] = [
         titulo: 'Documentos',
         descripcion: 'Todas las páginas de documentación, con adjuntos y descarga en HTML.',
       },
-      {
-        ruta: 'documentos',
-        queryParams: { soloFavoritos: 1 },
-        icono: '⭐',
-        color: 'siif',
-        titulo: 'Favoritos',
-        descripcion: 'Tus documentos marcados como favoritos.',
-      },
     ],
   },
   {
@@ -107,8 +99,8 @@ const GRUPOS: GrupoModulo[] = [
  * Corrección prioritaria "Separación definitiva de Inicio y Dashboard"
  * (nov-2026): se reagrupan los tiles para que coincidan EXACTAMENTE con los
  * grupos del menú lateral de WikiDocs (ver shell.component.html):
- *  - Proceso: Documentos, Favoritos (antes vivían sueltos en un grupo
- *    llamado "WikiDocs").
+ *  - Proceso: Documentos (antes vivía suelto en un grupo llamado
+ *    "WikiDocs").
  *  - Reporte: Dashboard, Mapa de trazabilidad (antes Mapa de trazabilidad
  *    vivía en el grupo "WikiDocs" y Dashboard en un grupo "Reportes" sin
  *    Mapa de trazabilidad — se corrige el agrupado pedido explícitamente).
@@ -116,6 +108,15 @@ const GRUPOS: GrupoModulo[] = [
  *  - Configuración: Plantillas (antes vivía dentro de Catálogos).
  * Ningún `ruta`/`queryParams`/color/ícono/permiso cambió — solo el grupo al
  * que pertenece cada tile.
+ *
+ * Ajuste "Inicio de WikiDocs" (nov-2026): se retiró el tile "Favoritos" de
+ * Proceso (ahora solo Documentos) — a pedido explícito del usuario. La
+ * funcionalidad de favoritos sigue intacta dentro de Documentos (el mismo
+ * `routerLink="documentos"` con `queryParams: { soloFavoritos: 1 }` que
+ * usaba este tile sigue funcionando como filtro dentro de esa pantalla) y
+ * el indicador "Mis favoritos" del Dashboard no se tocó — no se eliminó
+ * ninguna tabla, servicio ni método relacionado con favoritos, solo este
+ * tile de acceso directo en Inicio.
  */
 @Component({
   selector: 'app-wikidocs-landing',
