@@ -22,10 +22,14 @@ export const DESTINOS: DestinoPaleta[] = [
 
   { label: 'Inicio', grupo: 'WikiDocs', ruta: '/wikidocs', icono: '⌂' },
   { label: 'Documentos', grupo: 'WikiDocs', ruta: '/wikidocs/documentos', icono: '📚' },
+  // Dashboard: corrección prioritaria "Separación definitiva de Inicio y
+  // Dashboard" (nov-2026) — antes no existía como ruta propia (compartía
+  // "/wikidocs" con Inicio), así que tampoco tenía su propio destino aquí.
+  { label: 'Dashboard', grupo: 'WikiDocs', ruta: '/wikidocs/dashboard', icono: '📊' },
+  { label: 'Mapa de trazabilidad', grupo: 'WikiDocs', ruta: '/wikidocs/mapa-trazabilidad', icono: '🕸️' },
   { label: 'Tipo de sistema', grupo: 'WikiDocs', ruta: '/wikidocs/tipos-sistema', icono: '🗂️' },
   { label: 'Categoría', grupo: 'WikiDocs', ruta: '/wikidocs/categorias', icono: '📖' },
   { label: 'Secciones', grupo: 'WikiDocs', ruta: '/wikidocs/secciones', icono: '📑' },
-  { label: 'Mapa de trazabilidad', grupo: 'WikiDocs', ruta: '/wikidocs/mapa-trazabilidad', icono: '🕸️' },
 
   { label: 'Inicio', grupo: 'Presupuesto Personal', ruta: '/presupuesto', icono: '⌂' },
   { label: 'Dashboard', grupo: 'Presupuesto Personal', ruta: '/presupuesto/dashboard', icono: '📊' },

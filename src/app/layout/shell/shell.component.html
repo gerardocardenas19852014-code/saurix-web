@@ -30,15 +30,22 @@
     @if (moduloActivo() === 'wikidocs') {
       <span class="sidebar-label">WikiDocs</span>
       <nav class="sidebar-nav" aria-label="Menú de WikiDocs">
-        <!-- Reorganización del menú de WikiDocs en grupos desplegables
-             (mandato 88, nov-2026): "Proceso" agrupa Documentos; "Reporte"
-             agrupa el Dashboard (antes "Inicio" suelto arriba -- misma ruta
-             exacta "/wikidocs", solo se renombró la etiqueta y se movió de
-             grupo) y el Mapa de trazabilidad. Catálogos y Configuración
-             sin cambios. Mismo mecanismo genérico toggleGrupo/grupoAbierto
-             que ya usan los demás grupos de este módulo y los demás
-             módulos; arrancan cerrados igual que todos los grupos del
-             sistema (ver gruposAbiertosManualmente en shell.component.ts). -->
+        <!-- Corrección prioritaria "Separación definitiva de Inicio y
+             Dashboard" (nov-2026): la reorganización del mandato 88 había
+             agrupado bien Proceso/Reporte/Catálogos/Configuración, pero
+             había renombrado "Inicio" a "Dashboard" dejándolo apuntar a la
+             misma ruta raíz "/wikidocs" (el índice de mosaicos) — nunca
+             existió una ruta/pantalla de Dashboard separada en ese momento.
+             Ahora que sí existe ("/wikidocs/dashboard", ver
+             wikidocs.routes.ts y dashboard/wikidocs-dashboard.component.ts),
+             se restaura "Inicio" como opción independiente (no un grupo,
+             igual que en todos los demás módulos) y "Dashboard" dentro de
+             Reporte apunta a su propia ruta real. Mismo mecanismo genérico
+             toggleGrupo/grupoAbierto que ya usan los demás grupos; arrancan
+             cerrados igual que todos los grupos del sistema (ver
+             gruposAbiertosManualmente en shell.component.ts). -->
+        <a routerLink="/wikidocs" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Inicio</a>
+
         <button type="button" class="sidebar-group-toggle" (click)="toggleGrupo('wikidocs', 'Proceso')">
           <span>{{ grupoAbierto('wikidocs', 'Proceso') ? '▾' : '▸' }} Proceso</span>
         </button>
@@ -50,7 +57,7 @@
           <span>{{ grupoAbierto('wikidocs', 'Reporte') ? '▾' : '▸' }} Reporte</span>
         </button>
         @if (grupoAbierto('wikidocs', 'Reporte')) {
-          <a routerLink="/wikidocs" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">⌂ Dashboard</a>
+          <a routerLink="/wikidocs/dashboard" routerLinkActive="active">📊 Dashboard</a>
           <a routerLink="/wikidocs/mapa-trazabilidad" routerLinkActive="active">🕸️ Mapa de trazabilidad</a>
         }
 

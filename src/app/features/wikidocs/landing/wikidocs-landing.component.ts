@@ -19,7 +19,7 @@ interface GrupoModulo {
 
 const GRUPOS: GrupoModulo[] = [
   {
-    titulo: 'WikiDocs',
+    titulo: 'Proceso',
     enlaces: [
       {
         ruta: 'documentos',
@@ -36,17 +36,10 @@ const GRUPOS: GrupoModulo[] = [
         titulo: 'Favoritos',
         descripcion: 'Tus documentos marcados como favoritos.',
       },
-      {
-        ruta: 'mapa-trazabilidad',
-        icono: '🕸️',
-        color: 'siif',
-        titulo: 'Mapa de trazabilidad',
-        descripcion: 'Explora visualmente las relaciones de un documento con tablas, procesos, módulos y otros documentos.',
-      },
     ],
   },
   {
-    titulo: 'Reportes',
+    titulo: 'Reporte',
     enlaces: [
       {
         ruta: 'dashboard',
@@ -55,6 +48,13 @@ const GRUPOS: GrupoModulo[] = [
         titulo: 'Dashboard',
         descripcion:
           'Indicadores de WikiDocs: documentos activos/inactivos/huérfanos, distribución por sistema y categoría, últimos documentos actualizados y favoritos recientes.',
+      },
+      {
+        ruta: 'mapa-trazabilidad',
+        icono: '🕸️',
+        color: 'siif',
+        titulo: 'Mapa de trazabilidad',
+        descripcion: 'Explora visualmente las relaciones de un documento con tablas, procesos, módulos y otros documentos.',
       },
     ],
   },
@@ -82,6 +82,11 @@ const GRUPOS: GrupoModulo[] = [
         titulo: 'Secciones',
         descripcion: 'Secciones de cada categoría — de aquí cuelgan los documentos.',
       },
+    ],
+  },
+  {
+    titulo: 'Configuración',
+    enlaces: [
       {
         ruta: 'plantillas',
         icono: '🧩',
@@ -99,22 +104,18 @@ const GRUPOS: GrupoModulo[] = [
  * índice de pantallas (cuadrícula de accesos), sin ninguna carga de datos
  * propia.
  *
- * Rectificación a la Corrección 02 del Mandato 89 (nov-2026): la corrección
- * anterior había movido el bloque de menús (WikiDocs/Catálogos) a la parte
- * de arriba de esta misma pantalla, pero el Dashboard (indicadores,
- * distribución por sistema/categoría, últimos documentos, favoritos) seguía
- * viviendo aquí también — dos responsabilidades en un solo componente, que
- * no es como funcionan los demás módulos. Se corrige homologando con el
- * patrón real de Inventario/Ventas: Inicio y Dashboard son dos RUTAS y dos
- * COMPONENTES independientes (`wikidocs` → este componente; `wikidocs/
- * dashboard` → `WikidocsDashboardComponent`, ver dashboard/
- * wikidocs-dashboard.component.ts). Este componente volvió a ser un simple
- * índice de pantallas: ninguna llamada a Supabase, ningún signal de datos,
- * ningún `OnInit`/`OnDestroy` — exactamente como
- * `InventarioLandingComponent`/`VentasLandingComponent`. Se agregó el grupo
- * "Reportes" con el tile "Dashboard" (mismo criterio que Inventario/Ventas:
- * "Reportes" es su propio grupo, con Dashboard como su pantalla), para que
- * el Dashboard siga siendo accesible desde Inicio.
+ * Corrección prioritaria "Separación definitiva de Inicio y Dashboard"
+ * (nov-2026): se reagrupan los tiles para que coincidan EXACTAMENTE con los
+ * grupos del menú lateral de WikiDocs (ver shell.component.html):
+ *  - Proceso: Documentos, Favoritos (antes vivían sueltos en un grupo
+ *    llamado "WikiDocs").
+ *  - Reporte: Dashboard, Mapa de trazabilidad (antes Mapa de trazabilidad
+ *    vivía en el grupo "WikiDocs" y Dashboard en un grupo "Reportes" sin
+ *    Mapa de trazabilidad — se corrige el agrupado pedido explícitamente).
+ *  - Catálogos: Tipo de sistema, Categoría, Secciones.
+ *  - Configuración: Plantillas (antes vivía dentro de Catálogos).
+ * Ningún `ruta`/`queryParams`/color/ícono/permiso cambió — solo el grupo al
+ * que pertenece cada tile.
  */
 @Component({
   selector: 'app-wikidocs-landing',
