@@ -138,3 +138,37 @@ export interface DocumentoRelacion {
   documentoRelacionadoId: number;
   tipo: TipoRelacionDocumento;
 }
+
+/**
+ * Etiqueta del catálogo de la empresa (Mandato 90, nov-2026: "WikiDocs —
+ * etiquetas y duplicación de documentos"). Texto libre, normalizado y
+ * deduplicado server-side (`nombre_normalizado`, índice único parcial por
+ * empresa) — nunca se administra con alta/modificacion/baja genéricos:
+ * siempre a través de `wikidocs.fn_documento_etiquetas_sincronizar` (al
+ * guardar un documento — get-or-create atómico incluido, en la misma
+ * transacción) o, de solo lectura, `fn_etiquetas_sugerencias`
+ * (autocompletado, 2+ caracteres) y `fn_documento_etiquetas_listar`
+ * (precarga de las ya asignadas al entrar a "Editar"). Ver
+ * ChipsEtiquetasComponent (shared/components/chips-etiquetas).
+ */
+export interface Etiqueta {
+  id: number;
+  nombre: string;
+}
+
+/** Parámetros que acepta `wikidocs.fn_documento_duplicar` — ver
+ *  Mandato 90 §6. Todas las banderas de copia son explícitas (sin
+ *  default implícito en Angular) para que el formulario de "Duplicar"
+ *  sea la única fuente de verdad sobre qué se copia. */
+export interface DuplicarDocumentoParametros {
+  documentoId: number;
+  titulo: string;
+  seccionId: number;
+  copiarContenido: boolean;
+  copiarEtiquetas: boolean;
+  copiarReferenciasTablas: boolean;
+  copiarReferenciasProcesos: boolean;
+  copiarReferenciasModulos: boolean;
+  copiarRelacionados: boolean;
+  claveIdempotencia: string;
+}

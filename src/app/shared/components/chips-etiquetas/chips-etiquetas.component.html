@@ -1,0 +1,49 @@
+<div class="chips-etiquetas">
+  <div class="chips-etiquetas-lista" [class.chips-etiquetas-lista--tope]="alTope()">
+    @for (etiqueta of seleccionadas(); track (etiqueta.id ?? 'nueva') + '|' + etiqueta.nombre) {
+      <span class="chips-etiquetas-chip">
+        {{ etiqueta.nombre }}
+        <button
+          type="button"
+          class="chips-etiquetas-quitar"
+          [attr.aria-label]="'Quitar etiqueta ' + etiqueta.nombre"
+          (click)="quitar(etiqueta)"
+        >×</button>
+      </span>
+    }
+    @if (!alTope()) {
+      <input
+        #campo
+        type="text"
+        class="chips-etiquetas-input"
+        [placeholder]="placeholder"
+        [value]="texto()"
+        (input)="onInput($any($event.target).value)"
+        (focus)="onFocus()"
+        (keydown)="onKeydown($event)"
+        autocomplete="off"
+      />
+    }
+  </div>
+  @if (alTope()) {
+    <p class="chips-etiquetas-ayuda">Límite de {{ maximo }} etiquetas alcanzado.</p>
+  }
+  @if (abierto() && (sugerenciasFiltradas().length > 0 || mostrarVacio())) {
+    <ul class="chips-etiquetas-dropdown" role="listbox">
+      @for (sugerencia of sugerenciasFiltradas(); track (sugerencia.id ?? 0) + '|' + sugerencia.nombre; let i = $index) {
+        <li role="option" [class.activa]="i === indiceActivo()" (mousedown)="elegirSugerencia(sugerencia)">
+          {{ sugerencia.nombre }}
+        </li>
+      }
+      @if (mostrarVacio()) {
+        <li class="chips-etiquetas-vacio">
+          @if (permitirNuevas) {
+            Sin coincidencias — presiona Enter para agregarla como nueva.
+          } @else {
+            No existe esa etiqueta en el catálogo.
+          }
+        </li>
+      }
+    </ul>
+  }
+</div>

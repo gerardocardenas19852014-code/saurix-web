@@ -83,6 +83,29 @@
         Mostrar inactivos
       </label>
     </div>
+
+    <!-- Filtro por etiquetas (Mandato 90 §5, nov-2026) — SAURIX-CAT-001
+         v1.1: ningún cambio aquí busca nada por sí solo, solo "Buscar". -->
+    <div class="grid-filter grid-filter-etiquetas">
+      <app-chips-etiquetas
+        placeholder="Filtrar por etiqueta…"
+        [permitirNuevas]="false"
+        [busquedaRemota]="sugerirEtiquetas"
+        [valor]="etiquetasFiltroEnEdicion()"
+        (valorChange)="etiquetasFiltroEnEdicion.set($event)"
+      />
+      @if (etiquetasFiltroEnEdicion().length > 1) {
+        <select
+          class="grid-filter-modo-etiquetas"
+          title="Cómo combinar las etiquetas elegidas"
+          [value]="modoEtiquetasEnEdicion()"
+          (change)="modoEtiquetasEnEdicion.set($any($event.target).value)"
+        >
+          <option value="any">Cualquiera de ellas</option>
+          <option value="all">Todas ellas</option>
+        </select>
+      }
+    </div>
   </div>
 
   @if (!haBuscado()) {
@@ -105,6 +128,10 @@
       (accionExtra2)="toggleFavorito($event.id)"
       accionExtraEtiqueta="Ver"
       (accionExtra)="verDesdeFila($event)"
+      accionExtra3Etiqueta="⧉"
+      [accionExtra3Icono]="true"
+      accionExtra3Titulo="Duplicar documento"
+      (accionExtra3)="pedirDuplicar($event)"
       (editar)="editarDesdeFila($event)"
       (eliminar)="pedirEliminar($event)"
     />
@@ -125,6 +152,12 @@
     <div class="page-actions">
       @if (documentoActual()) {
         <button type="button" class="btn-secondary" title="Copiar enlace directo a este documento" (click)="copiarEnlace()">🔗 Copiar enlace</button>
+        @if (vista() === 'ver') {
+          <!-- Mandato 90 §6.6: a propósito solo en "Ver" (nunca en
+               "Editar") — duplicar siempre parte de la última versión
+               guardada, nunca de cambios en pantalla sin guardar. -->
+          <button type="button" class="btn-secondary" title="Duplicar este documento" (click)="pedirDuplicar(documentoActual()!)">⧉ Duplicar</button>
+        }
         <a
           class="btn-secondary"
           routerLink="/wikidocs/mapa-trazabilidad"
@@ -159,16 +192,25 @@
 
   @if (vista() === 'ver') {
     @if (tablaContenido().length > 0) {
-      <nav class="toc-documento" aria-label="Tabla de contenido">
-        <span class="toc-titulo">Contenido</span>
-        @for (item of tablaContenido(); track item.id) {
-          <a
-            class="toc-item"
-            [class.toc-nivel-1]="item.nivel === 1"
-            [class.toc-nivel-2]="item.nivel === 2"
-            [class.toc-nivel-3]="item.nivel === 3"
-            (click)="irASeccion(item.id)"
-          >{{ item.texto }}</a>
+      <nav class="toc-documento" [class.toc-documento--colapsado]="tocColapsado()" aria-label="Tabla de contenido">
+        <button type="button" class="toc-titulo toc-titulo-toggle" (click)="toggleToc()">
+          <span>Contenido</span>
+          <span class="toc-toggle-icono" [class.toc-toggle-icono--colapsado]="tocColapsado()">▾</span>
+        </button>
+        @if (!tocColapsado()) {
+          @for (item of tablaContenido(); track item.id) {
+            <a
+              class="toc-item"
+              [class.toc-nivel-1]="item.nivel === 1"
+              [class.toc-nivel-2]="item.nivel === 2"
+              [class.toc-nivel-3]="item.nivel === 3"
+              [class.toc-nivel-4]="item.nivel === 4"
+              [class.toc-nivel-5]="item.nivel === 5"
+              [class.toc-nivel-6]="item.nivel === 6"
+              [class.toc-item--activo]="seccionActivaId() === item.id"
+              (click)="irASeccion(item.id)"
+            >{{ item.texto }}</a>
+          }
         }
       </nav>
     }
@@ -543,6 +585,18 @@
           <input type="text" formControlName="titulo" />
         </label>
 
+        <label>
+          Etiquetas (opcional)
+          <app-chips-etiquetas
+            placeholder="Agregar etiqueta…"
+            [permitirNuevas]="true"
+            [maximo]="30"
+            [busquedaRemota]="sugerirEtiquetas"
+            [valor]="etiquetasDocumento()"
+            (valorChange)="etiquetasDocumento.set($event)"
+          />
+        </label>
+
         @if (esNuevo() && plantillas().length > 0) {
           <label>
             Usar plantilla (opcional)
@@ -602,3 +656,99 @@
   (confirmar)="confirmarQuitarReferencia()"
   (cancelar)="referenciaAEliminar.set(null)"
 />
+
+<!-- Duplicar documento (Mandato 90 §6, nov-2026) — ConfirmDialogComponent
+     no tiene slot de contenido (ver su comentario en confirm-dialog.
+     component.ts), así que este formulario de varios campos reutiliza
+     directamente las clases globales .modal-overlay/.modal-box/.modal-
+     actions (las mismas que usa ConfirmDialogComponent por dentro) en vez
+     de un componente nuevo — mismo criterio ya usado para la pestaña
+     Referencias (tarjeta oculta hasta pedirse explícitamente). -->
+@if (documentoADuplicar(); as origen) {
+  <div class="modal-overlay show" (click)="cancelarDuplicar()">
+    <div class="modal-box modal-box--duplicar" (click)="$event.stopPropagation()">
+      <h3>Duplicar documento</h3>
+      <p>Se creará una copia nueva de «{{ origen.titulo }}».</p>
+
+      <label>
+        Título de la copia
+        <input
+          type="text"
+          [value]="draftDuplicar().titulo"
+          (input)="draftDuplicar.set({ ...draftDuplicar(), titulo: $any($event.target).value })"
+        />
+      </label>
+
+      <label>
+        Sección de destino
+        <app-select-buscable
+          [opciones]="opcionesSeccionDuplicar()"
+          [value]="draftDuplicar().seccionId"
+          (valueChange)="draftDuplicar.set({ ...draftDuplicar(), seccionId: $event ? +$event : 0 })"
+          placeholder="Buscar sección…"
+        />
+      </label>
+
+      <p class="duplicar-copiar-titulo">Qué copiar de «{{ origen.titulo }}»:</p>
+      <div class="duplicar-opciones">
+        <label class="checkbox-inline">
+          <input
+            type="checkbox"
+            [checked]="draftDuplicar().copiarContenido"
+            (change)="draftDuplicar.set({ ...draftDuplicar(), copiarContenido: $any($event.target).checked })"
+          />
+          Contenido (si no, la copia inicia en blanco)
+        </label>
+        <label class="checkbox-inline">
+          <input
+            type="checkbox"
+            [checked]="draftDuplicar().copiarEtiquetas"
+            (change)="draftDuplicar.set({ ...draftDuplicar(), copiarEtiquetas: $any($event.target).checked })"
+          />
+          Etiquetas
+        </label>
+        <label class="checkbox-inline">
+          <input
+            type="checkbox"
+            [checked]="draftDuplicar().copiarReferenciasTablas"
+            (change)="draftDuplicar.set({ ...draftDuplicar(), copiarReferenciasTablas: $any($event.target).checked })"
+          />
+          Referencias a tablas
+        </label>
+        <label class="checkbox-inline">
+          <input
+            type="checkbox"
+            [checked]="draftDuplicar().copiarReferenciasProcesos"
+            (change)="draftDuplicar.set({ ...draftDuplicar(), copiarReferenciasProcesos: $any($event.target).checked })"
+          />
+          Referencias a procesos
+        </label>
+        <label class="checkbox-inline">
+          <input
+            type="checkbox"
+            [checked]="draftDuplicar().copiarReferenciasModulos"
+            (change)="draftDuplicar.set({ ...draftDuplicar(), copiarReferenciasModulos: $any($event.target).checked })"
+          />
+          Referencias a módulos/pantallas
+        </label>
+        <label class="checkbox-inline">
+          <input
+            type="checkbox"
+            [checked]="draftDuplicar().copiarRelacionados"
+            (change)="draftDuplicar.set({ ...draftDuplicar(), copiarRelacionados: $any($event.target).checked })"
+          />
+          Documentos relacionados (solo los que este documento referencia)
+        </label>
+      </div>
+      <p class="duplicar-nota">Los archivos adjuntos, el historial de versiones y los documentos que referencian a este nunca se copian.</p>
+      <p class="duplicar-nota">Si el contenido copiado incluye enlaces internos a otros documentos, esos enlaces seguirán apuntando a sus destinos originales (no se redirigen hacia la copia).</p>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="cancelarDuplicar()">Cancelar</button>
+        <button type="button" class="btn-primary" [disabled]="guardandoDuplicado()" (click)="confirmarDuplicar()">
+          {{ guardandoDuplicado() ? 'Duplicando…' : 'Duplicar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

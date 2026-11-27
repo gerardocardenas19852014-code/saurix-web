@@ -1,0 +1,115 @@
+.chips-etiquetas {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.chips-etiquetas-lista {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-raised);
+  min-height: 38px;
+}
+
+.chips-etiquetas-lista--tope {
+  background: color-mix(in srgb, var(--paper-raised) 94%, var(--ink-soft) 6%);
+}
+
+.chips-etiquetas-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px 3px 10px;
+  border-radius: 999px;
+  background: var(--chip-bg, rgba(99, 102, 241, 0.12));
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.chips-etiquetas-quitar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.chips-etiquetas-quitar:hover {
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.chips-etiquetas-input {
+  flex: 1;
+  min-width: 140px;
+  border: none;
+  background: transparent;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13.5px;
+  color: var(--text-strong);
+  padding: 4px 2px;
+}
+
+.chips-etiquetas-input:focus {
+  outline: none;
+}
+
+.chips-etiquetas-ayuda {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+
+.chips-etiquetas-dropdown {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 16px 32px -14px rgba(0, 0, 0, 0.35);
+}
+
+.chips-etiquetas-dropdown li {
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.chips-etiquetas-dropdown li.activa,
+.chips-etiquetas-dropdown li:hover {
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.chips-etiquetas-vacio {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  cursor: default;
+}
+
+.chips-etiquetas-vacio:hover {
+  background: transparent;
+}

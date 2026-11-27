@@ -20,6 +20,7 @@ import { generarTablaContenido } from '../../shared/utils/tabla-contenido.util';
 import { truncarTexto } from '../../shared/utils/texto.util';
 import { SelectBuscableComponent, OpcionBuscable } from '../../shared/components/select-buscable/select-buscable.component';
 import { TextoSugeridoComponent, SugerenciaTexto } from '../../shared/components/texto-sugerido/texto-sugerido.component';
+import { ChipsEtiquetasComponent, EtiquetaChip } from '../../shared/components/chips-etiquetas/chips-etiquetas.component';
 import {
   CategoriaOpcion,
   Documento,
@@ -29,6 +30,7 @@ import {
   DocumentoReferenciaTabla,
   DocumentoRelacion,
   DocumentoVersion,
+  Etiqueta,
   SeccionOpcion,
   TipoRelacionDocumento,
   TipoSistemaOpcion,
@@ -60,6 +62,13 @@ interface DocumentoListaFila {
   fechaModificacion?: string;
   esFavorito: boolean;
   tieneTrazabilidad: boolean;
+  /** Mandato 90 (nov-2026): recorte server-side (hasta 3) de los nombres
+   *  de etiqueta de este documento + el total real — pensados exactamente
+   *  para la columna "Etiquetas" de la cuadrícula (ver columnas más abajo).
+   *  Nunca se piden las etiquetas completas por fila aparte (eso solo pasa
+   *  al editar un documento puntual, ver fn_documento_etiquetas_listar). */
+  etiquetasNombres: string[];
+  etiquetasTotal: number;
 }
 
 const COLUMNA_ORDEN_DEFECTO: keyof DocumentoListaFila & string = 'titulo';
@@ -111,6 +120,21 @@ interface DraftRelacion {
   id: number | null;
   documentoRelacionadoId: number | null;
   tipo: TipoRelacionDocumento;
+}
+
+/** Borrador del formulario "Duplicar documento" (Mandato 90 §6, nov-2026)
+ *  — las 6 banderas de copia no tienen ningún default server-side (ver
+ *  wikidocs.fn_documento_duplicar): Angular es la única fuente de verdad
+ *  sobre sus valores iniciales, ver draftDuplicarVacio(). */
+interface DraftDuplicar {
+  titulo: string;
+  seccionId: number;
+  copiarContenido: boolean;
+  copiarEtiquetas: boolean;
+  copiarReferenciasTablas: boolean;
+  copiarReferenciasProcesos: boolean;
+  copiarReferenciasModulos: boolean;
+  copiarRelacionados: boolean;
 }
 
 /** Referencia señalada para eliminar (pide confirmación antes de la baja
@@ -197,6 +221,7 @@ interface ReferenciaAEliminar {
     EditorTextoComponent,
     SelectBuscableComponent,
     TextoSugeridoComponent,
+    ChipsEtiquetasComponent,
   ],
   templateUrl: './documentos-list.component.html',
   styleUrl: './documentos-list.component.scss',
@@ -238,6 +263,17 @@ export class DocumentosListComponent implements OnInit {
   private soloHuerfanosAplicado = false;
   private soloConectadosAplicado = false;
   private mostrarInactivosAplicado = false;
+
+  /** Filtro por etiquetas (Mandato 90 §5, nov-2026) — mismo criterio
+   *  SAURIX-CAT-001 v1.1 que el resto: "...EnEdicion" no dispara nada por
+   *  sí solo, "buscar()" lo copia a lo aplicado recién ahí. Solo admite
+   *  etiquetas YA EXISTENTES en el catálogo (permitirNuevas=false en el
+   *  <app-chips-etiquetas> del template) — no tendría con qué filtrar un
+   *  nombre que no existe. */
+  protected readonly etiquetasFiltroEnEdicion = signal<EtiquetaChip[]>([]);
+  protected readonly modoEtiquetasEnEdicion = signal<'any' | 'all'>('any');
+  private etiquetasFiltroAplicado: number[] = [];
+  private modoEtiquetasAplicado: 'any' | 'all' = 'any';
 
   private secuencia = 0;
 
@@ -312,6 +348,15 @@ export class DocumentosListComponent implements OnInit {
    *  localmente en cada toggle sin volver a consultar. */
   protected readonly favoritoActual = signal(false);
 
+  /** Etiquetas del documento actualmente en alta/edición (Mandato 90,
+   *  nov-2026) — 100% estado local hasta presionar "Guardar" (igual que el
+   *  resto del formulario): se precargan al entrar a "Editar" (ver
+   *  cargarEtiquetasDocumento/cargarFormDesde), se vacían al "Nuevo
+   *  documento", y se descartan sin tocar nada guardado si se cancela.
+   *  `id` viene en null para las agregadas como texto libre que todavía no
+   *  existen en el catálogo — ver EtiquetaChip. */
+  protected readonly etiquetasDocumento = signal<EtiquetaChip[]>([]);
+
   protected readonly versiones = signal<DocumentoVersion[]>([]);
   protected readonly versionARestaurar = signal<DocumentoVersion | null>(null);
   protected readonly columnasVersiones: ColumnaTabla<DocumentoVersion>[] = [
@@ -338,6 +383,25 @@ export class DocumentosListComponent implements OnInit {
       formatear: (fila) => this.mapaSecciones().get(fila.seccionId)?.nombre ?? '—',
     },
     {
+      // Mandato 90 §5/§7: recorte de hasta 3 nombres + "+N" cuando hay más
+      // (ambos ya calculados server-side por fn_documentos_lista_pagina,
+      // nunca una consulta extra por fila). A propósito NO se usa el
+      // mecanismo `badgesSubfila` (pensado para convertir la PRIMERA
+      // columna marcada `subfila` en un renglón de ancho completo, ver
+      // ColumnaTabla.subfila en data-table.component.ts): hacerlo sobre
+      // "Título" le quitaría a esa columna su encabezado clicable para
+      // ordenar (columnasFila excluye toda columna `subfila` del
+      // encabezado) — con "Título" como orden por defecto de esta
+      // pantalla, esa regresión no se justifica solo para mostrar
+      // etiquetas. Una columna normal más (igual que "Sección") logra lo
+      // mismo sin ese costo.
+      campo: 'id',
+      claveColumna: 'etiquetas',
+      etiqueta: 'Etiquetas',
+      formatear: (fila) => this.textoEtiquetasFila(fila),
+      titulo: (fila) => (fila.etiquetasNombres?.length ? fila.etiquetasNombres.join(', ') : 'Sin etiquetas'),
+    },
+    {
       campo: 'id',
       claveColumna: 'trazabilidad',
       etiqueta: 'Trazabilidad',
@@ -351,6 +415,17 @@ export class DocumentosListComponent implements OnInit {
     { campo: 'activo', etiqueta: 'Activo', formatear: (fila) => (fila.activo ? 'Sí' : 'No') },
   ];
 
+  /** Texto compacto para la columna "Etiquetas" de la cuadrícula —
+   *  "tag1, tag2, tag3 +N" cuando hay más de las 3 que ya trae el recorte
+   *  server-side, o "—" cuando el documento no tiene ninguna. */
+  private textoEtiquetasFila(fila: DocumentoListaFila): string {
+    const nombres = fila.etiquetasNombres ?? [];
+    const total = fila.etiquetasTotal ?? 0;
+    if (total === 0) return '—';
+    const extra = total - nombres.length;
+    return extra > 0 ? `${nombres.join(', ')} +${extra}` : nombres.join(', ');
+  }
+
   /** Encabezados (h1/h2/h3) del documento actual + el mismo HTML con esos
    *  encabezados ya con id — una sola pasada para no parsear el HTML dos
    *  veces (una vez para el índice, otra para el contenido mostrado). */
@@ -360,11 +435,70 @@ export class DocumentosListComponent implements OnInit {
     return generarTablaContenido(insertarEmbeds(html));
   });
 
-  /** Índice de contenido de la vista "Ver" — solo tiene caso mostrarlo
-   *  cuando el documento realmente tiene varias secciones. */
+  /** Índice de contenido de la vista "Ver". Mandato 90 §7: antes exigía
+   *  más de un encabezado (`length > 1`) para aparecer — con la extensión
+   *  a h1-h6 un documento con UN SOLO encabezado (p.ej. nada más un h2
+   *  dentro de contenido corto) también se beneficia de poder saltar
+   *  directo a él, así que ahora alcanza con que exista al menos uno. */
   protected readonly tablaContenido = computed(() => {
     const items = this.tocYContenido().items;
-    return items.length > 1 ? items : [];
+    return items.length > 0 ? items : [];
+  });
+
+  /** Colapsado/expandido del índice de contenido (Mandato 90 §7.1) — una
+   *  sola señal para escritorio y móvil (nunca un observer ni media query
+   *  en JS: el CSS ya distingue breakpoints solo); empieza expandido,
+   *  igual que el comportamiento de siempre antes de poder colapsarlo. */
+  protected readonly tocColapsado = signal(false);
+
+  protected toggleToc(): void {
+    this.tocColapsado.update((v) => !v);
+  }
+
+  /** Id del encabezado actualmente "activo" (el más alto visible dentro
+   *  del área de lectura) para resaltarlo en el índice mientras se hace
+   *  scroll — Mandato 90 §7.1. Se recalcula con un único IntersectionObserver
+   *  por documento mostrado (nunca con un listener de scroll + cálculos
+   *  manuales de posición, más caro); se desconecta solo tanto al cambiar
+   *  de documento como al destruirse el componente (onCleanup del propio
+   *  effect, mismo patrón que _anchoSegunVista más arriba). */
+  protected readonly seccionActivaId = signal<string | null>(null);
+  private readonly _observarEncabezados = effect((onCleanup) => {
+    const items = this.tablaContenido();
+    const vista = this.vista();
+    if (vista !== 'ver' || items.length === 0) {
+      this.seccionActivaId.set(null);
+      return;
+    }
+
+    // Se espera un tick para que `[innerHTML]` ya haya pintado los
+    // encabezados reales en el DOM antes de intentar observarlos.
+    const idTimeout = setTimeout(() => {
+      const elementos = items
+        .map((item) => document.getElementById(item.id))
+        .filter((el): el is HTMLElement => el !== null);
+      if (elementos.length === 0) return;
+
+      this.seccionActivaId.set(items[0].id);
+
+      const observer = new IntersectionObserver(
+        (entradas) => {
+          // El encabezado "activo" es el más alto entre los que siguen
+          // visibles bajo la franja superior del área de lectura — si
+          // ninguno sigue visible (se hizo scroll más allá de todos), se
+          // conserva el último conocido en vez de limpiarlo a `null`.
+          const visibles = entradas.filter((e) => e.isIntersecting).map((e) => e.target.id);
+          if (visibles.length === 0) return;
+          const primerIndice = items.findIndex((item) => visibles.includes(item.id));
+          if (primerIndice >= 0) this.seccionActivaId.set(items[primerIndice].id);
+        },
+        { rootMargin: '0px 0px -70% 0px', threshold: 0 },
+      );
+      elementos.forEach((el) => observer.observe(el));
+      onCleanup(() => observer.disconnect());
+    }, 0);
+
+    onCleanup(() => clearTimeout(idTimeout));
   });
 
   protected readonly contenidoRenderizado = computed<SafeHtml>(() => {
@@ -1045,6 +1179,8 @@ export class DocumentosListComponent implements OnInit {
       p_orden_direccion: this.direccionOrden(),
       p_desde: desde,
       p_cantidad: tamanio,
+      p_etiquetas_id: this.etiquetasFiltroAplicado.length ? this.etiquetasFiltroAplicado : null,
+      p_modo_etiquetas: this.modoEtiquetasAplicado,
     });
 
     if (miSecuencia !== this.secuencia) return;
@@ -1078,6 +1214,10 @@ export class DocumentosListComponent implements OnInit {
     this.soloHuerfanosAplicado = this.soloHuerfanosEnEdicion();
     this.soloConectadosAplicado = this.soloConectadosEnEdicion();
     this.mostrarInactivosAplicado = this.mostrarInactivosEnEdicion();
+    this.etiquetasFiltroAplicado = this.etiquetasFiltroEnEdicion()
+      .map((e) => e.id)
+      .filter((id): id is number => id !== null);
+    this.modoEtiquetasAplicado = this.modoEtiquetasEnEdicion();
     this.reiniciarYCargar();
   }
 
@@ -1087,7 +1227,23 @@ export class DocumentosListComponent implements OnInit {
     this.soloHuerfanosEnEdicion.set(false);
     this.soloConectadosEnEdicion.set(false);
     this.mostrarInactivosEnEdicion.set(false);
+    this.etiquetasFiltroEnEdicion.set([]);
+    this.modoEtiquetasEnEdicion.set('any');
   }
+
+  /** Autocompletado del filtro por etiquetas y del chip-selector del
+   *  formulario de documento (ambos comparten este mismo helper) — trae
+   *  sugerencias de `wikidocs.fn_etiquetas_sugerencias` con su id real
+   *  (a diferencia de `sugerirDesdeServidor`, pensado para
+   *  `TextoSugeridoComponent`/`SugerenciaTexto`, que no tiene id). */
+  protected readonly sugerirEtiquetas = async (texto: string): Promise<EtiquetaChip[]> => {
+    const { data, error } = await this.sb.schema('wikidocs').rpc('fn_etiquetas_sugerencias', { p_texto: texto });
+    if (error) return [];
+    return ((data ?? []) as Record<string, unknown>[]).map((f) => {
+      const fila = filaACamel(f) as { id: number; nombre: string };
+      return { id: fila.id, nombre: fila.nombre };
+    });
+  };
 
   protected onPaginaCambio(pagina: number): void {
     this.paginaActual.set(pagina);
@@ -1234,7 +1390,8 @@ export class DocumentosListComponent implements OnInit {
     this.categorias.set([]);
     this.secciones.set([]);
     this.favoritoActual.set(false);
-    this.valoresOriginales = JSON.stringify(this.form.getRawValue());
+    this.etiquetasDocumento.set([]);
+    this.valoresOriginales = this.snapshotFormulario();
     this.cargarDocumentosParaEnlazar();
     this.vista.set('editar');
   }
@@ -1361,10 +1518,23 @@ export class DocumentosListComponent implements OnInit {
     });
     this.categorias.set([]);
     this.secciones.set([]);
+    this.etiquetasDocumento.set([]);
 
+    // El snapshot para hayCambiosSinGuardar() necesita esperar a que
+    // terminen LAS DOS cargas asíncronas que alimentan el formulario: la
+    // cascada Sección→Categoría→Tipo de sistema (como siempre) y, desde el
+    // Mandato 90, la precarga de etiquetas ya asignadas (ver
+    // cargarEtiquetasDocumento) — mismo criterio de "varias cargas en
+    // paralelo, avisar solo cuando todas terminen" que cargarReferencias().
+    // Tomarlo antes de que ambas terminen marcaría como "sin cambios" un
+    // estado todavía incompleto.
+    let pendientes = 2;
     const terminar = () => {
-      this.valoresOriginales = JSON.stringify(this.form.getRawValue());
+      pendientes--;
+      if (pendientes === 0) this.valoresOriginales = this.snapshotFormulario();
     };
+
+    this.cargarEtiquetasDocumento(documento.id, terminar);
 
     if (this.seccionFijaId) {
       terminar();
@@ -1391,6 +1561,41 @@ export class DocumentosListComponent implements OnInit {
     });
   }
 
+  /** Precarga los chips de etiquetas ya asignadas a un documento al entrar
+   *  a "Editar" — `fn_documentos_lista_pagina` solo trae un recorte de 3 +
+   *  total (pensado para la columna de la cuadrícula, ver
+   *  DocumentoListaFila), así que aquí se usa la función de lectura
+   *  dedicada que trae el conjunto COMPLETO con su id real (necesario para
+   *  poder enviarlo luego como p_etiquetas_id si no cambia, ver guardar()).
+   *  `alTerminar` es el aviso opcional para el join con la cascada de
+   *  Sección→Categoría→Tipo de sistema, ver cargarFormDesde(). */
+  private cargarEtiquetasDocumento(documentoId: number, alTerminar?: () => void): void {
+    this.sb
+      .schema('wikidocs')
+      .rpc('fn_documento_etiquetas_listar', { p_documento_id: documentoId })
+      .then(({ data, error }: { data: unknown; error: { message: string } | null }) => {
+        if (!error) {
+          const filas = (data ?? []) as Record<string, unknown>[];
+          this.etiquetasDocumento.set(
+            filas.map((f) => filaACamel(f) as unknown as Etiqueta).map((e) => ({ id: e.id, nombre: e.nombre })),
+          );
+        }
+        alTerminar?.();
+      });
+  }
+
+  /** Snapshot para hayCambiosSinGuardar() — además de los campos del
+   *  FormGroup (como antes), incluye las etiquetas capturadas (Mandato 90):
+   *  normalizadas y ordenadas, para que solo un cambio REAL en el conjunto
+   *  de etiquetas (agregar/quitar una) cuente como "cambio sin guardar",
+   *  nunca el simple orden en que se fueron agregando. */
+  private snapshotFormulario(): string {
+    const etiquetas = this.etiquetasDocumento()
+      .map((e) => e.nombre.trim().toLowerCase())
+      .sort();
+    return JSON.stringify({ form: this.form.getRawValue(), etiquetas });
+  }
+
   volverALista(): void {
     this.documentoActual.set(null);
     this.vista.set('lista');
@@ -1398,7 +1603,7 @@ export class DocumentosListComponent implements OnInit {
   }
 
   private hayCambiosSinGuardar(): boolean {
-    return JSON.stringify(this.form.getRawValue()) !== this.valoresOriginales;
+    return this.snapshotFormulario() !== this.valoresOriginales;
   }
 
   protected readonly avisoCierreVisible = signal(false);
@@ -1435,45 +1640,88 @@ export class DocumentosListComponent implements OnInit {
       return;
     }
 
-    const { tipoSistemaId: _tipoSistemaId, categoriaId: _categoriaId, ...valor } = valorBruto;
     const documentoPrevio = this.documentoActual();
-    const activo = documentoPrevio?.activo ?? true;
-    const dto = { ...valor, activo };
     const esEdicion = documentoPrevio !== null;
 
-    const guardarDocumento = (): void => {
-      const peticion = esEdicion
-        ? this.data.modificacion<Documento>('Documento', dto)
-        : this.data.alta<Documento>('Documento', dto);
+    // Mandato 90 §2.1 + Mandato 90.1 §2: alta/edición del documento, el
+    // snapshot de DocumentoVersion (cómo se veía ANTES de este cambio) Y
+    // la sincronización de etiquetas ocurren ahora en UNA SOLA transacción
+    // server-side (fn_documento_etiquetas_sincronizar) — ya no dos pasos
+    // independientes con el historial resuelto aparte desde Angular: si
+    // algo falla a medio camino (guardado del documento, sincronización de
+    // etiquetas), nada queda a medias, tampoco una fila de historial
+    // huérfana de un guardado que en realidad nunca se completó. Las ya
+    // elegidas de una sugerencia (con id real) viajan en p_etiquetas_id;
+    // las escritas como texto libre que todavía no existen (id null)
+    // viajan en p_etiquetas_nuevas y se resuelven adentro de esa misma
+    // transacción (reutilizando la existente sin tocar su auditoría si el
+    // nombre ya estaba en el catálogo, normalizado).
+    const etiquetas = this.etiquetasDocumento();
+    const etiquetasId = etiquetas.filter((e) => e.id !== null).map((e) => e.id as number);
+    const etiquetasNuevas = etiquetas.filter((e) => e.id === null).map((e) => e.nombre);
 
-      peticion.subscribe({
+    const guardarDocumento = async (): Promise<void> => {
+      const { data, error } = await this.sb.schema('wikidocs').rpc('fn_documento_etiquetas_sincronizar', {
+        p_documento_id: esEdicion ? documentoPrevio!.id : null,
+        p_seccion_id: valorBruto.seccionId,
+        p_titulo: valorBruto.titulo,
+        p_contenido: valorBruto.contenido,
+        p_etiquetas_id: etiquetasId.length ? etiquetasId : null,
+        p_etiquetas_nuevas: etiquetasNuevas.length ? etiquetasNuevas : null,
+        // p_usuario YA NO se usa para la auditoría (Mandato 90.1 §1: el
+        // servidor resuelve la identidad real vía auth.uid(), nunca lo
+        // que mande el cliente, para que nadie pueda registrar un cambio
+        // en el historial a nombre de otra persona) — se deja de mandar.
+        //
+        // Control de concurrencia optimista (Mandato 90.1 §1): el token
+        // es fechaModificacion si el documento ya se editó antes, o
+        // fechaCreacion si todavía no (coincide con el COALESCE que usa
+        // el servidor) — así la PRIMERA edición de un documento recién
+        // creado también queda protegida, no solo las siguientes. En
+        // alta de documento nuevo va en null (no aplica, no hay nada
+        // previo que proteger).
+        p_fecha_modificacion_esperada: esEdicion
+          ? (documentoPrevio!.fechaModificacion ?? documentoPrevio!.fechaCreacion ?? null)
+          : null,
+      });
+
+      if (error) {
+        // 40001 = serialization_failure: el servidor detectó que otro
+        // usuario guardó este documento mientras este formulario seguía
+        // abierto (o que faltó el token de concurrencia). El formulario
+        // NUNCA se cierra solo ni se pierde lo escrito — el usuario
+        // decide si recarga (perdiendo su borrador) o copia su texto
+        // aparte antes de hacerlo.
+        if (error.code === '40001') {
+          this.toast.advertencia(
+            'Este documento fue modificado por otro usuario mientras lo editabas. Copia tus cambios si los necesitas y vuelve a abrirlo para continuar.',
+          );
+        } else {
+          this.toast.error('No se pudo guardar el documento. Intenta de nuevo.');
+        }
+        return;
+      }
+
+      const documentoId = data as number;
+      this.data.getById<Documento>('Documento', documentoId).subscribe({
         next: (documento) => {
           this.toast.exito(esEdicion ? 'Documento actualizado.' : 'Documento creado.');
-          this.valoresOriginales = JSON.stringify(this.form.getRawValue());
           this.documentoActual.set(documento);
           this.resolverFavoritoActual(documento.id);
+          // Refresca con los ids reales (las recién creadas quedaron con
+          // id null en memoria) — snapshotFormulario() solo compara
+          // nombres normalizados, así que esto no afecta el "sin cambios"
+          // que se fija justo después.
+          this.cargarEtiquetasDocumento(documento.id);
+          this.valoresOriginales = this.snapshotFormulario();
           this.vista.set('ver');
           if (this.haBuscado()) void this.cargar();
         },
-        error: () => this.toast.error('No se pudo guardar el documento. Intenta de nuevo.'),
+        error: () => this.toast.error('El documento se guardó, pero no se pudo recargar su información.'),
       });
     };
 
-    // Antes de sobrescribir un documento existente, se guarda un snapshot
-    // del contenido TAL COMO ESTABA (no el nuevo) — así el historial de
-    // versiones siempre tiene "cómo se veía antes de este cambio".
-    if (esEdicion && documentoPrevio) {
-      this.data
-        .alta<DocumentoVersion>('DocumentoVersion', {
-          documentoId: documentoPrevio.id,
-          titulo: documentoPrevio.titulo,
-          contenido: documentoPrevio.contenido,
-          usuario: this.auth.usuarioActual()?.nombreUsuario ?? 'desconocido',
-        })
-        .subscribe({ next: guardarDocumento, error: guardarDocumento });
-    } else {
-      guardarDocumento();
-    }
+    void guardarDocumento();
   }
 
   private renderParaDescarga(documento: Documento): string {
@@ -1587,6 +1835,109 @@ export class DocumentosListComponent implements OnInit {
     } catch {
       this.toast.error('No se pudo copiar el enlace. Cópialo manualmente: ' + url);
     }
+  }
+
+  // ---------------- Duplicar documento (Mandato 90 §6, nov-2026) ---------
+  // Tarjeta oculta hasta pedirse (mismo patrón que la pestaña Referencias,
+  // ver formAbierto/ConfirmDialogComponent sin slot de contenido) — se
+  // ofrece desde la fila de la cuadrícula (accionExtra3) y desde el header
+  // de la pestaña "Ver" del documento abierto; a propósito NUNCA desde la
+  // pestaña "Editar" (protección de cambios pendientes, §6.6): duplicar
+  // siempre parte de la ÚLTIMA VERSIÓN GUARDADA en la base — ofrecerlo
+  // también mientras hay cambios sin guardar en el formulario induciría a
+  // pensar que esos cambios en pantalla (todavía no persistidos) se
+  // incluirían en la copia, cuando en realidad nunca es así.
+
+  private draftDuplicarVacio(origen: { titulo: string; seccionId: number }): DraftDuplicar {
+    return {
+      titulo: `Copia de ${origen.titulo}`,
+      seccionId: this.seccionFijaId ?? origen.seccionId,
+      copiarContenido: true,
+      copiarEtiquetas: true,
+      copiarReferenciasTablas: true,
+      copiarReferenciasProcesos: true,
+      copiarReferenciasModulos: true,
+      copiarRelacionados: false,
+    };
+  }
+
+  protected readonly documentoADuplicar = signal<{ id: number; titulo: string; seccionId: number } | null>(null);
+  protected readonly draftDuplicar = signal<DraftDuplicar>(this.draftDuplicarVacio({ titulo: '', seccionId: 0 }));
+  protected readonly guardandoDuplicado = signal(false);
+  private claveIdempotenciaDuplicar = '';
+
+  /** Opciones de sección de destino para "Duplicar" — igual universo que
+   *  la columna "Sección" de la cuadrícula (todasLasSecciones, ya cargado
+   *  de siempre), sin la cascada Tipo de sistema→Categoría del alta normal
+   *  (aquí alcanza con elegir directo entre todas, vía selector
+   *  buscable). */
+  protected readonly opcionesSeccionDuplicar = computed<OpcionBuscable[]>(() =>
+    this.todasLasSecciones().map((s) => ({ valor: s.id, etiqueta: s.nombre })),
+  );
+
+  protected pedirDuplicar(origen: { id: number; titulo: string; seccionId: number }): void {
+    this.documentoADuplicar.set(origen);
+    this.draftDuplicar.set(this.draftDuplicarVacio(origen));
+    // Se genera UNA sola vez al abrir el formulario, no en cada intento de
+    // envío — así un reintento del mismo clic (doble click, reintento de
+    // red) comparte la misma clave y fn_documento_duplicar lo resuelve de
+    // forma idempotente (nunca crea un segundo documento); una duplicación
+    // deliberadamente nueva (cerrar y volver a pedir "Duplicar") sí
+    // obtiene una clave nueva.
+    this.claveIdempotenciaDuplicar = crypto.randomUUID();
+    this.guardandoDuplicado.set(false);
+  }
+
+  protected cancelarDuplicar(): void {
+    this.documentoADuplicar.set(null);
+  }
+
+  protected async confirmarDuplicar(): Promise<void> {
+    const origen = this.documentoADuplicar();
+    const draft = this.draftDuplicar();
+    if (!origen || this.guardandoDuplicado()) return;
+
+    if (!draft.titulo.trim()) {
+      this.toast.advertencia('Escribe un título para la copia.');
+      return;
+    }
+    if (!draft.seccionId) {
+      this.toast.advertencia('Elige la sección de destino.');
+      return;
+    }
+
+    this.guardandoDuplicado.set(true);
+    const { data, error } = await this.sb.schema('wikidocs').rpc('fn_documento_duplicar', {
+      p_documento_id: origen.id,
+      p_titulo: draft.titulo.trim(),
+      p_seccion_id: draft.seccionId,
+      p_copiar_contenido: draft.copiarContenido,
+      p_copiar_etiquetas: draft.copiarEtiquetas,
+      p_copiar_referencias_tablas: draft.copiarReferenciasTablas,
+      p_copiar_referencias_procesos: draft.copiarReferenciasProcesos,
+      p_copiar_referencias_modulos: draft.copiarReferenciasModulos,
+      p_copiar_relacionados: draft.copiarRelacionados,
+      p_clave_idempotencia: this.claveIdempotenciaDuplicar,
+    });
+    this.guardandoDuplicado.set(false);
+
+    if (error) {
+      this.toast.error('No se pudo duplicar el documento: ' + error.message);
+      return;
+    }
+
+    const nuevoId = data as number;
+    this.documentoADuplicar.set(null);
+    // Nunca regresa a la lista ni dispara una búsqueda — abre de una vez el
+    // documento recién creado, directo en modo edición (para revisar antes
+    // de darlo por terminado), igual que si se acabara de dar de alta.
+    this.data.getById<Documento>('Documento', nuevoId).subscribe({
+      next: (documento) => {
+        this.toast.exito('Documento duplicado.');
+        this.editarDocumento(documento);
+      },
+      error: () => this.toast.error('El documento se duplicó, pero no se pudo abrir automáticamente.'),
+    });
   }
 
   /** Descarga TODOS los documentos ACTIVOS de la sección actual (solo

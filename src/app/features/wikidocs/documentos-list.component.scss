@@ -265,3 +265,66 @@
     background: color-mix(in srgb, var(--ink-soft) 14%, transparent);
   }
 }
+
+/* ------------------------------------------------------------------
+ * Mandato 90 (nov-2026, "WikiDocs — etiquetas y duplicación de
+ * documentos"): filtro por etiquetas de la barra de herramientas y
+ * formulario de "Duplicar documento". Mismos tokens de color que el resto
+ * de la hoja (var(--line)/var(--paper-raised)/var(--ink-soft)) — ninguno
+ * nuevo. `.modal-overlay`/`.modal-box`/`.modal-actions` ya existen en
+ * src/styles.scss (los usa ConfirmDialogComponent por dentro) — el
+ * formulario de Duplicar los reutiliza tal cual en vez de un componente
+ * nuevo, ver comentario en el HTML.
+ * ------------------------------------------------------------------ */
+
+.grid-filter-etiquetas {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 8px;
+
+  app-chips-etiquetas {
+    flex: 1;
+    min-width: 220px;
+  }
+}
+
+.grid-filter-modo-etiquetas {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  padding: 8px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-raised);
+  color: var(--text-strong);
+  flex-shrink: 0;
+}
+
+.modal-box--duplicar {
+  max-width: 480px;
+  width: 100%;
+  text-align: left;
+
+  label {
+    display: block;
+    margin: 10px 0;
+  }
+}
+
+.duplicar-copiar-titulo {
+  margin: 14px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.duplicar-opciones {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.duplicar-nota {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
