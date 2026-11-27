@@ -62,6 +62,17 @@ const TOPE_VERIFICACION_DUPLICADO = 1000;
  * (tipo de sistema y categoría iniciales) solo se calcula cuando AMBAS
  * respuestas ya están disponibles, eliminando la dependencia del orden de
  * llegada.
+ *
+ * Corrección del Mandato 90.2: Fase B eliminó la auto-carga al ABRIR la
+ * pantalla, pero dejó que cambiar cualquiera de los dos selectores (Tipo
+ * de sistema o Categoría) siguiera disparando la carga de inmediato --
+ * detectado en pruebas visuales. Ahora `categoriaSeleccionadaId` es el
+ * valor "en edición" (lo que el usuario ve en el `<select>`) y
+ * `categoriaIdAplicada` es el que realmente usa la consulta -- solo se
+ * sincronizan al presionar "Buscar" (o Enter), igual que el texto de
+ * búsqueda y "Mostrar inactivas". Cambiar de tipo de sistema sigue
+ * limpiando/preseleccionando la categoría en edición cuando ya no
+ * corresponde, pero eso tampoco dispara ninguna consulta.
  */
 @Component({
   selector: 'app-secciones-list',
@@ -102,6 +113,16 @@ export class SeccionesListComponent implements OnInit, OnDestroy {
   protected readonly mostrarInactivasEnEdicion = signal(false);
   private busquedaAplicada = '';
   private mostrarInactivasAplicado = false;
+  /** Categoría realmente usada en la última búsqueda ejecutada --
+   *  independiente del valor "en edición" de los selectores de arriba
+   *  (Mandato 90.2: cambiar Tipo de sistema o Categoría nunca debe
+   *  disparar una consulta por sí solo). */
+  private categoriaIdAplicada = 0;
+  /** Categoría congelada para el formulario actualmente abierto (Mandato
+   *  90.2 - verificación de contexto): se fija al abrir el modal (nuevo()
+   *  toma el selector en edición; editar() toma el padre REAL del
+   *  registro) y nunca se recalcula mientras el modal sigue abierto. */
+  private categoriaIdFormulario = 0;
 
   private secuencia = 0;
 
@@ -146,9 +167,9 @@ export class SeccionesListComponent implements OnInit, OnDestroy {
     // (ver comentario de clase): ambas cargas de los selectores se esperan
     // juntas con forkJoin antes de calcular cualquier selección por
     // defecto. Igual que en Categoría, esto es "llenar combos", no
-    // "cargar resultados" -- lo que la Fase B elimina es la auto-carga de
-        // la CUADRÍCULA de secciones, que solo ocurre dentro de
-    // seleccionarCategoria() más abajo.
+    // "cargar resultados" -- la cuadrícula de secciones solo se carga
+    // dentro de buscar() / reiniciarYCargar() (Mandato 90.2: elegir un
+    // tipo de sistema o una categoría nunca dispara esa carga por sí solo).
     forkJoin({
       tipos: this.data.list<TipoSistema>('TipoSistema'),
       categorias: this.data.list<Categoria>('Categoria'),
@@ -157,9 +178,11 @@ export class SeccionesListComponent implements OnInit, OnDestroy {
         this.tiposSistema.set(tipos);
         this.categoriasTodas.set(categorias);
         if (!tipos.length) return;
+        // Mandato 90.2: preseleccionar tipo de sistema + categoría es solo
+        // una comodidad visual -- NUNCA dispara la carga de la cuadrícula.
         this.tipoSistemaSeleccionadoId.set(tipos[0].id);
         const primeraDelTipo = categorias.find((c) => c.tipoSistemaId === tipos[0].id);
-        if (primeraDelTipo) this.seleccionarCategoria(primeraDelTipo.id);
+        if (primeraDelTipo) this.categoriaSeleccionadaId.set(primeraDelTipo.id);
       },
       error: () => this.toast.error('No se pudieron cargar los tipos de sistema y categorías.'),
     });
@@ -171,43 +194,32 @@ export class SeccionesListComponent implements OnInit, OnDestroy {
 
   // ── Selectores de padres ─────────────────────────────────────────────────
 
+  /** Mandato 90.2: solo actualiza los selectores "en edición" -- nunca
+   *  dispara la carga de la cuadrícula. Si la categoría ya elegida no
+   *  corresponde al nuevo tipo de sistema, se limpia (o se preselecciona
+   *  la primera del nuevo tipo, si existe) -- tampoco dispara nada por sí
+   *  sola. Los resultados ya mostrados se quedan como estaban hasta que
+   *  el usuario presione "Buscar" de nuevo. */
   cambiarTipoSistema(idTexto: string): void {
     const tipoSistemaId = Number(idTexto);
     this.tipoSistemaSeleccionadoId.set(tipoSistemaId);
-    const primeraDelTipo = this.categoriasTodas().find((c) => c.tipoSistemaId === tipoSistemaId);
-    if (primeraDelTipo) {
-      this.seleccionarCategoria(primeraDelTipo.id);
-    } else {
-      this.categoriaSeleccionadaId.set(0);
-      this.haBuscado.set(false);
-      this.registrosPagina.set([]);
-      this.totalFiltrado.set(0);
+    const categoriaActual = this.categoriasTodas().find((c) => c.id === this.categoriaSeleccionadaId());
+    if (!categoriaActual || categoriaActual.tipoSistemaId !== tipoSistemaId) {
+      const primeraDelTipo = this.categoriasTodas().find((c) => c.tipoSistemaId === tipoSistemaId);
+      this.categoriaSeleccionadaId.set(primeraDelTipo?.id ?? 0);
     }
   }
 
+  /** Mandato 90.2: solo actualiza el selector "en edición" -- nunca
+   *  dispara la carga de la cuadrícula. */
   cambiarCategoria(idTexto: string): void {
-    this.seleccionarCategoria(Number(idTexto));
-  }
-
-  /** Centraliza el cambio de categoría (desde el selector o desde el
-   *  autoselect inicial): resetea los filtros propios de esta pantalla y
-   *  dispara la carga de inmediato -- acción equivalente a que el usuario
-   *  mismo la eligiera, no una auto-consulta "al abrir". */
-  private seleccionarCategoria(categoriaId: number): void {
-    this.categoriaSeleccionadaId.set(categoriaId);
-    this.busquedaEnEdicion.set('');
-    this.mostrarInactivasEnEdicion.set(false);
-    this.busquedaAplicada = '';
-    this.mostrarInactivasAplicado = false;
-    this.haBuscado.set(true);
-    this.paginaActual.set(1);
-    this.cargar();
+    this.categoriaSeleccionadaId.set(Number(idTexto));
   }
 
   // ── Búsqueda, orden y paginación ─────────────────────────────────────────
 
   private filtroActual(): Record<string, unknown> {
-    const filtro: Record<string, unknown> = { categoriaId: this.categoriaSeleccionadaId() };
+    const filtro: Record<string, unknown> = { categoriaId: this.categoriaIdAplicada };
     const texto = this.busquedaAplicada.trim();
     if (texto) {
       filtro[FILTRO_BUSQUEDA] = { columnas: COLUMNAS_BUSQUEDA, texto } satisfies FiltroBusqueda;
@@ -217,7 +229,7 @@ export class SeccionesListComponent implements OnInit, OnDestroy {
   }
 
   private cargar(): void {
-    const categoriaId = this.categoriaSeleccionadaId();
+    const categoriaId = this.categoriaIdAplicada;
     if (!categoriaId) {
       this.registrosPagina.set([]);
       this.totalFiltrado.set(0);
@@ -255,6 +267,7 @@ export class SeccionesListComponent implements OnInit, OnDestroy {
 
   protected buscar(): void {
     this.haBuscado.set(true);
+    this.categoriaIdAplicada = this.categoriaSeleccionadaId();
     this.busquedaAplicada = this.busquedaEnEdicion();
     this.mostrarInactivasAplicado = this.mostrarInactivasEnEdicion();
     this.reiniciarYCargar();
@@ -316,6 +329,11 @@ export class SeccionesListComponent implements OnInit, OnDestroy {
   nuevo(): void {
     this.elementoDisparador = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.registroEnEdicion.set(null);
+    // Mandato 90.2 (verificación): el alta usa la categoría seleccionada
+    // AL ABRIR el formulario, congelada aquí -- si el usuario cambia el
+    // selector de arriba mientras el modal sigue abierto, el alta sigue
+    // yendo a la categoría con la que se abrió.
+    this.categoriaIdFormulario = this.categoriaSeleccionadaId();
     this.form.reset({ id: 0, nombre: '', activo: true });
     this.valoresOriginales = JSON.stringify(this.form.getRawValue());
     this.modalAbierto.set(true);
@@ -324,6 +342,11 @@ export class SeccionesListComponent implements OnInit, OnDestroy {
   editar(registro: Seccion): void {
     this.elementoDisparador = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.registroEnEdicion.set(registro);
+    // Mandato 90.2 (verificación): la edición conserva el padre REAL del
+    // registro, nunca el selector en edición -- que puede haber cambiado
+    // de categoría sin que el usuario haya vuelto a buscar, mientras la
+    // cuadrícula sigue mostrando resultados de la categoría anterior.
+    this.categoriaIdFormulario = registro.categoriaId;
     this.form.reset({ id: registro.id, nombre: registro.nombre, activo: registro.activo !== false });
     this.valoresOriginales = JSON.stringify(this.form.getRawValue());
     this.modalAbierto.set(true);
@@ -418,7 +441,7 @@ export class SeccionesListComponent implements OnInit, OnDestroy {
     const { filas } = await firstValueFrom(
       this.data.listarPagina<Seccion>(
         ENTIDAD,
-        { categoriaId: this.categoriaSeleccionadaId() },
+        { categoriaId: this.categoriaIdFormulario },
         0,
         TOPE_VERIFICACION_DUPLICADO,
       ),
@@ -428,7 +451,7 @@ export class SeccionesListComponent implements OnInit, OnDestroy {
   }
 
   async guardar(): Promise<void> {
-    const categoriaId = this.categoriaSeleccionadaId();
+    const categoriaId = this.categoriaIdFormulario;
     if (this.form.invalid || !categoriaId) {
       this.form.markAllAsTouched();
       this.toast.error('Captura el nombre y selecciona una categoría.');

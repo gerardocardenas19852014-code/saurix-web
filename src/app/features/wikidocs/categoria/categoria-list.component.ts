@@ -49,10 +49,19 @@ const TOPE_VERIFICACION_DUPLICADO = 1000;
  * categorías bajo un tipo de sistema ya desactivado; ver informe de esta
  * fase). Cargar ese selector al abrir NO es "cargar resultados" (solo llena
  * un combo, mismo criterio que el catálogo de vendedores en Reporte de
- * comisiones) — lo que sí se eliminó es la auto-carga de la CUADRÍCULA de
- * categorías. Elegir un tipo de sistema (por defecto el primero, o a mano)
- * sigue disparando la carga de inmediato, igual que antes: es una acción
- * explícita del usuario, no una consulta automática al abrir la pantalla.
+ * comisiones).
+ *
+ * Corrección del Mandato 90.2: la Fase B original SÍ eliminó la
+ * auto-carga de la cuadrícula al ABRIR la pantalla, pero dejó que elegir
+ * un tipo de sistema (por defecto el primero, o a mano) siguiera
+ * disparando la carga de inmediato -- una auto-consulta real, detectada en
+ * pruebas visuales. Ahora el selector de Tipo de sistema es un filtro "en
+ * edición" más: `tipoSistemaSeleccionadoId` es el valor que el usuario ve
+ * en el `<select>`, y `tipoSistemaIdAplicado` es el que realmente usa la
+ * consulta -- solo se sincronizan al presionar "Buscar" (o Enter), igual
+ * que el texto de búsqueda y "Mostrar inactivas". El selector SÍ se
+ * preselecciona (primer tipo de sistema) al abrir, pero esa preselección
+ * nunca dispara una consulta por sí sola.
  * Se conservan CSV y `<app-bitacora>`.
  */
 @Component({
@@ -87,6 +96,19 @@ export class CategoriaListComponent implements OnInit, OnDestroy {
   protected readonly mostrarInactivasEnEdicion = signal(false);
   private busquedaAplicada = '';
   private mostrarInactivasAplicado = false;
+  /** Tipo de sistema realmente usado en la última búsqueda ejecutada --
+   *  independiente del valor "en edición" del selector de arriba (Mandato
+   *  90.2: cambiar el selector nunca debe disparar una consulta por sí
+   *  solo). */
+  private tipoSistemaIdAplicado = 0;
+  /** Tipo de sistema congelado para el formulario actualmente abierto
+   *  (Mandato 90.2 - verificación de contexto): se fija al abrir el modal
+   *  (nuevo() toma el selector en edición; editar() toma el padre REAL del
+   *  registro) y nunca se recalcula mientras el modal sigue abierto -- así
+   *  guardar()/existeDuplicado() nunca heredan un cambio posterior del
+   *  selector en edición, que ahora puede diverger libremente del registro
+   *  que se está editando. */
+  private tipoSistemaIdFormulario = 0;
 
   private secuencia = 0;
 
@@ -135,7 +157,11 @@ export class CategoriaListComponent implements OnInit, OnDestroy {
     this.data.list<TipoSistema>('TipoSistema').subscribe({
       next: (tipos) => {
         this.tiposSistema.set(tipos);
-        if (tipos.length) this.seleccionarTipoSistema(tipos[0].id);
+        // Mandato 90.2: preseleccionar el primer tipo de sistema en el
+        // selector es solo una comodidad visual -- NUNCA dispara la carga
+        // de la cuadrícula. El grid arranca vacío (ver plantilla) hasta
+        // que el usuario presione "Buscar" o Enter.
+        if (tipos.length) this.tipoSistemaSeleccionadoId.set(tipos[0].id);
       },
       error: () => this.toast.error('No se pudieron cargar los tipos de sistema.'),
     });
@@ -147,30 +173,18 @@ export class CategoriaListComponent implements OnInit, OnDestroy {
 
   // ── Selector de padre ────────────────────────────────────────────────────
 
+  /** Mandato 90.2: solo actualiza el selector "en edición" -- nunca
+   *  dispara la carga de la cuadrícula. Los resultados ya mostrados (si
+   *  los hay) se quedan como estaban hasta que el usuario presione
+   *  "Buscar" de nuevo, igual que cualquier otro filtro en edición. */
   cambiarTipoSistema(idTexto: string): void {
-    this.seleccionarTipoSistema(Number(idTexto));
-  }
-
-  /** Centraliza el cambio de tipo de sistema (desde el selector o desde el
-   *  autoselect inicial): arranca "limpio" -- resetea los filtros propios
-   *  de esta pantalla (texto buscado y "mostrar inactivas") en vez de
-   *  arrastrar un filtro de un contexto distinto al nuevo tipo de sistema
-   *  elegido -- y dispara la carga de inmediato. */
-  private seleccionarTipoSistema(tipoSistemaId: number): void {
-    this.tipoSistemaSeleccionadoId.set(tipoSistemaId);
-    this.busquedaEnEdicion.set('');
-    this.mostrarInactivasEnEdicion.set(false);
-    this.busquedaAplicada = '';
-    this.mostrarInactivasAplicado = false;
-    this.haBuscado.set(true);
-    this.paginaActual.set(1);
-    this.cargar();
+    this.tipoSistemaSeleccionadoId.set(Number(idTexto));
   }
 
   // ── Búsqueda, orden y paginación ─────────────────────────────────────────
 
   private filtroActual(): Record<string, unknown> {
-    const filtro: Record<string, unknown> = { tipoSistemaId: this.tipoSistemaSeleccionadoId() };
+    const filtro: Record<string, unknown> = { tipoSistemaId: this.tipoSistemaIdAplicado };
     const texto = this.busquedaAplicada.trim();
     if (texto) {
       filtro[FILTRO_BUSQUEDA] = { columnas: COLUMNAS_BUSQUEDA, texto } satisfies FiltroBusqueda;
@@ -180,7 +194,7 @@ export class CategoriaListComponent implements OnInit, OnDestroy {
   }
 
   private cargar(): void {
-    const tipoSistemaId = this.tipoSistemaSeleccionadoId();
+    const tipoSistemaId = this.tipoSistemaIdAplicado;
     if (!tipoSistemaId) {
       this.registrosPagina.set([]);
       this.totalFiltrado.set(0);
@@ -218,6 +232,7 @@ export class CategoriaListComponent implements OnInit, OnDestroy {
 
   protected buscar(): void {
     this.haBuscado.set(true);
+    this.tipoSistemaIdAplicado = this.tipoSistemaSeleccionadoId();
     this.busquedaAplicada = this.busquedaEnEdicion();
     this.mostrarInactivasAplicado = this.mostrarInactivasEnEdicion();
     this.reiniciarYCargar();
@@ -244,7 +259,7 @@ export class CategoriaListComponent implements OnInit, OnDestroy {
   async exportarCsvArchivo(): Promise<void> {
     const filtro = this.filtroActual();
     const orden = { columna: this.columnaOrden(), direccion: this.direccionOrden() };
-    const tipoNombre = this.tiposSistema().find((t) => t.id === this.tipoSistemaSeleccionadoId())?.nombre ?? '';
+    const tipoNombre = this.tiposSistema().find((t) => t.id === this.tipoSistemaIdAplicado)?.nombre ?? '';
     const todas: Categoria[] = [];
     let desde = 0;
     let total = Infinity;
@@ -275,6 +290,11 @@ export class CategoriaListComponent implements OnInit, OnDestroy {
   nuevo(): void {
     this.elementoDisparador = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.registroEnEdicion.set(null);
+    // Mandato 90.2 (verificación): el alta usa el tipo de sistema
+    // seleccionado AL ABRIR el formulario, congelado aquí -- si el usuario
+    // cambia el selector de arriba mientras el modal sigue abierto, el
+    // alta sigue yendo al tipo con el que se abrió.
+    this.tipoSistemaIdFormulario = this.tipoSistemaSeleccionadoId();
     this.form.reset({ id: 0, nombre: '', activo: true });
     this.valoresOriginales = JSON.stringify(this.form.getRawValue());
     this.modalAbierto.set(true);
@@ -283,6 +303,12 @@ export class CategoriaListComponent implements OnInit, OnDestroy {
   editar(registro: Categoria): void {
     this.elementoDisparador = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.registroEnEdicion.set(registro);
+    // Mandato 90.2 (verificación): la edición conserva el padre REAL del
+    // registro (el que ya tenía en la base de datos), nunca el selector en
+    // edición -- que puede haber cambiado a otro tipo de sistema sin que
+    // el usuario haya vuelto a buscar, mientras la cuadrícula sigue
+    // mostrando resultados del tipo anterior.
+    this.tipoSistemaIdFormulario = registro.tipoSistemaId;
     this.form.reset({ id: registro.id, nombre: registro.nombre, activo: registro.activo !== false });
     this.valoresOriginales = JSON.stringify(this.form.getRawValue());
     this.modalAbierto.set(true);
@@ -377,7 +403,7 @@ export class CategoriaListComponent implements OnInit, OnDestroy {
     const { filas } = await firstValueFrom(
       this.data.listarPagina<Categoria>(
         ENTIDAD,
-        { tipoSistemaId: this.tipoSistemaSeleccionadoId() },
+        { tipoSistemaId: this.tipoSistemaIdFormulario },
         0,
         TOPE_VERIFICACION_DUPLICADO,
       ),
@@ -387,7 +413,7 @@ export class CategoriaListComponent implements OnInit, OnDestroy {
   }
 
   async guardar(): Promise<void> {
-    const tipoSistemaId = this.tipoSistemaSeleccionadoId();
+    const tipoSistemaId = this.tipoSistemaIdFormulario;
     if (this.form.invalid || !tipoSistemaId) {
       this.form.markAllAsTouched();
       this.toast.error('Captura el nombre y selecciona un tipo de sistema.');
