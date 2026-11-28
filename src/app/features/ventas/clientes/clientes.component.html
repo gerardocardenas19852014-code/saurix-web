@@ -3,48 +3,76 @@
 </div>
 
 <div class="grid-toolbar">
-  <button type="button" class="toolbar-btn" (click)="nuevo()">+ Nuevo</button>
-  <button type="button" class="btn-primary small" (click)="cambiarFiltro()">🔍 Buscar</button>
+  <button type="button" class="toolbar-btn" title="Nuevo cliente (Alt+N)" (click)="nuevo()">+ Nuevo</button>
+  <button type="button" class="btn-primary small" title="Buscar (Alt+B)" (click)="buscar()">🔍 Buscar</button>
+  <button type="button" class="btn-secondary small" title="Limpiar filtros (Alt+L)" (click)="limpiarFiltros()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px; margin-right:4px;">
+      <path d="M12.531 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14v6a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341l.427-.473" />
+      <path d="m16.5 3.5 5 5" />
+      <path d="m21.5 3.5-5 5" />
+    </svg>
+    Limpiar filtros
+  </button>
+
+  <div class="toolbar-group">
+    <button
+      type="button"
+      class="btn-secondary small toolbar-icon-button"
+      title="Exportar CSV (filtros aplicados)"
+      aria-label="Exportar clientes a CSV"
+      [disabled]="!haBuscado() || exportando()"
+      (click)="exportarCsvArchivo()"
+    >
+      ⇩
+    </button>
+  </div>
 
   <div class="grid-filter">
     <input
       type="search"
-      placeholder="Buscar por nombre, RFC, correo o teléfono…"
-      [value]="busqueda()"
-      (input)="busqueda.set($any($event.target).value)"
-      (keyup.enter)="cambiarFiltro()"
+      placeholder="Buscar por nombre, razón social, RFC, correo o teléfono…"
+      aria-label="Buscar clientes"
+      [value]="busquedaEnEdicion()"
+      (input)="busquedaEnEdicion.set($any($event.target).value)"
+      (keyup.enter)="buscar()"
     />
     <label class="board-filter-field board-filter-checkbox" style="margin:0;">
-      <input type="checkbox" [checked]="mostrarInactivos()" (change)="mostrarInactivos.set($any($event.target).checked)" />
+      <input
+        type="checkbox"
+        [checked]="mostrarInactivosEnEdicion()"
+        (change)="mostrarInactivosEnEdicion.set($any($event.target).checked)"
+      />
       Mostrar inactivos
     </label>
   </div>
 </div>
 
-<!-- Paginación REAL contra el servidor (ver cargar()/irAPaginaSiguiente()/
-     irAPaginaAnterior() en clientes.component.ts) — mismo criterio que
-     Productos/Kardex/Órdenes de compra. VA ANTES de la tabla para que no
-     brinque de posición cuando la tabla pasa de vacía a poblada. -->
-<div class="grid-paginador" style="display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-bottom:10px;">
-  <span class="hint" style="margin:0;">
-    Página {{ paginaActual() }} de {{ totalPaginas() }} — {{ totalFiltrado() }} cliente(s)
-  </span>
-  <button type="button" class="btn-secondary small" [disabled]="paginaActual() <= 1 || cargando()" (click)="irAPaginaAnterior()">
-    ← Anterior
-  </button>
-  <button type="button" class="btn-secondary small" [disabled]="paginaActual() >= totalPaginas() || cargando()" (click)="irAPaginaSiguiente()">
-    Siguiente →
-  </button>
-</div>
-
-<app-data-table
-  [tamanoPagina]="preferenciasGrid.tamanoPagina()"
-  [columnas]="columnas"
-  [filas]="clientesPagina()"
-  [cargando]="cargando()"
-  (editar)="editar($event)"
-  (eliminar)="pedirEliminar($event)"
-/>
+@if (!haBuscado()) {
+  <p class="empty" style="margin-top:20px;">Presiona "🔍 Buscar" para consultar los registros.</p>
+} @else {
+  <!-- Paginación/orden/conteo reales en servidor: la paginación estándar la
+       dibuja <app-data-table> en su pie (debajo del grid). La barra
+       Anterior/Siguiente propia que había encima de la tabla se eliminó
+       (Mandato 90.3 / Adicional 3). -->
+  <app-data-table
+    [columnas]="columnas"
+    [filas]="clientesPagina()"
+    [cargando]="cargando()"
+    [tamanoPagina]="preferenciasGrid.tamanoPagina()"
+    [modoServidor]="true"
+    [paginaExterna]="paginaActual()"
+    [totalExterno]="totalFiltrado()"
+    [campoOrdenExterno]="columnaOrden()"
+    [direccionOrdenExterno]="direccionOrden()"
+    [redimensionable]="true"
+    [anchosColumnas]="anchosColumnas()"
+    (anchoColumnaCambio)="onAnchoColumnaCambio($event)"
+    (paginaCambio)="onPaginaCambio($event)"
+    (ordenCambio)="onOrdenCambio($event)"
+    (editar)="editar($event)"
+    (eliminar)="pedirEliminar($event)"
+  />
+}
 
 <app-cliente-form-modal
   [visible]="modalAbierto()"

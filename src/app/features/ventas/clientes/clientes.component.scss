@@ -1,0 +1,28 @@
+// Mandato 90.3 / Adicional 3 — homologación SAURIX-CAT-001 v1.1 (mismos
+// ajustes encapsulados que Categorías de producto/Proveedores; nada de
+// esto sale de este componente).
+
+// Buscador: ancho fijo suficiente para que el placeholder completo
+// ("Buscar por nombre, razón social, RFC, correo o teléfono…") se lea sin
+// recortarse — la regla global (.grid-filter input, styles.scss) lo topa
+// en 260px. Si la barra no alcanza, .grid-toolbar baja el bloque
+// buscador+checkbox completo a una segunda línea (flex-wrap global).
+.grid-filter input[type='search'] {
+  flex: 0 0 420px;
+  width: 420px;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .grid-filter input[type='search'] {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+}
+
+// <app-data-table> reserva 260px de alto mínimo (.grid-table-scroll,
+// styles.scss); con pocos clientes dejaba un hueco grande entre la última
+// fila y el contador de resultados. Se reduce SOLO en esta pantalla.
+:host ::ng-deep .grid-table-scroll {
+  min-height: 120px;
+}
