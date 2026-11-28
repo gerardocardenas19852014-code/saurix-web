@@ -131,6 +131,13 @@ export class CatalogoTiendaComponent implements OnInit, OnDestroy {
    *  degradado liso con el color de marca (.tienda-hero-sin-foto, usa
    *  --store-primary/--store-primary-dark, derivados de colorAcento). */
   protected readonly heroImagenUrl = computed(() => this.config()?.empresa.imagenPortada ?? null);
+  /** Mandato 90.3 (corrección de portada): guarda la URL que falló al
+   *  cargar (nunca un booleano simple) para que, si imagenPortada cambia a
+   *  otra URL distinta más adelante, no quede arrastrado un "fallo"
+   *  viejo que ya no aplica. Sin ningún reintento: el navegador dispara
+   *  (error) una sola vez por intento de carga y aquí solo se registra,
+   *  nunca se vuelve a asignar el [src] para forzar una nueva descarga. */
+  protected readonly heroImagenFallo = signal<string | null>(null);
   /** Cuadrícula (tarjetas) o lista (renglones compactos) — se recuerda por
    *  navegador (localStorage) para que no se tenga que elegir cada visita;
    *  si no está disponible (modo privado, etc.) simplemente no se recuerda. */

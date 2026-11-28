@@ -2128,53 +2128,49 @@ button { font-family: inherit; }
  * a la vez foto-menos y toda la identidad). Sin foto disponible
  * (.tienda-hero-sin-foto) cae a un degradado liso con el color de marca. ── */
 .tienda-hero {
-  /* Segunda vuelta (mandato "Corrección del banner de tienda pública",
-   * nov-2026): se abandona el mecanismo background-image/background-size
-   * sobre este contenedor (ver historial arriba: "contain" dejaba
-   * franjas vacías, "cover" recortaba logotipo/producto -- ningún valor
-   * fijo de background-size resuelve ambos problemas a la vez porque la
-   * caja tenía una ALTURA FIJA independiente de la imagen). Ahora la foto
-   * es un <img class="tienda-hero-foto"> normal (ver regla de abajo) cuya
-   * altura se deriva de su propia proporción -- este contenedor ya no
-   * fuerza una altura fija, solo aporta position:relative (ancla el
-   * overlay absoluto y el <img>), overflow:hidden (recorta a las esquinas
-   * redondeadas) y el color de fondo de respaldo.
-   * min-height aquí NO es para forzar el tamaño de la foto (eso ya lo
-   * decide el <img> con su propia proporción) -- es el piso mínimo para
-   * que el overlay (position:absolute, title+descripción+botón) nunca
-   * quede más alto que el propio contenedor y se recorte contra
-   * overflow:hidden, en el caso raro de una imagen muy panorámica y baja.
-   * También es la altura que usa el degradado de marca cuando la empresa
-   * no configuró imagenPortada (.tienda-hero-sin-foto no tiene <img> que
-   * le dé altura propia). */
+  /* Mandato 90.3 (corrección de portada, nov-2026) -- tercera vuelta: la
+   * "segunda vuelta" había cambiado a object-fit:contain con ALTURA
+   * DERIVADA de la imagen para no recortar nunca, pero eso dejaba franjas
+   * laterales del color de marca cuando una foto vertical topaba con el
+   * max-height de respaldo (el defecto reportado: portada rosa con
+   * franjas azules). Ahora la caja vuelve a tener una ALTURA FIJA (height,
+   * no min-height -- ver abajo por qué) para que .tienda-hero-foto pueda
+   * usar object-fit:cover y cubrir el banner por completo, sin franjas,
+   * sea cual sea la proporción de la foto (la contraparte aceptada: un
+   * recorte leve en fotos muy distintas a la proporción del banner, nunca
+   * deformación). Esta misma altura fija es la que usa el degradado de
+   * marca cuando no hay imagenPortada o falló su carga
+   * (.tienda-hero-sin-foto, sin <img> de por medio). position:relative
+   * ancla el overlay absoluto y el <img>; overflow:hidden recorta a las
+   * esquinas redondeadas. */
   position: relative;
   margin: 0 -16px 18px;
-  min-height: 180px;
+  height: 200px;
   background-color: var(--store-primary-dark);
   border-radius: 0 0 24px 24px;
   overflow: hidden;
 }
 
 .tienda-hero-foto {
-  /* object-fit:contain real (mandato nov-2026): width:100% + height:auto
-   * hace que ESTA caja adopte la proporción natural de la imagen -- nunca
-   * hay franja vacía salvo que max-height tenga que recortar la altura
-   * (imagen muy vertical, caso raro), y en ese único caso object-fit:
-   * contain sigue mostrando la foto completa, sin deformar ni recortar,
-   * dejando como máximo una franja lateral angosta. display:block evita
-   * el espacio fantasma bajo la imagen que deja el renderizado inline
-   * por defecto de <img>. */
+  /* object-fit:cover (Mandato 90.3) sobre una caja de altura fija (ver
+   * .tienda-hero arriba): position:absolute + inset:0 hace que la foto
+   * cubra el banner completo de borde a borde, sin dejar franjas nunca,
+   * preservando su proporción (nunca se deforma) y recortando solo el
+   * sobrante cuando la proporción de la foto no coincide con la del
+   * banner -- justo el comportamiento que pedía el mandato. */
   display: block;
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: auto;
-  max-height: 420px;
-  object-fit: contain;
+  height: 100%;
+  object-fit: cover;
   object-position: center;
 }
 
 .tienda-hero-sin-foto {
-  /* La altura (min-height) ya la pone la regla base .tienda-hero arriba
-   * -- aquí solo queda el degradado de marca, sin cambios. */
+  /* La altura (ahora fija, Mandato 90.3) ya la pone la regla base
+   * .tienda-hero de arriba -- aquí solo queda el degradado de marca, sin
+   * cambios. */
   background-image: linear-gradient(135deg, var(--store-primary), var(--store-primary-dark));
 }
 
@@ -2516,13 +2512,9 @@ button { font-family: inherit; }
   }
 
   .tienda-hero {
-    min-height: 140px;
+    height: 160px;
     margin: 0 -14px 12px;
     border-radius: 0 0 16px 16px;
-  }
-
-  .tienda-hero-foto {
-    max-height: 260px;
   }
 
   .tienda-hero-overlay {

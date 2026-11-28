@@ -41,7 +41,25 @@
 
       <div class="pos-grid">
         @for (producto of productos(); track producto.id) {
-          <button type="button" class="pos-tile" (click)="agregarProducto(producto); reenfocarBuscadorSiAplica()">
+          <!-- Mandato 90.3: ya NO es <button> (necesitamos anidar los
+               botones -/+ del stepper, y un <button> dentro de otro
+               <button> es HTML inválido) -- role="button" + manejo de
+               Enter/Espacio conservan la misma activación por teclado que
+               ya tenía. El clic en la tarjeta sigue agregando una unidad,
+               exactamente igual que antes; el stepper detiene la
+               propagación del clic para no agregar doble. -->
+          <div
+            class="pos-tile"
+            [class.pos-tile-agregado]="cantidadEnTicket(producto.id) > 0"
+            role="button"
+            tabindex="0"
+            (click)="agregarProducto(producto); reenfocarBuscadorSiAplica()"
+            (keydown.enter)="agregarProducto(producto); reenfocarBuscadorSiAplica()"
+            (keydown.space)="$event.preventDefault(); agregarProducto(producto); reenfocarBuscadorSiAplica()"
+          >
+            @if (cantidadEnTicket(producto.id) > 0) {
+              <span class="pos-tile-indicador">{{ cantidadEnTicket(producto.id) }} en ticket</span>
+            }
             <span class="pos-tile-nombre">{{ producto.nombre }}</span>
             <span class="pos-tile-precio">{{ formatMoneda(precioProducto(producto)) }}</span>
             @if (existenciaDisponible(producto) !== null) {
@@ -49,7 +67,27 @@
                 {{ existenciaDisponible(producto) }} disp.
               </span>
             }
-          </button>
+            <div class="pos-tile-stepper">
+              <button
+                type="button"
+                class="pos-tile-stepper-btn"
+                [disabled]="cantidadEnTicket(producto.id) === 0"
+                title="Quitar una unidad"
+                (click)="$event.stopPropagation(); quitarUnidadDesdeTarjeta(producto)"
+              >−</button>
+              <span class="pos-tile-stepper-cantidad">{{ cantidadEnTicket(producto.id) }}</span>
+              <button
+                type="button"
+                class="pos-tile-stepper-btn"
+                [disabled]="noHayMasDisponible(producto)"
+                title="Agregar una unidad"
+                (click)="$event.stopPropagation(); agregarProducto(producto)"
+              >+</button>
+            </div>
+            @if (cantidadEnTicket(producto.id) > 0) {
+              <span class="pos-tile-subtotal">Subtotal: {{ formatMoneda(subtotalEnTicket(producto)) }}</span>
+            }
+          </div>
         } @empty {
           @if (cargandoProductos()) {
             <p class="empty">Buscando…</p>
@@ -199,11 +237,16 @@
      cantidad de artículos y el total sin necesidad de abrir el cajón. -->
 @if (turno() && !cargando()) {
   <button type="button" class="pos-ticket-boton-movil" (click)="abrirTicketMovil()">
-    🧾 Ver ticket
+    <span class="pos-ticket-boton-movil-fila1">
+      <span>🧾 Ver ticket</span>
+      <span class="pos-ticket-boton-movil-total">{{ formatMoneda(totalConPuntos()) }}</span>
+    </span>
     @if (carrito().length > 0) {
-      <span class="pos-ticket-boton-movil-badge">{{ carrito().length }}</span>
+      <span class="pos-ticket-boton-movil-resumen">
+        {{ productosDistintosEnCarrito() }} producto{{ productosDistintosEnCarrito() === 1 ? '' : 's' }} ·
+        {{ unidadesTotalesEnCarrito() }} unidad{{ unidadesTotalesEnCarrito() === 1 ? '' : 'es' }}
+      </span>
     }
-    <span class="pos-ticket-boton-movil-total">{{ formatMoneda(totalConPuntos()) }}</span>
   </button>
 }
 

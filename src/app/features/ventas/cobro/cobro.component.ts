@@ -308,6 +308,23 @@ export class CobroComponent implements OnInit, OnDestroy {
   );
   protected readonly totalCarrito = computed(() => redondear(this.subtotalCarrito() - this.descuentoCarrito()));
 
+  /** Mandato 90.3 -- barra inferior "Ver ticket" en celular: cuenta
+   *  PRODUCTOS DISTINTOS, no líneas del carrito (un mismo producto puede
+   *  ocupar varias partidas por precio/descuento diferente -- ver
+   *  agregarProducto() -- y ahí solo debe contar una vez). Las líneas de
+   *  "Venta simple" (productoId null) sí cuentan cada una por separado,
+   *  son conceptos distintos aunque compartan productoId null. */
+  protected readonly productosDistintosEnCarrito = computed(() => {
+    const claves = this.carrito().map((item, idx) => (item.productoId !== null ? `p${item.productoId}` : `s${idx}`));
+    return new Set(claves).size;
+  });
+
+  /** Suma de cantidades de TODAS las líneas -- para productos con unidades
+   *  fraccionarias (peso/volumen) el total puede no ser entero; se muestra
+   *  tal cual, sin desglosar por unidad de medida (mismo criterio que ya
+   *  usa el total en dinero del ticket). */
+  protected readonly unidadesTotalesEnCarrito = computed(() => this.carrito().reduce((acc, i) => acc + i.cantidad, 0));
+
   // ── Programa de lealtad (ver lealtad.service.ts) ────────────────────────
   protected readonly puntosACanjear = signal(0);
 
@@ -820,6 +837,50 @@ export class CobroComponent implements OnInit, OnDestroy {
   quitarLinea(index: number): void {
     this.carrito.update((lista) => lista.filter((_, idx) => idx !== index));
     this.limpiarOrigenSiCarritoVacio();
+  }
+
+  // ── Tarjetas de producto (indicador de cantidad + stepper -/+, Mandato
+  // 90.3) -- solo visibles en celular/tablet (ver @media en el .scss); en
+  // escritorio la tarjeta sigue siendo la misma de siempre. Todo esto es
+  // una capa de LECTURA sobre el carrito -- nunca un segundo estado: si un
+  // producto aparece en varias partidas (precio/descuento distinto, ver
+  // agregarProducto()), la tarjeta se refiere SIEMPRE a la primera
+  // coincidencia por productoId -- la misma que agregarProducto() ya
+  // encuentra y modifica -- para no combinar ni mostrar una cantidad que
+  // los botones +/- no estarían realmente moviendo. ─────────────────────
+
+  /** Cantidad ya agregada de este producto -- 0 si no está en el carrito. */
+  protected cantidadEnTicket(productoId: number): number {
+    return this.carrito().find((i) => i.productoId === productoId)?.cantidad ?? 0;
+  }
+
+  /** Subtotal de ESA partida (cantidad × precio × (1 - descuento%)) -- misma
+   *  fórmula que subtotalCarrito()/descuentoCarrito() de arriba, aplicada a
+   *  una sola línea en vez de a todo el carrito. */
+  protected subtotalEnTicket(producto: Producto): number {
+    const item = this.carrito().find((i) => i.productoId === producto.id);
+    if (!item) return 0;
+    return redondear(item.cantidad * item.precioUnitario * (1 - item.descuentoPct / 100));
+  }
+
+  /** Mismo límite que ya aplica agregarProducto()/incrementar() (nunca se
+   *  duplica la regla de negocio, solo se refleja en el botón "+" para que
+   *  no quede habilitado a simple vista cuando la siguiente unidad de
+   *  todos modos sería rechazada con un toast). */
+  protected noHayMasDisponible(producto: Producto): boolean {
+    const disponible = this.existenciaDisponible(producto);
+    if (disponible === null) return false;
+    return this.cantidadEnTicket(producto.id) >= disponible;
+  }
+
+  /** Botón "-" de la tarjeta: resuelve el índice de esa misma partida (la
+   *  primera con este productoId) y reutiliza decrementar() tal cual --
+   *  incluye retirar la partida al llegar a cero, igual que desde el
+   *  ticket. */
+  protected quitarUnidadDesdeTarjeta(producto: Producto): void {
+    const index = this.carrito().findIndex((i) => i.productoId === producto.id);
+    if (index === -1) return;
+    this.decrementar(index);
   }
 
   /** Ver el comentario grande de pedidoTiendaOrigenId arriba: si el
